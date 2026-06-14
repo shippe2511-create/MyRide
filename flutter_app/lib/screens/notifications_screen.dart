@@ -1,0 +1,389 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../theme/app_theme.dart';
+
+class NotificationsScreen extends StatefulWidget {
+  const NotificationsScreen({super.key});
+
+  @override
+  State<NotificationsScreen> createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends State<NotificationsScreen> {
+  final List<Map<String, dynamic>> _notifications = [
+    {
+      'id': '1',
+      'type': 'ride',
+      'title': 'Ride Completed',
+      'message': 'Your trip to Hulhumale Terminal has been completed. Rate your experience!',
+      'time': DateTime.now().subtract(const Duration(minutes: 15)),
+      'read': false,
+    },
+    {
+      'id': '2',
+      'type': 'promo',
+      'title': 'Free Rides This Week!',
+      'message': 'Enjoy unlimited free rides for MACL staff. Valid until Sunday.',
+      'time': DateTime.now().subtract(const Duration(hours: 2)),
+      'read': false,
+    },
+    {
+      'id': '3',
+      'type': 'ride',
+      'title': 'Driver Assigned',
+      'message': 'Ibrahim Hassan is on the way to pick you up. ETA: 5 minutes.',
+      'time': DateTime.now().subtract(const Duration(hours: 5)),
+      'read': true,
+    },
+    {
+      'id': '4',
+      'type': 'system',
+      'title': 'Profile Updated',
+      'message': 'Your profile information has been updated successfully.',
+      'time': DateTime.now().subtract(const Duration(days: 1)),
+      'read': true,
+    },
+    {
+      'id': '5',
+      'type': 'announcement',
+      'title': 'New Route Available',
+      'message': 'Now serving Male Office to Airport direct route. Book your ride today!',
+      'time': DateTime.now().subtract(const Duration(days: 2)),
+      'read': true,
+    },
+    {
+      'id': '6',
+      'type': 'ride',
+      'title': 'Trip Cancelled',
+      'message': 'Your scheduled trip for 3:00 PM has been cancelled.',
+      'time': DateTime.now().subtract(const Duration(days: 2)),
+      'read': true,
+    },
+    {
+      'id': '7',
+      'type': 'system',
+      'title': 'Welcome to MyRide!',
+      'message': 'Thank you for joining MyRide. Enjoy free staff transport services.',
+      'time': DateTime.now().subtract(const Duration(days: 5)),
+      'read': true,
+    },
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final unreadCount = _notifications.where((n) => !n['read']).length;
+
+    return Scaffold(
+      backgroundColor: context.bgColor,
+      appBar: AppBar(
+        backgroundColor: context.bgColor,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: context.textColor),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text('Notifications', style: TextStyle(color: context.textColor)),
+        actions: [
+          if (unreadCount > 0)
+            TextButton(
+              onPressed: _markAllAsRead,
+              child: Text('Mark all read', style: TextStyle(color: AppColors.yellow)),
+            ),
+        ],
+      ),
+      body: _notifications.isEmpty
+          ? _buildEmptyState(context)
+          : ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: _notifications.length,
+              itemBuilder: (context, index) {
+                final notification = _notifications[index];
+                return _buildNotificationCard(context, notification, index);
+              },
+            ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              color: context.cardColor,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Icon(Icons.notifications_off_outlined, size: 48, color: context.mutedColor),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'No Notifications',
+            style: TextStyle(
+              color: context.textColor,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'You\'re all caught up!',
+            style: TextStyle(
+              color: context.mutedColor,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationCard(BuildContext context, Map<String, dynamic> notification, int index) {
+    final type = notification['type'] as String;
+    final isRead = notification['read'] as bool;
+
+    IconData icon;
+    Color iconColor;
+
+    switch (type) {
+      case 'ride':
+        icon = Icons.directions_car;
+        iconColor = AppColors.yellow;
+        break;
+      case 'promo':
+        icon = Icons.local_offer;
+        iconColor = AppColors.success;
+        break;
+      case 'announcement':
+        icon = Icons.campaign;
+        iconColor = Colors.blue;
+        break;
+      case 'system':
+        icon = Icons.info;
+        iconColor = context.mutedColor;
+        break;
+      default:
+        icon = Icons.notifications;
+        iconColor = context.mutedColor;
+    }
+
+    return Dismissible(
+      key: Key(notification['id'] as String),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        color: AppColors.error,
+        child: Icon(Icons.delete, color: Colors.white),
+      ),
+      onDismissed: (_) {
+        setState(() => _notifications.removeAt(index));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Notification deleted'),
+            backgroundColor: context.cardColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            action: SnackBarAction(
+              label: 'Undo',
+              textColor: AppColors.yellow,
+              onPressed: () {
+                setState(() => _notifications.insert(index, notification));
+              },
+            ),
+          ),
+        );
+      },
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          if (!isRead) {
+            setState(() => notification['read'] = true);
+          }
+          _showNotificationDetail(context, notification);
+        },
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isRead ? context.cardColor : AppColors.yellow.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isRead ? context.borderColor : AppColors.yellow.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: iconColor, size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            notification['title'] as String,
+                            style: TextStyle(
+                              color: context.textColor,
+                              fontSize: 15,
+                              fontWeight: isRead ? FontWeight.w500 : FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        if (!isRead)
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: AppColors.yellow,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      notification['message'] as String,
+                      style: TextStyle(
+                        color: context.mutedColor,
+                        fontSize: 13,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _formatTime(notification['time'] as DateTime),
+                      style: TextStyle(
+                        color: context.mutedColor.withValues(alpha: 0.7),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showNotificationDetail(BuildContext context, Map<String, dynamic> notification) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 30),
+        decoration: BoxDecoration(
+          color: context.cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.borderColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              notification['title'] as String,
+              style: TextStyle(
+                color: context.textColor,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _formatTime(notification['time'] as DateTime),
+              style: TextStyle(
+                color: context.mutedColor,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              notification['message'] as String,
+              style: TextStyle(
+                color: context.textColor,
+                fontSize: 15,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.yellow,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text('Got it', style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _markAllAsRead() {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      for (var notification in _notifications) {
+        notification['read'] = true;
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('All notifications marked as read'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  String _formatTime(DateTime time) {
+    final now = DateTime.now();
+    final diff = now.difference(time);
+
+    if (diff.inMinutes < 1) {
+      return 'Just now';
+    } else if (diff.inMinutes < 60) {
+      return '${diff.inMinutes}m ago';
+    } else if (diff.inHours < 24) {
+      return '${diff.inHours}h ago';
+    } else if (diff.inDays == 1) {
+      return 'Yesterday';
+    } else if (diff.inDays < 7) {
+      return '${diff.inDays}d ago';
+    } else {
+      return '${time.day}/${time.month}/${time.year}';
+    }
+  }
+}

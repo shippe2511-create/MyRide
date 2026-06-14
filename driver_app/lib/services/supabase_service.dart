@@ -1,0 +1,1002 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class SupabaseService {
+  static const String _supabaseUrl = 'https://lwkndyyfmmrzazdvrsnk.supabase.co';
+  static const String _supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3a25keXlmbW1yemF6ZHZyc25rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTM0NzAsImV4cCI6MjA5NTg4OTQ3MH0.hIcx_gway6VJrTYV1MAXAbcapgTfxo4zYOwgmS2uChg';
+
+  static SupabaseClient get client => Supabase.instance.client;
+
+  static Future<void> initialize() async {
+    await Supabase.initialize(
+      url: _supabaseUrl,
+      anonKey: _supabaseAnonKey,
+    );
+  }
+
+  // Auth methods
+  static User? get currentUser => client.auth.currentUser;
+  static bool get isLoggedIn => currentUser != null;
+
+  // Check if phone exists in system
+  static Future<Map<String, dynamic>?> checkPhoneExists(String phone) async {
+    try {
+      final response = await client
+          .from('profiles')
+          .select()
+          .eq('phone', phone)
+          .maybeSingle();
+      return response;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Sign up with phone (for new drivers)
+  static Future<Map<String, dynamic>> signUpWithPhone({
+    required String phone,
+    required String fullName,
+    String? email,
+    String? gender,
+    String? staffId,
+    List<Map<String, dynamic>>? emergencyContacts,
+    bool isDriver = true,
+  }) async {
+    final data = <String, dynamic>{
+      'phone': phone,
+      'full_name': fullName,
+      'gender': gender,
+      'employee_id': staffId,
+      'emergency_contacts': emergencyContacts,
+      'role': 'driver',
+      'status': 'pending',
+    };
+
+    if (email != null && email.isNotEmpty) {
+      data['email'] = email;
+    }
+
+    // Use upsert to handle existing records
+    final response = await client.from('profiles').upsert(
+      data,
+      onConflict: 'employee_id',
+    ).select().single();
+    return response;
+  }
+
+  static Future<AuthResponse> signUp({
+    required String email,
+    required String password,
+    required String fullName,
+    required String phone,
+    String? employeeId,
+    String? licenseNumber,
+  }) async {
+    final response = await client.auth.signUp(
+      email: email,
+      password: password,
+      data: {
+        'full_name': fullName,
+        'phone': phone,
+        'employee_id': employeeId,
+        'license_number': licenseNumber,
+        'role': 'driver',
+      },
+    );
+
+    // Ensure profile has pending status for driver approval
+    if (response.user != null) {
+      await client.from('profiles').update({
+        'status': 'pending',
+        'role': 'driver',
+        'full_name': fullName,
+        'phone': phone,
+        'employee_id': employeeId,
+      }).eq('id', response.user!.id);
+    }
+
+    return response;
+  }
+
+  static Future<AuthResponse> signIn({
+    required String email,
+    required String password,
+  }) async {
+    return await client.auth.signInWithPassword(
+      email: email,
+      password: password,
+    );
+  }
+
+  static Future<void> signOut() async {
+    await client.auth.signOut();
+  }
+
+  // Profile methods
+  static Future<Map<String, dynamic>?> getProfile() async {
+    if (currentUser == null) return null;
+    final response = await client
+        .from('profiles')
+        .select()
+        .eq('id', currentUser!.id)
+        .single();
+    return response;
+  }
+
+  static Future<void> updateProfile(Map<String, dynamic> data) async {
+    if (currentUser == null) return;
+    await client
+        .from('profiles')
+        .update(data)
+        .eq('id', currentUser!.id);
+  }
+
+  // Driver methods
+  static Future<Map<String, dynamic>?> getDriverProfile() async {
+    if (currentUser == null) return null;
+    try {
+      final response = await client
+          .from('drivers')
+          .select('*, profile:profiles(*), vehicle:vehicle_types(*)')
+          .eq('profile_id', currentUser!.id)
+          .single();
+      return response;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Get driver by profile UUID (for phone-based login)
+  static Future<Map<String, dynamic>?> getDriverByProfileId(String profileId) async {
+    try {
+      final response = await client
+          .from('drivers')
+          .select('*, profile:profiles(*), vehicle:vehicle_types(*)')
+          .eq('profile_id', profileId)
+          .maybeSingle();
+      return response;
+    } catch (e) {
+      debugPrint('Error getting driver by profile ID: $e');
+      return null;
+    }
+  }
+
+  static Future<void> createDriverProfile({
+    String? licenseNumber,
+    DateTime? licenseExpiry,
+  }) async {
+    if (currentUser == null) return;
+    await client.from('drivers').insert({
+      'profile_id': currentUser!.id,
+      'license_number': licenseNumber,
+      'license_expiry': licenseExpiry?.toIso8601String(),
+    });
+  }
+
+  static Future<void> updateDriverStatus({
+    required String driverId,
+    bool? isOnline,
+    bool? isOnBreak,
+    String? breakType,
+    double? lat,
+    double? lng,
+  }) async {
+    if (driverId.isEmpty) return;
+    final data = <String, dynamic>{};
+    if (isOnline != null) data['is_online'] = isOnline;
+    if (isOnBreak != null) {
+      data['is_on_break'] = isOnBreak;
+      if (isOnBreak) {
+        data['break_start_time'] = DateTime.now().toIso8601String();
+        data['break_type'] = breakType;
+      } else {
+        data['break_start_time'] = null;
+        data['break_type'] = null;
+      }
+    }
+    if (lat != null) data['current_location_lat'] = lat;
+    if (lng != null) data['current_location_lng'] = lng;
+
+    await client
+        .from('drivers')
+        .update(data)
+        .eq('id', driverId);
+  }
+
+  static Future<void> updateLocation(String driverId, double lat, double lng, {double? heading, double? speed}) async {
+    await updateDriverStatus(driverId: driverId, lat: lat, lng: lng);
+
+    // Also update live tracking table
+    try {
+      await client.rpc('update_driver_location', params: {
+        'p_driver_id': driverId,
+        'p_lat': lat,
+        'p_lng': lng,
+        'p_heading': heading,
+        'p_speed': speed,
+      });
+    } catch (e) {
+      debugPrint('Error updating driver location: $e');
+    }
+  }
+
+  static Future<void> setDriverOnlineStatus(String driverId, bool isOnline) async {
+    if (driverId.isEmpty) return;
+
+    // Update drivers table
+    await updateDriverStatus(driverId: driverId, isOnline: isOnline);
+
+    // Update live tracking table
+    try {
+      await client.from('driver_locations')
+          .upsert({
+            'driver_id': driverId,
+            'is_online': isOnline,
+            'last_updated': DateTime.now().toIso8601String(),
+          }, onConflict: 'driver_id');
+    } catch (e) {
+      debugPrint('Error updating driver_locations: $e');
+    }
+  }
+
+  // Vehicle methods
+  static Future<void> addVehicle({
+    required String vehicleNumber,
+    String? vehicleType,
+    String? vehicleModel,
+    String? vehicleColor,
+  }) async {
+    final driver = await getDriverProfile();
+    if (driver == null) return;
+
+    await client.from('vehicles').insert({
+      'driver_id': driver['id'],
+      'vehicle_number': vehicleNumber,
+      'vehicle_type': vehicleType ?? 'sedan',
+      'vehicle_model': vehicleModel,
+      'vehicle_color': vehicleColor,
+    });
+  }
+
+  // Rides methods
+  static Future<List<Map<String, dynamic>>> getPendingRides() async {
+    // Fetch pending rides: recent immediate rides OR scheduled rides that are due
+    final now = DateTime.now().toUtc().toIso8601String();
+    final cutoffTime = DateTime.now().toUtc().subtract(const Duration(minutes: 30)).toIso8601String();
+    debugPrint('getPendingRides: now=$now, cutoff=$cutoffTime');
+
+    // Get immediate rides (no scheduled_time, created recently)
+    final immediateRides = await client
+        .from('rides')
+        .select('*, customer:profiles!customer_id(*)')
+        .eq('status', 'pending')
+        .isFilter('scheduled_time', null)
+        .gte('created_at', cutoffTime)
+        .order('created_at', ascending: true);
+
+    // Get scheduled rides that are due (scheduled_time <= now) but not too old (within 10 min window)
+    final scheduledCutoff = DateTime.now().toUtc().subtract(const Duration(minutes: 10)).toIso8601String();
+    final scheduledRides = await client
+        .from('rides')
+        .select('*, customer:profiles!customer_id(*)')
+        .eq('status', 'pending')
+        .not('scheduled_time', 'is', null)
+        .lte('scheduled_time', now)
+        .gte('scheduled_time', scheduledCutoff) // Only show if scheduled within last 10 min
+        .order('scheduled_time', ascending: true);
+
+    debugPrint('Found ${immediateRides.length} immediate + ${scheduledRides.length} scheduled rides');
+
+    // Combine both lists
+    final allRides = <Map<String, dynamic>>[
+      ...List<Map<String, dynamic>>.from(immediateRides),
+      ...List<Map<String, dynamic>>.from(scheduledRides),
+    ];
+
+    return allRides;
+  }
+
+  // Get the current status of a specific ride
+  static Future<String?> getRideStatus(String rideId) async {
+    try {
+      final response = await client
+          .from('rides')
+          .select('status')
+          .eq('id', rideId)
+          .maybeSingle();
+      return response?['status'] as String?;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> getActiveRide() async {
+    if (currentUser == null) return null;
+    try {
+      final driver = await getDriverProfile();
+      if (driver == null) return null;
+
+      final response = await client
+          .from('rides')
+          .select('*, customer:profiles!customer_id(*)')
+          .eq('driver_id', driver['id'])
+          .inFilter('status', ['accepted', 'arrived', 'in_progress'])
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      return response;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Get active ride by driver ID (for phone-based login)
+  static Future<Map<String, dynamic>?> getActiveRideByDriverId(String driverId) async {
+    try {
+      final response = await client
+          .from('rides')
+          .select('*, customer:profiles!customer_id(*)')
+          .eq('driver_id', driverId)
+          .inFilter('status', ['accepted', 'arrived', 'in_progress'])
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      debugPrint('Active ride for driver $driverId: $response');
+      return response;
+    } catch (e) {
+      debugPrint('Error getting active ride: $e');
+      return null;
+    }
+  }
+
+  // Accept ride using atomic RPC function (prevents race conditions)
+  static Future<Map<String, dynamic>> acceptRide(String rideId, {required String driverId}) async {
+    try {
+      debugPrint('Accepting ride $rideId with driver $driverId');
+
+      // Use atomic RPC function
+      final result = await client.rpc('accept_ride', params: {
+        'p_ride_id': rideId,
+        'p_driver_id': driverId,
+      });
+
+      debugPrint('Accept ride result: $result');
+
+      if (result is Map && result['success'] == true) {
+        return {
+          'success': true,
+          'driver_name': result['driver_name'],
+          'driver_phone': result['driver_phone'],
+        };
+      } else {
+        return {
+          'success': false,
+          'error': result?['error'] ?? 'Ride already taken',
+        };
+      }
+    } catch (e) {
+      debugPrint('Error accepting ride: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    }
+  }
+
+  // Decline/skip a ride (doesn't change status, just removes from driver's view)
+  static Future<void> declineRide(String rideId) async {
+    // For now, just log - the ride stays pending for other drivers
+    debugPrint('Driver declined ride: $rideId');
+  }
+
+  static Future<void> updateRideStatus(String rideId, String status, {String? cancelReason}) async {
+    final data = <String, dynamic>{'status': status};
+
+    if (status == 'arrived') {
+      data['arrived_at'] = DateTime.now().toIso8601String();
+    } else if (status == 'in_progress') {
+      data['started_at'] = DateTime.now().toIso8601String();
+    } else if (status == 'completed') {
+      data['completed_at'] = DateTime.now().toIso8601String();
+    } else if (status == 'cancelled') {
+      data['cancelled_at'] = DateTime.now().toIso8601String();
+      if (cancelReason != null) {
+        data['cancel_reason'] = cancelReason;
+      }
+    }
+
+    await client.from('rides').update(data).eq('id', rideId);
+  }
+
+  static Future<void> completeRide(String rideId, {double? distanceKm, int? durationMinutes}) async {
+    await client.from('rides').update({
+      'status': 'completed',
+      'completed_at': DateTime.now().toIso8601String(),
+      'distance_km': distanceKm,
+      'duration_minutes': durationMinutes,
+    }).eq('id', rideId);
+  }
+
+  static Future<List<Map<String, dynamic>>> getCompletedRides() async {
+    final driver = await getDriverProfile();
+    if (driver == null) return [];
+
+    final response = await client
+        .from('rides')
+        .select('*, customer:profiles!customer_id(*), rating:ratings(*)')
+        .eq('driver_id', driver['id'])
+        .inFilter('status', ['completed', 'cancelled', 'rejected'])
+        .order('created_at', ascending: false)
+        .limit(50);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  // Shifts methods
+  static Future<List<Map<String, dynamic>>> getMyShifts({DateTime? fromDate, DateTime? toDate}) async {
+    final driver = await getDriverProfile();
+    if (driver == null) return [];
+
+    var query = client
+        .from('shifts')
+        .select()
+        .eq('driver_id', driver['id']);
+
+    if (fromDate != null) {
+      query = query.gte('shift_date', fromDate.toIso8601String().split('T')[0]);
+    }
+    if (toDate != null) {
+      query = query.lte('shift_date', toDate.toIso8601String().split('T')[0]);
+    }
+
+    final response = await query.order('shift_date').order('start_time');
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  // Documents methods
+  static Future<List<Map<String, dynamic>>> getMyDocuments() async {
+    final driver = await getDriverProfile();
+    if (driver == null) return [];
+
+    final response = await client
+        .from('documents')
+        .select()
+        .eq('driver_id', driver['id'])
+        .order('document_type');
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<void> uploadDocument({
+    required String documentType,
+    required String fileUrl,
+    DateTime? expiryDate,
+  }) async {
+    final driver = await getDriverProfile();
+    if (driver == null) return;
+
+    await client.from('documents').upsert({
+      'driver_id': driver['id'],
+      'document_type': documentType,
+      'file_url': fileUrl,
+      'expiry_date': expiryDate?.toIso8601String(),
+      'status': 'pending',
+      'uploaded_at': DateTime.now().toIso8601String(),
+    }, onConflict: 'driver_id,document_type');
+  }
+
+  // Notifications methods
+  static Future<List<Map<String, dynamic>>> getNotifications() async {
+    if (currentUser == null) return [];
+    final response = await client
+        .from('notifications')
+        .select()
+        .eq('user_id', currentUser!.id)
+        .order('created_at', ascending: false)
+        .limit(50);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<void> markNotificationRead(String notificationId) async {
+    await client
+        .from('notifications')
+        .update({'is_read': true})
+        .eq('id', notificationId);
+  }
+
+  static Future<void> sendCustomerNotification({
+    required String customerId,
+    required String title,
+    required String message,
+    String? rideId,
+    String type = 'ride_update',
+  }) async {
+    try {
+      await client.from('notifications').insert({
+        'user_id': customerId,
+        'title': title,
+        'message': message,
+        'type': type,
+        'ride_id': rideId,
+        'is_read': false,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      // Log error but don't crash
+      print('Failed to send notification: $e');
+    }
+  }
+
+  static Future<void> notifyCustomerDriverArrived({
+    required String rideId,
+    required String customerId,
+    required String driverName,
+    required String location,
+  }) async {
+    await sendCustomerNotification(
+      customerId: customerId,
+      title: 'Driver Arrived',
+      message: '$driverName has arrived at $location. Please come out.',
+      rideId: rideId,
+      type: 'driver_arrived',
+    );
+  }
+
+  // Ratings methods
+  static Future<Map<String, dynamic>> getDriverRatings() async {
+    final driver = await getDriverProfile();
+    if (driver == null) return {'average': 0.0, 'total': 0, 'ratings': []};
+
+    final response = await client
+        .from('ratings')
+        .select('*, ride:rides!inner(*)')
+        .eq('to_user_id', currentUser!.id)
+        .order('created_at', ascending: false)
+        .limit(20);
+
+    final ratings = List<Map<String, dynamic>>.from(response);
+    final total = ratings.length;
+    final average = total > 0
+        ? ratings.map((r) => r['rating'] as int).reduce((a, b) => a + b) / total
+        : 5.0;
+
+    return {
+      'average': average,
+      'total': total,
+      'ratings': ratings,
+    };
+  }
+
+  // Vehicle Checklist methods
+  static Future<void> saveVehicleChecklist({
+    required String driverId,
+    required String driverName,
+    required String vehicleNumber,
+    required bool hasIssues,
+    required Map<String, String> issues,
+    required Map<String, bool> allItems,
+  }) async {
+    await client.from('vehicle_checklists').insert({
+      'driver_id': driverId,
+      'driver_name': driverName,
+      'vehicle_number': vehicleNumber,
+      'has_issues': hasIssues,
+      'issues': issues,
+      'all_items': allItems,
+      'checked_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  // Real-time subscriptions
+  static RealtimeChannel subscribeToNewRides(
+    void Function(Map<String, dynamic>) onNewRide,
+  ) {
+    return client
+        .channel('new_rides')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'rides',
+          callback: (payload) async {
+            // Only notify for pending rides
+            final status = payload.newRecord['status'];
+            if (status == 'pending') {
+              // Fetch full ride data with customer info
+              final rideId = payload.newRecord['id'];
+              try {
+                final fullRide = await client
+                    .from('rides')
+                    .select('*, customer:profiles!customer_id(*)')
+                    .eq('id', rideId)
+                    .single();
+                onNewRide(fullRide);
+              } catch (e) {
+                // Fallback to basic data
+                onNewRide(payload.newRecord);
+              }
+            }
+          },
+        )
+        .subscribe();
+  }
+
+  // Subscribe to ride cancellations/status changes
+  static RealtimeChannel subscribeToRideCancellations(
+    void Function(Map<String, dynamic>) onUpdate,
+  ) {
+    return client
+        .channel('ride_cancellations')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'rides',
+          callback: (payload) {
+            onUpdate(payload.newRecord);
+          },
+        )
+        .subscribe();
+  }
+
+  static RealtimeChannel subscribeToRideUpdates(
+    String rideId,
+    void Function(Map<String, dynamic>) onUpdate,
+  ) {
+    return client
+        .channel('ride_$rideId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'rides',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: rideId,
+          ),
+          callback: (payload) {
+            onUpdate(payload.newRecord);
+          },
+        )
+        .subscribe();
+  }
+
+  // Chat methods
+  static Future<List<Map<String, dynamic>>> getChatMessages(String rideId) async {
+    final response = await client
+        .from('chat_messages')
+        .select()
+        .eq('ride_id', rideId)
+        .order('created_at', ascending: true);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<void> sendChatMessage({
+    required String rideId,
+    required String message,
+    required String senderType,
+  }) async {
+    await client.from('chat_messages').insert({
+      'ride_id': rideId,
+      'sender_id': currentUser!.id,
+      'sender_type': senderType,
+      'message': message,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  static Future<void> markMessagesAsRead(String rideId) async {
+    if (currentUser == null) return;
+    await client
+        .from('chat_messages')
+        .update({'is_read': true})
+        .eq('ride_id', rideId)
+        .neq('sender_id', currentUser!.id);
+  }
+
+  static RealtimeChannel subscribeToChatMessages(
+    String rideId,
+    void Function(Map<String, dynamic>) onNewMessage,
+  ) {
+    return client
+        .channel('chat_$rideId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'chat_messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'ride_id',
+            value: rideId,
+          ),
+          callback: (payload) {
+            onNewMessage(payload.newRecord);
+          },
+        )
+        .subscribe();
+  }
+
+  // Check for pending destination change request (driver polls this)
+  static Future<Map<String, dynamic>?> getPendingDestinationChange(String rideId) async {
+    try {
+      final response = await client
+          .from('rides')
+          .select('pending_dropoff_name, pending_dropoff_lat, pending_dropoff_lng, destination_change_status')
+          .eq('id', rideId)
+          .eq('destination_change_status', 'pending')
+          .maybeSingle();
+      return response;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Approve destination change (driver)
+  static Future<bool> approveDestinationChange(String rideId) async {
+    try {
+      // Get pending destination
+      final pending = await client
+          .from('rides')
+          .select('pending_dropoff_name, pending_dropoff_lat, pending_dropoff_lng')
+          .eq('id', rideId)
+          .maybeSingle();
+
+      if (pending == null) return false;
+
+      // Update actual destination and clear pending
+      await client.from('rides').update({
+        'dropoff_name': pending['pending_dropoff_name'],
+        'dropoff_lat': pending['pending_dropoff_lat'],
+        'dropoff_lng': pending['pending_dropoff_lng'],
+        'destination_change_status': 'approved',
+        'pending_dropoff_name': null,
+        'pending_dropoff_lat': null,
+        'pending_dropoff_lng': null,
+      }).eq('id', rideId);
+      return true;
+    } catch (e) {
+      debugPrint('Error approving destination change: $e');
+      return false;
+    }
+  }
+
+  // Reject destination change (driver)
+  static Future<bool> rejectDestinationChange(String rideId) async {
+    try {
+      await client.from('rides').update({
+        'destination_change_status': 'rejected',
+        'pending_dropoff_name': null,
+        'pending_dropoff_lat': null,
+        'pending_dropoff_lng': null,
+      }).eq('id', rideId);
+      return true;
+    } catch (e) {
+      debugPrint('Error rejecting destination change: $e');
+      return false;
+    }
+  }
+
+  // Document Storage - upload file to Supabase Storage
+  static Future<String?> uploadDocumentFile({
+    required String filePath,
+    required String documentType,
+    required String driverId,
+  }) async {
+    try {
+      final file = File(filePath);
+      final userId = currentUser?.id;
+      if (userId == null) return null;
+
+      final extension = filePath.split('.').last.toLowerCase();
+      final fileName = '$userId/${documentType}_${DateTime.now().millisecondsSinceEpoch}.$extension';
+
+      await client.storage.from('documents').upload(
+        fileName,
+        file,
+        fileOptions: const FileOptions(upsert: true),
+      );
+
+      // Documents bucket is private, so we create a signed URL
+      final signedUrl = await client.storage.from('documents').createSignedUrl(fileName, 60 * 60 * 24 * 365);
+      debugPrint('Document uploaded: $signedUrl');
+      return signedUrl;
+    } catch (e) {
+      debugPrint('Error uploading document: $e');
+      return null;
+    }
+  }
+
+  // Avatar/Profile Photo Storage
+  static Future<String?> uploadAvatar(String filePath, String userId) async {
+    try {
+      final file = File(filePath);
+      final fileName = 'driver_avatar_$userId.jpg';
+
+      await client.storage.from('avatars').upload(
+        fileName,
+        file,
+        fileOptions: const FileOptions(upsert: true),
+      );
+
+      final url = client.storage.from('avatars').getPublicUrl(fileName);
+      debugPrint('Avatar uploaded: $url');
+      return url;
+    } catch (e) {
+      debugPrint('Error uploading avatar: $e');
+      return null;
+    }
+  }
+
+  static Future<bool> updateDriverAvatarUrl(String userId, String avatarUrl) async {
+    try {
+      await client.from('drivers').update({
+        'avatar_url': avatarUrl,
+      }).eq('user_id', userId);
+      return true;
+    } catch (e) {
+      debugPrint('Error updating driver avatar: $e');
+      return false;
+    }
+  }
+
+  static Future<String?> getDriverAvatarUrl(String userId) async {
+    try {
+      final response = await client
+          .from('drivers')
+          .select('avatar_url')
+          .eq('user_id', userId)
+          .maybeSingle();
+      return response?['avatar_url'] as String?;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Driver Earnings
+  static Future<Map<String, dynamic>> getDriverEarnings(String driverId, String period) async {
+    try {
+      DateTime startDate;
+      final now = DateTime.now();
+
+      switch (period) {
+        case 'today':
+          startDate = DateTime(now.year, now.month, now.day);
+          break;
+        case 'week':
+          startDate = now.subtract(Duration(days: now.weekday - 1));
+          startDate = DateTime(startDate.year, startDate.month, startDate.day);
+          break;
+        case 'month':
+          startDate = DateTime(now.year, now.month, 1);
+          break;
+        default:
+          startDate = DateTime(now.year, now.month, now.day);
+      }
+
+      final response = await client
+          .from('rides')
+          .select('id, status, distance_km, duration_minutes, created_at')
+          .eq('driver_id', driverId)
+          .gte('created_at', startDate.toIso8601String())
+          .inFilter('status', ['completed', 'cancelled']);
+
+      final rides = List<Map<String, dynamic>>.from(response);
+      final completedRides = rides.where((r) => r['status'] == 'completed').toList();
+      final cancelledRides = rides.where((r) => r['status'] == 'cancelled').toList();
+
+      double totalDistance = 0;
+      int totalDuration = 0;
+
+      for (final ride in completedRides) {
+        totalDistance += (ride['distance_km'] ?? 0).toDouble();
+        totalDuration += (ride['duration_minutes'] ?? 0) as int;
+      }
+
+      // Get average rating
+      final ratingsResponse = await client
+          .from('ratings')
+          .select('rating')
+          .eq('to_user_id', driverId)
+          .gte('created_at', startDate.toIso8601String());
+
+      final ratings = List<Map<String, dynamic>>.from(ratingsResponse);
+      double avgRating = 5.0;
+      if (ratings.isNotEmpty) {
+        final sum = ratings.fold<int>(0, (s, r) => s + (r['rating'] as int));
+        avgRating = sum / ratings.length;
+      }
+
+      final completionRate = rides.isNotEmpty
+          ? ((completedRides.length / rides.length) * 100).round()
+          : 100;
+
+      return {
+        'total_rides': completedRides.length,
+        'total_distance': totalDistance,
+        'total_duration': totalDuration,
+        'avg_rating': avgRating,
+        'completion_rate': completionRate,
+        'cancelled_rides': cancelledRides.length,
+      };
+    } catch (e) {
+      debugPrint('Error getting driver earnings: $e');
+      return {
+        'total_rides': 0,
+        'total_distance': 0.0,
+        'total_duration': 0,
+        'avg_rating': 5.0,
+        'completion_rate': 100,
+      };
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getCompletedRidesForDriver(String driverId, String period) async {
+    try {
+      DateTime startDate;
+      final now = DateTime.now();
+
+      switch (period) {
+        case 'today':
+          startDate = DateTime(now.year, now.month, now.day);
+          break;
+        case 'week':
+          startDate = now.subtract(Duration(days: now.weekday - 1));
+          startDate = DateTime(startDate.year, startDate.month, startDate.day);
+          break;
+        case 'month':
+          startDate = DateTime(now.year, now.month, 1);
+          break;
+        default:
+          startDate = DateTime(now.year, now.month, now.day);
+      }
+
+      final response = await client
+          .from('rides')
+          .select('*, customer:profiles!customer_id(*)')
+          .eq('driver_id', driverId)
+          .eq('status', 'completed')
+          .gte('created_at', startDate.toIso8601String())
+          .order('created_at', ascending: false)
+          .limit(20);
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error getting completed rides: $e');
+      return [];
+    }
+  }
+
+  // Register FCM token for push notifications
+  static Future<void> registerFcmToken(String token, String? userId) async {
+    if (userId == null) return;
+
+    try {
+      await client.from('push_tokens').upsert({
+        'user_id': userId,
+        'token': token,
+        'platform': 'ios',
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'user_id');
+    } catch (e) {
+      debugPrint('Error registering FCM token: $e');
+    }
+  }
+
+  // Send push notification to customer
+  static Future<void> sendPushToCustomer({
+    required String customerId,
+    required String title,
+    required String body,
+    String? rideId,
+  }) async {
+    try {
+      await client.from('push_notification_queue').insert({
+        'user_id': customerId,
+        'title': title,
+        'body': body,
+        'data': rideId != null ? {'ride_id': rideId} : null,
+        'status': 'pending',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Error sending push notification: $e');
+    }
+  }
+}

@@ -1,0 +1,238 @@
+"use client"
+
+import { useState, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Car, Loader2 } from "lucide-react"
+import { toast } from "sonner"
+
+function LoginContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const error = searchParams.get("error")
+
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [resetMode, setResetMode] = useState(false)
+
+  const supabase = createClient()
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email) {
+      toast.error("Please enter your email address")
+      return
+    }
+    setLoading(true)
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+
+      if (error) {
+        toast.error(error.message)
+      } else {
+        toast.success("Password reset link sent to your email")
+        setResetMode(false)
+      }
+    } catch {
+      toast.error("An error occurred")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        toast.error(error.message)
+        setLoading(false)
+        return
+      }
+
+      if (data.user) {
+        let { data: profile } = await supabase
+          .from("profiles")
+          .select("role, status")
+          .eq("id", data.user.id)
+          .single()
+
+        if (!profile) {
+          // Auto-create profile for authenticated users
+          const { data: newProfile, error: insertError } = await supabase
+            .from("profiles")
+            .insert({
+              id: data.user.id,
+              email: data.user.email,
+              full_name: data.user.user_metadata?.full_name || data.user.email?.split("@")[0] || "Admin",
+              role: "super-admin",
+              status: "approved"
+            })
+            .select("role, status")
+            .single()
+
+          if (insertError) {
+            toast.error("Failed to create profile: " + insertError.message)
+            await supabase.auth.signOut()
+            setLoading(false)
+            return
+          }
+          profile = newProfile
+        }
+
+        if (!["admin", "super-admin"].includes(profile.role)) {
+          toast.error("Access denied. Admin privileges required.")
+          await supabase.auth.signOut()
+          setLoading(false)
+          return
+        }
+
+        if (profile.status !== "approved") {
+          toast.error("Your account is pending approval")
+          await supabase.auth.signOut()
+          setLoading(false)
+          return
+        }
+
+        toast.success("Welcome back!")
+        router.push("/dashboard")
+      }
+    } catch {
+      toast.error("An error occurred")
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1 text-center">
+          <div className="flex justify-center mb-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
+              <Car className="h-7 w-7 text-primary-foreground" />
+            </div>
+          </div>
+          <CardTitle className="text-2xl font-bold">MyRide Admin</CardTitle>
+          <CardDescription>
+            Enter your credentials to access the admin panel
+          </CardDescription>
+          {error === "unauthorized" && (
+            <p className="text-sm text-destructive">
+              Access denied. Admin privileges required.
+            </p>
+          )}
+        </CardHeader>
+        <CardContent>
+          {resetMode ? (
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="email" className="text-sm font-medium">
+                  Email
+                </label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="admin@macl.aero"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  "Send Reset Link"
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={() => setResetMode(false)}
+              >
+                Back to Sign in
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="email" className="text-sm font-medium">
+                  Email
+                </label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="admin@macl.aero"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="password" className="text-sm font-medium">
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setResetMode(true)}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  "Sign in"
+                )}
+              </Button>
+            </form>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
+  )
+}

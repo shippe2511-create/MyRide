@@ -1,0 +1,52 @@
+# Flutter
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/*.iml
+**/.idea/
+**/*.lock
+!pubspec.lock
+
+# iOS
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/app.flx
+**/ios/Flutter/flutter_assets/
+**/ios/Flutter/App.framework
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+
+# Android
+**/android/.gradle/
+**/android/local.properties
+**/android/*.iml
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+
+# Node / Next.js
+**/node_modules/
+**/.next/
+**/out/
+**/.env
+**/.env.local
+**/.env*.local
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Misc
+*.log
+*.swp
+*.swo
+.vscode/
+*.bak
+
+# Supabase
+**/supabase/.temp/

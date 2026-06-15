@@ -50,3 +50,10 @@
 
 # Supabase
 **/supabase/.temp/
+
+# Secrets - NEVER commit these
+**/*service_role*
+**/*secret*key*
+**/credentials.json
+**/*.pem
+**/*.p12

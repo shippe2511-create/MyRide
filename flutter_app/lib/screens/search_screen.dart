@@ -1890,11 +1890,8 @@ class _NearbyScreenState extends State<NearbyScreen> with SingleTickerProviderSt
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
-  final List<LatLng> _vehicleLocations = [
-    const LatLng(4.1940, 73.5310),
-    const LatLng(4.1895, 73.5260),
-    const LatLng(4.1930, 73.5270),
-  ];
+  List<LatLng> _vehicleLocations = [];
+  bool _loadingDrivers = true;
 
   @override
   void initState() {
@@ -1906,6 +1903,24 @@ class _NearbyScreenState extends State<NearbyScreen> with SingleTickerProviderSt
     _pulseAnimation = Tween<double>(begin: 1.0, end: 2.5).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+    _loadNearbyDrivers();
+  }
+
+  Future<void> _loadNearbyDrivers() async {
+    try {
+      final drivers = await SupabaseService.getOnlineDriverLocations();
+      if (mounted) {
+        setState(() {
+          _vehicleLocations = drivers
+              .map((d) => LatLng(d['lat'] as double, d['lng'] as double))
+              .toList();
+          _loadingDrivers = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading nearby drivers: $e');
+      if (mounted) setState(() => _loadingDrivers = false);
+    }
   }
 
   @override
@@ -2100,7 +2115,7 @@ class _NearbyScreenState extends State<NearbyScreen> with SingleTickerProviderSt
               const SizedBox(width: 8),
               Builder(
                 builder: (context) => Text(
-                  '3 vehicles near you',
+                  '${_vehicleLocations.length} vehicle${_vehicleLocations.length == 1 ? '' : 's'} near you',
                   style: TextStyle(
                     color: context.textColor,
                     fontSize: 14,

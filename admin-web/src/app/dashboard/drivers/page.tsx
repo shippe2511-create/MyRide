@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { DriversTable } from "./drivers-table"
+import { DocumentsTable } from "./documents-table"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -437,6 +438,7 @@ export default function DriversPage() {
         <TabsList>
           <TabsTrigger value="all">All Drivers</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all">
@@ -687,6 +689,10 @@ export default function DriversPage() {
               </Card>
             )}
           </div>
+        </TabsContent>
+
+        <TabsContent value="documents">
+          <DocumentsTable />
         </TabsContent>
       </Tabs>
     </div>

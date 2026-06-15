@@ -374,6 +374,51 @@ class SupabaseService {
     await client.from('saved_places').delete().eq('id', placeId);
   }
 
+  static Future<bool> upsertSavedPlace({
+    required String name,
+    required String address,
+    String icon = 'location_on',
+    String color = 'yellow',
+    double? latitude,
+    double? longitude,
+  }) async {
+    final id = userId;
+    if (id == null) return false;
+    try {
+      final existing = await client
+          .from('saved_places')
+          .select('id')
+          .eq('user_id', id)
+          .eq('name', name)
+          .maybeSingle();
+
+      if (existing != null) {
+        await client.from('saved_places').update({
+          'address': address,
+          'icon': icon,
+          'color': color,
+          'latitude': latitude,
+          'longitude': longitude,
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('id', existing['id']);
+      } else {
+        await client.from('saved_places').insert({
+          'user_id': id,
+          'name': name,
+          'address': address,
+          'icon': icon,
+          'color': color,
+          'latitude': latitude,
+          'longitude': longitude,
+        });
+      }
+      return true;
+    } catch (e) {
+      debugPrint('upsertSavedPlace ERROR: $e');
+      return false;
+    }
+  }
+
   // Notifications methods
   static Future<List<Map<String, dynamic>>> getNotifications() async {
     final id = userId;
@@ -476,6 +521,22 @@ class SupabaseService {
     }
   }
 
+  // Get online driver locations (for map display)
+  static Future<List<Map<String, dynamic>>> getOnlineDriverLocations() async {
+    try {
+      final fiveMinutesAgo = DateTime.now().subtract(const Duration(minutes: 5)).toIso8601String();
+      final response = await client
+          .from('driver_locations')
+          .select('lat, lng, heading, speed, driver_id')
+          .eq('is_online', true)
+          .gte('last_updated', fiveMinutesAgo);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error getting online driver locations: $e');
+      return [];
+    }
+  }
+
   // Get driver details by driver ID (from drivers table)
   static Future<Map<String, dynamic>?> getDriverDetails(String driverId) async {
     try {
@@ -506,12 +567,17 @@ class SupabaseService {
 
   // Transport Schedules
   static Future<List<Map<String, dynamic>>> getTransportTypes() async {
-    // Return hardcoded types matching admin panel
-    return [
-      {'name': 'internal_bus', 'display_name': 'Internal Bus', 'color': '#FFD60A', 'is_active': true},
-      {'name': 'mtcc_bus', 'display_name': 'MTCC Bus', 'color': '#34C759', 'is_active': true},
-      {'name': 'ferry', 'display_name': 'Ferry', 'color': '#0A84FF', 'is_active': true},
-    ];
+    try {
+      final response = await client
+          .from('transport_types')
+          .select()
+          .eq('is_active', true)
+          .order('name');
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('getTransportTypes ERROR: $e');
+      return [];
+    }
   }
 
   static Future<List<Map<String, dynamic>>> getRoutes({String? transportType}) async {
@@ -649,6 +715,29 @@ class SupabaseService {
         'message': message,
         'created_at': DateTime.now().toIso8601String(),
       });
+
+      // Queue push notification for driver
+      try {
+        final ride = await client
+            .from('rides')
+            .select('driver_id, driver:drivers(profile_id)')
+            .eq('id', rideId)
+            .maybeSingle();
+
+        final driverProfileId = ride?['driver']?['profile_id'];
+        if (driverProfileId != null) {
+          await client.from('push_notification_queue').insert({
+            'user_id': driverProfileId,
+            'title': 'New message from Customer',
+            'body': message.length > 100 ? '${message.substring(0, 100)}...' : message,
+            'data': {'type': 'chat', 'ride_id': rideId},
+            'ride_id': rideId,
+            'status': 'pending',
+          });
+        }
+      } catch (e) {
+        debugPrint('Error queueing chat notification: $e');
+      }
     } catch (e) {
       debugPrint('Error sending chat message: $e');
       rethrow;
@@ -1080,6 +1169,35 @@ class SupabaseService {
       });
     } catch (e) {
       debugPrint('Error queueing notification: $e');
+    }
+  }
+
+  // SOS Alert
+  static Future<bool> triggerSOSAlert({
+    String? rideId,
+    String? driverId,
+    double? latitude,
+    double? longitude,
+    String? locationAddress,
+  }) async {
+    try {
+      final uid = userId;
+      if (uid == null) return false;
+
+      await client.from('sos_alerts').insert({
+        'user_id': uid,
+        'ride_id': rideId,
+        'driver_id': driverId,
+        'latitude': latitude,
+        'longitude': longitude,
+        'location_address': locationAddress,
+        'status': 'active',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error triggering SOS alert: $e');
+      return false;
     }
   }
 }

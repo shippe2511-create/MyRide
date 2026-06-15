@@ -100,11 +100,6 @@ export default function SettingsPage() {
           enable_sos: settings.enable_sos,
           enable_chat: settings.enable_chat,
           enable_ratings: settings.enable_ratings,
-          notif_ride_request: settings.notif_ride_request,
-          notif_ride_accepted: settings.notif_ride_accepted,
-          notif_driver_arrived: settings.notif_driver_arrived,
-          notif_ride_completed: settings.notif_ride_completed,
-          notif_promotions: settings.notif_promotions,
           updated_at: new Date().toISOString()
         })
 
@@ -338,7 +333,12 @@ export default function SettingsPage() {
                 <Bell className="h-5 w-5" />
                 Notification Settings
               </CardTitle>
-              <CardDescription>Configure push notification behavior</CardDescription>
+              <CardDescription>
+                Configure push notification behavior
+                <span className="block mt-1 text-yellow-600 dark:text-yellow-500">
+                  Note: These settings are not yet persisted. Push notifications require Firebase setup.
+                </span>
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div>

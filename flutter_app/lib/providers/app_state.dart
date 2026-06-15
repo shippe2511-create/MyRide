@@ -121,6 +121,27 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> loadEmergencyContactsFromProfile() async {
+    if (_profileId == null) return;
+    try {
+      final profile = await SupabaseService.getProfile();
+      if (profile != null && profile['emergency_contacts'] != null) {
+        _emergencyContacts.clear();
+        final contacts = profile['emergency_contacts'] as List<dynamic>;
+        for (final c in contacts) {
+          _emergencyContacts.add({
+            'name': c['name']?.toString() ?? '',
+            'phone': c['phone']?.toString() ?? '',
+            'relation': c['relation']?.toString() ?? '',
+          });
+        }
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error loading emergency contacts: $e');
+    }
+  }
+
   // Language
   String _language = 'English';
   String get language => _language;
@@ -187,6 +208,10 @@ class AppState extends ChangeNotifier {
     _profileId = id;
     SupabaseService.setProfileId(id);
     _saveProfileId();
+    if (id != null) {
+      loadEmergencyContactsFromProfile();
+      loadTripHistory();
+    }
     notifyListeners();
   }
 
@@ -202,6 +227,8 @@ class AppState extends ChangeNotifier {
     _profileId = prefs.getString('profile_id');
     if (_profileId != null) {
       SupabaseService.setProfileId(_profileId);
+      loadEmergencyContactsFromProfile();
+      loadTripHistory();
     }
   }
 
@@ -260,17 +287,64 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Trip history (Vehicle rides only - not bus/ferry schedules)
-  // Twin Cabs: MV70, MV88, MV102
-  final List<Map<String, dynamic>> _tripHistory = [
-    {'date': 'Today', 'departTime': '9:30 AM', 'from': 'Home', 'to': 'Airport T3', 'time': '24 min', 'type': 'Twin Cab', 'driver': 'Marcus K.', 'vehicle': 'MV 88', 'rating': 5, 'status': 'completed'},
-    {'date': 'Yesterday', 'departTime': '5:15 PM', 'from': 'Work', 'to': 'Hulhumalé Phase 2', 'time': '18 min', 'type': 'Twin Cab', 'driver': 'Ahmed R.', 'vehicle': 'MV 70', 'rating': 4, 'status': 'completed'},
-    {'date': 'May 28', 'departTime': '2:00 PM', 'from': 'Airport T1', 'to': 'Home', 'time': '22 min', 'type': 'Twin Cab', 'driver': 'Ibrahim M.', 'vehicle': 'MV 102', 'rating': 5, 'status': 'completed'},
-    {'date': 'May 27', 'departTime': '11:30 AM', 'from': 'Cargo Area', 'to': 'T2', 'time': '8 min', 'type': 'Twin Cab', 'driver': 'Hassan A.', 'vehicle': 'MV 70', 'rating': 4, 'status': 'completed'},
-    {'date': 'May 25', 'departTime': '8:45 AM', 'from': 'Home', 'to': 'Airport T3', 'time': '25 min', 'type': 'Twin Cab', 'driver': 'Marcus K.', 'vehicle': 'MV 88', 'rating': 5, 'status': 'completed'},
-  ];
+  // Trip history (loaded from database)
+  List<Map<String, dynamic>> _tripHistory = [];
+  bool _tripHistoryLoading = false;
 
   List<Map<String, dynamic>> get tripHistory => _tripHistory;
+  bool get tripHistoryLoading => _tripHistoryLoading;
+
+  Future<void> loadTripHistory() async {
+    if (_profileId == null) return;
+    _tripHistoryLoading = true;
+    notifyListeners();
+    try {
+      final rides = await SupabaseService.getRideHistory(_profileId);
+      _tripHistory = rides.map((ride) {
+        final createdAt = DateTime.tryParse(ride['created_at'] ?? '') ?? DateTime.now();
+        final driver = ride['driver'];
+        final driverProfile = driver?['profile'];
+        final vehicle = driver?['vehicle'];
+        return {
+          'id': ride['id'],
+          'date': _formatDate(createdAt),
+          'departTime': _formatTime(createdAt),
+          'from': ride['pickup_name'] ?? 'Unknown',
+          'to': ride['dropoff_name'] ?? 'Unknown',
+          'time': ride['duration_minutes'] != null ? '${ride['duration_minutes']} min' : '-',
+          'type': vehicle?['display_name'] ?? vehicle?['name'] ?? 'Vehicle',
+          'driver': driverProfile?['full_name'] ?? 'Driver',
+          'vehicle': vehicle?['plate_no'] ?? '-',
+          'rating': 0,
+          'status': ride['status'] ?? 'completed',
+          'distance_km': ride['distance_km'],
+        };
+      }).toList();
+    } catch (e) {
+      debugPrint('Error loading trip history: $e');
+    }
+    _tripHistoryLoading = false;
+    notifyListeners();
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date).inDays;
+    if (diff == 0) return 'Today';
+    if (diff == 1) return 'Yesterday';
+    return '${_monthName(date.month)} ${date.day}';
+  }
+
+  String _monthName(int month) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return months[month - 1];
+  }
+
+  String _formatTime(DateTime date) {
+    final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
+    final period = date.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:${date.minute.toString().padLeft(2, '0')} $period';
+  }
 
   void addTrip(Map<String, dynamic> trip) {
     _tripHistory.insert(0, trip);

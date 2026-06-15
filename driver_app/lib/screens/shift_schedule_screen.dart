@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
+import '../services/supabase_service.dart';
 
 class ShiftScheduleScreen extends StatefulWidget {
   const ShiftScheduleScreen({super.key});
@@ -11,37 +12,82 @@ class ShiftScheduleScreen extends StatefulWidget {
 
 class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
   int _selectedDay = DateTime.now().weekday - 1;
+  bool _isLoading = true;
 
   final List<String> _weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  final List<Map<String, dynamic>> _weekSchedule = [
-    // Monday
-    {'shifts': [
-      {'start': '06:00', 'end': '14:00', 'type': 'Morning', 'status': 'completed'},
-    ]},
-    // Tuesday
-    {'shifts': [
-      {'start': '06:00', 'end': '14:00', 'type': 'Morning', 'status': 'completed'},
-    ]},
-    // Wednesday
-    {'shifts': [
-      {'start': '14:00', 'end': '22:00', 'type': 'Evening', 'status': 'completed'},
-    ]},
-    // Thursday
-    {'shifts': [
-      {'start': '06:00', 'end': '14:00', 'type': 'Morning', 'status': 'current'},
-    ]},
-    // Friday
-    {'shifts': [
-      {'start': '06:00', 'end': '14:00', 'type': 'Morning', 'status': 'upcoming'},
-    ]},
-    // Saturday
-    {'shifts': []}, // Day off
-    // Sunday
-    {'shifts': [
-      {'start': '14:00', 'end': '22:00', 'type': 'Evening', 'status': 'upcoming'},
-    ]},
+  List<Map<String, dynamic>> _weekSchedule = [
+    {'shifts': []}, {'shifts': []}, {'shifts': []}, {'shifts': []},
+    {'shifts': []}, {'shifts': []}, {'shifts': []},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadShifts();
+  }
+
+  Future<void> _loadShifts() async {
+    setState(() => _isLoading = true);
+    try {
+      final driverId = SupabaseService.visibleUserId;
+      if (driverId == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final now = DateTime.now();
+      final weekStart = now.subtract(Duration(days: now.weekday - 1));
+      final weekEnd = weekStart.add(const Duration(days: 7));
+
+      final shifts = await SupabaseService.getDriverShifts(
+        driverId,
+        weekStart,
+        weekEnd,
+      );
+
+      final newSchedule = List.generate(7, (_) => <String, dynamic>{'shifts': <Map<String, dynamic>>[]});
+
+      for (final shift in shifts) {
+        final shiftDate = DateTime.tryParse(shift['shift_date'] ?? '');
+        if (shiftDate == null) continue;
+
+        final dayIndex = shiftDate.weekday - 1;
+        if (dayIndex < 0 || dayIndex > 6) continue;
+
+        String status = shift['status'] ?? 'scheduled';
+        if (status == 'scheduled') {
+          if (shiftDate.isBefore(DateTime(now.year, now.month, now.day))) {
+            status = 'completed';
+          } else if (shiftDate.year == now.year && shiftDate.month == now.month && shiftDate.day == now.day) {
+            status = 'current';
+          } else {
+            status = 'upcoming';
+          }
+        }
+
+        (newSchedule[dayIndex]['shifts'] as List).add({
+          'start': shift['start_time']?.toString().substring(0, 5) ?? '00:00',
+          'end': shift['end_time']?.toString().substring(0, 5) ?? '00:00',
+          'type': _capitalizeFirst(shift['shift_type'] ?? 'shift'),
+          'status': status,
+        });
+      }
+
+      setState(() {
+        _weekSchedule = newSchedule;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading shifts: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  String _capitalizeFirst(String s) {
+    if (s.isEmpty) return s;
+    return s[0].toUpperCase() + s.substring(1);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,20 +107,22 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Week summary card
-          _buildWeekSummary(context),
-
-          // Day selector
-          _buildDaySelector(context),
-
-          // Selected day schedule
-          Expanded(
-            child: _buildDaySchedule(context),
-          ),
-        ],
-      ),
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator(color: AppColors.yellow))
+          : RefreshIndicator(
+              onRefresh: _loadShifts,
+              color: AppColors.yellow,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  children: [
+                    _buildWeekSummary(context),
+                    _buildDaySelector(context),
+                    _buildDaySchedule(context),
+                  ],
+                ),
+              ),
+            ),
     );
   }
 
@@ -270,19 +318,22 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
       );
     }
 
-    return ListView(
+    return Padding(
       padding: const EdgeInsets.all(20),
-      children: [
-        Text(
-          _formatDate(selectedDate),
-          style: TextStyle(
-            color: context.mutedColor,
-            fontSize: 14,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _formatDate(selectedDate),
+            style: TextStyle(
+              color: context.mutedColor,
+              fontSize: 14,
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
-        ...shifts.map((shift) => _buildShiftCard(context, shift as Map<String, dynamic>)),
-      ],
+          const SizedBox(height: 16),
+          ...shifts.map((shift) => _buildShiftCard(context, shift as Map<String, dynamic>)),
+        ],
+      ),
     );
   }
 

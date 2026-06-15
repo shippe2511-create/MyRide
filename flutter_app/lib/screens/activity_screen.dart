@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
+import '../services/supabase_service.dart';
 
 enum TripStatus { completed, cancelled, ongoing }
 
@@ -38,71 +39,43 @@ class ActivityScreen extends StatefulWidget {
 class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String _selectedDateFilter = 'All Time';
+  bool _isLoading = true;
+  List<TripHistory> _trips = [];
 
   final List<String> _dateFilters = ['All Time', 'Today', 'This Week', 'This Month'];
-
-  final List<TripHistory> _trips = [
-    TripHistory(
-      id: '1',
-      pickup: 'Hulhumale Phase 2',
-      dropoff: 'Velana International Airport',
-      date: DateTime.now().subtract(const Duration(hours: 1)),
-      status: TripStatus.completed,
-      driverName: 'Ahmed Ali',
-      vehicleNumber: 'P 2547',
-      duration: 25,
-      distance: 8.5,
-    ),
-    TripHistory(
-      id: '2',
-      pickup: 'Male City Center',
-      dropoff: 'Hulhumale Ferry Terminal',
-      date: DateTime.now().subtract(const Duration(hours: 4)),
-      status: TripStatus.completed,
-      driverName: 'Ibrahim Hassan',
-      vehicleNumber: 'P 1234',
-      duration: 18,
-      distance: 5.2,
-    ),
-    TripHistory(
-      id: '3',
-      pickup: 'ADK Hospital',
-      dropoff: 'Artificial Beach',
-      date: DateTime.now().subtract(const Duration(hours: 6)),
-      status: TripStatus.cancelled,
-      driverName: 'Mohamed Rasheed',
-      vehicleNumber: 'P 8899',
-      duration: 0,
-      distance: 0,
-    ),
-    TripHistory(
-      id: '4',
-      pickup: 'Hulhumale Central Park',
-      dropoff: 'Tree Top Hospital',
-      date: DateTime.now().subtract(const Duration(days: 1)),
-      status: TripStatus.completed,
-      driverName: 'Ali Waheed',
-      vehicleNumber: 'P 5566',
-      duration: 12,
-      distance: 3.8,
-    ),
-    TripHistory(
-      id: '5',
-      pickup: 'Male Fish Market',
-      dropoff: 'Hulhumale Phase 1',
-      date: DateTime.now().subtract(const Duration(days: 2)),
-      status: TripStatus.completed,
-      driverName: 'Hassan Manik',
-      vehicleNumber: 'P 7788',
-      duration: 22,
-      distance: 7.1,
-    ),
-  ];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _loadTrips();
+  }
+
+  Future<void> _loadTrips() async {
+    setState(() => _isLoading = true);
+    try {
+      final rides = await SupabaseService.getRideHistory(SupabaseService.userId);
+      _trips = rides.map((ride) {
+        final driver = ride['driver'];
+        final driverProfile = driver?['profile'];
+        final vehicle = driver?['vehicle'];
+        final status = ride['status'] as String? ?? 'completed';
+        return TripHistory(
+          id: ride['id'] ?? '',
+          pickup: ride['pickup_name'] ?? 'Unknown',
+          dropoff: ride['dropoff_name'] ?? 'Unknown',
+          date: DateTime.tryParse(ride['created_at'] ?? '') ?? DateTime.now(),
+          status: status == 'cancelled' ? TripStatus.cancelled : TripStatus.completed,
+          driverName: driverProfile?['full_name'] ?? 'Driver',
+          vehicleNumber: vehicle?['plate_no'] ?? '-',
+          duration: ride['duration_minutes'] ?? 0,
+          distance: (ride['distance_km'] ?? 0).toDouble(),
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('Error loading trips: $e');
+    }
+    setState(() => _isLoading = false);
   }
 
   @override
@@ -153,14 +126,28 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
             _buildHeader(context),
             _buildTabs(context),
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildTripList(_getFilteredTrips(0)),
-                  _buildTripList(_getFilteredTrips(1)),
-                  _buildTripList(_getFilteredTrips(2)),
-                ],
-              ),
+              child: _isLoading
+                  ? Center(child: CircularProgressIndicator(color: AppColors.yellow))
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        RefreshIndicator(
+                          onRefresh: _loadTrips,
+                          color: AppColors.yellow,
+                          child: _buildTripList(_getFilteredTrips(0)),
+                        ),
+                        RefreshIndicator(
+                          onRefresh: _loadTrips,
+                          color: AppColors.yellow,
+                          child: _buildTripList(_getFilteredTrips(1)),
+                        ),
+                        RefreshIndicator(
+                          onRefresh: _loadTrips,
+                          color: AppColors.yellow,
+                          child: _buildTripList(_getFilteredTrips(2)),
+                        ),
+                      ],
+                    ),
             ),
           ],
         ),

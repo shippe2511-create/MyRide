@@ -49,24 +49,19 @@ class SmoothPageRoute<T> extends PageRouteBuilder<T> {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Minimal startup - comment out services to test
   try {
     await SupabaseService.initialize();
   } catch (e) {
     debugPrint('Supabase init failed: $e');
   }
 
-  try {
-    await NotificationService().init();
-    await NotificationService().requestPermissions();
-  } catch (e) {
-    debugPrint('Notification init failed: $e');
-  }
-
-  // Firebase disabled - requires paid Apple Developer Program for push notifications
+  // Disable notifications temporarily to test if it's causing crash
   // try {
-  //   await FirebaseService().initialize();
+  //   await NotificationService().init();
+  //   await NotificationService().requestPermissions();
   // } catch (e) {
-  //   debugPrint('Firebase init failed: $e');
+  //   debugPrint('Notification init failed: $e');
   // }
 
   SystemChrome.setSystemUIOverlayStyle(

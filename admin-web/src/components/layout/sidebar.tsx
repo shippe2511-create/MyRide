@@ -18,6 +18,8 @@ import {
   Settings,
   Ticket,
   LogOut,
+  AlertTriangle,
+  MessageSquare,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -32,6 +34,8 @@ const navigation = [
   { name: "Scheduling", href: "/dashboard/scheduling", icon: Calendar },
   { name: "Content", href: "/dashboard/content", icon: FileText },
   { name: "Service Zones", href: "/dashboard/zones", icon: Map },
+  { name: "Chat", href: "/dashboard/chat", icon: MessageSquare },
+  { name: "SOS Alerts", href: "/dashboard/sos", icon: AlertTriangle },
   { name: "Admins", href: "/dashboard/admins", icon: Shield },
   { name: "Reports", href: "/dashboard/reports", icon: BarChart3 },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },

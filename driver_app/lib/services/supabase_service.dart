@@ -208,6 +208,17 @@ class SupabaseService {
         .from('drivers')
         .update(data)
         .eq('id', driverId);
+
+    // Also update driver_locations table for admin panel visibility
+    if (isOnline != null) {
+      await client
+          .from('driver_locations')
+          .update({
+            'is_online': isOnline,
+            'last_updated': DateTime.now().toIso8601String(),
+          })
+          .eq('driver_id', driverId);
+    }
   }
 
   static Future<void> updateLocation(String driverId, double lat, double lng, {double? heading, double? speed}) async {
@@ -459,15 +470,32 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(response);
   }
 
+  static Future<List<Map<String, dynamic>>> getDriverShifts(String driverId, DateTime fromDate, DateTime toDate) async {
+    try {
+      final response = await client
+          .from('shifts')
+          .select()
+          .eq('driver_id', driverId)
+          .gte('shift_date', fromDate.toIso8601String().split('T')[0])
+          .lte('shift_date', toDate.toIso8601String().split('T')[0])
+          .order('shift_date')
+          .order('start_time');
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error getting driver shifts: $e');
+      return [];
+    }
+  }
+
   // Documents methods
-  static Future<List<Map<String, dynamic>>> getMyDocuments() async {
-    final driver = await getDriverProfile();
-    if (driver == null) return [];
+  static Future<List<Map<String, dynamic>>> getMyDocuments({String? driverId}) async {
+    final id = driverId ?? _driverId;
+    if (id == null || id.isEmpty) return [];
 
     final response = await client
         .from('documents')
         .select()
-        .eq('driver_id', driver['id'])
+        .eq('driver_id', id)
         .order('document_type');
     return List<Map<String, dynamic>>.from(response);
   }
@@ -475,13 +503,13 @@ class SupabaseService {
   static Future<void> uploadDocument({
     required String documentType,
     required String fileUrl,
+    required String driverId,
     DateTime? expiryDate,
   }) async {
-    final driver = await getDriverProfile();
-    if (driver == null) return;
+    if (driverId.isEmpty) return;
 
     await client.from('documents').upsert({
-      'driver_id': driver['id'],
+      'driver_id': driverId,
       'document_type': documentType,
       'file_url': fileUrl,
       'expiry_date': expiryDate?.toIso8601String(),
@@ -693,6 +721,29 @@ class SupabaseService {
         'message': message,
         'created_at': DateTime.now().toIso8601String(),
       });
+
+      // Queue push notification for customer
+      try {
+        final ride = await client
+            .from('rides')
+            .select('customer_id')
+            .eq('id', rideId)
+            .maybeSingle();
+
+        final customerId = ride?['customer_id'];
+        if (customerId != null) {
+          await client.from('push_notification_queue').insert({
+            'user_id': customerId,
+            'title': 'New message from Driver',
+            'body': message.length > 100 ? '${message.substring(0, 100)}...' : message,
+            'data': {'type': 'chat', 'ride_id': rideId},
+            'ride_id': rideId,
+            'status': 'pending',
+          });
+        }
+      } catch (e) {
+        debugPrint('Error queueing chat notification: $e');
+      }
     } catch (e) {
       debugPrint('Error sending chat message: $e');
       rethrow;
@@ -803,11 +854,13 @@ class SupabaseService {
   }) async {
     try {
       final file = File(filePath);
-      final userId = currentUser?.id;
-      if (userId == null) return null;
+      if (driverId.isEmpty) {
+        debugPrint('Error: driverId is empty');
+        return null;
+      }
 
       final extension = filePath.split('.').last.toLowerCase();
-      final fileName = '$userId/${documentType}_${DateTime.now().millisecondsSinceEpoch}.$extension';
+      final fileName = '$driverId/${documentType}_${DateTime.now().millisecondsSinceEpoch}.$extension';
 
       await client.storage.from('documents').upload(
         fileName,
@@ -815,10 +868,10 @@ class SupabaseService {
         fileOptions: const FileOptions(upsert: true),
       );
 
-      // Documents bucket is private, so we create a signed URL
-      final signedUrl = await client.storage.from('documents').createSignedUrl(fileName, 60 * 60 * 24 * 365);
-      debugPrint('Document uploaded: $signedUrl');
-      return signedUrl;
+      // Get public URL for the document
+      final publicUrl = client.storage.from('documents').getPublicUrl(fileName);
+      debugPrint('Document uploaded: $publicUrl');
+      return publicUrl;
     } catch (e) {
       debugPrint('Error uploading document: $e');
       return null;
@@ -1074,6 +1127,32 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Error getting emergency contacts: $e');
       return [];
+    }
+  }
+
+  // SOS Alert
+  static Future<bool> triggerSOSAlert({
+    required String driverId,
+    String? rideId,
+    double? latitude,
+    double? longitude,
+    String? locationAddress,
+  }) async {
+    try {
+      await client.from('sos_alerts').insert({
+        'user_id': driverId,
+        'ride_id': rideId,
+        'driver_id': driverId,
+        'latitude': latitude,
+        'longitude': longitude,
+        'location_address': locationAddress,
+        'status': 'active',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error triggering SOS alert: $e');
+      return false;
     }
   }
 }

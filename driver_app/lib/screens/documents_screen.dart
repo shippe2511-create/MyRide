@@ -4,8 +4,10 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../providers/driver_state.dart';
 
 class DocumentsScreen extends StatefulWidget {
   const DocumentsScreen({super.key});
@@ -23,7 +25,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   final Map<String, IconData> _documentIcons = {
     'license': Icons.badge_outlined,
     'driving_license': Icons.badge_outlined,
-    'vehicle_registration': Icons.directions_car_outlined,
+    'vehicle_reg': Icons.directions_car_outlined,
     'insurance': Icons.security_outlined,
     'id_card': Icons.credit_card_outlined,
     'profile_photo': Icons.person_outline,
@@ -33,7 +35,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   final Map<String, String> _documentTitles = {
     'license': 'Driving License',
     'driving_license': 'Driving License',
-    'vehicle_registration': 'Vehicle Registration',
+    'vehicle_reg': 'Vehicle Registration',
     'insurance': 'Insurance Certificate',
     'id_card': 'National ID Card',
     'profile_photo': 'Profile Photo',
@@ -49,7 +51,8 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   Future<void> _loadDocuments() async {
     setState(() => _isLoading = true);
     try {
-      final docs = await SupabaseService.getMyDocuments();
+      final driverState = Provider.of<DriverState>(context, listen: false);
+      final docs = await SupabaseService.getMyDocuments(driverId: driverState.driverId);
 
       // Map Supabase documents to local format
       _documents = docs.map((doc) {
@@ -68,7 +71,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
 
       // Add missing required documents
       final uploadedTypes = _documents.map((d) => d['type']).toSet();
-      final requiredTypes = ['license', 'vehicle_registration', 'insurance', 'id_card'];
+      final requiredTypes = ['license', 'vehicle_reg', 'insurance', 'id_card'];
 
       for (final type in requiredTypes) {
         if (!uploadedTypes.contains(type)) {
@@ -88,7 +91,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       // Use default documents if error
       _documents = [
         {'id': 'license', 'type': 'license', 'title': 'Driving License', 'icon': Icons.badge_outlined, 'status': 'not_uploaded', 'expiry': null, 'uploaded': false},
-        {'id': 'vehicle_registration', 'type': 'vehicle_registration', 'title': 'Vehicle Registration', 'icon': Icons.directions_car_outlined, 'status': 'not_uploaded', 'expiry': null, 'uploaded': false},
+        {'id': 'vehicle_reg', 'type': 'vehicle_reg', 'title': 'Vehicle Registration', 'icon': Icons.directions_car_outlined, 'status': 'not_uploaded', 'expiry': null, 'uploaded': false},
         {'id': 'insurance', 'type': 'insurance', 'title': 'Insurance Certificate', 'icon': Icons.security_outlined, 'status': 'not_uploaded', 'expiry': null, 'uploaded': false},
         {'id': 'id_card', 'type': 'id_card', 'title': 'National ID Card', 'icon': Icons.credit_card_outlined, 'status': 'not_uploaded', 'expiry': null, 'uploaded': false},
       ];
@@ -678,10 +681,10 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
             ),
             const SizedBox(height: 24),
             SizedBox(
-              height: 200,
+              height: 320,
               child: Theme(
                 data: Theme.of(context).copyWith(
-                  colorScheme: ColorScheme.light(
+                  colorScheme: ColorScheme.dark(
                     primary: AppColors.yellow,
                     onPrimary: Colors.black,
                     surface: context.cardColor,
@@ -769,15 +772,16 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     );
 
     try {
-      // Get driver profile for driver_id
-      final driver = await SupabaseService.getDriverProfile();
-      if (driver == null) throw Exception('Driver profile not found');
+      // Get driver ID from state
+      final driverState = Provider.of<DriverState>(context, listen: false);
+      final driverId = driverState.driverId;
+      if (driverId.isEmpty) throw Exception('Not logged in as driver');
 
       // Upload file to Supabase Storage
       final fileUrl = await SupabaseService.uploadDocumentFile(
         filePath: image.path,
         documentType: docType ?? 'other',
-        driverId: driver['id'],
+        driverId: driverId,
       );
 
       if (fileUrl == null) throw Exception('Failed to upload file');
@@ -786,6 +790,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       await SupabaseService.uploadDocument(
         documentType: docType ?? 'other',
         fileUrl: fileUrl,
+        driverId: driverId,
         expiryDate: expiryDate,
       );
 
@@ -817,6 +822,8 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   }
 
   void _showDocumentPreview(BuildContext context, Map<String, dynamic> doc) {
+    final fileUrl = doc['file_url'] as String?;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -824,18 +831,48 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(doc['title'] as String, style: TextStyle(color: context.textColor)),
         content: Container(
-          height: 200,
+          constraints: const BoxConstraints(maxHeight: 400, maxWidth: 300),
           decoration: BoxDecoration(
             color: context.bgColor,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Center(
-            child: Icon(
-              doc['icon'] as IconData,
-              size: 64,
-              color: context.mutedColor,
-            ),
-          ),
+          child: fileUrl != null && fileUrl.isNotEmpty
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    fileUrl,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                              : null,
+                          color: AppColors.yellow,
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) => Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.broken_image, size: 48, color: context.mutedColor),
+                          const SizedBox(height: 8),
+                          Text('Failed to load', style: TextStyle(color: context.mutedColor)),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+              : Center(
+                  child: Icon(
+                    doc['icon'] as IconData,
+                    size: 64,
+                    color: context.mutedColor,
+                  ),
+                ),
         ),
         actions: [
           TextButton(

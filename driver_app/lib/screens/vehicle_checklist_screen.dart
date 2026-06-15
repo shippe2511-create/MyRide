@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import 'dart:math' as math;
 import '../theme/app_theme.dart';
 import '../providers/driver_state.dart';
@@ -23,6 +25,8 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
 
   final Map<String, CheckStatus> _checklist = {};
   final Map<String, String> _issueNotes = {};
+  final Map<String, List<File>> _issuePhotos = {};
+  final ImagePicker _picker = ImagePicker();
 
   final List<_ChecklistCategory> _categories = [
     _ChecklistCategory(
@@ -856,12 +860,14 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
 
   void _showIssueDialog(BuildContext context, _ChecklistItem item) {
     final controller = TextEditingController(text: _issueNotes[item.key] ?? '');
+    List<File> tempPhotos = List.from(_issuePhotos[item.key] ?? []);
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Container(
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
         decoration: BoxDecoration(
           color: context.cardColor,
@@ -968,6 +974,118 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                   contentPadding: const EdgeInsets.all(16),
                 ),
               ),
+              const SizedBox(height: 16),
+
+              // Photo section
+              Text(
+                'Add Photos (optional)',
+                style: TextStyle(
+                  color: context.textColor,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 80,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    // Add photo button
+                    GestureDetector(
+                      onTap: () async {
+                        final source = await showModalBottomSheet<ImageSource>(
+                          context: ctx,
+                          backgroundColor: context.cardColor,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                          ),
+                          builder: (c) => Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ListTile(
+                                  leading: Icon(Icons.camera_alt, color: AppColors.yellow),
+                                  title: Text('Take Photo', style: TextStyle(color: context.textColor)),
+                                  onTap: () => Navigator.pop(c, ImageSource.camera),
+                                ),
+                                ListTile(
+                                  leading: Icon(Icons.photo_library, color: AppColors.yellow),
+                                  title: Text('Choose from Gallery', style: TextStyle(color: context.textColor)),
+                                  onTap: () => Navigator.pop(c, ImageSource.gallery),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                        if (source != null) {
+                          final picked = await _picker.pickImage(source: source, imageQuality: 80);
+                          if (picked != null) {
+                            setModalState(() {
+                              tempPhotos.add(File(picked.path));
+                            });
+                          }
+                        }
+                      },
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: context.bgColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: context.borderColor, width: 2, style: BorderStyle.solid),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_a_photo, color: AppColors.warning, size: 28),
+                            const SizedBox(height: 4),
+                            Text('Add', style: TextStyle(color: context.mutedColor, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Photo thumbnails
+                    ...tempPhotos.asMap().entries.map((entry) => Stack(
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 80,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            image: DecorationImage(
+                              image: FileImage(entry.value),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 4,
+                          right: 12,
+                          child: GestureDetector(
+                            onTap: () {
+                              setModalState(() {
+                                tempPhotos.removeAt(entry.key);
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.7),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.close, color: Colors.white, size: 14),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )),
+                  ],
+                ),
+              ),
               const SizedBox(height: 24),
 
               // Buttons
@@ -1007,6 +1125,7 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                           _issueNotes[item.key] = controller.text.trim().isEmpty
                               ? 'Issue reported'
                               : controller.text.trim();
+                          _issuePhotos[item.key] = tempPhotos;
                         });
                         _updateProgress();
                         Navigator.pop(ctx);
@@ -1054,7 +1173,7 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
             ],
           ),
         ),
-      ),
+      )),
     );
   }
 

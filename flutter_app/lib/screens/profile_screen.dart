@@ -867,18 +867,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    if (name == 'Home') appState.updateHomeAddress(controller.text);
-                    if (name == 'Work') appState.updateWorkAddress(controller.text);
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name address updated'), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))));
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.yellow, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                  child: Text('Save', style: TextStyle(fontWeight: FontWeight.w600)),
-                ),
+              StatefulBuilder(
+                builder: (context, setSaveState) {
+                  bool isSaving = false;
+                  return SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: isSaving ? null : () async {
+                        setSaveState(() => isSaving = true);
+                        final success = await SupabaseService.upsertSavedPlace(
+                          name: name,
+                          address: controller.text,
+                          icon: name == 'Home' ? 'home' : 'work',
+                          color: name == 'Home' ? 'blue' : 'green',
+                        );
+                        if (success) {
+                          if (name == 'Home') appState.updateHomeAddress(controller.text);
+                          if (name == 'Work') appState.updateWorkAddress(controller.text);
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name address updated'), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))));
+                        } else {
+                          setSaveState(() => isSaving = false);
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save $name address'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))));
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.yellow, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                      child: isSaving
+                          ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                          : Text('Save', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  );
+                },
               ),
               SizedBox(height: MediaQuery.of(context).padding.bottom),
             ],
@@ -953,10 +972,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 contact['name'] ?? '',
                 contact['phone'] ?? '',
                 contact['relation'] ?? '',
-                () {
-                  appState.removeEmergencyContact(contact['phone'] ?? '');
-                  Navigator.pop(ctx);
-                  _showEmergencyContacts(context);
+                () async {
+                  final phone = contact['phone'] ?? '';
+                  final updatedContacts = appState.emergencyContacts.where((c) => c['phone'] != phone).toList();
+                  try {
+                    await SupabaseService.updateProfile({
+                      'emergency_contacts': updatedContacts,
+                    });
+                    appState.removeEmergencyContact(phone);
+                    Navigator.pop(ctx);
+                    _showEmergencyContacts(context);
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to remove contact'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))));
+                  }
                 },
               )),
             const SizedBox(height: 16),
@@ -1057,19 +1085,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   )).toList(),
                 ),
                 const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      if (nameController.text.isNotEmpty && phoneController.text.isNotEmpty) {
-                        appState.addEmergencyContact({'name': nameController.text, 'phone': phoneController.text, 'relation': selectedRelation});
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${nameController.text} added as emergency contact'), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))));
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.yellow, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                    child: Text('Add Contact', style: TextStyle(fontWeight: FontWeight.w600)),
-                  ),
+                StatefulBuilder(
+                  builder: (context, setSaveState) {
+                    bool isSaving = false;
+                    return SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: isSaving ? null : () async {
+                          if (nameController.text.isEmpty || phoneController.text.isEmpty) return;
+                          setSaveState(() => isSaving = true);
+                          try {
+                            final newContact = {'name': nameController.text, 'phone': phoneController.text, 'relation': selectedRelation};
+                            final updatedContacts = [...appState.emergencyContacts, newContact];
+                            await SupabaseService.updateProfile({
+                              'emergency_contacts': updatedContacts,
+                            });
+                            appState.addEmergencyContact(newContact);
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${nameController.text} added as emergency contact'), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))));
+                          } catch (e) {
+                            setSaveState(() => isSaving = false);
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save contact'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))));
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.yellow, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                        child: isSaving
+                            ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                            : Text('Add Contact', style: TextStyle(fontWeight: FontWeight.w600)),
+                      ),
+                    );
+                  },
                 ),
                 SizedBox(height: MediaQuery.of(context).padding.bottom),
               ],

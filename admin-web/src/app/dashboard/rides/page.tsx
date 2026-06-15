@@ -176,7 +176,7 @@ export default function RidesPage() {
             avatar_url
           )
         )
-      `).eq("is_online", true)
+      `).eq("is_online", true).gte("last_updated", new Date(Date.now() - 5 * 60 * 1000).toISOString())
     ])
 
     // Get active rides with full details
@@ -248,6 +248,7 @@ export default function RidesPage() {
         )
       `)
       .eq("is_online", true)
+      .gte("last_updated", new Date(Date.now() - 5 * 60 * 1000).toISOString())
 
     if (data) {
       // Map the nested structure to flat driver info

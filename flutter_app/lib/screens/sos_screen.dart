@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:geolocator/geolocator.dart';
 import '../theme/app_theme.dart';
+import '../services/supabase_service.dart';
 
 class SOSScreen extends StatefulWidget {
   const SOSScreen({super.key});
@@ -65,14 +67,35 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
     );
   }
 
+  Future<void> _activateSOS() async {
+    HapticFeedback.heavyImpact();
+    setState(() => _sosActivated = true);
+
+    double? lat;
+    double? lng;
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      ).timeout(const Duration(seconds: 5));
+      lat = position.latitude;
+      lng = position.longitude;
+    } catch (e) {
+      debugPrint('Could not get location for SOS: $e');
+    }
+
+    await SupabaseService.triggerSOSAlert(
+      latitude: lat,
+      longitude: lng,
+    );
+  }
+
   Widget _buildSOSButton(BuildContext context) {
     return Column(
       children: [
         GestureDetector(
-          onLongPress: () {
-            HapticFeedback.heavyImpact();
-            setState(() => _sosActivated = true);
-            _showSOSActivatedDialog(context);
+          onLongPress: () async {
+            await _activateSOS();
+            if (mounted) _showSOSActivatedDialog(context);
           },
           child: AnimatedBuilder(
             animation: _pulseController,

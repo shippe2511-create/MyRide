@@ -93,10 +93,6 @@ export default function VehiclesPage() {
     icon: "car",
     plate_no: "",
     capacity: 4,
-    base_fare: 0,
-    per_km_rate: 0,
-    per_min_rate: 0,
-    min_fare: 0,
     is_active: true,
     features: ""
   })
@@ -130,10 +126,6 @@ export default function VehiclesPage() {
       icon: "car",
       plate_no: "",
       capacity: 4,
-      base_fare: 0,
-      per_km_rate: 0,
-      per_min_rate: 0,
-      min_fare: 0,
       is_active: true,
       features: ""
     })
@@ -149,10 +141,6 @@ export default function VehiclesPage() {
       icon: vehicle.icon,
       plate_no: vehicle.plate_no || "",
       capacity: vehicle.capacity,
-      base_fare: vehicle.base_fare,
-      per_km_rate: vehicle.per_km_rate,
-      per_min_rate: vehicle.per_min_rate,
-      min_fare: vehicle.min_fare,
       is_active: vehicle.is_active,
       features: (vehicle.features || []).join(", ")
     })
@@ -176,10 +164,6 @@ export default function VehiclesPage() {
       icon: formData.icon,
       plate_no: formData.plate_no || null,
       capacity: formData.capacity,
-      base_fare: formData.base_fare,
-      per_km_rate: formData.per_km_rate,
-      per_min_rate: formData.per_min_rate,
-      min_fare: formData.min_fare,
       is_active: formData.is_active,
       features: formData.features.split(",").map(f => f.trim()).filter(Boolean),
       sort_order: selectedVehicle?.sort_order || vehicles.length + 1
@@ -295,7 +279,7 @@ export default function VehiclesPage() {
         <CardHeader>
           <CardTitle>All Vehicle Types</CardTitle>
           <CardDescription>
-            Configure vehicle types, pricing, and features for your transport service
+            Configure vehicle types and features for your transport service
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -387,7 +371,7 @@ export default function VehiclesPage() {
           <DialogHeader>
             <DialogTitle>{selectedVehicle ? "Edit Vehicle Type" : "Add Vehicle Type"}</DialogTitle>
             <DialogDescription>
-              Configure vehicle details, pricing, and features
+              Configure vehicle details and features
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">

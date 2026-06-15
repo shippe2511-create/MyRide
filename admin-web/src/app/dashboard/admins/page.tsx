@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -20,7 +20,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Plus, Shield, ShieldCheck, UserCog, Headphones, Eye, MoreHorizontal, Edit, Trash2, Loader2, Ban, CheckCircle, KeyRound } from "lucide-react"
+import { Plus, Shield, ShieldCheck, UserCog, Headphones, Eye, MoreHorizontal, Edit, Trash2, Loader2, Ban, CheckCircle, KeyRound, Settings2 } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 import { formatDate } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -45,6 +46,29 @@ interface AuditLog {
   table_name: string | null
   created_at: string
   user: { full_name: string } | null
+}
+
+interface UserPermissions {
+  id: string
+  user_id: string
+  role: string
+  can_manage_customers: boolean
+  can_manage_drivers: boolean
+  can_manage_rides: boolean
+  can_manage_content: boolean
+  can_manage_settings: boolean
+  can_manage_admins: boolean
+  can_export_data: boolean
+}
+
+const PERMISSION_LABELS: Record<string, { label: string; description: string }> = {
+  can_manage_customers: { label: "Manage Customers", description: "View, edit, and manage customer accounts" },
+  can_manage_drivers: { label: "Manage Drivers", description: "View, edit, and manage driver accounts and documents" },
+  can_manage_rides: { label: "Manage Rides", description: "View and manage ride bookings and history" },
+  can_manage_content: { label: "Manage Content", description: "Edit announcements, FAQs, and app content" },
+  can_manage_settings: { label: "System Settings", description: "Access and modify system configuration" },
+  can_manage_admins: { label: "Manage Admins", description: "Add, edit, and remove admin users" },
+  can_export_data: { label: "Export Data", description: "Export reports and data to files" },
 }
 
 const ROLES = [
@@ -89,10 +113,12 @@ export default function AdminsPage() {
   const supabase = createClient()
   const [users, setUsers] = useState<AdminUser[]>([])
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
+  const [userPermissions, setUserPermissions] = useState<Record<string, UserPermissions>>({})
   const [loading, setLoading] = useState(true)
-  const [dialogType, setDialogType] = useState<"add" | "edit" | "delete" | null>(null)
+  const [dialogType, setDialogType] = useState<"add" | "edit" | "delete" | "permissions" | null>(null)
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
   const [saving, setSaving] = useState(false)
+  const [savingPermissions, setSavingPermissions] = useState(false)
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
@@ -103,20 +129,37 @@ export default function AdminsPage() {
     role: "operator",
     status: "approved"
   })
+  const [permissionsForm, setPermissionsForm] = useState<Partial<UserPermissions>>({
+    can_manage_customers: false,
+    can_manage_drivers: false,
+    can_manage_rides: false,
+    can_manage_content: false,
+    can_manage_settings: false,
+    can_manage_admins: false,
+    can_export_data: false,
+  })
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    const [usersRes, logsRes] = await Promise.all([
+  const loadData = useCallback(async () => {
+    const [usersRes, logsRes, permsRes] = await Promise.all([
       supabase.from("profiles").select("*").in("role", ["admin", "super-admin", "operator", "support", "viewer"]).order("created_at", { ascending: false }),
       supabase.from("audit_logs").select("*, user:profiles(full_name)").order("created_at", { ascending: false }).limit(20),
+      supabase.from("admin_permissions").select("*"),
     ])
     setUsers(usersRes.data || [])
     setAuditLogs(logsRes.data || [])
+
+    const permsMap: Record<string, UserPermissions> = {}
+    for (const perm of permsRes.data || []) {
+      permsMap[perm.user_id] = perm
+    }
+    setUserPermissions(permsMap)
+
     setLoading(false)
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const openAddDialog = () => {
     setSelectedUser(null)
@@ -146,6 +189,87 @@ export default function AdminsPage() {
       status: user.status
     })
     setDialogType("edit")
+  }
+
+  const openPermissionsDialog = (user: AdminUser) => {
+    setSelectedUser(user)
+    const existing = userPermissions[user.id]
+    if (existing) {
+      setPermissionsForm({
+        can_manage_customers: existing.can_manage_customers,
+        can_manage_drivers: existing.can_manage_drivers,
+        can_manage_rides: existing.can_manage_rides,
+        can_manage_content: existing.can_manage_content,
+        can_manage_settings: existing.can_manage_settings,
+        can_manage_admins: existing.can_manage_admins,
+        can_export_data: existing.can_export_data,
+      })
+    } else {
+      const defaults = getDefaultPermissions(user.role)
+      setPermissionsForm(defaults)
+    }
+    setDialogType("permissions")
+  }
+
+  const getDefaultPermissions = (role: string) => {
+    switch (role) {
+      case "super-admin":
+        return {
+          can_manage_customers: true, can_manage_drivers: true, can_manage_rides: true,
+          can_manage_content: true, can_manage_settings: true, can_manage_admins: true, can_export_data: true,
+        }
+      case "admin":
+        return {
+          can_manage_customers: true, can_manage_drivers: true, can_manage_rides: true,
+          can_manage_content: true, can_manage_settings: false, can_manage_admins: false, can_export_data: true,
+        }
+      case "operator":
+        return {
+          can_manage_customers: false, can_manage_drivers: true, can_manage_rides: true,
+          can_manage_content: true, can_manage_settings: false, can_manage_admins: false, can_export_data: false,
+        }
+      case "support":
+        return {
+          can_manage_customers: true, can_manage_drivers: false, can_manage_rides: true,
+          can_manage_content: false, can_manage_settings: false, can_manage_admins: false, can_export_data: false,
+        }
+      default:
+        return {
+          can_manage_customers: false, can_manage_drivers: false, can_manage_rides: false,
+          can_manage_content: false, can_manage_settings: false, can_manage_admins: false, can_export_data: false,
+        }
+    }
+  }
+
+  const handleSavePermissions = async () => {
+    if (!selectedUser) return
+    setSavingPermissions(true)
+
+    const existing = userPermissions[selectedUser.id]
+    const payload = {
+      user_id: selectedUser.id,
+      role: selectedUser.role,
+      ...permissionsForm,
+      updated_at: new Date().toISOString(),
+    }
+
+    let error
+    if (existing) {
+      const res = await supabase.from("admin_permissions").update(payload).eq("id", existing.id)
+      error = res.error
+    } else {
+      const res = await supabase.from("admin_permissions").insert(payload)
+      error = res.error
+    }
+
+    if (error) {
+      toast.error("Failed to save permissions: " + error.message)
+    } else {
+      toast.success("Permissions updated")
+      loadData()
+      setDialogType(null)
+    }
+    setSavingPermissions(false)
   }
 
   const handleSave = async () => {
@@ -430,6 +554,9 @@ export default function AdminsPage() {
                               <DropdownMenuItem onSelect={() => openEditDialog(user)}>
                                 <Edit className="mr-2 h-4 w-4" />Edit
                               </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => openPermissionsDialog(user)}>
+                                <Settings2 className="mr-2 h-4 w-4" />Permissions
+                              </DropdownMenuItem>
                               <DropdownMenuItem onSelect={() => sendResetLink(user)}>
                                 <KeyRound className="mr-2 h-4 w-4" />Send Reset Link
                               </DropdownMenuItem>
@@ -687,6 +814,61 @@ export default function AdminsPage() {
             <Button variant="outline" onClick={() => setDialogType(null)}>Cancel</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={saving}>
               {saving ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Permissions Dialog */}
+      <Dialog open={dialogType === "permissions"} onOpenChange={() => setDialogType(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings2 className="h-5 w-5" />
+              Edit Permissions
+            </DialogTitle>
+            <DialogDescription>
+              Configure granular permissions for {selectedUser?.full_name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="flex items-center gap-3 mb-4 p-3 bg-muted rounded-lg">
+              <Avatar>
+                <AvatarImage src={selectedUser?.avatar_url || undefined} />
+                <AvatarFallback>{selectedUser?.full_name?.[0] || "U"}</AvatarFallback>
+              </Avatar>
+              <div>
+                <p className="font-medium">{selectedUser?.full_name}</p>
+                <p className="text-sm text-muted-foreground">{getRoleBadge(selectedUser?.role || "viewer")}</p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              {Object.entries(PERMISSION_LABELS).map(([key, { label, description }]) => (
+                <div key={key} className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <label className="text-sm font-medium">{label}</label>
+                    <p className="text-xs text-muted-foreground">{description}</p>
+                  </div>
+                  <Switch
+                    checked={Boolean(permissionsForm[key as keyof typeof permissionsForm])}
+                    onCheckedChange={(checked) =>
+                      setPermissionsForm({ ...permissionsForm, [key]: checked })
+                    }
+                    disabled={selectedUser?.role === "super-admin"}
+                  />
+                </div>
+              ))}
+            </div>
+            {selectedUser?.role === "super-admin" && (
+              <p className="text-xs text-muted-foreground mt-4 p-2 bg-muted rounded">
+                Super Admins have all permissions enabled by default and cannot be modified.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogType(null)}>Cancel</Button>
+            <Button onClick={handleSavePermissions} disabled={savingPermissions || selectedUser?.role === "super-admin"}>
+              {savingPermissions ? "Saving..." : "Save Permissions"}
             </Button>
           </DialogFooter>
         </DialogContent>

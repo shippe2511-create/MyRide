@@ -153,6 +153,14 @@ export default function AdminsPage() {
       toast.error("Name and email are required")
       return
     }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email)) {
+      toast.error("Please enter a valid email address")
+      return
+    }
+
     setSaving(true)
 
     if (dialogType === "edit" && selectedUser) {
@@ -176,6 +184,9 @@ export default function AdminsPage() {
         loadData()
       }
     } else {
+      // For new admin users, we need to create auth user first
+      // Note: This requires admin API access via Edge Function or service role
+      // For now, create profile and send invite
       const { error } = await supabase
         .from("profiles")
         .insert({
@@ -186,12 +197,22 @@ export default function AdminsPage() {
           department: formData.department || null,
           gender: formData.gender || null,
           role: formData.role,
-          status: formData.status
+          status: "pending" // Set to pending until they accept invite
         })
 
-      if (error) toast.error("Failed to add user: " + error.message)
-      else {
-        toast.success("User added")
+      if (error) {
+        toast.error("Failed to add user: " + error.message)
+      } else {
+        // Send password reset email as invite
+        const { error: inviteError } = await supabase.auth.resetPasswordForEmail(
+          formData.email,
+          { redirectTo: `${window.location.origin}/auth/callback` }
+        )
+        if (inviteError) {
+          toast.warning("User added but invite email failed. Send reset link manually.")
+        } else {
+          toast.success("User added - invite email sent")
+        }
         loadData()
       }
     }

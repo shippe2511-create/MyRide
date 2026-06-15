@@ -29,6 +29,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      debugPrint('Error loading announcements: $e');
       setState(() => _isLoading = false);
     }
   }

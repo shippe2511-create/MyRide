@@ -146,7 +146,7 @@ class RideRequestCard extends StatelessWidget {
 
           // Route info
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: Column(
               children: [
                 _buildLocationRow(
@@ -160,7 +160,7 @@ class RideRequestCard extends StatelessWidget {
                   padding: const EdgeInsets.only(left: 11),
                   child: Container(
                     width: 2,
-                    height: 30,
+                    height: 20,
                     color: context.borderColor,
                   ),
                 ),
@@ -177,7 +177,7 @@ class RideRequestCard extends StatelessWidget {
 
           // Stats row
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: context.bgColor,
               border: Border(
@@ -201,7 +201,7 @@ class RideRequestCard extends StatelessWidget {
 
           // Action button
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -212,7 +212,7 @@ class RideRequestCard extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.yellow,
                   foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),

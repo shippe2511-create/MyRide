@@ -39,6 +39,24 @@ export function Header() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [notifCount, setNotifCount] = useState(0)
+  const [searchQuery, setSearchQuery] = useState("")
+
+  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase()
+      // Route to appropriate page based on search context
+      if (q.includes("driver")) {
+        router.push(`/dashboard/drivers?search=${encodeURIComponent(q)}`)
+      } else if (q.includes("customer") || q.includes("user")) {
+        router.push(`/dashboard/customers?search=${encodeURIComponent(q)}`)
+      } else if (q.includes("ride") || q.includes("trip")) {
+        router.push(`/dashboard/rides?search=${encodeURIComponent(q)}`)
+      } else {
+        // Default to customers search
+        router.push(`/dashboard/customers?search=${encodeURIComponent(q)}`)
+      }
+    }
+  }
 
   useEffect(() => {
     loadProfile()
@@ -120,8 +138,11 @@ export function Header() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Search..."
+            placeholder="Search drivers, customers, rides..."
             className="w-64 pl-9"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleSearch}
           />
         </div>
       </div>

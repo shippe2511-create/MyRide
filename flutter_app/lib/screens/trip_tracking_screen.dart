@@ -44,6 +44,15 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
     _rideStatus = widget.tripData['status'] as String? ?? 'accepted';
     _startDriverSimulation();
     _startStatusPolling(); // Poll for driver completing the trip
+
+    // Subscribe to chat notifications
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final appState = Provider.of<AppState>(context, listen: false);
+      final rideId = widget.tripData['rideId'] as String?;
+      if (rideId != null && appState.profileId != null) {
+        NotificationService.subscribeToChatMessages(rideId, appState.profileId!);
+      }
+    });
   }
 
   @override

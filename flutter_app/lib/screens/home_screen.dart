@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../services/notification_service.dart';
 import 'search_screen.dart';
 import 'activity_screen.dart';
 import 'inbox_screen.dart';
@@ -56,6 +57,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     )..repeat(reverse: true);
     _loadContent();
     _checkForScheduledRides();
+    _initNotifications();
+  }
+
+  void _initNotifications() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final appState = Provider.of<AppState>(context, listen: false);
+      if (appState.profileId != null) {
+        NotificationService.subscribeToNotifications(appState.profileId!);
+        debugPrint('Subscribed to general notifications for user ${appState.profileId}');
+      }
+    });
   }
 
   void _checkForScheduledRides() {

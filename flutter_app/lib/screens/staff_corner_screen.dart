@@ -29,6 +29,7 @@ class _StaffCornerScreenState extends State<StaffCornerScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      debugPrint('Error loading staff corner: $e');
       setState(() => _isLoading = false);
     }
   }

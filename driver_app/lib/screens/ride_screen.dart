@@ -10,6 +10,7 @@ import '../models/ride_request.dart';
 import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../services/notification_service.dart';
 import 'chat_screen.dart';
 
 class RideScreen extends StatefulWidget {
@@ -57,6 +58,15 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
 
     _startDriverSimulation();
     _startDestinationChangePolling();
+
+    // Subscribe to chat notifications
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final driverState = Provider.of<DriverState>(context, listen: false);
+      final rideId = driverState.currentRide?.id;
+      if (rideId != null && driverState.driverId.isNotEmpty) {
+        NotificationService.subscribeToChatMessages(rideId, driverState.driverId);
+      }
+    });
   }
 
   @override

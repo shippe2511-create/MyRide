@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../services/notification_service.dart';
+import '../providers/driver_state.dart';
 
 enum MessageType { text, voice, location, image }
 enum MessageStatus { sending, sent, delivered, read }
@@ -81,6 +84,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   final FocusNode _focusNode = FocusNode();
   final List<ChatMessage> _messages = [];
   RealtimeChannel? _chatSubscription;
+  String? _myDriverId;
 
   bool _isTyping = false;
   bool _customerTyping = false;
@@ -104,6 +108,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    NotificationService.setChatScreenOpen(true);
     _recordingController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
@@ -112,13 +117,16 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       CurvedAnimation(parent: _recordingController, curve: Curves.easeInOut),
     );
 
-    if (widget.rideId != null) {
-      _loadMessages();
-      _subscribeToMessages();
-    } else {
-      _loadMockMessages();
-      setState(() => _isLoading = false);
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _myDriverId = Provider.of<DriverState>(context, listen: false).driverId;
+      if (widget.rideId != null) {
+        _loadMessages();
+        _subscribeToMessages();
+      } else {
+        _loadMockMessages();
+        setState(() => _isLoading = false);
+      }
+    });
     _messageController.addListener(_onTextChanged);
   }
 
@@ -142,7 +150,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       }
 
       // Mark messages as read
-      await SupabaseService.markMessagesAsRead(widget.rideId!);
+      await SupabaseService.markMessagesAsRead(widget.rideId!, userId: _myDriverId);
     } catch (e) {
       debugPrint('Error loading messages: $e');
     }
@@ -153,9 +161,11 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   void _subscribeToMessages() {
     if (widget.rideId == null) return;
 
+    debugPrint('DriverChatScreen: Subscribing to messages for ride ${widget.rideId}');
     _chatSubscription = SupabaseService.subscribeToChatMessages(
       widget.rideId!,
       (newMessage) {
+        debugPrint('DriverChatScreen: Received realtime message: $newMessage');
         if (!mounted) return;
 
         final isDriver = newMessage['sender_type'] == 'driver';
@@ -169,6 +179,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
         // Don't add duplicates
         if (!_messages.any((m) => m.id == msg.id)) {
+          debugPrint('DriverChatScreen: Adding message to UI');
           setState(() => _messages.add(msg));
           _scrollToBottom();
 
@@ -223,6 +234,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    NotificationService.setChatScreenOpen(false);
     _messageController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
@@ -245,6 +257,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           rideId: widget.rideId!,
           message: messageText,
           senderType: 'driver',
+          senderId: _myDriverId,
         );
         // Message will be added via the subscription
       } catch (e) {

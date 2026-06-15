@@ -102,6 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
         // Store the Supabase profile ID
         if (existingUser['id'] != null) {
           appState.setProfileId(existingUser['id']);
+          SupabaseService.setProfileId(existingUser['id']);
         }
 
         appState.setUserData(

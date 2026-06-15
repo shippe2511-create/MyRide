@@ -33,6 +33,7 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      debugPrint('Error loading ride history: $e');
       setState(() => _isLoading = false);
     }
   }

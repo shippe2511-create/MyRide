@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
+import '../services/supabase_service.dart';
+import '../providers/driver_state.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -10,68 +13,38 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  final List<Map<String, dynamic>> _notifications = [
-    {
-      'id': '1',
-      'type': 'ride',
-      'title': 'New Ride Request',
-      'message': 'Hassan Mohamed requested a ride from IT Division to Hulhumale Terminal',
-      'time': DateTime.now().subtract(const Duration(minutes: 5)),
-      'read': false,
-    },
-    {
-      'id': '2',
-      'type': 'announcement',
-      'title': 'Schedule Update',
-      'message': 'Your shift for tomorrow has been updated. Please check the schedule.',
-      'time': DateTime.now().subtract(const Duration(hours: 2)),
-      'read': false,
-    },
-    {
-      'id': '3',
-      'type': 'rating',
-      'title': 'New 5-Star Rating!',
-      'message': 'Ahmed Ali rated your trip 5 stars. Great job!',
-      'time': DateTime.now().subtract(const Duration(hours: 5)),
-      'read': true,
-    },
-    {
-      'id': '4',
-      'type': 'system',
-      'title': 'Vehicle Inspection Reminder',
-      'message': 'Your vehicle inspection is due in 3 days. Please schedule an appointment.',
-      'time': DateTime.now().subtract(const Duration(days: 1)),
-      'read': true,
-    },
-    {
-      'id': '5',
-      'type': 'announcement',
-      'title': 'Holiday Notice',
-      'message': 'Office will remain closed on Friday for public holiday. Emergency services will continue.',
-      'time': DateTime.now().subtract(const Duration(days: 2)),
-      'read': true,
-    },
-    {
-      'id': '6',
-      'type': 'ride',
-      'title': 'Trip Completed',
-      'message': 'Your trip with Fathimath Hassan has been completed successfully.',
-      'time': DateTime.now().subtract(const Duration(days: 2)),
-      'read': true,
-    },
-    {
-      'id': '7',
-      'type': 'system',
-      'title': 'Document Verified',
-      'message': 'Your driving license has been verified successfully.',
-      'time': DateTime.now().subtract(const Duration(days: 3)),
-      'read': true,
-    },
-  ];
+  List<Map<String, dynamic>> _notifications = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    setState(() => _isLoading = true);
+    try {
+      final driverState = Provider.of<DriverState>(context, listen: false);
+      final driverId = driverState.driverId;
+      if (driverId != null) {
+        final notifications = await SupabaseService.getDriverNotifications(driverId);
+        setState(() {
+          _notifications = notifications;
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      debugPrint('Error loading notifications: $e');
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final unreadCount = _notifications.where((n) => !n['read']).length;
+    final unreadCount = _notifications.where((n) => n['read'] != true).length;
 
     return Scaffold(
       backgroundColor: context.bgColor,
@@ -90,78 +63,62 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
         ],
       ),
-      body: _notifications.isEmpty
-          ? _buildEmptyState(context)
-          : ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: _notifications.length,
-              itemBuilder: (context, index) {
-                final notification = _notifications[index];
-                return _buildNotificationCard(context, notification, index);
-              },
-            ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: AppColors.yellow))
+          : _notifications.isEmpty
+              ? _buildEmptyState(context)
+              : RefreshIndicator(
+                  onRefresh: _loadNotifications,
+                  color: AppColors.yellow,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: _notifications.length,
+                    itemBuilder: (context, index) {
+                      final notification = _notifications[index];
+                      return _buildNotificationCard(context, notification, index);
+                    },
+                  ),
+                ),
     );
   }
 
   Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              color: context.cardColor,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Icon(Icons.notifications_off_outlined, size: 48, color: context.mutedColor),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'No Notifications',
-            style: TextStyle(
-              color: context.textColor,
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          Icon(Icons.notifications_none, size: 80, color: context.mutedColor),
+          const SizedBox(height: 16),
+          Text('No notifications', style: TextStyle(color: context.mutedColor, fontSize: 18)),
           const SizedBox(height: 8),
-          Text(
-            'You\'re all caught up!',
-            style: TextStyle(
-              color: context.mutedColor,
-              fontSize: 14,
-            ),
-          ),
+          Text('You\'re all caught up!', style: TextStyle(color: context.mutedColor, fontSize: 14)),
         ],
       ),
     );
   }
 
   Widget _buildNotificationCard(BuildContext context, Map<String, dynamic> notification, int index) {
-    final type = notification['type'] as String;
-    final isRead = notification['read'] as bool;
+    final isRead = notification['read'] == true;
+    final type = notification['type'] as String? ?? 'system';
+    final title = notification['title'] as String? ?? 'Notification';
+    final message = notification['message'] as String? ?? '';
+    final timeStr = notification['created_at'] as String?;
+    final time = timeStr != null ? DateTime.tryParse(timeStr) : null;
 
     IconData icon;
     Color iconColor;
-
     switch (type) {
       case 'ride':
-        icon = Icons.directions_car;
+        icon = Icons.local_taxi;
         iconColor = AppColors.yellow;
         break;
       case 'rating':
         icon = Icons.star;
-        iconColor = AppColors.yellow;
+        iconColor = Colors.amber;
         break;
       case 'announcement':
         icon = Icons.campaign;
-        iconColor = Colors.blue;
-        break;
-      case 'system':
-        icon = Icons.info;
-        iconColor = AppColors.success;
+        iconColor = AppColors.info;
         break;
       default:
         icon = Icons.notifications;
@@ -169,63 +126,35 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
 
     return Dismissible(
-      key: Key(notification['id'] as String),
+      key: Key(notification['id']?.toString() ?? index.toString()),
       direction: DismissDirection.endToStart,
+      onDismissed: (_) => _deleteNotification(index),
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         color: AppColors.error,
         child: const Icon(Icons.delete, color: Colors.white),
       ),
-      onDismissed: (_) {
-        setState(() => _notifications.removeAt(index));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Notification deleted'),
-            backgroundColor: context.cardColor,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            action: SnackBarAction(
-              label: 'Undo',
-              textColor: AppColors.yellow,
-              onPressed: () {
-                setState(() => _notifications.insert(index, notification));
-              },
-            ),
-          ),
-        );
-      },
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          if (!isRead) {
-            setState(() => notification['read'] = true);
-          }
-          _showNotificationDetail(context, notification);
-        },
+      child: InkWell(
+        onTap: () => _markAsRead(index),
         child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isRead ? context.cardColor : AppColors.yellow.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isRead ? context.borderColor : AppColors.yellow.withValues(alpha: 0.3),
-            ),
+            color: isRead ? context.cardColor : AppColors.yellow.withValues(alpha: 0.1),
+            border: Border(bottom: BorderSide(color: context.borderColor, width: 0.5)),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 48,
-                height: 48,
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: iconColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: iconColor, size: 24),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -234,11 +163,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            notification['title'] as String,
+                            title,
                             style: TextStyle(
                               color: context.textColor,
                               fontSize: 15,
-                              fontWeight: isRead ? FontWeight.w500 : FontWeight.w700,
+                              fontWeight: isRead ? FontWeight.w500 : FontWeight.w600,
                             ),
                           ),
                         ),
@@ -255,21 +184,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      notification['message'] as String,
-                      style: TextStyle(
-                        color: context.mutedColor,
-                        fontSize: 13,
-                      ),
+                      message,
+                      style: TextStyle(color: context.mutedColor, fontSize: 13),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Text(
-                      _formatTime(notification['time'] as DateTime),
-                      style: TextStyle(
-                        color: context.mutedColor.withValues(alpha: 0.7),
-                        fontSize: 11,
-                      ),
+                      time != null ? _formatTime(time) : '',
+                      style: TextStyle(color: context.mutedColor.withValues(alpha: 0.7), fontSize: 12),
                     ),
                   ],
                 ),
@@ -281,109 +204,62 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  void _showNotificationDetail(BuildContext context, Map<String, dynamic> notification) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 30),
-        decoration: BoxDecoration(
-          color: context.cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: context.borderColor,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              notification['title'] as String,
-              style: TextStyle(
-                color: context.textColor,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _formatTime(notification['time'] as DateTime),
-              style: TextStyle(
-                color: context.mutedColor,
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              notification['message'] as String,
-              style: TextStyle(
-                color: context.textColor,
-                fontSize: 15,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.yellow,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.w600)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _markAllAsRead() {
-    HapticFeedback.mediumImpact();
-    setState(() {
-      for (var notification in _notifications) {
-        notification['read'] = true;
-      }
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('All notifications marked as read'),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-  }
-
   String _formatTime(DateTime time) {
     final now = DateTime.now();
     final diff = now.difference(time);
 
-    if (diff.inMinutes < 1) {
-      return 'Just now';
-    } else if (diff.inMinutes < 60) {
-      return '${diff.inMinutes}m ago';
-    } else if (diff.inHours < 24) {
-      return '${diff.inHours}h ago';
-    } else if (diff.inDays == 1) {
-      return 'Yesterday';
-    } else if (diff.inDays < 7) {
-      return '${diff.inDays}d ago';
-    } else {
-      return '${time.day}/${time.month}/${time.year}';
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${time.day}/${time.month}/${time.year}';
+  }
+
+  void _markAsRead(int index) async {
+    if (_notifications[index]['read'] == true) return;
+
+    final notificationId = _notifications[index]['id']?.toString();
+    if (notificationId != null) {
+      try {
+        await SupabaseService.markNotificationAsRead(notificationId);
+        setState(() {
+          _notifications[index] = {..._notifications[index], 'read': true};
+        });
+      } catch (e) {
+        debugPrint('Error marking notification as read: $e');
+      }
+    }
+  }
+
+  void _markAllAsRead() async {
+    final driverState = Provider.of<DriverState>(context, listen: false);
+    final driverId = driverState.driverId;
+    if (driverId != null) {
+      try {
+        await SupabaseService.markAllNotificationsAsRead(driverId);
+        setState(() {
+          _notifications = _notifications.map((n) => {...n, 'read': true}).toList();
+        });
+        HapticFeedback.lightImpact();
+      } catch (e) {
+        debugPrint('Error marking all notifications as read: $e');
+      }
+    }
+  }
+
+  void _deleteNotification(int index) async {
+    final notificationId = _notifications[index]['id']?.toString();
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _notifications.removeAt(index);
+    });
+
+    if (notificationId != null) {
+      try {
+        await SupabaseService.deleteNotification(notificationId);
+      } catch (e) {
+        debugPrint('Error deleting notification: $e');
+      }
     }
   }
 }

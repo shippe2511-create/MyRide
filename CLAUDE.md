@@ -50,3 +50,20 @@ are documented there. Keep those notes updated as the project evolves.
 - 5 tables still have RLS disabled (transport_routes, route_stops, route_schedules,
   saved_places, chat_messages) — RLS fix SQL is drafted but NOT yet applied. Review
   before applying to the live database.
+
+## Working rules — ALWAYS follow (added by Athif)
+- **No dead buttons or fields, ever.** Every button, field, toggle, and feature you
+  create or touch must be fully wired and functional before you call it done:
+  connected to Supabase (correct table/RPC), with save/load, validation, loading and
+  error states, and clear user feedback (success/error messages). Never leave a
+  control as a visual placeholder. If you cannot fully wire something, say so
+  explicitly and explain what's missing — do not silently leave it half-built.
+- **Connect to the admin portal.** Features that should be manageable or visible from
+  admin-web must actually be wired to it, not just built in the app in isolation.
+- **Fix incrementally, never all at once.** When fixing bugs, work ONE issue (or one
+  page) at a time. Explain the fix, make the change, then PAUSE for Athif to test
+  before moving on. Do not batch unrelated fixes across many files in one go.
+- **Verify, don't assume.** Before saying something is fixed, trace the data flow end
+  to end (UI → Supabase → back). State what you checked.
+- **Keep the vault updated.** As issues are found and fixed, record them in the
+  NOVA-Brain vault (e.g. Knowledge/Issues.md) so state persists across sessions.

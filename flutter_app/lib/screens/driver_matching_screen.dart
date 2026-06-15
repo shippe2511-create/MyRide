@@ -116,6 +116,11 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
       _rideId = ride['id'];
       debugPrint('Ride created: $_rideId');
 
+      // Subscribe to chat notifications for this ride
+      if (customerId != null) {
+        NotificationService.subscribeToChatMessages(_rideId!, customerId);
+      }
+
       // Subscribe to ride status updates
       _subscribeToRideUpdates();
 

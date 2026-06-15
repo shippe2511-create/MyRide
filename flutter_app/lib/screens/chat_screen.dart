@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart';
 import 'dart:async';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../services/notification_service.dart';
+import '../providers/app_state.dart';
 
 enum MessageType { text, voice, location, image }
 enum MessageStatus { sending, sent, delivered, read }
@@ -58,6 +61,8 @@ class ChatScreen extends StatefulWidget {
   final double? driverRating;
   final String? rideId;
   final String? driverUserId;
+  final String? rideStatus;
+  final int? etaMinutes;
 
   const ChatScreen({
     super.key,
@@ -68,6 +73,8 @@ class ChatScreen extends StatefulWidget {
     this.driverRating,
     this.rideId,
     this.driverUserId,
+    this.rideStatus,
+    this.etaMinutes,
   });
 
   @override
@@ -89,6 +96,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   late AnimationController _recordingController;
   late Animation<double> _recordingAnimation;
   RealtimeChannel? _chatChannel;
+  String? _myProfileId;
 
   final List<_QuickReply> _quickReplies = [
     _QuickReply(icon: Icons.waving_hand, text: "Hi, I'm here!", color: AppColors.yellow),
@@ -103,6 +111,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    NotificationService.setChatScreenOpen(true);
     _recordingController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
@@ -110,17 +119,21 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _recordingAnimation = Tween<double>(begin: 1.0, end: 1.3).animate(
       CurvedAnimation(parent: _recordingController, curve: Curves.easeInOut),
     );
-    if (widget.rideId != null) {
-      _loadMessages();
-      _subscribeToMessages();
-    } else {
-      _loadMockMessages();
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _myProfileId = Provider.of<AppState>(context, listen: false).profileId;
+      if (widget.rideId != null) {
+        _loadMessages();
+        _subscribeToMessages();
+      } else {
+        _loadMockMessages();
+      }
+    });
     _messageController.addListener(_onTextChanged);
   }
 
   Future<void> _loadMessages() async {
     if (widget.rideId == null) return;
+    final appState = Provider.of<AppState>(context, listen: false);
     try {
       final messages = await SupabaseService.getChatMessages(widget.rideId!);
       if (mounted) {
@@ -139,7 +152,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         });
         _scrollToBottom();
       }
-      await SupabaseService.markMessagesAsRead(widget.rideId!);
+      await SupabaseService.markMessagesAsRead(widget.rideId!, userId: appState.profileId);
     } catch (e) {
       debugPrint('Error loading messages: $e');
     }
@@ -147,11 +160,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   void _subscribeToMessages() {
     if (widget.rideId == null) return;
+    debugPrint('ChatScreen: Subscribing to messages for ride ${widget.rideId}');
     _chatChannel = SupabaseService.subscribeToChatMessages(
       widget.rideId!,
       (newMessage) {
+        debugPrint('ChatScreen: Received realtime message: $newMessage');
         final isFromCustomer = newMessage['sender_type'] == 'customer';
         if (mounted && !isFromCustomer) {
+          debugPrint('ChatScreen: Adding driver message to UI');
           setState(() {
             _driverTyping = false;
             _messages.add(ChatMessage(
@@ -163,7 +179,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             ));
           });
           _scrollToBottom();
-          SupabaseService.markMessagesAsRead(widget.rideId!);
+          SupabaseService.markMessagesAsRead(widget.rideId!, userId: _myProfileId);
         }
       },
     );
@@ -213,6 +229,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    NotificationService.setChatScreenOpen(false);
     _chatChannel?.unsubscribe();
     _messageController.dispose();
     _scrollController.dispose();
@@ -221,6 +238,37 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _recordingTimer?.cancel();
     _recordingController.dispose();
     super.dispose();
+  }
+
+  String _getStatusText() {
+    switch (widget.rideStatus) {
+      case 'accepted':
+        final eta = widget.etaMinutes ?? 5;
+        return 'Driver is $eta min away';
+      case 'arrived':
+        return 'Driver has arrived';
+      case 'in_progress':
+        return 'Trip in progress';
+      case 'completed':
+        return 'Trip completed';
+      default:
+        return 'Driver is on the way';
+    }
+  }
+
+  String _getStatusSubtext() {
+    switch (widget.rideStatus) {
+      case 'accepted':
+        return 'Arriving at pickup point';
+      case 'arrived':
+        return 'Waiting at pickup location';
+      case 'in_progress':
+        return 'Heading to destination';
+      case 'completed':
+        return 'Thank you for riding';
+      default:
+        return 'Getting ready';
+    }
   }
 
   void _sendMessage(String text, {MessageType type = MessageType.text, int? voiceDuration, String? locationName}) async {
@@ -247,9 +295,11 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     // Send to Supabase if we have a ride ID
     if (widget.rideId != null) {
       try {
+        final appState = Provider.of<AppState>(context, listen: false);
         await SupabaseService.sendChatMessage(
           rideId: widget.rideId!,
           message: text.trim(),
+          senderId: appState.profileId,
         );
         if (mounted) {
           setState(() {
@@ -648,7 +698,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Driver is 3 min away',
+                  _getStatusText(),
                   style: TextStyle(
                     color: context.textColor,
                     fontSize: 13,
@@ -656,7 +706,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   ),
                 ),
                 Text(
-                  'Arriving at pickup point',
+                  _getStatusSubtext(),
                   style: TextStyle(
                     color: context.mutedColor,
                     fontSize: 11,

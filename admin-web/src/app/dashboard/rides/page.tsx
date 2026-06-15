@@ -158,7 +158,25 @@ export default function RidesPage() {
       supabase.from("rides").select("*", { count: "exact", head: true }).in("status", ["pending", "accepted", "arrived", "in_progress"]),
       supabase.from("rides").select("*", { count: "exact", head: true }).eq("status", "completed").gte("completed_at", today.toISOString()),
       supabase.from("rides").select("*", { count: "exact", head: true }).eq("status", "cancelled").gte("cancelled_at", today.toISOString()),
-      supabase.from("drivers").select(`*, profile:profiles!drivers_profile_id_fkey(id, full_name, phone, avatar_url)`).eq("is_online", true).eq("is_on_break", false)
+      supabase.from("driver_locations").select(`
+        id,
+        driver_id,
+        lat,
+        lng,
+        heading,
+        speed,
+        is_online,
+        last_updated,
+        driver:drivers!driver_locations_driver_id_fkey(
+          id,
+          profile:profiles!drivers_profile_id_fkey(
+            id,
+            full_name,
+            phone,
+            avatar_url
+          )
+        )
+      `).eq("is_online", true)
     ])
 
     // Get active rides with full details
@@ -171,7 +189,29 @@ export default function RidesPage() {
     setRides(ridesRes.data || [])
     setTotalCount(ridesRes.count || 0)
     setActiveRides(activeRidesData || [])
-    setDriverLocations(locationsRes.data || [])
+
+    // Map driver locations data to expected structure
+    if (locationsRes.data) {
+      const mapped: DriverLocation[] = locationsRes.data.map((loc: any) => ({
+        id: loc.id,
+        driver_id: loc.driver_id,
+        lat: loc.lat,
+        lng: loc.lng,
+        heading: loc.heading || 0,
+        speed: loc.speed || 0,
+        is_online: loc.is_online ?? true,
+        last_updated: loc.last_updated || new Date().toISOString(),
+        driver: loc.driver ? {
+          id: loc.driver.id,
+          full_name: loc.driver.profile?.full_name || 'Unknown',
+          phone: loc.driver.profile?.phone || null,
+          avatar_url: loc.driver.profile?.avatar_url || null
+        } : undefined
+      }))
+      setDriverLocations(mapped)
+    } else {
+      setDriverLocations([])
+    }
 
     setStats({
       totalRides: ridesRes.count || 0,
@@ -185,12 +225,50 @@ export default function RidesPage() {
   }
 
   const loadDriverLocations = async () => {
+    // Query driver_locations table with driver and profile info
     const { data } = await supabase
-      .from("drivers")
-      .select(`*, profile:profiles!drivers_profile_id_fkey(id, full_name, phone, avatar_url)`)
+      .from("driver_locations")
+      .select(`
+        id,
+        driver_id,
+        lat,
+        lng,
+        heading,
+        speed,
+        is_online,
+        last_updated,
+        driver:drivers!driver_locations_driver_id_fkey(
+          id,
+          profile:profiles!drivers_profile_id_fkey(
+            id,
+            full_name,
+            phone,
+            avatar_url
+          )
+        )
+      `)
       .eq("is_online", true)
-      .eq("is_on_break", false)
-    if (data) setDriverLocations(data)
+
+    if (data) {
+      // Map the nested structure to flat driver info
+      const mapped: DriverLocation[] = data.map(loc => ({
+        id: loc.id,
+        driver_id: loc.driver_id,
+        lat: loc.lat,
+        lng: loc.lng,
+        heading: loc.heading || 0,
+        speed: loc.speed || 0,
+        is_online: loc.is_online ?? true,
+        last_updated: loc.last_updated || new Date().toISOString(),
+        driver: loc.driver ? {
+          id: (loc.driver as any).id,
+          full_name: (loc.driver as any).profile?.full_name || 'Unknown',
+          phone: (loc.driver as any).profile?.phone || null,
+          avatar_url: (loc.driver as any).profile?.avatar_url || null
+        } : undefined
+      }))
+      setDriverLocations(mapped)
+    }
   }
 
   const handleCancel = async () => {

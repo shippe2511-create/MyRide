@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
+import '../services/supabase_service.dart';
+import '../providers/driver_state.dart';
 
 class SOSScreen extends StatefulWidget {
   const SOSScreen({super.key});
@@ -14,7 +17,8 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
   late AnimationController _pulseController;
   bool _sosActivated = false;
 
-  final List<Map<String, dynamic>> _emergencyContacts = [
+  // Default emergency contacts (loaded from database if available)
+  List<Map<String, dynamic>> _emergencyContacts = [
     {'name': 'Police', 'number': '119', 'icon': Icons.local_police_outlined},
     {'name': 'Ambulance', 'number': '102', 'icon': Icons.medical_services_outlined},
     {'name': 'Fire Department', 'number': '118', 'icon': Icons.fire_truck_outlined},
@@ -28,6 +32,35 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat();
+    _loadEmergencyContacts();
+  }
+
+  Future<void> _loadEmergencyContacts() async {
+    try {
+      final driverState = Provider.of<DriverState>(context, listen: false);
+      final driverId = driverState.driverId;
+      if (driverId != null) {
+        final contacts = await SupabaseService.getEmergencyContacts(driverId);
+        if (contacts.isNotEmpty) {
+          setState(() {
+            _emergencyContacts = [
+              // Keep default emergency services
+              {'name': 'Police', 'number': '119', 'icon': Icons.local_police_outlined},
+              {'name': 'Ambulance', 'number': '102', 'icon': Icons.medical_services_outlined},
+              {'name': 'Fire Department', 'number': '118', 'icon': Icons.fire_truck_outlined},
+              // Add custom contacts from database
+              ...contacts.map((c) => {
+                'name': c['name'] ?? 'Contact',
+                'number': c['phone'] ?? '',
+                'icon': Icons.person_outline,
+              }),
+            ];
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading emergency contacts: $e');
+    }
   }
 
   @override

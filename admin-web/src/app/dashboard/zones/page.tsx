@@ -122,13 +122,27 @@ export default function ZonesPage() {
       toast.error("Location name is required")
       return
     }
+
+    // Validate coordinates if provided
+    const lat = parseFloat(formData.latitude)
+    const lng = parseFloat(formData.longitude)
+
+    if (formData.latitude && (isNaN(lat) || lat < -90 || lat > 90)) {
+      toast.error("Latitude must be between -90 and 90")
+      return
+    }
+    if (formData.longitude && (isNaN(lng) || lng < -180 || lng > 180)) {
+      toast.error("Longitude must be between -180 and 180")
+      return
+    }
+
     setSaving(true)
 
     const payload = {
       name: formData.name,
       address: formData.address || null,
-      latitude: parseFloat(formData.latitude) || null,
-      longitude: parseFloat(formData.longitude) || null,
+      latitude: formData.latitude ? lat : null,
+      longitude: formData.longitude ? lng : null,
       location_type: formData.location_type,
       is_active: formData.is_active
     }

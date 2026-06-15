@@ -8,6 +8,11 @@ class SupabaseService {
 
   static SupabaseClient get client => Supabase.instance.client;
 
+  // Profile ID for phone-based login (not using Supabase Auth)
+  static String? _profileId;
+  static void setProfileId(String? id) => _profileId = id;
+  static String? get profileId => _profileId;
+
   static Future<void> initialize() async {
     await Supabase.initialize(
       url: _supabaseUrl,
@@ -15,9 +20,10 @@ class SupabaseService {
     );
   }
 
-  // Auth methods
+  // Auth methods - returns profileId first, then falls back to Supabase Auth user
   static User? get currentUser => client.auth.currentUser;
-  static bool get isLoggedIn => currentUser != null;
+  static String? get userId => _profileId ?? currentUser?.id;
+  static bool get isLoggedIn => userId != null;
 
   // Check if phone exists in system
   static Future<Map<String, dynamic>?> checkPhoneExists(String phone) async {
@@ -119,11 +125,12 @@ class SupabaseService {
 
   // Profile methods
   static Future<Map<String, dynamic>?> getProfile() async {
-    if (currentUser == null) return null;
+    final id = userId;
+    if (id == null) return null;
     final response = await client
         .from('profiles')
         .select()
-        .eq('id', currentUser!.id)
+        .eq('id', id)
         .single();
     return response;
   }
@@ -157,11 +164,12 @@ class SupabaseService {
   }
 
   static Future<void> updateProfile(Map<String, dynamic> data) async {
-    if (currentUser == null) return;
+    final id = userId;
+    if (id == null) return;
     await client
         .from('profiles')
         .update(data)
-        .eq('id', currentUser!.id);
+        .eq('id', id);
   }
 
   // Locations methods
@@ -217,11 +225,12 @@ class SupabaseService {
   }
 
   static Future<List<Map<String, dynamic>>> getMyRides() async {
-    if (currentUser == null) return [];
+    final id = userId;
+    if (id == null) return [];
     final response = await client
         .from('rides')
         .select('*, driver:drivers(*, profile:profiles(*), vehicle:vehicle_types(*))')
-        .eq('customer_id', currentUser!.id)
+        .eq('customer_id', id)
         .order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(response);
   }
@@ -246,12 +255,13 @@ class SupabaseService {
   }
 
   static Future<Map<String, dynamic>?> getActiveRide() async {
-    if (currentUser == null) return null;
+    final id = userId;
+    if (id == null) return null;
     try {
       final response = await client
           .from('rides')
           .select('*, driver:drivers(*, profile:profiles(*), vehicle:vehicle_types(*))')
-          .eq('customer_id', currentUser!.id)
+          .eq('customer_id', id)
           .inFilter('status', ['pending', 'accepted', 'arrived', 'in_progress'])
           .order('created_at', ascending: false)
           .limit(1)
@@ -291,9 +301,11 @@ class SupabaseService {
     required int rating,
     String? comment,
   }) async {
+    final id = userId;
+    if (id == null) return;
     await client.from('ratings').insert({
       'ride_id': rideId,
-      'from_user_id': currentUser!.id,
+      'from_user_id': id,
       'to_user_id': driverUserId,
       'rating': rating,
       'comment': comment,
@@ -302,11 +314,12 @@ class SupabaseService {
 
   // Saved Places methods
   static Future<List<Map<String, dynamic>>> getSavedPlaces() async {
-    if (currentUser == null) return [];
+    final id = userId;
+    if (id == null) return [];
     final response = await client
         .from('saved_places')
         .select()
-        .eq('user_id', currentUser!.id)
+        .eq('user_id', id)
         .order('created_at');
     return List<Map<String, dynamic>>.from(response);
   }
@@ -322,12 +335,7 @@ class SupabaseService {
     String? profileId,
   }) async {
     try {
-      String? userId = profileId;
-
-      // Try to get user ID from auth first
-      if (userId == null && currentUser != null) {
-        userId = currentUser!.id;
-      }
+      String? resolvedUserId = userId;
 
       // Fallback: get profile ID by staffId
       if (userId == null && staffId != null && staffId.isNotEmpty) {
@@ -336,17 +344,17 @@ class SupabaseService {
             .select('id')
             .eq('employee_id', staffId)
             .maybeSingle();
-        userId = profile?['id'];
+        resolvedUserId = profile?['id'];
       }
 
-      if (userId == null) {
+      if (resolvedUserId == null) {
         debugPrint('addSavedPlace: No user ID found');
         return false;
       }
 
-      debugPrint('addSavedPlace: Saving place "$name" for user $userId');
+      debugPrint('addSavedPlace: Saving place "$name" for user $resolvedUserId');
       await client.from('saved_places').insert({
-        'user_id': userId,
+        'user_id': resolvedUserId,
         'name': name,
         'address': address,
         'icon': icon,
@@ -368,11 +376,12 @@ class SupabaseService {
 
   // Notifications methods
   static Future<List<Map<String, dynamic>>> getNotifications() async {
-    if (currentUser == null) return [];
+    final id = userId;
+    if (id == null) return [];
     final response = await client
         .from('notifications')
         .select()
-        .eq('user_id', currentUser!.id)
+        .eq('user_id', id)
         .order('created_at', ascending: false)
         .limit(50);
     return List<Map<String, dynamic>>.from(response);
@@ -386,11 +395,12 @@ class SupabaseService {
   }
 
   static Future<void> markAllNotificationsRead() async {
-    if (currentUser == null) return;
+    final id = userId;
+    if (id == null) return;
     await client
         .from('notifications')
         .update({'is_read': true})
-        .eq('user_id', currentUser!.id);
+        .eq('user_id', id);
   }
 
   // Real-time subscriptions
@@ -419,11 +429,12 @@ class SupabaseService {
   static RealtimeChannel subscribeToNewNotifications(
     void Function(Map<String, dynamic>) onNotification,
   ) {
-    if (currentUser == null) {
+    final id = userId;
+    if (id == null) {
       throw Exception('User not logged in');
     }
     return client
-        .channel('notifications_${currentUser!.id}')
+        .channel('notifications_$id')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
@@ -431,7 +442,7 @@ class SupabaseService {
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
             column: 'user_id',
-            value: currentUser!.id,
+            value: id,
           ),
           callback: (payload) {
             onNotification(payload.newRecord);
@@ -610,11 +621,12 @@ class SupabaseService {
     try {
       final response = await client
           .from('chat_messages')
-          .select('*, sender:profiles!sender_id(full_name)')
+          .select('*')
           .eq('ride_id', rideId)
           .order('created_at', ascending: true);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
+      debugPrint('Error getting chat messages: $e');
       return [];
     }
   }
@@ -622,23 +634,39 @@ class SupabaseService {
   static Future<void> sendChatMessage({
     required String rideId,
     required String message,
+    String? senderId,
   }) async {
-    await client.from('chat_messages').insert({
-      'ride_id': rideId,
-      'sender_id': currentUser!.id,
-      'sender_type': 'customer',
-      'message': message,
-      'created_at': DateTime.now().toIso8601String(),
-    });
+    final id = senderId ?? userId;
+    if (id == null) {
+      debugPrint('Error sending message: no sender ID available');
+      throw Exception('No sender ID available');
+    }
+    try {
+      await client.from('chat_messages').insert({
+        'ride_id': rideId,
+        'sender_id': id,
+        'sender_type': 'customer',
+        'message': message,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Error sending chat message: $e');
+      rethrow;
+    }
   }
 
-  static Future<void> markMessagesAsRead(String rideId) async {
-    if (currentUser == null) return;
-    await client
-        .from('chat_messages')
-        .update({'is_read': true})
-        .eq('ride_id', rideId)
-        .neq('sender_id', currentUser!.id);
+  static Future<void> markMessagesAsRead(String rideId, {String? userId}) async {
+    final id = userId ?? SupabaseService.userId;
+    if (id == null) return;
+    try {
+      await client
+          .from('chat_messages')
+          .update({'is_read': true})
+          .eq('ride_id', rideId)
+          .neq('sender_id', id);
+    } catch (e) {
+      debugPrint('Error marking messages as read: $e');
+    }
   }
 
   static RealtimeChannel subscribeToChatMessages(
@@ -665,9 +693,10 @@ class SupabaseService {
 
   // Push notification token registration
   static Future<void> registerPushToken(String token) async {
-    if (currentUser == null) return;
+    final id = userId;
+    if (id == null) return;
     await client.from('push_tokens').upsert({
-      'user_id': currentUser!.id,
+      'user_id': id,
       'token': token,
       'platform': 'ios',
       'updated_at': DateTime.now().toIso8601String(),
@@ -675,11 +704,12 @@ class SupabaseService {
   }
 
   static Future<void> removePushToken() async {
-    if (currentUser == null) return;
+    final id = userId;
+    if (id == null) return;
     await client
         .from('push_tokens')
         .delete()
-        .eq('user_id', currentUser!.id);
+        .eq('user_id', id);
   }
 
   // Send push notification request

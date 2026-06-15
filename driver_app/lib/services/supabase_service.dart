@@ -8,6 +8,11 @@ class SupabaseService {
 
   static SupabaseClient get client => Supabase.instance.client;
 
+  // Driver ID for phone-based login (not using Supabase Auth)
+  static String? _driverId;
+  static void setDriverId(String? id) => _driverId = id;
+  static String? get driverId => _driverId;
+
   static Future<void> initialize() async {
     await Supabase.initialize(
       url: _supabaseUrl,
@@ -15,9 +20,10 @@ class SupabaseService {
     );
   }
 
-  // Auth methods
+  // Auth methods - returns driverId first, then falls back to Supabase Auth user
   static User? get currentUser => client.auth.currentUser;
-  static bool get isLoggedIn => currentUser != null;
+  static String? get visibleUserId => _driverId ?? currentUser?.id;
+  static bool get isLoggedIn => visibleUserId != null;
 
   // Check if phone exists in system
   static Future<Map<String, dynamic>?> checkPhoneExists(String phone) async {
@@ -115,31 +121,31 @@ class SupabaseService {
 
   // Profile methods
   static Future<Map<String, dynamic>?> getProfile() async {
-    if (currentUser == null) return null;
+    if (visibleUserId == null) return null;
     final response = await client
         .from('profiles')
         .select()
-        .eq('id', currentUser!.id)
+        .eq('id', visibleUserId!)
         .single();
     return response;
   }
 
   static Future<void> updateProfile(Map<String, dynamic> data) async {
-    if (currentUser == null) return;
+    if (visibleUserId == null) return;
     await client
         .from('profiles')
         .update(data)
-        .eq('id', currentUser!.id);
+        .eq('id', visibleUserId!);
   }
 
   // Driver methods
   static Future<Map<String, dynamic>?> getDriverProfile() async {
-    if (currentUser == null) return null;
+    if (visibleUserId == null) return null;
     try {
       final response = await client
           .from('drivers')
           .select('*, profile:profiles(*), vehicle:vehicle_types(*)')
-          .eq('profile_id', currentUser!.id)
+          .eq('profile_id', visibleUserId!)
           .single();
       return response;
     } catch (e) {
@@ -166,9 +172,9 @@ class SupabaseService {
     String? licenseNumber,
     DateTime? licenseExpiry,
   }) async {
-    if (currentUser == null) return;
+    if (visibleUserId == null) return;
     await client.from('drivers').insert({
-      'profile_id': currentUser!.id,
+      'profile_id': visibleUserId!,
       'license_number': licenseNumber,
       'license_expiry': licenseExpiry?.toIso8601String(),
     });
@@ -312,7 +318,7 @@ class SupabaseService {
   }
 
   static Future<Map<String, dynamic>?> getActiveRide() async {
-    if (currentUser == null) return null;
+    if (visibleUserId == null) return null;
     try {
       final driver = await getDriverProfile();
       if (driver == null) return null;
@@ -486,11 +492,11 @@ class SupabaseService {
 
   // Notifications methods
   static Future<List<Map<String, dynamic>>> getNotifications() async {
-    if (currentUser == null) return [];
+    if (visibleUserId == null) return [];
     final response = await client
         .from('notifications')
         .select()
-        .eq('user_id', currentUser!.id)
+        .eq('user_id', visibleUserId!)
         .order('created_at', ascending: false)
         .limit(50);
     return List<Map<String, dynamic>>.from(response);
@@ -549,7 +555,7 @@ class SupabaseService {
     final response = await client
         .from('ratings')
         .select('*, ride:rides!inner(*)')
-        .eq('to_user_id', currentUser!.id)
+        .eq('to_user_id', visibleUserId!)
         .order('created_at', ascending: false)
         .limit(20);
 
@@ -672,23 +678,39 @@ class SupabaseService {
     required String rideId,
     required String message,
     required String senderType,
+    String? senderId,
   }) async {
-    await client.from('chat_messages').insert({
-      'ride_id': rideId,
-      'sender_id': currentUser!.id,
-      'sender_type': senderType,
-      'message': message,
-      'created_at': DateTime.now().toIso8601String(),
-    });
+    final id = senderId ?? visibleUserId;
+    if (id == null) {
+      debugPrint('Error sending message: no sender ID available');
+      throw Exception('No sender ID available');
+    }
+    try {
+      await client.from('chat_messages').insert({
+        'ride_id': rideId,
+        'sender_id': id,
+        'sender_type': senderType,
+        'message': message,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Error sending chat message: $e');
+      rethrow;
+    }
   }
 
-  static Future<void> markMessagesAsRead(String rideId) async {
-    if (currentUser == null) return;
-    await client
-        .from('chat_messages')
-        .update({'is_read': true})
-        .eq('ride_id', rideId)
-        .neq('sender_id', currentUser!.id);
+  static Future<void> markMessagesAsRead(String rideId, {String? userId}) async {
+    final id = userId ?? visibleUserId;
+    if (id == null) return;
+    try {
+      await client
+          .from('chat_messages')
+          .update({'is_read': true})
+          .eq('ride_id', rideId)
+          .neq('sender_id', id);
+    } catch (e) {
+      debugPrint('Error marking messages as read: $e');
+    }
   }
 
   static RealtimeChannel subscribeToChatMessages(
@@ -997,6 +1019,61 @@ class SupabaseService {
       });
     } catch (e) {
       debugPrint('Error sending push notification: $e');
+    }
+  }
+
+  // Driver Notifications
+  static Future<List<Map<String, dynamic>>> getDriverNotifications(String driverId) async {
+    try {
+      final response = await client
+          .from('notifications')
+          .select()
+          .eq('user_id', driverId)
+          .order('created_at', ascending: false)
+          .limit(50);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error getting driver notifications: $e');
+      return [];
+    }
+  }
+
+  static Future<void> markNotificationAsRead(String notificationId) async {
+    try {
+      await client.from('notifications').update({'read': true}).eq('id', notificationId);
+    } catch (e) {
+      debugPrint('Error marking notification as read: $e');
+    }
+  }
+
+  static Future<void> markAllNotificationsAsRead(String driverId) async {
+    try {
+      await client.from('notifications').update({'read': true}).eq('user_id', driverId);
+    } catch (e) {
+      debugPrint('Error marking all notifications as read: $e');
+    }
+  }
+
+  static Future<void> deleteNotification(String notificationId) async {
+    try {
+      await client.from('notifications').delete().eq('id', notificationId);
+    } catch (e) {
+      debugPrint('Error deleting notification: $e');
+    }
+  }
+
+  // Emergency Contacts
+  static Future<List<Map<String, dynamic>>> getEmergencyContacts(String driverId) async {
+    try {
+      final response = await client
+          .from('emergency_contacts')
+          .select()
+          .eq('user_id', driverId)
+          .order('created_at');
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error getting emergency contacts: $e');
+      return [];
     }
   }
 }

@@ -16,6 +16,11 @@ import { DashboardCharts } from "./charts"
 async function getStats() {
   const supabase = await createClient()
 
+  // Get date for last month comparison
+  const now = new Date()
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
   const [
     { count: totalCustomers },
     { count: totalDrivers },
@@ -24,7 +29,10 @@ async function getStats() {
     { count: completedRides },
     { count: pendingApprovals },
     { data: onlineDrivers },
-    { data: recentRides }
+    { data: recentRides },
+    { count: lastMonthCustomers },
+    { count: lastMonthDrivers },
+    { count: lastMonthRides }
   ] = await Promise.all([
     supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer"),
     supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver"),
@@ -39,8 +47,24 @@ async function getStats() {
       driver:drivers!rides_driver_id_fkey(
         profile:profiles(full_name)
       )
-    `).order("created_at", { ascending: false }).limit(5)
+    `).order("created_at", { ascending: false }).limit(5),
+    // Last month counts for trend calculation
+    supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer").lt("created_at", thisMonth.toISOString()),
+    supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver").lt("created_at", thisMonth.toISOString()),
+    supabase.from("rides").select("*", { count: "exact", head: true }).lt("created_at", thisMonth.toISOString())
   ])
+
+  // Calculate trends (new this month vs total last month)
+  const calcTrend = (current: number, lastMonthTotal: number) => {
+    const newThisMonth = current - lastMonthTotal
+    if (lastMonthTotal === 0) return { percent: newThisMonth > 0 ? 100 : 0, up: newThisMonth > 0 }
+    const percent = Math.round((newThisMonth / lastMonthTotal) * 100)
+    return { percent: Math.abs(percent), up: percent >= 0 }
+  }
+
+  const customerTrend = calcTrend(totalCustomers || 0, lastMonthCustomers || 0)
+  const driverTrend = calcTrend(totalDrivers || 0, lastMonthDrivers || 0)
+  const rideTrend = calcTrend(totalRides || 0, lastMonthRides || 0)
 
   return {
     totalCustomers: totalCustomers || 0,
@@ -50,7 +74,10 @@ async function getStats() {
     completedRides: completedRides || 0,
     pendingApprovals: pendingApprovals || 0,
     onlineDrivers: onlineDrivers?.length || 0,
-    recentRides: recentRides || []
+    recentRides: recentRides || [],
+    customerTrend,
+    driverTrend,
+    rideTrend
   }
 }
 
@@ -62,22 +89,22 @@ export default async function DashboardPage() {
       title: "Total Customers",
       value: stats.totalCustomers,
       icon: Users,
-      trend: "+12%",
-      trendUp: true,
+      trend: stats.customerTrend.percent > 0 ? `${stats.customerTrend.up ? '+' : '-'}${stats.customerTrend.percent}%` : undefined,
+      trendUp: stats.customerTrend.up,
     },
     {
       title: "Total Drivers",
       value: stats.totalDrivers,
       icon: Car,
-      trend: "+5%",
-      trendUp: true,
+      trend: stats.driverTrend.percent > 0 ? `${stats.driverTrend.up ? '+' : '-'}${stats.driverTrend.percent}%` : undefined,
+      trendUp: stats.driverTrend.up,
     },
     {
       title: "Total Rides",
       value: stats.totalRides,
       icon: MapPin,
-      trend: "+23%",
-      trendUp: true,
+      trend: stats.rideTrend.percent > 0 ? `${stats.rideTrend.up ? '+' : '-'}${stats.rideTrend.percent}%` : undefined,
+      trendUp: stats.rideTrend.up,
     },
     {
       title: "Active Rides",

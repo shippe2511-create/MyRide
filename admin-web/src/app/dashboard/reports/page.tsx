@@ -27,8 +27,33 @@ export default function ReportsPage() {
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
 
+  // Get date filter range
+  const getDateFilter = () => {
+    const now = new Date()
+    if (dateRange === "custom" && startDate && endDate) {
+      return { start: startDate, end: endDate }
+    }
+    switch (dateRange) {
+      case "today":
+        const today = now.toISOString().split("T")[0]
+        return { start: today, end: today }
+      case "week":
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+        return { start: weekAgo, end: now.toISOString().split("T")[0] }
+      case "month":
+        const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate()).toISOString().split("T")[0]
+        return { start: monthAgo, end: now.toISOString().split("T")[0] }
+      case "year":
+        const yearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).toISOString().split("T")[0]
+        return { start: yearAgo, end: now.toISOString().split("T")[0] }
+      default:
+        return null
+    }
+  }
+
   const generateReport = async (reportType: string) => {
     setLoading(reportType)
+    const dateFilter = getDateFilter()
 
     try {
       let data: Record<string, unknown>[] = []
@@ -36,29 +61,37 @@ export default function ReportsPage() {
 
       switch (reportType) {
         case "rides": {
-          const { data: rides } = await supabase
+          let query = supabase
             .from("rides")
             .select(`
               id, pickup_name, dropoff_name, status, distance_km, duration_minutes, created_at, completed_at,
               customer:profiles!rides_customer_id_fkey(full_name, phone)
             `)
             .order("created_at", { ascending: false })
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          const { data: rides } = await query
           data = rides || []
           filename = "rides_report.csv"
           break
         }
         case "customers": {
-          const { data: customers } = await supabase
+          let query = supabase
             .from("profiles")
             .select("*")
             .eq("role", "customer")
             .order("created_at", { ascending: false })
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          const { data: customers } = await query
           data = customers || []
           filename = "customers_report.csv"
           break
         }
         case "drivers": {
-          const { data: drivers } = await supabase
+          let query = supabase
             .from("profiles")
             .select(`
               *,
@@ -66,12 +99,16 @@ export default function ReportsPage() {
             `)
             .eq("role", "driver")
             .order("created_at", { ascending: false })
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          const { data: drivers } = await query
           data = drivers || []
           filename = "drivers_report.csv"
           break
         }
         case "ratings": {
-          const { data: ratings } = await supabase
+          let query = supabase
             .from("ratings")
             .select(`
               *,
@@ -79,14 +116,22 @@ export default function ReportsPage() {
               to_user:profiles!ratings_to_user_id_fkey(full_name)
             `)
             .order("created_at", { ascending: false })
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          const { data: ratings } = await query
           data = ratings || []
           filename = "ratings_report.csv"
           break
         }
         case "usage": {
-          const { data: rides } = await supabase
+          let query = supabase
             .from("rides")
             .select("created_at, status")
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          const { data: rides } = await query
 
           const grouped = (rides || []).reduce((acc: Record<string, { total: number; completed: number }>, ride) => {
             const date = new Date(ride.created_at).toISOString().split("T")[0]

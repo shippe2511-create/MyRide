@@ -12,6 +12,7 @@ import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import 'trip_tracking_screen.dart';
+import 'trip_complete_screen.dart';
 import 'chat_screen.dart';
 
 class DriverArrivingScreen extends StatefulWidget {
@@ -66,6 +67,14 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
     _startEtaCountdown();
     _subscribeToRideUpdates();
     _startStatusPolling(); // Backup polling
+
+    // Subscribe to chat notifications
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final appState = Provider.of<AppState>(context, listen: false);
+      if (widget.rideId != null && appState.profileId != null) {
+        NotificationService.subscribeToChatMessages(widget.rideId!, appState.profileId!);
+      }
+    });
   }
 
   void _subscribeToRideUpdates() {
@@ -134,6 +143,23 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
               'rideId': widget.rideId,
               'status': 'in_progress',
             },
+          ),
+        ),
+      );
+    } else if (status == 'completed' && !_tripStarted) {
+      _tripStarted = true;
+      _etaTimer.cancel();
+      _statusPollingTimer?.cancel();
+      // Trip completed (skip straight to complete screen)
+      NotificationService().showTripCompletedNotification(destination: widget.dropoff);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TripCompleteScreen(
+            destination: widget.dropoff,
+            rideId: widget.rideId,
+            driverName: widget.driverName,
+            vehicleNumber: widget.vehicleNumber,
           ),
         ),
       );
@@ -474,6 +500,8 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
           driverPhone: widget.driverPhone,
           vehicleNumber: widget.vehicleNumber,
           driverRating: widget.driverRating,
+          rideId: widget.rideId,
+          driverUserId: widget.driverProfileId,
         ),
       ),
     );

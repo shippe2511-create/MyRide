@@ -548,30 +548,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 16),
               _buildEditTextField('Email', 'Enter your email', emailController),
               const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    appState.updateUserName(nameController.text);
-                    appState.updateUserEmail(emailController.text);
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Profile updated'),
+              StatefulBuilder(
+                builder: (context, setSaveState) {
+                  bool isSaving = false;
+                  return SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: isSaving ? null : () async {
+                        setSaveState(() => isSaving = true);
+                        try {
+                          await SupabaseService.updateProfile({
+                            'full_name': nameController.text,
+                            'email': emailController.text.isNotEmpty ? emailController.text : null,
+                          });
+                          appState.updateUserName(nameController.text);
+                          appState.updateUserEmail(emailController.text);
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Profile updated'),
+                              backgroundColor: AppColors.success,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          );
+                        } catch (e) {
+                          setSaveState(() => isSaving = false);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to save: $e'),
+                              backgroundColor: AppColors.error,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.yellow,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.yellow,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  child: Text('Save Changes', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                ),
+                      child: isSaving
+                          ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                          : Text('Save Changes', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                    ),
+                  );
+                },
               ),
               SizedBox(height: MediaQuery.of(ctx).padding.bottom),
             ],

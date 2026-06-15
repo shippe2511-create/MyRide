@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/supabase_service.dart';
 
 class AppState extends ChangeNotifier {
   AppState() {
@@ -184,6 +185,7 @@ class AppState extends ChangeNotifier {
 
   void setProfileId(String? id) {
     _profileId = id;
+    SupabaseService.setProfileId(id);
     _saveProfileId();
     notifyListeners();
   }
@@ -198,6 +200,9 @@ class AppState extends ChangeNotifier {
   Future<void> _loadProfileId() async {
     final prefs = await SharedPreferences.getInstance();
     _profileId = prefs.getString('profile_id');
+    if (_profileId != null) {
+      SupabaseService.setProfileId(_profileId);
+    }
   }
 
   void updateProfilePhoto(String? path) {

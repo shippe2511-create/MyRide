@@ -113,9 +113,9 @@ class DriverApp extends StatelessWidget {
             '/help': (_) => const HelpScreen(),
             '/about': (_) => const AboutScreen(),
           },
-          // builder: (context, child) {
-          //   return _GlobalRideRequestOverlay(child: child!);
-          // },
+          builder: (context, child) {
+            return _GlobalRideRequestOverlay(child: child!);
+          },
         );
       },
     );

@@ -159,6 +159,11 @@ class DriverState extends ChangeNotifier {
       _employeeId = prefs.getString('employeeId') ?? '';
       _vehicleNumber = prefs.getString('vehicleNumber') ?? '';
 
+      // Sync driverId to SupabaseService
+      if (_driverId.isNotEmpty) {
+        SupabaseService.setDriverId(_driverId);
+      }
+
       // Fetch employee_id from database if not set but logged in
       if (_isLoggedIn && _employeeId.isEmpty && _driverId.isNotEmpty) {
         _fetchEmployeeId();
@@ -239,6 +244,9 @@ class DriverState extends ChangeNotifier {
     _rating = rating;
     _avatarUrl = avatarUrl;
     _isLoggedIn = true;
+
+    // Sync to SupabaseService
+    SupabaseService.setDriverId(id);
 
     final prefs = await SharedPreferences.getInstance();
     prefs.setBool('loggedIn', true);
@@ -744,6 +752,10 @@ class DriverState extends ChangeNotifier {
         // Success - update local state
         _currentRide = request.copyWith(status: RideStatus.accepted);
         _incomingRequests.removeWhere((r) => r.id == request.id);
+
+        // Subscribe to chat notifications for this ride
+        NotificationService.subscribeToChatMessages(request.id, _driverId);
+
         notifyListeners();
         return result;
       } else {

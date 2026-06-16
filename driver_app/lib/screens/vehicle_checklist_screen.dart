@@ -795,6 +795,7 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                           hasIssues: _hasIssues,
                           issues: _issueNotes,
                           allItems: allItems,
+                          issuePhotos: _issuePhotos,
                         );
                       } catch (e) {
                         debugPrint('Failed to save checklist: $e');

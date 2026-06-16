@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MyRide — Taxi App UI</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #0B0B0C; }
+  * { box-sizing: border-box; }
+  @keyframes mrPulse { 0%,100%{opacity:.35;transform:scale(1)} 50%{opacity:1;transform:scale(1.4)} }
+  @keyframes mrSlide { 0%{transform:translateX(-180%)} 100%{transform:translateX(-50%)} }
+  @keyframes mrCaret { 0%,100%{opacity:1} 50%{opacity:0} }
+  @keyframes mrRadar { 0%{transform:scale(0.6);opacity:.7} 100%{transform:scale(3.2);opacity:0} }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="screens.jsx"></script>
+<script type="text/babel" src="app-shared.jsx"></script>
+<script type="text/babel" src="app-screens-1.jsx"></script>
+<script type="text/babel" src="app-screens-2.jsx"></script>
+<script type="text/babel" src="app-screens-3.jsx"></script>
+<script type="text/babel" src="app-screens-4.jsx"></script>
+<script type="text/babel">
+const { useState } = React;
+
+// Wrap any screen component in the iOS device frame, dark mode.
+function Phone({ children }) {
+  return (
+    <IOSDevice width={372} height={806} dark={true}>
+      {children}
+    </IOSDevice>
+  );
+}
+
+function App() {
+  return (
+    <DesignCanvas>
+      <DCSection id="splash" title="1 · Splash" subtitle="App launch — boot + brand reveal">
+        <DCArtboard id="splash-a" label="A · Monogram burst" width={372} height={806}>
+          <Phone><SplashA/></Phone>
+        </DCArtboard>
+        <DCArtboard id="splash-b" label="B · Taxi over city" width={372} height={806}>
+          <Phone><SplashB/></Phone>
+        </DCArtboard>
+        <DCArtboard id="splash-c" label="C · Bold yellow" width={372} height={806}>
+          <Phone><SplashC/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="welcome" title="2 · Welcome" subtitle="First impression + entry to sign-in">
+        <DCArtboard id="welcome-a" label="A · Hero + CTA stack" width={372} height={806}>
+          <Phone><WelcomeA/></Phone>
+        </DCArtboard>
+        <DCArtboard id="welcome-b" label="B · Onboarding carousel ↔" width={372} height={806}>
+          <Phone><WelcomeB/></Phone>
+        </DCArtboard>
+        <DCArtboard id="welcome-c" label="C · Live map + frosted card" width={372} height={806}>
+          <Phone><WelcomeC/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="login" title="3 · Login" subtitle="Three auth approaches">
+        <DCArtboard id="login-a" label="A · Phone / OTP request" width={372} height={806}>
+          <Phone><LoginA/></Phone>
+        </DCArtboard>
+        <DCArtboard id="login-b" label="B · Email + password" width={372} height={806}>
+          <Phone><LoginB/></Phone>
+        </DCArtboard>
+        <DCArtboard id="login-c" label="C · OTP entry + Face ID" width={372} height={806}>
+          <Phone><LoginC/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="home" title="4 · Home & Booking" subtitle="The core map + ride request flow">
+        <DCArtboard id="s-home" label="Home · Where to?" width={372} height={806}>
+          <Phone><ScreenHome/></Phone>
+        </DCArtboard>
+        <DCArtboard id="s-search" label="Search destination" width={372} height={806}>
+          <Phone><ScreenSearch/></Phone>
+        </DCArtboard>
+        <DCArtboard id="s-choose" label="Nearby vehicles ▸ request" width={372} height={806}>
+          <Phone><ScreenNearby/></Phone>
+        </DCArtboard>
+        <DCArtboard id="s-finding" label="Finding driver" width={372} height={806}>
+          <Phone><ScreenFinding/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="ride" title="5 · The Ride" subtitle="Match → pickup → in-trip → arrive">
+        <DCArtboard id="s-track" label="Driver arriving · tracking" width={372} height={806}>
+          <Phone><ScreenTracking/></Phone>
+        </DCArtboard>
+        <DCArtboard id="s-trip" label="Trip in progress" width={372} height={806}>
+          <Phone><ScreenTripProgress/></Phone>
+        </DCArtboard>
+        <DCArtboard id="s-pay" label="Arrived · fare summary" width={372} height={806}>
+          <Phone><ScreenPayment/></Phone>
+        </DCArtboard>
+        <DCArtboard id="s-rate" label="Rate & tip ▸ tap stars" width={372} height={806}>
+          <Phone><ScreenRateTip/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="account" title="6 · Account" subtitle="Profile, history, wallet, settings & logout">
+        <DCArtboard id="s-profile" label="Profile / Account" width={372} height={806}>
+          <Phone><ScreenProfile/></Phone>
+        </DCArtboard>
+        <DCArtboard id="s-activity" label="Trip history" width={372} height={806}>
+          <Phone><ScreenActivity/></Phone>
+        </DCArtboard>
+        <DCArtboard id="s-wallet" label="Wallet & payment" width={372} height={806}>
+          <Phone><ScreenWallet/></Phone>
+        </DCArtboard>
+        <DCArtboard id="s-settings" label="Settings ▸ dark theme, toggles" width={372} height={806}>
+          <Phone><ScreenSettings/></Phone>
+        </DCArtboard>
+        <DCArtboard id="s-logout" label="Log out confirmation" width={372} height={806}>
+          <Phone><ScreenLogout/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="schedule" title="7 · Staff Schedules" subtitle="Bus & Dhoni timetable — information only">
+        <DCArtboard id="s-sched" label="Schedule ▸ toggle Bus / Dhoni" width={372} height={806}>
+          <Phone><ScreenSchedule/></Phone>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="features" title="8 · Smart Features" subtitle="Safety, chat, notifications, pre-booking">
+        <DCArtboard id="s-safety" label="Safety / SOS ▸ hold button" width={372} height={806}>
+          <Phone><ScreenSafety/></Phone>
+        </DCArtboard>
+        <DCArtboard id="s-chat" label="In-app chat" width={372} height={806}>
+          <Phone><ScreenChat/></Phone>
+        </DCArtboard>
+        <DCArtboard id="s-notif" label="Notifications" width={372} height={806}>
+          <Phone><ScreenNotifications/></Phone>
+        </DCArtboard>
+        <DCArtboard id="s-ahead" label="Schedule a ride ▸ pick day/time" width={372} height={806}>
+          <Phone><ScreenScheduleAhead/></Phone>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

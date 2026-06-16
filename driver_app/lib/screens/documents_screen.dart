@@ -901,21 +901,60 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
             child: Text('Cancel', style: TextStyle(color: context.mutedColor)),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Document removed'),
-                  backgroundColor: AppColors.error,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              );
+              await _deleteDocument(doc);
             },
             child: const Text('Remove', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _deleteDocument(Map<String, dynamic> doc) async {
+    final documentId = doc['id']?.toString();
+    if (documentId == null || documentId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Cannot delete: document ID not found'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+
+    final driverState = Provider.of<DriverState>(context, listen: false);
+    final driverId = driverState.driverId;
+
+    final success = await SupabaseService.deleteDocument(
+      documentId: documentId,
+      driverId: driverId,
+    );
+
+    if (mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Document removed'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+        _loadDocuments();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Failed to remove document'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    }
   }
 }

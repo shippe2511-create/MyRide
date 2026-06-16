@@ -518,6 +518,24 @@ class SupabaseService {
     }, onConflict: 'driver_id,document_type');
   }
 
+  static Future<bool> deleteDocument({
+    required String documentId,
+    required String driverId,
+  }) async {
+    if (driverId.isEmpty || documentId.isEmpty) return false;
+    try {
+      await client
+          .from('documents')
+          .delete()
+          .eq('id', documentId)
+          .eq('driver_id', driverId);
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting document: $e');
+      return false;
+    }
+  }
+
   // Notifications methods
   static Future<List<Map<String, dynamic>>> getNotifications() async {
     if (visibleUserId == null) return [];
@@ -608,13 +626,44 @@ class SupabaseService {
     required bool hasIssues,
     required Map<String, String> issues,
     required Map<String, bool> allItems,
+    Map<String, List<File>>? issuePhotos,
   }) async {
+    // Upload photos and build issues with photo URLs
+    final issuesWithPhotos = <String, Map<String, dynamic>>{};
+
+    for (final entry in issues.entries) {
+      final photoUrls = <String>[];
+
+      // Upload photos for this issue if any
+      if (issuePhotos != null && issuePhotos.containsKey(entry.key)) {
+        final photos = issuePhotos[entry.key]!;
+        for (int i = 0; i < photos.length; i++) {
+          final file = photos[i];
+          final fileName = '${driverId}_${entry.key}_${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
+          final path = 'checklist-photos/$fileName';
+
+          try {
+            await client.storage.from('documents').upload(path, file);
+            final url = client.storage.from('documents').getPublicUrl(path);
+            photoUrls.add(url);
+          } catch (e) {
+            debugPrint('Failed to upload checklist photo: $e');
+          }
+        }
+      }
+
+      issuesWithPhotos[entry.key] = {
+        'note': entry.value,
+        'photos': photoUrls,
+      };
+    }
+
     await client.from('vehicle_checklists').insert({
       'driver_id': driverId,
       'driver_name': driverName,
       'vehicle_number': vehicleNumber,
       'has_issues': hasIssues,
-      'issues': issues,
+      'issues': issuesWithPhotos,
       'all_items': allItems,
       'checked_at': DateTime.now().toIso8601String(),
     });

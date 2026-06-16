@@ -56,7 +56,12 @@
       "Bash(ios-deploy *)",
       "Bash(idevicesyslog -u 00008140-0008052A2862201C)",
       "Bash(curl -s http://localhost:3000/dashboard/checklists)",
-      "Bash(curl -s http://localhost:3000/dashboard)"
+      "Bash(curl -s http://localhost:3000/dashboard)",
+      "Bash(osascript -e 'quit app \"Xcode\"')",
+      "Bash(ruby -e ' *)",
+      "Bash(pkill -f \"iproxy\")",
+      "Bash(tee /tmp/flutter_crash.log)",
+      "Bash(curl *)"
     ],
     "additionalDirectories": [
       "/tmp"

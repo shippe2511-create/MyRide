@@ -21,38 +21,47 @@ import {
   MessageSquare,
   ClipboardCheck,
   Star,
+  Radio,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+import { usePermissions } from "@/hooks/usePermissions"
+import type { Permission } from "@/lib/permissions"
 
-const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Customers", href: "/dashboard/customers", icon: Users },
-  { name: "Drivers", href: "/dashboard/drivers", icon: Car },
-  { name: "Vehicles", href: "/dashboard/vehicles", icon: CarFront },
-  { name: "Rides", href: "/dashboard/rides", icon: MapPin },
-  { name: "Schedules", href: "/dashboard/scheduling", icon: Calendar },
-  { name: "Pre-trip Checks", href: "/dashboard/checklists", icon: ClipboardCheck },
-  { name: "Eligibility", href: "/dashboard/eligibility", icon: Ticket },
-  { name: "Content", href: "/dashboard/content", icon: FileText },
-  { name: "Service Zones", href: "/dashboard/zones", icon: Map },
-  { name: "Chat", href: "/dashboard/chat", icon: MessageSquare },
-  { name: "SOS Alerts", href: "/dashboard/sos", icon: AlertTriangle },
-  { name: "Ratings", href: "/dashboard/ratings", icon: Star },
-  { name: "Reports", href: "/dashboard/reports", icon: BarChart3 },
-  { name: "Admins", href: "/dashboard/admins", icon: Shield },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
+const navigation: { name: string; href: string; icon: typeof LayoutDashboard; permission: Permission }[] = [
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard:view" },
+  { name: "Customers", href: "/dashboard/customers", icon: Users, permission: "customers:view" },
+  { name: "Drivers", href: "/dashboard/drivers", icon: Car, permission: "drivers:view" },
+  { name: "Vehicles", href: "/dashboard/vehicles", icon: CarFront, permission: "vehicles:view" },
+  { name: "Rides", href: "/dashboard/rides", icon: MapPin, permission: "rides:view" },
+  { name: "Live Tracking", href: "/dashboard/tracking", icon: Radio, permission: "tracking:view" },
+  { name: "Schedules", href: "/dashboard/scheduling", icon: Calendar, permission: "schedules:view" },
+  { name: "Pre-trip Checks", href: "/dashboard/checklists", icon: ClipboardCheck, permission: "pretrip:view" },
+  { name: "Eligibility", href: "/dashboard/eligibility", icon: Ticket, permission: "eligibility:view" },
+  { name: "Content", href: "/dashboard/content", icon: FileText, permission: "content:view" },
+  { name: "Service Zones", href: "/dashboard/zones", icon: Map, permission: "zones:view" },
+  { name: "Chat", href: "/dashboard/chat", icon: MessageSquare, permission: "chat:view" },
+  { name: "SOS Alerts", href: "/dashboard/sos", icon: AlertTriangle, permission: "sos:view" },
+  { name: "Ratings", href: "/dashboard/ratings", icon: Star, permission: "ratings:view" },
+  { name: "Reports", href: "/dashboard/reports", icon: BarChart3, permission: "reports:view" },
+  { name: "Admins", href: "/dashboard/admins", icon: Shield, permission: "admins:view" },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings, permission: "settings:view" },
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const { can, loading } = usePermissions()
 
   const handleLogout = async () => {
+    sessionStorage.removeItem("myride_admin_role")
+    sessionStorage.removeItem("myride_admin_custom_perms")
     await supabase.auth.signOut()
     router.push("/login")
   }
+
+  const visibleNavigation = loading ? navigation : navigation.filter(item => can(item.permission))
 
   return (
     <div className="flex h-full w-56 flex-col border-r bg-card">
@@ -65,7 +74,7 @@ export function Sidebar() {
         </Link>
       </div>
       <nav className="flex-1 space-y-0.5 p-3 overflow-y-auto">
-        {navigation.map((item) => {
+        {visibleNavigation.map((item) => {
           const isActive = item.href === "/dashboard"
               ? pathname === "/dashboard"
               : pathname === item.href || pathname.startsWith(item.href + "/")

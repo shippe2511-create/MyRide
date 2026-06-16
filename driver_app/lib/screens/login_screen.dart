@@ -121,6 +121,7 @@ class _LoginScreenState extends State<LoginScreen> {
         driverState.setDriverData(
           name: existingUser['full_name'] ?? 'Driver',
           id: driverProfile['id'], // This is drivers.id (UUID)
+          profileId: driverProfile['profile_id'] ?? existingUser['id'], // profile UUID for SOS
           vehicleNumber: vehicleNumber,
           vehicleModel: vehicleModel,
           phone: fullPhone,

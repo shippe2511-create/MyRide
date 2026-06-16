@@ -13,11 +13,21 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { DialogFooter } from "@/components/ui/dialog"
+import {
   ClipboardCheck, AlertTriangle, CheckCircle, XCircle, Car,
-  Loader2, RefreshCw, Download, Image as ImageIcon
+  Loader2, RefreshCw, Download, MoreHorizontal, Pencil, Trash2
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -47,15 +57,30 @@ export default function ChecklistsPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState("all")
   const [selectedChecklist, setSelectedChecklist] = useState<VehicleChecklist | null>(null)
+  const [editingChecklist, setEditingChecklist] = useState<VehicleChecklist | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
   const [stats, setStats] = useState({ total: 0, withIssues: 0, passed: 0 })
 
   useEffect(() => {
-    loadChecklists()
+    loadChecklists(true)
+
+    // Real-time subscription
+    const channel = supabase
+      .channel('checklists_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_checklists' }, () => {
+        loadChecklists(false)
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [filter])
 
-  const loadChecklists = async () => {
-    setLoading(true)
+  const loadChecklists = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
     let query = supabase.from("vehicle_checklists").select("*").order("checked_at", { ascending: false }).limit(50)
 
     if (filter === "issues") query = query.eq("has_issues", true)
@@ -74,12 +99,60 @@ export default function ChecklistsPage() {
   }
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+    return new Date(date).toLocaleString("en-US", {
+      timeZone: "Indian/Maldives",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
+    })
   }
 
   const getFailedItems = (checklist: VehicleChecklist) => {
     if (!checklist.all_items) return []
     return Object.entries(checklist.all_items).filter(([, passed]) => !passed).map(([key]) => key)
+  }
+
+  const handleSave = async () => {
+    if (!editingChecklist) return
+    setSaving(true)
+
+    const { error } = await supabase.from("vehicle_checklists").update({
+      driver_name: editingChecklist.driver_name,
+      vehicle_number: editingChecklist.vehicle_number,
+      has_issues: editingChecklist.has_issues,
+      issues: editingChecklist.issues,
+      all_items: editingChecklist.all_items,
+    }).eq("id", editingChecklist.id)
+
+    if (error) {
+      toast.error("Failed to update")
+    } else {
+      toast.success("Updated successfully")
+      setEditingChecklist(null)
+      loadChecklists(false)
+    }
+    setSaving(false)
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteId) return
+    const { error } = await supabase.from("vehicle_checklists").delete().eq("id", deleteId)
+    if (error) {
+      toast.error("Failed to delete")
+    } else {
+      toast.success("Deleted successfully")
+      loadChecklists(false)
+    }
+    setDeleteId(null)
+  }
+
+  const toggleItemStatus = (key: string) => {
+    if (!editingChecklist?.all_items) return
+    const newItems = { ...editingChecklist.all_items, [key]: !editingChecklist.all_items[key] }
+    const hasIssues = Object.values(newItems).some(v => !v)
+    setEditingChecklist({ ...editingChecklist, all_items: newItems, has_issues: hasIssues })
   }
 
   if (loading) {
@@ -100,7 +173,7 @@ export default function ChecklistsPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Driver vehicle inspections</p>
         </div>
-        <Button variant="outline" size="sm" onClick={loadChecklists}>
+        <Button variant="outline" size="sm" onClick={() => loadChecklists()}>
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
@@ -214,9 +287,29 @@ export default function ChecklistsPage() {
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{formatDate(checklist.checked_at)}</TableCell>
                     <TableCell>
-                      <Button variant="outline" size="sm" onClick={() => setSelectedChecklist(checklist)}>
-                        Details
-                      </Button>
+                      <DropdownMenu modal={false}>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onSelect={() => setSelectedChecklist(checklist)}>
+                            Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => setEditingChecklist(checklist)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-500"
+                            onSelect={() => setDeleteId(checklist.id)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 )
@@ -296,6 +389,117 @@ export default function ChecklistsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingChecklist} onOpenChange={() => setEditingChecklist(null)}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Checklist</DialogTitle>
+          </DialogHeader>
+          {editingChecklist && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium">Driver Name</label>
+                  <Input
+                    value={editingChecklist.driver_name}
+                    onChange={e => setEditingChecklist({ ...editingChecklist, driver_name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Vehicle Number</label>
+                  <Input
+                    value={editingChecklist.vehicle_number}
+                    onChange={e => setEditingChecklist({ ...editingChecklist, vehicle_number: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Checklist Items (click to toggle)</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {editingChecklist.all_items && Object.entries(editingChecklist.all_items).map(([key, passed]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => toggleItemStatus(key)}
+                      className={`flex items-center gap-2 p-2 rounded border text-sm text-left transition-colors ${
+                        passed
+                          ? "bg-green-50 border-green-200 dark:bg-green-950/20"
+                          : "bg-red-50 border-red-200 dark:bg-red-950/20"
+                      }`}
+                    >
+                      {passed ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-red-500" />}
+                      {ITEM_LABELS[key] || key}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Show issues with photos */}
+              {editingChecklist.issues && Object.keys(editingChecklist.issues).length > 0 && (
+                <div className="p-3 border border-red-200 rounded-lg bg-red-50 dark:bg-red-950/20">
+                  <h3 className="font-medium text-red-600 mb-2 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Reported Issues
+                  </h3>
+                  <div className="space-y-3">
+                    {Object.entries(editingChecklist.issues).map(([key, value]) => {
+                      const isDetail = typeof value === "object" && value !== null
+                      const note = isDetail ? (value as IssueDetail).note : value as string
+                      const photos = isDetail ? (value as IssueDetail).photos : undefined
+
+                      return (
+                        <div key={key} className="p-2 bg-background rounded border text-sm">
+                          <p className="font-medium text-red-600">{ITEM_LABELS[key] || key}</p>
+                          <p className="text-muted-foreground">{note}</p>
+                          {photos && photos.length > 0 && (
+                            <div className="flex gap-2 mt-2 flex-wrap">
+                              {photos.map((photo, i) => (
+                                <a key={i} href={photo} target="_blank" rel="noopener noreferrer" className="relative group">
+                                  <img src={photo} alt="" className="h-20 w-20 object-cover rounded border" />
+                                  <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded">
+                                    <Download className="h-4 w-4 text-white" />
+                                  </span>
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingChecklist(null)}>Cancel</Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open) setDeleteId(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Checklist?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this checklist record. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

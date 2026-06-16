@@ -12,6 +12,7 @@ import {
   AlertCircle
 } from "lucide-react"
 import { DashboardCharts } from "./charts"
+import { DashboardRefresh } from "./dashboard-refresh"
 
 async function getStats() {
   const supabase = await createClient()
@@ -128,6 +129,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      <DashboardRefresh />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>

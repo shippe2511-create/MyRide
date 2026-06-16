@@ -38,13 +38,28 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Check if user is admin
-  if (user && request.nextUrl.pathname.startsWith('/dashboard')) {
-    const { data: profile } = await supabase
+  // Helper to find profile by ID or email
+  const findProfile = async () => {
+    let { data: profile } = await supabase
       .from('profiles')
       .select('role, status')
-      .eq('id', user.id)
+      .eq('id', user!.id)
       .single()
+
+    if (!profile && user!.email) {
+      const { data: profileByEmail } = await supabase
+        .from('profiles')
+        .select('role, status')
+        .eq('email', user!.email)
+        .single()
+      profile = profileByEmail
+    }
+    return profile
+  }
+
+  // Check if user is admin
+  if (user && request.nextUrl.pathname.startsWith('/dashboard')) {
+    const profile = await findProfile()
 
     if (!profile || !['admin', 'super-admin'].includes(profile.role) || profile.status !== 'approved') {
       const url = request.nextUrl.clone()
@@ -56,11 +71,7 @@ export async function updateSession(request: NextRequest) {
 
   // Redirect logged in admins from login to dashboard
   if (user && request.nextUrl.pathname === '/login') {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, status')
-      .eq('id', user.id)
-      .single()
+    const profile = await findProfile()
 
     if (profile && ['admin', 'super-admin'].includes(profile.role) && profile.status === 'approved') {
       const url = request.nextUrl.clone()

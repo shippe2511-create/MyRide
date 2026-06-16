@@ -11,7 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Settings, Globe, Bell, Shield, Database, Save, Loader2, KeyRound } from "lucide-react"
+import { Settings, Globe, Bell, Shield, Database, Save, Loader2, KeyRound, Phone, Plus, Trash2, GripVertical, Eye, EyeOff } from "lucide-react"
 import { toast } from "sonner"
 
 interface AppSettings {
@@ -31,6 +31,15 @@ interface AppSettings {
   notif_driver_arrived: boolean
   notif_ride_completed: boolean
   notif_promotions: boolean
+}
+
+interface EmergencyContact {
+  id: string
+  name: string
+  phone: string
+  icon: string
+  sort_order: number
+  is_active: boolean
 }
 
 const defaultSettings: AppSettings = {
@@ -60,9 +69,14 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [changingPassword, setChangingPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([])
+  const [savingContacts, setSavingContacts] = useState(false)
 
   useEffect(() => {
     loadSettings()
+    loadEmergencyContacts()
   }, [])
 
   const loadSettings = async () => {
@@ -113,6 +127,59 @@ export default function SettingsPage() {
 
   const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     setSettings(prev => ({ ...prev, [key]: value }))
+  }
+
+  const loadEmergencyContacts = async () => {
+    const { data } = await supabase
+      .from("emergency_contacts")
+      .select("*")
+      .order("sort_order", { ascending: true })
+    if (data) setEmergencyContacts(data)
+  }
+
+  const saveEmergencyContacts = async () => {
+    setSavingContacts(true)
+    try {
+      for (const contact of emergencyContacts) {
+        await supabase.from("emergency_contacts").upsert({
+          id: contact.id,
+          name: contact.name,
+          phone: contact.phone,
+          icon: contact.icon,
+          sort_order: contact.sort_order,
+          is_active: contact.is_active,
+          updated_at: new Date().toISOString()
+        })
+      }
+      toast.success("Emergency contacts saved")
+    } catch {
+      toast.error("Failed to save contacts")
+    }
+    setSavingContacts(false)
+  }
+
+  const addEmergencyContact = () => {
+    const newContact: EmergencyContact = {
+      id: crypto.randomUUID(),
+      name: "",
+      phone: "",
+      icon: "phone",
+      sort_order: emergencyContacts.length + 1,
+      is_active: true
+    }
+    setEmergencyContacts([...emergencyContacts, newContact])
+  }
+
+  const updateContact = (id: string, field: keyof EmergencyContact, value: string | number | boolean) => {
+    setEmergencyContacts(contacts =>
+      contacts.map(c => c.id === id ? { ...c, [field]: value } : c)
+    )
+  }
+
+  const deleteContact = async (id: string) => {
+    await supabase.from("emergency_contacts").delete().eq("id", id)
+    setEmergencyContacts(contacts => contacts.filter(c => c.id !== id))
+    toast.success("Contact deleted")
   }
 
   const handleChangePassword = async () => {
@@ -180,6 +247,7 @@ export default function SettingsPage() {
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="rides">Rides</TabsTrigger>
+          <TabsTrigger value="emergency">Emergency</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
@@ -326,6 +394,84 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="emergency" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Phone className="h-5 w-5" />
+                    Emergency Contacts
+                  </CardTitle>
+                  <CardDescription>SOS screen emergency contact numbers</CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={addEmergencyContact}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Contact
+                  </Button>
+                  <Button size="sm" onClick={saveEmergencyContacts} disabled={savingContacts}>
+                    {savingContacts ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+                    Save
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {emergencyContacts.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No emergency contacts configured</p>
+                ) : (
+                  emergencyContacts.map((contact, index) => (
+                    <div key={contact.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                      <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
+                      <div className="flex-1 grid grid-cols-3 gap-3">
+                        <Input
+                          placeholder="Name (e.g., Police)"
+                          value={contact.name}
+                          onChange={(e) => updateContact(contact.id, "name", e.target.value)}
+                        />
+                        <Input
+                          placeholder="Phone (e.g., 119)"
+                          value={contact.phone}
+                          onChange={(e) => updateContact(contact.id, "phone", e.target.value)}
+                        />
+                        <Select
+                          value={contact.icon}
+                          onValueChange={(v) => updateContact(contact.id, "icon", v)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="shield">Shield (Police)</SelectItem>
+                            <SelectItem value="heart">Heart (Medical)</SelectItem>
+                            <SelectItem value="flame">Flame (Fire)</SelectItem>
+                            <SelectItem value="building">Building (Office)</SelectItem>
+                            <SelectItem value="phone">Phone (General)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Switch
+                        checked={contact.is_active}
+                        onCheckedChange={(checked) => updateContact(contact.id, "is_active", checked)}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-red-500 hover:text-red-600"
+                        onClick={() => deleteContact(contact.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="notifications" className="space-y-4">
           <Card>
             <CardHeader>
@@ -413,21 +559,41 @@ export default function SettingsPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">New Password</label>
-                  <Input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new password"
-                  />
+                  <div className="relative">
+                    <Input
+                      type={showNewPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter new password"
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Confirm Password</label>
-                  <Input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm new password"
-                  />
+                  <div className="relative">
+                    <Input
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm new password"
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
               </div>
               <Button onClick={handleChangePassword} disabled={changingPassword || !newPassword}>

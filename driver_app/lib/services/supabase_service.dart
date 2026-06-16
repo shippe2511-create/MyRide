@@ -16,6 +16,7 @@ class SupabaseService {
   static Future<void> initialize() async {
     await Supabase.initialize(
       url: _supabaseUrl,
+      // ignore: deprecated_member_use
       anonKey: _supabaseAnonKey,
     );
   }
@@ -573,8 +574,7 @@ class SupabaseService {
         'created_at': DateTime.now().toIso8601String(),
       });
     } catch (e) {
-      // Log error but don't crash
-      print('Failed to send notification: $e');
+      debugPrint('Failed to send notification: $e');
     }
   }
 
@@ -665,7 +665,7 @@ class SupabaseService {
       'has_issues': hasIssues,
       'issues': issuesWithPhotos,
       'all_items': allItems,
-      'checked_at': DateTime.now().toIso8601String(),
+      'checked_at': DateTime.now().toUtc().toIso8601String(),
     });
   }
 
@@ -1164,14 +1164,14 @@ class SupabaseService {
     }
   }
 
-  // Emergency Contacts
-  static Future<List<Map<String, dynamic>>> getEmergencyContacts(String driverId) async {
+  // Emergency Contacts (global, managed by admin)
+  static Future<List<Map<String, dynamic>>> getEmergencyContacts() async {
     try {
       final response = await client
           .from('emergency_contacts')
           .select()
-          .eq('user_id', driverId)
-          .order('created_at');
+          .eq('is_active', true)
+          .order('sort_order');
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint('Error getting emergency contacts: $e');
@@ -1181,7 +1181,8 @@ class SupabaseService {
 
   // SOS Alert
   static Future<bool> triggerSOSAlert({
-    required String driverId,
+    required String userId,
+    String? driverId,
     String? rideId,
     double? latitude,
     double? longitude,
@@ -1189,7 +1190,7 @@ class SupabaseService {
   }) async {
     try {
       await client.from('sos_alerts').insert({
-        'user_id': driverId,
+        'user_id': userId,
         'ride_id': rideId,
         'driver_id': driverId,
         'latitude': latitude,
@@ -1198,6 +1199,7 @@ class SupabaseService {
         'status': 'active',
         'created_at': DateTime.now().toIso8601String(),
       });
+      debugPrint('SOS alert inserted successfully for user: $userId');
       return true;
     } catch (e) {
       debugPrint('Error triggering SOS alert: $e');

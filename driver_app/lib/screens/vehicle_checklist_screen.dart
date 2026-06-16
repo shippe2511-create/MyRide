@@ -832,7 +832,7 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                 child: Row(
                   children: [
                     Icon(
-                      _hasIssues ? Icons.arrow_forward : Icons.power_settings_new,
+                      _hasIssues ? Icons.check_circle : Icons.power_settings_new,
                       color: _allChecked
                           ? (_hasIssues ? Colors.black : Colors.white)
                           : context.mutedColor,

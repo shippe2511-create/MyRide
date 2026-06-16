@@ -203,8 +203,11 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
     setLoading(false)
   }
 
-  const handleDelete = async () => {
+  const handleDelete = async (e?: React.MouseEvent) => {
+    e?.preventDefault()
     if (!selectedDriver) return
+    const driverToDelete = selectedDriver
+    setDialogType(null)
     setLoading(true)
 
     try {
@@ -212,20 +215,19 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
       await supabase
         .from("drivers")
         .delete()
-        .eq("profile_id", selectedDriver.id)
+        .eq("profile_id", driverToDelete.id)
 
       // Then delete from profiles table
       const { error } = await supabase
         .from("profiles")
         .delete()
-        .eq("id", selectedDriver.id)
+        .eq("id", driverToDelete.id)
 
       if (error) {
         console.error("Delete error:", error)
         toast.error("Failed to delete driver: " + error.message)
       } else {
         toast.success("Driver deleted")
-        setDialogType(null)
         router.refresh()
       }
     } catch (e) {
@@ -504,7 +506,7 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
                   </TableCell>
                   <TableCell>{formatDate(driver.created_at)}</TableCell>
                   <TableCell>
-                    <DropdownMenu>
+                    <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
                           <MoreHorizontal className="h-4 w-4" />

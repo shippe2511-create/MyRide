@@ -188,16 +188,18 @@ export default function VehiclesPage() {
     setSaving(false)
   }
 
-  const handleDelete = async () => {
+  const handleDelete = async (e?: React.MouseEvent) => {
+    e?.preventDefault()
     if (!selectedVehicle) return
+    const vehicleToDelete = selectedVehicle
+    setDeleteDialogOpen(false)
     setSaving(true)
 
-    const { error } = await supabase.from("vehicle_types").delete().eq("id", selectedVehicle.id)
+    const { error } = await supabase.from("vehicle_types").delete().eq("id", vehicleToDelete.id)
     if (error) {
       toast.error("Failed to delete")
     } else {
       toast.success("Vehicle type deleted")
-      setDeleteDialogOpen(false)
       loadVehicles()
     }
     setSaving(false)
@@ -333,7 +335,7 @@ export default function VehiclesPage() {
                         />
                       </TableCell>
                       <TableCell>
-                        <DropdownMenu>
+                        <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon">
                               <MoreHorizontal className="h-4 w-4" />

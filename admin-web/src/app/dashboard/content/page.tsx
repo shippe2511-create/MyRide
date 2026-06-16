@@ -291,7 +291,7 @@ export default function ContentPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -309,14 +309,6 @@ export default function ContentPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{announcements.filter(a => a.is_active).length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Push Sent</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{notifications.length}</div>
           </CardContent>
         </Card>
       </div>
@@ -398,7 +390,7 @@ export default function ContentPage() {
                         </TableCell>
                         <TableCell>{item.published_at ? formatDate(item.published_at) : "-"}</TableCell>
                         <TableCell>
-                          <DropdownMenu>
+                          <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                             </DropdownMenuTrigger>
@@ -492,7 +484,7 @@ export default function ContentPage() {
                         </TableCell>
                         <TableCell>{formatDate(ann.created_at)}</TableCell>
                         <TableCell>
-                          <DropdownMenu>
+                          <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                             </DropdownMenuTrigger>
@@ -559,7 +551,7 @@ export default function ContentPage() {
                         <TableCell className="text-green-500">{notif.success_count}</TableCell>
                         <TableCell>{formatDate(notif.sent_at)}</TableCell>
                         <TableCell>
-                          <DropdownMenu>
+                          <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                             </DropdownMenuTrigger>

@@ -23,13 +23,14 @@ import { toast } from "sonner"
 interface SOSAlert {
   id: string
   user_id: string
+  driver_id: string | null
   status: string
   latitude: number | null
   longitude: number | null
   location_address: string | null
   notes: string | null
   created_at: string
-  user?: { full_name: string; phone: string | null }
+  user?: { full_name: string; phone: string | null; role: string | null }
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -51,6 +52,18 @@ export default function SOSPage() {
 
   useEffect(() => {
     loadAlerts()
+
+    // Real-time subscription for SOS alerts
+    const channel = supabase
+      .channel('sos_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sos_alerts' }, () => {
+        loadAlerts()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [statusFilter])
 
   const loadAlerts = async () => {
@@ -58,7 +71,7 @@ export default function SOSPage() {
 
     let query = supabase
       .from("sos_alerts")
-      .select("*, user:profiles!sos_alerts_user_id_fkey(full_name, phone)")
+      .select("*, user:profiles!sos_alerts_user_id_fkey(full_name, phone, role)")
       .order("created_at", { ascending: false })
       .limit(50)
 
@@ -103,7 +116,9 @@ export default function SOSPage() {
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleString("en-US", {
-      month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+      timeZone: "Indian/Maldives",
+      month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+      hour12: true
     })
   }
 
@@ -216,7 +231,12 @@ export default function SOSPage() {
                         <AvatarFallback>{alert.user?.full_name?.[0] || "?"}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium text-sm">{alert.user?.full_name || "Unknown"}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm">{alert.user?.full_name || "Unknown"}</p>
+                          <Badge variant="outline" className="text-xs">
+                            {alert.user?.role === "driver" ? "Driver" : "Customer"}
+                          </Badge>
+                        </div>
                         <p className="text-xs text-muted-foreground">{alert.user?.phone || "-"}</p>
                       </div>
                     </div>

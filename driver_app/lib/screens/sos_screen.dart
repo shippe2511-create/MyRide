@@ -38,26 +38,24 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
 
   Future<void> _loadEmergencyContacts() async {
     try {
-      final driverState = Provider.of<DriverState>(context, listen: false);
-      final driverId = driverState.driverId;
-      if (driverId != null) {
-        final contacts = await SupabaseService.getEmergencyContacts(driverId);
-        if (contacts.isNotEmpty) {
-          setState(() {
-            _emergencyContacts = [
-              // Keep default emergency services
-              {'name': 'Police', 'number': '119', 'icon': Icons.local_police_outlined},
-              {'name': 'Ambulance', 'number': '102', 'icon': Icons.medical_services_outlined},
-              {'name': 'Fire Department', 'number': '118', 'icon': Icons.fire_truck_outlined},
-              // Add custom contacts from database
-              ...contacts.map((c) => {
-                'name': c['name'] ?? 'Contact',
-                'number': c['phone'] ?? '',
-                'icon': Icons.person_outline,
-              }),
-            ];
-          });
-        }
+      final contacts = await SupabaseService.getEmergencyContacts();
+      if (contacts.isNotEmpty) {
+        setState(() {
+          _emergencyContacts = contacts.map((c) {
+            IconData icon = Icons.phone_outlined;
+            switch (c['icon']) {
+              case 'shield': icon = Icons.local_police_outlined; break;
+              case 'heart': icon = Icons.medical_services_outlined; break;
+              case 'flame': icon = Icons.fire_truck_outlined; break;
+              case 'building': icon = Icons.business_outlined; break;
+            }
+            return {
+              'name': c['name'] ?? 'Contact',
+              'number': c['phone'] ?? '',
+              'icon': icon,
+            };
+          }).toList();
+        });
       }
     } catch (e) {
       debugPrint('Error loading emergency contacts: $e');
@@ -112,6 +110,7 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
 
     final driverState = Provider.of<DriverState>(context, listen: false);
     final driverId = driverState.driverId;
+    final profileId = driverState.profileId;
 
     double? lat;
     double? lng;
@@ -126,11 +125,13 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
     }
 
     if (driverId.isNotEmpty) {
-      await SupabaseService.triggerSOSAlert(
+      final success = await SupabaseService.triggerSOSAlert(
+        userId: profileId.isNotEmpty ? profileId : driverId,
         driverId: driverId,
         latitude: lat,
         longitude: lng,
       );
+      debugPrint('SOS Alert sent: $success');
     }
   }
 

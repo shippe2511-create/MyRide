@@ -51,6 +51,18 @@ export default function RidesPage() {
 
   useEffect(() => {
     loadData()
+
+    // Real-time subscription for rides
+    const channel = supabase
+      .channel('rides_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rides' }, () => {
+        loadData()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [statusFilter])
 
   const loadData = async () => {
@@ -88,7 +100,9 @@ export default function RidesPage() {
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleString("en-US", {
-      month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+      timeZone: "Indian/Maldives",
+      month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+      hour12: true
     })
   }
 

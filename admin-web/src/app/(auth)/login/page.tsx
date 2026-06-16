@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Car, Loader2 } from "lucide-react"
+import { Car, Loader2, Eye, EyeOff } from "lucide-react"
 import { toast } from "sonner"
 
 function LoginContent() {
@@ -18,6 +18,7 @@ function LoginContent() {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [resetMode, setResetMode] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const supabase = createClient()
 
@@ -64,33 +65,33 @@ function LoginContent() {
       }
 
       if (data.user) {
+        // First try to find profile by auth user ID
         let { data: profile } = await supabase
           .from("profiles")
-          .select("role, status")
+          .select("id, role, status")
           .eq("id", data.user.id)
           .single()
 
         if (!profile) {
-          // Auto-create profile for authenticated users
-          const { data: newProfile, error: insertError } = await supabase
+          // Try to find by email instead
+          const { data: profileByEmail } = await supabase
             .from("profiles")
-            .insert({
-              id: data.user.id,
-              email: data.user.email,
-              full_name: data.user.user_metadata?.full_name || data.user.email?.split("@")[0] || "Admin",
-              role: "super-admin",
-              status: "approved"
-            })
-            .select("role, status")
+            .select("id, role, status")
+            .eq("email", data.user.email)
             .single()
 
-          if (insertError) {
-            toast.error("Failed to create profile: " + insertError.message)
-            await supabase.auth.signOut()
-            setLoading(false)
-            return
+          if (profileByEmail) {
+            // Profile exists with different ID - use it as-is
+            profile = profileByEmail
           }
-          profile = newProfile
+        }
+
+        if (!profile) {
+          // No profile exists - deny access (don't auto-create)
+          toast.error("No admin profile found. Contact administrator.")
+          await supabase.auth.signOut()
+          setLoading(false)
+          return
         }
 
         if (!["admin", "super-admin"].includes(profile.role)) {
@@ -198,14 +199,24 @@ function LoginContent() {
                     Forgot password?
                   </button>
                 </div>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? (

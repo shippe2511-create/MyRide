@@ -158,6 +158,7 @@ export function DocumentsTable() {
   const formatDate = (date: string | null) => {
     if (!date) return "-"
     return new Date(date).toLocaleDateString("en-US", {
+      timeZone: "Indian/Maldives",
       month: "short",
       day: "numeric",
       year: "numeric"
@@ -373,7 +374,7 @@ export function DocumentsTable() {
                         {formatDate(doc.uploaded_at)}
                       </TableCell>
                       <TableCell>
-                        <DropdownMenu>
+                        <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" disabled={updating === doc.id}>
                               {updating === doc.id ? (

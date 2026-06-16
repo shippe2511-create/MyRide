@@ -22,6 +22,7 @@ class DriverState extends ChangeNotifier {
 
   String _driverName = '';
   String _driverId = '';
+  String _profileId = '';
   String _employeeId = '';
   String _vehicleNumber = '';
   String _vehicleModel = '';
@@ -98,6 +99,7 @@ class DriverState extends ChangeNotifier {
   bool get isLoggedIn => _isLoggedIn;
   String get driverName => _driverName;
   String get driverId => _driverId;
+  String get profileId => _profileId;
   String get employeeId => _employeeId;
   String get vehicleNumber => _vehicleNumber;
   String get vehicleModel => _vehicleModel;
@@ -156,6 +158,7 @@ class DriverState extends ChangeNotifier {
       _isLoggedIn = prefs.getBool('loggedIn') ?? false;
       _driverName = prefs.getString('driverName') ?? '';
       _driverId = prefs.getString('driverId') ?? '';
+      _profileId = prefs.getString('profileId') ?? '';
       _employeeId = prefs.getString('employeeId') ?? '';
       _vehicleNumber = prefs.getString('vehicleNumber') ?? '';
 
@@ -234,9 +237,11 @@ class DriverState extends ChangeNotifier {
     double rating = 5.0,
     String avatarUrl = '',
     String employeeId = '',
+    String profileId = '',
   }) async {
     _driverName = name;
     _driverId = id;
+    _profileId = profileId;
     _employeeId = employeeId;
     _vehicleNumber = vehicleNumber;
     _vehicleModel = vehicleModel;
@@ -252,6 +257,7 @@ class DriverState extends ChangeNotifier {
     prefs.setBool('loggedIn', true);
     prefs.setString('driverName', name);
     prefs.setString('driverId', id);
+    prefs.setString('profileId', profileId);
     prefs.setString('employeeId', employeeId);
     prefs.setString('vehicleNumber', vehicleNumber);
     prefs.setString('vehicleModel', vehicleModel);

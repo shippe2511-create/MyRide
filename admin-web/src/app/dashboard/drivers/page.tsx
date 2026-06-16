@@ -24,6 +24,14 @@ export default function DriversPage() {
 
   useEffect(() => {
     loadData()
+
+    const channel = supabase
+      .channel('drivers_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => loadData())
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
   }, [])
 
   const loadData = async () => {

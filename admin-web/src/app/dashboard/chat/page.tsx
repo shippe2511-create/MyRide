@@ -32,8 +32,8 @@ interface RideConversation {
   customer_avatar: string | null
   driver_name: string
   driver_avatar: string | null
-  pickup_address: string | null
-  dropoff_address: string | null
+  pickup_name: string | null
+  dropoff_name: string | null
   ride_status: string
   message_count: number
   last_message: string
@@ -83,17 +83,38 @@ export default function ChatPage() {
       return
     }
 
-    const { data: ridesData } = await supabase
+    const { data: ridesData, error: ridesError } = await supabase
       .from("rides")
       .select(`
         id,
         status,
-        pickup_address,
-        dropoff_address,
-        customer:profiles!rides_customer_id_fkey(full_name, avatar_url),
-        driver:profiles!rides_driver_id_fkey(full_name, avatar_url)
+        pickup_name,
+        dropoff_name,
+        customer_id,
+        driver_id
       `)
       .in("id", rideIds)
+
+    if (ridesError) {
+      console.error("Error loading rides:", ridesError)
+    }
+
+    // Fetch profiles separately for reliability
+    const customerIds = (ridesData || []).map(r => r.customer_id).filter(Boolean)
+    const driverIds = (ridesData || []).map(r => r.driver_id).filter(Boolean)
+
+    const { data: profilesData } = await supabase
+      .from("profiles")
+      .select("id, full_name, avatar_url")
+      .in("id", customerIds)
+
+    const { data: driversData } = await supabase
+      .from("drivers")
+      .select("id, profile:profiles(full_name, avatar_url)")
+      .in("id", driverIds)
+
+    const profilesMap = new Map((profilesData || []).map(p => [p.id, p]))
+    const driversMap = new Map((driversData || []).map(d => [d.id, d]))
 
     const ridesMap = new Map((ridesData || []).map(r => [r.id, r]))
 
@@ -104,16 +125,17 @@ export default function ChatPage() {
       if (!ride) continue
 
       if (!conversationMap.has(msg.ride_id)) {
-        const customer = Array.isArray(ride.customer) ? ride.customer[0] : ride.customer
-        const driver = Array.isArray(ride.driver) ? ride.driver[0] : ride.driver
+        const customer = profilesMap.get(ride.customer_id)
+        const driverData = driversMap.get(ride.driver_id)
+        const driverProfile = Array.isArray(driverData?.profile) ? driverData.profile[0] : driverData?.profile
         conversationMap.set(msg.ride_id, {
           ride_id: msg.ride_id,
           customer_name: customer?.full_name || "Unknown Customer",
           customer_avatar: customer?.avatar_url || null,
-          driver_name: driver?.full_name || "Unknown Driver",
-          driver_avatar: driver?.avatar_url || null,
-          pickup_address: ride.pickup_address,
-          dropoff_address: ride.dropoff_address,
+          driver_name: driverProfile?.full_name || "Unknown Driver",
+          driver_avatar: driverProfile?.avatar_url || null,
+          pickup_name: ride.pickup_name,
+          dropoff_name: ride.dropoff_name,
           ride_status: ride.status,
           message_count: 0,
           last_message: msg.message,
@@ -189,11 +211,12 @@ export default function ChatPage() {
     if (diffMins < 60) return `${diffMins}m`
     const diffHours = Math.floor(diffMins / 60)
     if (diffHours < 24) return `${diffHours}h`
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    return d.toLocaleDateString("en-US", { timeZone: "Indian/Maldives", month: "short", day: "numeric" })
   }
 
   const formatMessageTime = (date: string) => {
     return new Date(date).toLocaleTimeString("en-US", {
+      timeZone: "Indian/Maldives",
       hour: "2-digit",
       minute: "2-digit",
     })
@@ -397,9 +420,9 @@ export default function ChatPage() {
                     </CardTitle>
                     <CardDescription className="flex items-center gap-2 mt-1">
                       <MapPin className="h-3 w-3" />
-                      {selectedConversation?.pickup_address?.slice(0, 30)}...
+                      {selectedConversation?.pickup_name?.slice(0, 30)}...
                       <ChevronRight className="h-3 w-3" />
-                      {selectedConversation?.dropoff_address?.slice(0, 30)}...
+                      {selectedConversation?.dropoff_name?.slice(0, 30)}...
                     </CardDescription>
                   </div>
                   <Badge variant={getStatusColor(selectedConversation?.ride_status || "") as "default" | "success" | "destructive" | "warning" | "secondary"}>

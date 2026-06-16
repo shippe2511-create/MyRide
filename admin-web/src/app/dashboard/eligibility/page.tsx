@@ -135,14 +135,17 @@ export default function EligibilityPage() {
     setDialogType(null)
   }
 
-  const handleDelete = async () => {
+  const handleDelete = async (e?: React.MouseEvent) => {
+    e?.preventDefault()
     if (!selectedCampaign) return
+    const campaignToDelete = selectedCampaign
+    setDialogType(null)
     setSaving(true)
 
     const { error } = await supabase
       .from("ride_campaigns")
       .delete()
-      .eq("id", selectedCampaign.id)
+      .eq("id", campaignToDelete.id)
 
     if (error) toast.error("Failed to delete campaign")
     else {
@@ -150,7 +153,6 @@ export default function EligibilityPage() {
       loadCampaigns()
     }
     setSaving(false)
-    setDialogType(null)
   }
 
   const toggleActive = async (campaign: Campaign) => {
@@ -264,7 +266,7 @@ export default function EligibilityPage() {
                     </TableCell>
                     <TableCell>{formatDate(campaign.created_at)}</TableCell>
                     <TableCell>
-                      <DropdownMenu>
+                      <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon">
                             <MoreHorizontal className="h-4 w-4" />

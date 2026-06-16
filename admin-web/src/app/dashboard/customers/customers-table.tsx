@@ -188,20 +188,22 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
     setLoading(false)
   }
 
-  const handleDelete = async () => {
+  const handleDelete = async (e?: React.MouseEvent) => {
+    e?.preventDefault()
     if (!selectedCustomer) return
+    const customerToDelete = selectedCustomer
+    setDialogType(null)
     setLoading(true)
 
     const { error } = await supabase
       .from("profiles")
       .delete()
-      .eq("id", selectedCustomer.id)
+      .eq("id", customerToDelete.id)
 
     if (error) {
       toast.error("Failed to delete customer")
     } else {
       toast.success("Customer deleted")
-      setDialogType(null)
       router.refresh()
     }
     setLoading(false)
@@ -431,7 +433,7 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
                   </TableCell>
                   <TableCell>{formatDate(customer.created_at)}</TableCell>
                   <TableCell>
-                    <DropdownMenu>
+                    <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
                           <MoreHorizontal className="h-4 w-4" />

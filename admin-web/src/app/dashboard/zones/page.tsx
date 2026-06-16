@@ -161,25 +161,29 @@ export default function ZonesPage() {
     loadData()
   }
 
-  const handleDeleteZone = async () => {
+  const handleDeleteZone = async (e?: React.MouseEvent) => {
+    e?.preventDefault()
     if (!selectedItem) return
+    const itemToDelete = selectedItem
+    setDialogType(null)
     setSaving(true)
-    const { error } = await supabase.from("service_zones").delete().eq("id", selectedItem.id)
+    const { error } = await supabase.from("service_zones").delete().eq("id", itemToDelete.id)
     if (error) toast.error("Failed to delete zone")
     else toast.success("Zone deleted")
     setSaving(false)
-    setDialogType(null)
     loadData()
   }
 
-  const handleDeleteLocation = async () => {
+  const handleDeleteLocation = async (e?: React.MouseEvent) => {
+    e?.preventDefault()
     if (!selectedItem) return
+    const itemToDelete = selectedItem
+    setDialogType(null)
     setSaving(true)
-    const { error } = await supabase.from("locations").delete().eq("id", selectedItem.id)
+    const { error } = await supabase.from("locations").delete().eq("id", itemToDelete.id)
     if (error) toast.error("Failed to delete location")
     else toast.success("Location deleted")
     setSaving(false)
-    setDialogType(null)
     loadData()
   }
 
@@ -289,7 +293,7 @@ export default function ZonesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <DropdownMenu>
+                        <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
@@ -350,7 +354,7 @@ export default function ZonesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <DropdownMenu>
+                        <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>

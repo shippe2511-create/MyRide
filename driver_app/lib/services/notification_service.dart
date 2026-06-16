@@ -1,12 +1,17 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
   static RealtimeChannel? _rideChannel;
+  // ignore: unused_field
   static String? _currentDriverId;
   static bool _initialized = false;
+
+  // Callback for showing in-app toast
+  static void Function(String title, String body, String? rideId)? onShowInAppMessage;
 
   // Instance methods for backward compatibility
   Future<void> init() async {
@@ -166,6 +171,11 @@ class NotificationService {
         payload: payload,
       );
       debugPrint('NotificationService: Notification shown successfully');
+
+      // Also show in-app toast via callback
+      final isChat = payload?.startsWith('chat_') ?? false;
+      final rideId = isChat ? payload!.replaceFirst('chat_', '') : null;
+      onShowInAppMessage?.call(title, body, rideId);
     } catch (e) {
       debugPrint('NotificationService: ERROR showing notification: $e');
     }

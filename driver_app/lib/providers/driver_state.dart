@@ -52,25 +52,12 @@ class DriverState extends ChangeNotifier {
   double _currentLat = 4.1755;
   double _currentLng = 73.5093;
 
-  // Duty roster schedule (weekday index 0=Monday to 6=Sunday)
-  final List<Map<String, dynamic>> _dutyRoster = [
-    // Monday
-    {'shifts': [{'start': '06:00', 'end': '14:00'}]},
-    // Tuesday
-    {'shifts': [{'start': '06:00', 'end': '14:00'}]},
-    // Wednesday
-    {'shifts': [{'start': '14:00', 'end': '22:00'}]},
-    // Thursday
-    {'shifts': [{'start': '06:00', 'end': '14:00'}]},
-    // Friday
-    {'shifts': [{'start': '06:00', 'end': '14:00'}]},
-    // Saturday - day off
-    {'shifts': []},
-    // Sunday
-    {'shifts': [{'start': '14:00', 'end': '22:00'}]},
-  ];
+  // Duty roster from database
+  List<Map<String, dynamic>> _dutyRoster = [];
+  List<Map<String, dynamic>> _weekShifts = [];
 
   List<Map<String, dynamic>> get dutyRoster => _dutyRoster;
+  List<Map<String, dynamic>> get weekShifts => _weekShifts;
 
   // Seat management for shared rides
   int _totalSeats = 8; // Van capacity
@@ -147,10 +134,71 @@ class DriverState extends ChangeNotifier {
   }
 
   // Check if current time is within duty roster hours
-  bool get isWithinDutyHours => true; // Always allow for now
+  bool get isWithinDutyHours {
+    final todayShiftInfo = todayShift;
+    if (todayShiftInfo == null) return true; // No shift = allow
 
-  // Get today's shift info
-  Map<String, String>? get todayShift => null;
+    final now = DateTime.now();
+    final startParts = todayShiftInfo['start']!.split(':');
+    final endParts = todayShiftInfo['end']!.split(':');
+
+    final shiftStart = DateTime(now.year, now.month, now.day,
+      int.parse(startParts[0]), int.parse(startParts[1]));
+    final shiftEnd = DateTime(now.year, now.month, now.day,
+      int.parse(endParts[0]), int.parse(endParts[1]));
+
+    return now.isAfter(shiftStart) && now.isBefore(shiftEnd);
+  }
+
+  // Get today's shift info from loaded shifts
+  Map<String, String>? get todayShift {
+    if (_weekShifts.isEmpty) return null;
+
+    final today = DateTime.now();
+    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+    for (final shift in _weekShifts) {
+      if (shift['shift_date'] == todayStr) {
+        return {
+          'start': shift['start_time']?.toString().substring(0, 5) ?? '00:00',
+          'end': shift['end_time']?.toString().substring(0, 5) ?? '23:59',
+          'type': shift['shift_type'] ?? 'regular',
+        };
+      }
+    }
+    return null;
+  }
+
+  // Load shifts from database
+  Future<void> loadShifts() async {
+    if (_driverId.isEmpty) return;
+
+    try {
+      final now = DateTime.now();
+      final weekStart = now.subtract(Duration(days: now.weekday - 1));
+      final weekEnd = weekStart.add(const Duration(days: 6));
+
+      final shifts = await SupabaseService.getDriverShifts(_driverId, weekStart, weekEnd);
+      _weekShifts = shifts;
+
+      // Convert to duty roster format for weekly view
+      _dutyRoster = List.generate(7, (dayIndex) {
+        final date = weekStart.add(Duration(days: dayIndex));
+        final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+        final dayShifts = shifts.where((s) => s['shift_date'] == dateStr).map((s) => {
+          'start': s['start_time']?.toString().substring(0, 5) ?? '00:00',
+          'end': s['end_time']?.toString().substring(0, 5) ?? '23:59',
+        }).toList();
+
+        return {'shifts': dayShifts};
+      });
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading shifts: $e');
+    }
+  }
 
   Future<void> _loadPreferences() async {
     try {
@@ -169,6 +217,8 @@ class DriverState extends ChangeNotifier {
       // Sync driverId to SupabaseService
       if (_driverId.isNotEmpty) {
         SupabaseService.setDriverId(_driverId);
+        // Load shifts for this week
+        loadShifts();
       }
 
       // Fetch employee_id from database if not set but logged in
@@ -267,6 +317,9 @@ class DriverState extends ChangeNotifier {
     prefs.setString('vehicleModel', vehicleModel);
     prefs.setString('phoneNumber', phone);
     prefs.setString('avatarUrl', avatarUrl);
+
+    // Load shifts from database
+    await loadShifts();
 
     notifyListeners();
   }

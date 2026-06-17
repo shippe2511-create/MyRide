@@ -10,8 +10,12 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
@@ -50,6 +54,8 @@ export default function SOSPage() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [selectedAlert, setSelectedAlert] = useState<SOSAlert | null>(null)
   const [saving, setSaving] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [alertToDelete, setAlertToDelete] = useState<string | null>(null)
 
   const [stats, setStats] = useState({ active: 0, responding: 0, resolved: 0 })
 
@@ -165,15 +171,22 @@ export default function SOSPage() {
     window.open(`https://www.google.com/maps?q=${lat},${lng}`, "_blank")
   }
 
-  const deleteAlert = async (alertId: string) => {
-    if (!confirm("Are you sure you want to delete this SOS alert?")) return
-    const { error } = await supabase.from("sos_alerts").delete().eq("id", alertId)
+  const confirmDelete = (alertId: string) => {
+    setAlertToDelete(alertId)
+    setDeleteDialogOpen(true)
+  }
+
+  const deleteAlert = async () => {
+    if (!alertToDelete) return
+    const { error } = await supabase.from("sos_alerts").delete().eq("id", alertToDelete)
     if (error) {
       toast.error("Failed to delete")
     } else {
       toast.success("Alert deleted")
       loadAlerts()
     }
+    setDeleteDialogOpen(false)
+    setAlertToDelete(null)
   }
 
   if (loading) {
@@ -334,7 +347,7 @@ export default function SOSPage() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-red-500"
-                          onClick={() => deleteAlert(alert.id)}
+                          onClick={() => confirmDelete(alert.id)}
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
                           Delete
@@ -420,6 +433,23 @@ export default function SOSPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete SOS Alert</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this SOS alert? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={deleteAlert} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

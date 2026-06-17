@@ -70,13 +70,13 @@ export default function RidesPage() {
   const [deleteRideId, setDeleteRideId] = useState<string | null>(null)
 
   useEffect(() => {
-    loadData()
+    loadData(true)
 
-    // Real-time subscription for rides
+    // Real-time subscription for rides - refresh silently without loading spinner
     const channel = supabase
       .channel('rides_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rides' }, () => {
-        loadData()
+        loadData(false)
       })
       .subscribe()
 
@@ -85,8 +85,8 @@ export default function RidesPage() {
     }
   }, [statusFilter])
 
-  const loadData = async () => {
-    setLoading(true)
+  const loadData = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
 
     let query = supabase
       .from("rides")
@@ -151,7 +151,13 @@ export default function RidesPage() {
       toast.error("Failed to delete ride")
     } else {
       toast.success("Ride deleted")
-      loadData()
+      // Update state directly without full reload
+      setRides(prev => prev.filter(r => r.id !== deleteRideId))
+      setStats(prev => ({
+        ...prev,
+        total: prev.total - 1,
+        completed: rides.find(r => r.id === deleteRideId)?.status === 'completed' ? prev.completed - 1 : prev.completed
+      }))
     }
     setDeleteRideId(null)
   }
@@ -181,7 +187,7 @@ export default function RidesPage() {
           <h1 className="text-2xl font-bold">Rides</h1>
           <p className="text-sm text-muted-foreground">Monitor and manage all rides</p>
         </div>
-        <Button variant="outline" size="sm" onClick={loadData}>
+        <Button variant="outline" size="sm" onClick={() => loadData(true)}>
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>

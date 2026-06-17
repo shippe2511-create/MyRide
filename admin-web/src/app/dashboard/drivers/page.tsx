@@ -4,9 +4,10 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { DriversTable } from "./drivers-table"
 import { DocumentsTable } from "./documents-table"
+import { ShiftsTable } from "./shifts-table"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, UserCheck, Clock, FileText, Loader2 } from "lucide-react"
+import { Users, UserCheck, Clock, FileText, Loader2, Calendar } from "lucide-react"
 import { Breadcrumbs } from "@/components/breadcrumbs"
 
 export default function DriversPage() {
@@ -132,6 +133,10 @@ export default function DriversPage() {
             <FileText className="h-4 w-4" />
             Documents
           </TabsTrigger>
+          <TabsTrigger value="shifts" className="gap-2">
+            <Calendar className="h-4 w-4" />
+            Shifts
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="drivers" className="mt-4">
@@ -145,6 +150,10 @@ export default function DriversPage() {
 
         <TabsContent value="documents" className="mt-4">
           <DocumentsTable />
+        </TabsContent>
+
+        <TabsContent value="shifts" className="mt-4">
+          <ShiftsTable />
         </TabsContent>
       </Tabs>
     </div>

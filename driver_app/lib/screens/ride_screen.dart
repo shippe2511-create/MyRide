@@ -1304,48 +1304,54 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (ctx) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.75,
+        ),
         padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).padding.bottom + 20),
         decoration: BoxDecoration(
           color: context.cardColor,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: context.borderColor,
-                borderRadius: BorderRadius.circular(2),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.borderColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Cancel Ride',
-              style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Please select a reason for cancellation',
-              style: TextStyle(color: context.mutedColor, fontSize: 14),
-            ),
-            const SizedBox(height: 20),
-            _buildCancelOption(ctx, state, ride, Icons.person_off, 'Customer No Show', 'Customer did not arrive at pickup location'),
-            _buildCancelOption(ctx, state, ride, Icons.cancel, 'Customer Requested', 'Customer asked to cancel the ride'),
-            _buildCancelOption(ctx, state, ride, Icons.wrong_location, 'Wrong Address', 'Pickup location is incorrect'),
-            _buildCancelOption(ctx, state, ride, Icons.timer_off, 'Long Wait Time', 'Customer taking too long'),
-            _buildOtherReasonOption(ctx, state, ride),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text('Go Back', style: TextStyle(color: context.mutedColor, fontSize: 15)),
+              const SizedBox(height: 20),
+              Text(
+                'Cancel Ride',
+                style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w700),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'Please select a reason for cancellation',
+                style: TextStyle(color: context.mutedColor, fontSize: 14),
+              ),
+              const SizedBox(height: 20),
+              _buildCancelOption(ctx, state, ride, Icons.person_off, 'Customer No Show', 'Customer did not arrive at pickup location'),
+              _buildCancelOption(ctx, state, ride, Icons.cancel, 'Customer Requested', 'Customer asked to cancel the ride'),
+              _buildCancelOption(ctx, state, ride, Icons.wrong_location, 'Wrong Address', 'Pickup location is incorrect'),
+              _buildCancelOption(ctx, state, ride, Icons.timer_off, 'Long Wait Time', 'Customer taking too long'),
+              _buildOtherReasonOption(ctx, state, ride),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('Go Back', style: TextStyle(color: context.mutedColor, fontSize: 15)),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

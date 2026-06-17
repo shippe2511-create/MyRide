@@ -1,5 +1,8 @@
 import { Sidebar } from "@/components/layout/sidebar"
 import { Header } from "@/components/layout/header"
+import { SOSAlertListener } from "@/components/sos-alert-listener"
+import { GlobalSearch } from "@/components/global-search"
+import { KeyboardShortcuts } from "@/components/keyboard-shortcuts"
 
 export default function DashboardLayout({
   children,
@@ -8,6 +11,9 @@ export default function DashboardLayout({
 }) {
   return (
     <div className="flex h-screen overflow-hidden">
+      <SOSAlertListener />
+      <GlobalSearch />
+      <KeyboardShortcuts />
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />

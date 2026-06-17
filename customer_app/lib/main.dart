@@ -20,6 +20,7 @@ import 'theme/app_theme.dart';
 import 'services/notification_service.dart';
 import 'services/cache_service.dart';
 import 'services/supabase_service.dart';
+import 'services/location_service.dart';
 
 // Custom page route with smooth fade + slide transition
 class SmoothPageRoute<T> extends PageRouteBuilder<T> {
@@ -68,6 +69,13 @@ void main() async {
     await CacheService.initializeCache();
   } catch (e) {
     debugPrint('Cache init error: $e');
+  }
+
+  try {
+    // Initialize location service early
+    await LocationService.initialize();
+  } catch (e) {
+    debugPrint('Location init error: $e');
   }
 
   SystemChrome.setSystemUIOverlayStyle(

@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/ride_request.dart';
 import '../services/notification_service.dart';
 import '../services/supabase_service.dart';
+import '../services/voice_service.dart';
 
 class DriverState extends ChangeNotifier {
   bool _isDarkMode = true;
@@ -36,6 +38,7 @@ class DriverState extends ChangeNotifier {
   final List<CompletedTrip> _completedTrips = [];
 
   int _todayTrips = 0;
+  int _weekTrips = 0;
   int _totalTrips = 0;
   double _rating = 4.8;
   double _todayDistance = 0;
@@ -111,6 +114,7 @@ class DriverState extends ChangeNotifier {
   List<RideRequest> get queuedRequests => _queuedRequests;
   List<CompletedTrip> get completedTrips => _completedTrips;
   int get todayTrips => _todayTrips;
+  int get weekTrips => _weekTrips;
   int get totalTrips => _totalTrips;
   double get rating => _rating;
   double get todayDistance => _todayDistance;
@@ -326,6 +330,10 @@ class DriverState extends ChangeNotifier {
     _breakType = '';
     _breakStartTime = null;
     _incomingRequests.clear(); // Clear any stale requests
+
+    // Haptic and voice feedback
+    HapticFeedback.mediumImpact();
+    VoiceService().announceGoingOnline();
     if (_shiftStartTime == null) {
       _shiftStartTime = DateTime.now();
     }
@@ -420,6 +428,10 @@ class DriverState extends ChangeNotifier {
     _stopRidePolling();
     _unsubscribeFromRides();
 
+    // Haptic and voice feedback
+    HapticFeedback.lightImpact();
+    VoiceService().announceGoingOffline();
+
     // Clear break state when going offline
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isOnBreak', false);
@@ -501,6 +513,15 @@ class DriverState extends ChangeNotifier {
       final request = _convertSupabaseRideToRequest(newRide);
       if (request != null && !_incomingRequests.any((r) => r.id == request.id)) {
         _incomingRequests.add(request);
+
+        // Haptic feedback for new ride
+        HapticFeedback.heavyImpact();
+
+        // Voice announcement
+        VoiceService().announceNewRide(
+          request.pickupLocation,
+          request.dropoffLocation,
+        );
 
         // Show notification
         NotificationService().showRideRequestNotification(
@@ -759,6 +780,10 @@ class DriverState extends ChangeNotifier {
         _currentRide = request.copyWith(status: RideStatus.accepted);
         _incomingRequests.removeWhere((r) => r.id == request.id);
 
+        // Haptic and voice feedback
+        HapticFeedback.mediumImpact();
+        VoiceService().announceRideAccepted();
+
         // Subscribe to chat notifications for this ride
         NotificationService.subscribeToChatMessages(request.id, _driverId);
 
@@ -845,6 +870,11 @@ class DriverState extends ChangeNotifier {
   Future<void> startTrip() async {
     if (_currentRide != null) {
       _currentRide = _currentRide!.copyWith(status: RideStatus.inProgress);
+
+      // Haptic and voice feedback
+      HapticFeedback.mediumImpact();
+      VoiceService().announceTripStarted();
+
       notifyListeners();
 
       // Update in Supabase
@@ -874,6 +904,10 @@ class DriverState extends ChangeNotifier {
       _todayTrips++;
       _totalTrips++;
       _todayDistance += distance;
+
+      // Haptic and voice feedback
+      HapticFeedback.heavyImpact();
+      VoiceService().announceTripCompleted();
 
       // Show completion notification
       NotificationService().showTripCompletedNotification(

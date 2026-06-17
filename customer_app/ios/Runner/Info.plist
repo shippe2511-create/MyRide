@@ -34,6 +34,10 @@
 	<string>Sign in quickly and securely with Face ID</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Choose a profile photo from your gallery</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>MyRide needs your location to show nearby pickup points and track your ride</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>MyRide needs your location to show nearby pickup points and track your ride</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -34,6 +35,8 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   bool _isShowingDestinationChange = false;
   double _driverLat = 4.2050;
   double _driverLng = 73.5380;
+  double _prevDriverLat = 4.2050;
+  double _prevDriverLng = 73.5380;
   List<LatLng> _routePoints = [];
   int _currentRouteIndex = 0;
   bool _isQueueExpanded = false;
@@ -214,19 +217,65 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     });
   }
 
-  void _startDriverSimulation() {
-    _etaTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
-      if (mounted && _routePoints.isNotEmpty && _currentRouteIndex < _routePoints.length - 1) {
-        setState(() {
-          _currentRouteIndex++;
-          _driverLat = _routePoints[_currentRouteIndex].latitude;
-          _driverLng = _routePoints[_currentRouteIndex].longitude;
-          if (_etaSeconds > 0) _etaSeconds -= 2;
-        });
-        _mapController.move(LatLng(_driverLat, _driverLng), _mapController.camera.zoom);
+  Future<void> _initDriverLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
 
-        // Send location update to Supabase for live tracking
-        _sendLocationUpdate();
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return;
+      }
+
+      if (permission == LocationPermission.deniedForever) return;
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+
+      if (mounted) {
+        setState(() {
+          _driverLat = position.latitude;
+          _driverLng = position.longitude;
+        });
+      }
+    } catch (e) {
+      debugPrint('Could not get GPS location: $e');
+    }
+  }
+
+  void _startDriverSimulation() {
+    // First try to get real GPS location
+    _initDriverLocation();
+
+    _etaTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      // Only use real GPS location - no simulation
+      try {
+        final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.best,
+          timeLimit: const Duration(seconds: 10),
+        );
+        if (mounted) {
+          setState(() {
+            _prevDriverLat = _driverLat;
+            _prevDriverLng = _driverLng;
+            _driverLat = position.latitude;
+            _driverLng = position.longitude;
+            if (_etaSeconds > 0) _etaSeconds -= 3;
+          });
+          _mapController.move(LatLng(_driverLat, _driverLng), _mapController.camera.zoom);
+          _sendLocationUpdate();
+        }
+      } catch (e) {
+        // GPS failed - just update ETA, don't simulate movement
+        debugPrint('GPS error: $e');
+        if (mounted && _etaSeconds > 0) {
+          setState(() {
+            _etaSeconds -= 3;
+          });
+        }
       }
     });
   }
@@ -237,19 +286,19 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
       final driverId = driverState.driverId;
       if (driverId.isEmpty) return;
 
-      // Calculate heading based on previous and current position
+      // Calculate heading based on actual GPS movement
       double heading = 0;
-      if (_currentRouteIndex > 0) {
-        final prevPoint = _routePoints[_currentRouteIndex - 1];
-        final currPoint = _routePoints[_currentRouteIndex];
+      if (_prevDriverLat != _driverLat || _prevDriverLng != _driverLng) {
         heading = math.atan2(
-          currPoint.longitude - prevPoint.longitude,
-          currPoint.latitude - prevPoint.latitude,
+          _driverLng - _prevDriverLng,
+          _driverLat - _prevDriverLat,
         ) * 180 / math.pi;
       }
 
-      // Estimate speed (km/h) based on simulation
-      final speed = 30.0 + (math.Random().nextDouble() * 20); // 30-50 km/h
+      // Calculate actual speed based on GPS distance
+      final distanceMeters = Geolocator.distanceBetween(
+        _prevDriverLat, _prevDriverLng, _driverLat, _driverLng);
+      final speed = (distanceMeters / 3) * 3.6; // m/s to km/h (3 second interval)
 
       await SupabaseService.updateLocation(
         driverId,

@@ -17,16 +17,28 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
-  MapPin, Clock, CheckCircle, XCircle, Search, Loader2, RefreshCw, Car
+  MapPin, Clock, CheckCircle, XCircle, Search, Loader2, RefreshCw, Car, MoreVertical, Edit, Trash2
 } from "lucide-react"
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator
+} from "@/components/ui/dropdown-menu"
+import { toast } from "sonner"
 
 interface Ride {
   id: string
   pickup_name: string
   dropoff_name: string
+  pickup_lat: number | null
+  pickup_lng: number | null
+  dropoff_lat: number | null
+  dropoff_lng: number | null
   status: string
   created_at: string
   completed_at: string | null
+  cancelled_at: string | null
+  cancel_reason: string | null
+  distance_km: number | null
+  duration_minutes: number | null
   customer: { full_name: string; phone: string | null } | null
   driver?: { profile: { full_name: string } } | null
 }
@@ -48,6 +60,9 @@ export default function RidesPage() {
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [stats, setStats] = useState({ total: 0, active: 0, completed: 0 })
+  const [editRide, setEditRide] = useState<Ride | null>(null)
+  const [editStatus, setEditStatus] = useState("")
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -72,7 +87,7 @@ export default function RidesPage() {
       .from("rides")
       .select(`*, customer:profiles!rides_customer_id_fkey(full_name, phone), driver:drivers!rides_driver_id_fkey(profile:profiles(full_name))`)
       .order("created_at", { ascending: false })
-      .limit(50)
+      .limit(100)
 
     if (statusFilter !== "all") {
       if (statusFilter === "active") {
@@ -104,6 +119,35 @@ export default function RidesPage() {
       month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
       hour12: true
     })
+  }
+
+  const updateRideStatus = async () => {
+    if (!editRide || !editStatus) return
+    setSaving(true)
+    const updates: Record<string, unknown> = { status: editStatus }
+    if (editStatus === "completed") {
+      updates.completed_at = new Date().toISOString()
+    }
+    const { error } = await supabase.from("rides").update(updates).eq("id", editRide.id)
+    if (error) {
+      toast.error("Failed to update ride")
+    } else {
+      toast.success("Ride updated")
+      setEditRide(null)
+      loadData()
+    }
+    setSaving(false)
+  }
+
+  const deleteRide = async (rideId: string) => {
+    if (!confirm("Are you sure you want to delete this ride?")) return
+    const { error } = await supabase.from("rides").delete().eq("id", rideId)
+    if (error) {
+      toast.error("Failed to delete ride")
+    } else {
+      toast.success("Ride deleted")
+      loadData()
+    }
   }
 
   const filteredRides = rides.filter(ride => {
@@ -205,12 +249,13 @@ export default function RidesPage() {
               <TableHead>Driver</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Time</TableHead>
+              <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredRides.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   No rides found
                 </TableCell>
               </TableRow>
@@ -251,6 +296,29 @@ export default function RidesPage() {
                   <TableCell className="text-sm text-muted-foreground">
                     {formatDate(ride.created_at)}
                   </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditRide(ride); setEditStatus(ride.status); }}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Status
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-red-500"
+                          onClick={(e) => { e.stopPropagation(); deleteRide(ride.id); }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
                 </TableRow>
               ))
             )}
@@ -259,7 +327,7 @@ export default function RidesPage() {
       </Card>
 
       <Dialog open={!!selectedRide} onOpenChange={() => setSelectedRide(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Ride Details</DialogTitle>
           </DialogHeader>
@@ -277,19 +345,93 @@ export default function RidesPage() {
                 </div>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Route</p>
-                <p className="font-medium">{selectedRide.pickup_name}</p>
-                <p className="text-sm text-muted-foreground">→ {selectedRide.dropoff_name}</p>
+                <p className="text-sm text-muted-foreground mb-1">Pickup</p>
+                <div className="flex items-center justify-between">
+                  <p className="font-medium">{selectedRide.pickup_name}</p>
+                  {selectedRide.pickup_lat && selectedRide.pickup_lng && (
+                    <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => window.open(`https://www.google.com/maps?q=${selectedRide.pickup_lat},${selectedRide.pickup_lng}`, "_blank")}>
+                      <MapPin className="h-3 w-3 mr-1" /> View
+                    </Button>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Dropoff</p>
+                <div className="flex items-center justify-between">
+                  <p className="font-medium">{selectedRide.dropoff_name}</p>
+                  {selectedRide.dropoff_lat && selectedRide.dropoff_lng && (
+                    <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => window.open(`https://www.google.com/maps?q=${selectedRide.dropoff_lat},${selectedRide.dropoff_lng}`, "_blank")}>
+                      <MapPin className="h-3 w-3 mr-1" /> View
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Status</p>
-                  <Badge className={STATUS_COLORS[selectedRide.status]}>{selectedRide.status}</Badge>
+                  <Badge className={STATUS_COLORS[selectedRide.status]}>{selectedRide.status.replace("_", " ")}</Badge>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Created</p>
-                  <p className="text-sm">{formatDate(selectedRide.created_at)}</p>
+                  <p className="text-sm text-muted-foreground">Distance</p>
+                  <p className="text-sm font-medium">{selectedRide.distance_km ? `${selectedRide.distance_km} km` : "-"}</p>
                 </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Duration</p>
+                  <p className="text-sm font-medium">{selectedRide.duration_minutes ? `${selectedRide.duration_minutes} mins` : "-"}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Created</p>
+                <p className="text-sm">{formatDate(selectedRide.created_at)}</p>
+              </div>
+              {selectedRide.status === "cancelled" && selectedRide.cancel_reason && (
+                <div className="bg-red-50 dark:bg-red-950/30 p-3 rounded-lg">
+                  <p className="text-sm text-red-600 dark:text-red-400 font-medium">Cancellation Reason</p>
+                  <p className="text-sm">{selectedRide.cancel_reason}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editRide} onOpenChange={() => setEditRide(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Ride</DialogTitle>
+          </DialogHeader>
+          {editRide && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Customer</p>
+                <p className="font-medium">{editRide.customer?.full_name}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Route</p>
+                <p className="text-sm">{editRide.pickup_name} → {editRide.dropoff_name}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">Status</p>
+                <Select value={editStatus} onValueChange={setEditStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="accepted">Accepted</SelectItem>
+                    <SelectItem value="arrived">Arrived</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setEditRide(null)}>Cancel</Button>
+                <Button onClick={updateRideStatus} disabled={saving}>
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Save Changes
+                </Button>
               </div>
             </div>
           )}

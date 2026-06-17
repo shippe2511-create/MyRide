@@ -16,8 +16,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
-  AlertTriangle, Phone, MapPin, Clock, CheckCircle, XCircle, Loader2, RefreshCw, Shield
+  AlertTriangle, Phone, MapPin, Clock, CheckCircle, XCircle, Loader2, RefreshCw, Shield, MoreVertical, Edit, Trash2
 } from "lucide-react"
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator
+} from "@/components/ui/dropdown-menu"
 import { toast } from "sonner"
 
 interface SOSAlert {
@@ -50,13 +53,49 @@ export default function SOSPage() {
 
   const [stats, setStats] = useState({ active: 0, responding: 0, resolved: 0 })
 
+  const playAlarmSound = () => {
+    try {
+      const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+
+      oscillator.type = 'sawtooth'
+      gainNode.gain.value = 0.5
+
+      oscillator.start()
+
+      // Siren effect - sweep between frequencies
+      let time = audioContext.currentTime
+      for (let i = 0; i < 6; i++) {
+        oscillator.frequency.setValueAtTime(600, time)
+        oscillator.frequency.linearRampToValueAtTime(1200, time + 0.25)
+        oscillator.frequency.linearRampToValueAtTime(600, time + 0.5)
+        time += 0.5
+      }
+
+      oscillator.stop(audioContext.currentTime + 3)
+    } catch (e) {
+      console.error('Audio error:', e)
+    }
+  }
+
   useEffect(() => {
     loadAlerts()
 
     // Real-time subscription for SOS alerts
     const channel = supabase
       .channel('sos_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sos_alerts' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sos_alerts' }, (payload) => {
+        if (payload.new && payload.new.status === 'active') {
+          playAlarmSound()
+          toast.error("🚨 NEW SOS ALERT!", { duration: 10000 })
+        }
+        loadAlerts()
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sos_alerts' }, () => {
         loadAlerts()
       })
       .subscribe()
@@ -126,6 +165,17 @@ export default function SOSPage() {
     window.open(`https://www.google.com/maps?q=${lat},${lng}`, "_blank")
   }
 
+  const deleteAlert = async (alertId: string) => {
+    if (!confirm("Are you sure you want to delete this SOS alert?")) return
+    const { error } = await supabase.from("sos_alerts").delete().eq("id", alertId)
+    if (error) {
+      toast.error("Failed to delete")
+    } else {
+      toast.success("Alert deleted")
+      loadAlerts()
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -144,10 +194,15 @@ export default function SOSPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Emergency alerts from users</p>
         </div>
-        <Button variant="outline" size="sm" onClick={loadAlerts}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={playAlarmSound}>
+            🔊 Test Sound
+          </Button>
+          <Button variant="outline" size="sm" onClick={loadAlerts}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3 grid-cols-3">
@@ -265,13 +320,27 @@ export default function SOSPage() {
                     {formatDate(alert.created_at)}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSelectedAlert(alert)}
-                    >
-                      Details
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setSelectedAlert(alert)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          View / Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-red-500"
+                          onClick={() => deleteAlert(alert.id)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))

@@ -10,6 +10,8 @@ import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
+import '../services/location_service.dart';
+import '../services/haptic_service.dart';
 import 'search_screen.dart';
 import 'activity_screen.dart';
 import 'inbox_screen.dart';
@@ -1522,9 +1524,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   try {
                                     final appState = Provider.of<AppState>(context, listen: false);
                                     final scheduledUtc = selectedDate.toUtc();
+                                    // Use GPS location if pickup not set
+                                    double finalPickupLat = pickupLat ?? 4.1755;
+                                    double finalPickupLng = pickupLng ?? 73.5093;
+                                    if (pickupLat == null) {
+                                      final gpsLoc = await LocationService.getCurrentLocation();
+                                      finalPickupLat = gpsLoc.latitude;
+                                      finalPickupLng = gpsLoc.longitude;
+                                    }
                                     await SupabaseService.createRide(
                                       pickupName: pickupAddress, dropoffName: dropoffAddress,
-                                      pickupLat: pickupLat ?? 4.1755, pickupLng: pickupLng ?? 73.5093,
+                                      pickupLat: finalPickupLat, pickupLng: finalPickupLng,
                                       dropoffLat: dropoffLat ?? 4.1918, dropoffLng: dropoffLng ?? 73.5290,
                                       scheduledTime: scheduledUtc, customerId: appState.profileId,
                                     );
@@ -1569,16 +1579,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  Future<LatLng> _getCurrentLocation() async {
+    return await LocationService.getCurrentLocation();
+  }
+
   Future<Map<String, dynamic>?> _showLocationPicker(BuildContext context, String title, Color accentColor) async {
-    LatLng selectedLocation = const LatLng(4.1755, 73.5093);
+    LatLng selectedLocation = await _getCurrentLocation();
     final mapController = MapController();
     final searchController = TextEditingController();
     String addressText = '';
     String selectedName = '';
     bool showSearchResults = false;
     List<Map<String, dynamic>> searchResults = [];
+    LatLng? userLocation = selectedLocation;
 
     final List<Map<String, dynamic>> allPlaces = [
+      {'name': 'Current Location', 'address': 'Use your GPS location', 'lat': userLocation.latitude, 'lng': userLocation.longitude, 'icon': Icons.my_location, 'isGps': true},
       {'name': 'Hulhumale Phase 2', 'address': 'Hulhumale Phase 2, Flat Area', 'lat': 4.2286, 'lng': 73.5400, 'icon': Icons.location_city},
       {'name': 'Hulhumale Phase 1', 'address': 'Hulhumale Phase 1, Housing', 'lat': 4.2116, 'lng': 73.5380, 'icon': Icons.location_city},
       {'name': 'Velana Airport', 'address': 'Velana International Airport', 'lat': 4.1918, 'lng': 73.5290, 'icon': Icons.flight},
@@ -1830,6 +1846,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 ),
                                 MarkerLayer(
                                   markers: [
+                                    // User's current location (blue dot)
+                                    if (userLocation != null)
+                                      Marker(
+                                        point: userLocation!,
+                                        width: 24,
+                                        height: 24,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: Colors.white, width: 3),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.blue.withValues(alpha: 0.4),
+                                                blurRadius: 8,
+                                                spreadRadius: 2,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    // Selected location marker
                                     Marker(
                                       point: selectedLocation,
                                       width: 60,
@@ -1906,7 +1944,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   ),
                                   const SizedBox(height: 10),
                                   GestureDetector(
-                                    onTap: () => mapController.move(const LatLng(4.1755, 73.5093), 13),
+                                    onTap: () async {
+                                      final currentPos = await _getCurrentLocation();
+                                      setModalState(() {
+                                        userLocation = currentPos;
+                                        selectedLocation = currentPos;
+                                      });
+                                      mapController.move(currentPos, 16);
+                                    },
                                     child: Container(
                                       width: 48,
                                       height: 48,

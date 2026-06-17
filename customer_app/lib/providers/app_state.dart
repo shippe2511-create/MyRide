@@ -3,16 +3,34 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/supabase_service.dart';
 
 class AppState extends ChangeNotifier {
+  bool _isInitialized = false;
+  bool get isInitialized => _isInitialized;
+
   AppState() {
-    _loadFavorites();
-    _loadReminders();
-    _loadProfilePhoto();
-    _loadFavoriteDrivers();
-    _loadOnboardingStatus();
-    _loadLanguage();
-    _loadUserRegistration();
-    _loadTheme();
-    _loadProfileId();
+    _initializeAll();
+  }
+
+  Future<void> _initializeAll() async {
+    await Future.wait([
+      _loadFavorites(),
+      _loadReminders(),
+      _loadProfilePhoto(),
+      _loadFavoriteDrivers(),
+      _loadOnboardingStatus(),
+      _loadLanguage(),
+      _loadUserRegistration(),
+      _loadTheme(),
+      _loadProfileId(),
+    ]);
+    _isInitialized = true;
+    notifyListeners();
+  }
+
+  Future<void> waitForInitialization() async {
+    if (_isInitialized) return;
+    while (!_isInitialized) {
+      await Future.delayed(const Duration(milliseconds: 50));
+    }
   }
   // Theme
   bool _isDarkMode = true;
@@ -152,11 +170,11 @@ class AppState extends ChangeNotifier {
   }
 
   // User profile
-  String _userName = 'Alex Lawson';
-  String _userInitials = 'AL';
-  String _staffId = 'AL-0093';
-  String _userPhone = '+960 777 1234';
-  String _userEmail = 'alex.lawson@company.mv';
+  String _userName = '';
+  String _userInitials = '';
+  String _staffId = '';
+  String _userPhone = '';
+  String _userEmail = '';
   final double _userRating = 4.92;
   int _totalTrips = 142;
   String? _profilePhotoPath;
@@ -220,16 +238,32 @@ class AppState extends ChangeNotifier {
     if (_profileId != null) {
       await prefs.setString('profile_id', _profileId!);
     }
+    if (_userPhone.isNotEmpty) {
+      await prefs.setString('user_phone', _userPhone);
+    }
+    if (_userName.isNotEmpty) {
+      await prefs.setString('user_name', _userName);
+    }
+    if (_userEmail.isNotEmpty) {
+      await prefs.setString('user_email', _userEmail);
+    }
   }
 
   Future<void> _loadProfileId() async {
     final prefs = await SharedPreferences.getInstance();
     _profileId = prefs.getString('profile_id');
+    _userPhone = prefs.getString('user_phone') ?? '';
+    _userName = prefs.getString('user_name') ?? '';
+    _userEmail = prefs.getString('user_email') ?? '';
+    if (_userName.isNotEmpty) {
+      _userInitials = _userName.split(' ').map((n) => n.isNotEmpty ? n[0] : '').take(2).join().toUpperCase();
+    }
     if (_profileId != null) {
       SupabaseService.setProfileId(_profileId);
       loadEmergencyContactsFromProfile();
       loadTripHistory();
     }
+    notifyListeners();
   }
 
   void updateProfilePhoto(String? path) {

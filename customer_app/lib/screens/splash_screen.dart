@@ -73,6 +73,10 @@ class _SplashScreenState extends State<SplashScreen>
 
     final appState = Provider.of<AppState>(context, listen: false);
 
+    // Wait for AppState to fully load from SharedPreferences
+    await appState.waitForInitialization();
+    if (!mounted) return;
+
     // Check if onboarding is needed
     if (!appState.hasCompletedOnboarding) {
       Navigator.pushReplacementNamed(context, '/onboarding');

@@ -787,6 +787,15 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                       final driverState = context.read<DriverState>();
                       final allItems = _checklist.map((k, v) => MapEntry(k, v == CheckStatus.ok));
 
+                      // Validate driver ID exists
+                      if (driverState.driverId.isEmpty) {
+                        debugPrint('Cannot save checklist: driverId is empty');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Error: Driver not logged in properly')),
+                        );
+                        return;
+                      }
+
                       try {
                         await SupabaseService.saveVehicleChecklist(
                           driverId: driverState.driverId,
@@ -797,8 +806,15 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                           allItems: allItems,
                           issuePhotos: _issuePhotos,
                         );
+                        debugPrint('Checklist saved successfully');
                       } catch (e) {
                         debugPrint('Failed to save checklist: $e');
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to save: $e')),
+                          );
+                        }
+                        return;
                       }
 
                       if (context.mounted) {

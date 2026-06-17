@@ -4,21 +4,73 @@ import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import { Download, FileSpreadsheet, FileText, Loader2, Calendar } from "lucide-react"
+import { Download, FileSpreadsheet, FileText, Loader2, Calendar, Users, Car, Star, BarChart3 } from "lucide-react"
 import { toast } from "sonner"
 
 const reportTypes = [
-  { id: "rides", name: "Rides Report", description: "All ride data with customer and driver info", icon: FileSpreadsheet },
-  { id: "customers", name: "Customers Report", description: "Customer profiles and activity", icon: FileSpreadsheet },
-  { id: "drivers", name: "Drivers Report", description: "Driver profiles, ratings, and trips", icon: FileSpreadsheet },
-  { id: "ratings", name: "Ratings Report", description: "All ratings and feedback", icon: FileSpreadsheet },
-  { id: "usage", name: "Usage Statistics", description: "Daily/weekly/monthly usage stats", icon: FileText },
+  { id: "rides", name: "Rides Report", description: "All rides with pickup, dropoff, and status", icon: Car },
+  { id: "customers", name: "Customers Report", description: "Customer list with contact info", icon: Users },
+  { id: "drivers", name: "Drivers Report", description: "Driver list with ratings and trips", icon: Car },
+  { id: "ratings", name: "Ratings Report", description: "All ratings and feedback", icon: Star },
+  { id: "usage", name: "Daily Usage", description: "Rides per day summary", icon: BarChart3 },
 ]
+
+// Friendly column names mapping
+const columnLabels: Record<string, Record<string, string>> = {
+  rides: {
+    "Ride ID": "id",
+    "Pickup Location": "pickup_name",
+    "Dropoff Location": "dropoff_name",
+    "Status": "status",
+    "Distance (km)": "distance_km",
+    "Duration (mins)": "duration_minutes",
+    "Customer Name": "customer_name",
+    "Customer Phone": "customer_phone",
+    "Date": "date",
+    "Time": "time",
+  },
+  customers: {
+    "Name": "full_name",
+    "Employee ID": "employee_id",
+    "Phone": "phone",
+    "Email": "email",
+    "Department": "department",
+    "Gender": "gender",
+    "Status": "status",
+    "Joined Date": "joined_date",
+  },
+  drivers: {
+    "Name": "full_name",
+    "Employee ID": "employee_id",
+    "Phone": "phone",
+    "Email": "email",
+    "Department": "department",
+    "Gender": "gender",
+    "Status": "status",
+    "Rating": "rating",
+    "Total Trips": "total_trips",
+    "Online Status": "online_status",
+    "Joined Date": "joined_date",
+  },
+  ratings: {
+    "From": "from_name",
+    "To": "to_name",
+    "Rating": "rating",
+    "Comment": "comment",
+    "Date": "date",
+  },
+  usage: {
+    "Date": "date",
+    "Total Rides": "total_rides",
+    "Completed": "completed_rides",
+    "Cancelled": "cancelled_rides",
+    "Completion Rate": "completion_rate",
+  },
+}
 
 export default function ReportsPage() {
   const supabase = createClient()
@@ -27,7 +79,40 @@ export default function ReportsPage() {
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
 
-  // Get date filter range
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return ""
+    const d = new Date(dateStr)
+    return d.toLocaleDateString("en-US", {
+      timeZone: "Indian/Maldives",
+      year: "numeric",
+      month: "short",
+      day: "numeric"
+    })
+  }
+
+  const formatTime = (dateStr: string) => {
+    if (!dateStr) return ""
+    const d = new Date(dateStr)
+    return d.toLocaleTimeString("en-US", {
+      timeZone: "Indian/Maldives",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
+    })
+  }
+
+  const formatStatus = (status: string) => {
+    if (!status) return ""
+    return status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ")
+  }
+
+  const formatPhone = (phone: string | number | null) => {
+    if (!phone) return ""
+    const str = String(phone)
+    if (str.length === 10) return `+960 ${str.slice(0, 3)} ${str.slice(3, 6)} ${str.slice(6)}`
+    return str
+  }
+
   const getDateFilter = () => {
     const now = new Date()
     if (dateRange === "custom" && startDate && endDate) {
@@ -56,15 +141,17 @@ export default function ReportsPage() {
     const dateFilter = getDateFilter()
 
     try {
-      let data: Record<string, unknown>[] = []
+      let rows: Record<string, string>[] = []
       let filename = ""
+      const labels = columnLabels[reportType]
+      const headers = Object.keys(labels)
 
       switch (reportType) {
         case "rides": {
           let query = supabase
             .from("rides")
             .select(`
-              id, pickup_name, dropoff_name, status, distance_km, duration_minutes, created_at, completed_at,
+              id, pickup_name, dropoff_name, status, distance_km, duration_minutes, created_at,
               customer:profiles!rides_customer_id_fkey(full_name, phone)
             `)
             .order("created_at", { ascending: false })
@@ -72,29 +159,56 @@ export default function ReportsPage() {
             query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
           }
           const { data: rides } = await query
-          data = rides || []
-          filename = "rides_report.csv"
+
+          rows = (rides || []).map((r: Record<string, unknown>) => {
+            const customer = r.customer as Record<string, unknown> | null
+            return {
+              "Ride ID": String(r.id || "").slice(0, 8),
+              "Pickup Location": String(r.pickup_name || ""),
+              "Dropoff Location": String(r.dropoff_name || ""),
+              "Status": formatStatus(String(r.status || "")),
+              "Distance (km)": r.distance_km ? String(r.distance_km) : "-",
+              "Duration (mins)": r.duration_minutes ? String(r.duration_minutes) : "-",
+              "Customer Name": String(customer?.full_name || "-"),
+              "Customer Phone": formatPhone(customer?.phone as string | null),
+              "Date": formatDate(String(r.created_at || "")),
+              "Time": formatTime(String(r.created_at || "")),
+            }
+          })
+          filename = `rides_report_${new Date().toISOString().split("T")[0]}.csv`
           break
         }
+
         case "customers": {
           let query = supabase
             .from("profiles")
-            .select("*")
+            .select("full_name, employee_id, phone, email, department, gender, status, created_at")
             .eq("role", "customer")
             .order("created_at", { ascending: false })
           if (dateFilter) {
             query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
           }
           const { data: customers } = await query
-          data = customers || []
-          filename = "customers_report.csv"
+
+          rows = (customers || []).map((c: Record<string, unknown>) => ({
+            "Name": String(c.full_name || ""),
+            "Employee ID": String(c.employee_id || "-"),
+            "Phone": formatPhone(c.phone as string | null),
+            "Email": String(c.email || "-"),
+            "Department": String(c.department || "-"),
+            "Gender": String(c.gender || "-"),
+            "Status": formatStatus(String(c.status || "")),
+            "Joined Date": formatDate(String(c.created_at || "")),
+          }))
+          filename = `customers_report_${new Date().toISOString().split("T")[0]}.csv`
           break
         }
+
         case "drivers": {
           let query = supabase
             .from("profiles")
             .select(`
-              *,
+              full_name, employee_id, phone, email, department, gender, status, created_at,
               driver:drivers(rating, total_trips, is_online)
             `)
             .eq("role", "driver")
@@ -103,15 +217,32 @@ export default function ReportsPage() {
             query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
           }
           const { data: drivers } = await query
-          data = drivers || []
-          filename = "drivers_report.csv"
+
+          rows = (drivers || []).map((d: Record<string, unknown>) => {
+            const driverInfo = Array.isArray(d.driver) ? d.driver[0] : d.driver
+            return {
+              "Name": String(d.full_name || ""),
+              "Employee ID": String(d.employee_id || "-"),
+              "Phone": formatPhone(d.phone as string | null),
+              "Email": String(d.email || "-"),
+              "Department": String(d.department || "-"),
+              "Gender": String(d.gender || "-"),
+              "Status": formatStatus(String(d.status || "")),
+              "Rating": driverInfo?.rating ? `${driverInfo.rating}/5` : "-",
+              "Total Trips": String(driverInfo?.total_trips || "0"),
+              "Online Status": driverInfo?.is_online ? "Online" : "Offline",
+              "Joined Date": formatDate(String(d.created_at || "")),
+            }
+          })
+          filename = `drivers_report_${new Date().toISOString().split("T")[0]}.csv`
           break
         }
+
         case "ratings": {
           let query = supabase
             .from("ratings")
             .select(`
-              *,
+              rating, comment, created_at,
               from_user:profiles!ratings_from_user_id_fkey(full_name),
               to_user:profiles!ratings_to_user_id_fkey(full_name)
             `)
@@ -120,57 +251,69 @@ export default function ReportsPage() {
             query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
           }
           const { data: ratings } = await query
-          data = ratings || []
-          filename = "ratings_report.csv"
+
+          rows = (ratings || []).map((r: Record<string, unknown>) => {
+            const fromUser = r.from_user as Record<string, unknown> | null
+            const toUser = r.to_user as Record<string, unknown> | null
+            return {
+              "From": String(fromUser?.full_name || "-"),
+              "To": String(toUser?.full_name || "-"),
+              "Rating": `${r.rating}/5`,
+              "Comment": String(r.comment || "-"),
+              "Date": formatDate(String(r.created_at || "")),
+            }
+          })
+          filename = `ratings_report_${new Date().toISOString().split("T")[0]}.csv`
           break
         }
+
         case "usage": {
-          let query = supabase
-            .from("rides")
-            .select("created_at, status")
+          let query = supabase.from("rides").select("created_at, status")
           if (dateFilter) {
             query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
           }
           const { data: rides } = await query
 
-          const grouped = (rides || []).reduce((acc: Record<string, { total: number; completed: number }>, ride) => {
-            const date = new Date(ride.created_at).toISOString().split("T")[0]
-            if (!acc[date]) acc[date] = { total: 0, completed: 0 }
+          const grouped = (rides || []).reduce((acc: Record<string, { total: number; completed: number; cancelled: number }>, ride) => {
+            const date = formatDate(ride.created_at)
+            if (!acc[date]) acc[date] = { total: 0, completed: 0, cancelled: 0 }
             acc[date].total++
             if (ride.status === "completed") acc[date].completed++
+            if (ride.status === "cancelled") acc[date].cancelled++
             return acc
           }, {})
 
-          data = Object.entries(grouped).map(([date, stats]) => ({
-            date,
-            total_rides: stats.total,
-            completed_rides: stats.completed,
-            completion_rate: ((stats.completed / stats.total) * 100).toFixed(1) + "%"
+          rows = Object.entries(grouped).map(([date, stats]) => ({
+            "Date": date,
+            "Total Rides": String(stats.total),
+            "Completed": String(stats.completed),
+            "Cancelled": String(stats.cancelled),
+            "Completion Rate": stats.total > 0 ? `${Math.round((stats.completed / stats.total) * 100)}%` : "0%",
           }))
-          filename = "usage_report.csv"
+          filename = `daily_usage_${new Date().toISOString().split("T")[0]}.csv`
           break
         }
       }
 
-      if (data.length === 0) {
+      if (rows.length === 0) {
         toast.error("No data to export")
         setLoading(null)
         return
       }
 
-      const headers = Object.keys(flattenObject(data[0]))
-      const rows = data.map(row => {
-        const flat = flattenObject(row)
-        return headers.map(h => {
-          const val = flat[h]
-          if (val === null || val === undefined) return ""
-          if (typeof val === "string" && val.includes(",")) return `"${val}"`
-          return String(val)
+      // Generate CSV with proper escaping
+      const csvRows = rows.map(row =>
+        headers.map(h => {
+          const val = row[h] || ""
+          if (val.includes(",") || val.includes('"') || val.includes("\n")) {
+            return `"${val.replace(/"/g, '""')}"`
+          }
+          return val
         }).join(",")
-      })
+      )
 
-      const csv = [headers.join(","), ...rows].join("\n")
-      const blob = new Blob([csv], { type: "text/csv" })
+      const csv = [headers.join(","), ...csvRows].join("\n")
+      const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }) // BOM for Excel
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
@@ -178,29 +321,13 @@ export default function ReportsPage() {
       a.click()
       URL.revokeObjectURL(url)
 
-      toast.success(`${filename} downloaded`)
+      toast.success(`${rows.length} records exported`)
     } catch (error) {
       toast.error("Failed to generate report")
       console.error(error)
     }
 
     setLoading(null)
-  }
-
-  const flattenObject = (obj: Record<string, unknown>, prefix = ""): Record<string, unknown> => {
-    const result: Record<string, unknown> = {}
-    for (const key in obj) {
-      const value = obj[key]
-      const newKey = prefix ? `${prefix}_${key}` : key
-      if (value && typeof value === "object" && !Array.isArray(value)) {
-        Object.assign(result, flattenObject(value as Record<string, unknown>, newKey))
-      } else if (Array.isArray(value) && value.length > 0 && typeof value[0] === "object") {
-        Object.assign(result, flattenObject(value[0] as Record<string, unknown>, newKey))
-      } else {
-        result[newKey] = value
-      }
-    }
-    return result
   }
 
   return (
@@ -214,11 +341,14 @@ export default function ReportsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Date Range</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Date Range
+          </CardTitle>
           <CardDescription>Filter reports by date (optional)</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap gap-4 items-center">
             <Select value={dateRange} onValueChange={setDateRange}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="Time period" />
@@ -226,15 +356,16 @@ export default function ReportsPage() {
               <SelectContent>
                 <SelectItem value="all">All Time</SelectItem>
                 <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">This Week</SelectItem>
-                <SelectItem value="month">This Month</SelectItem>
+                <SelectItem value="week">Last 7 Days</SelectItem>
+                <SelectItem value="month">Last 30 Days</SelectItem>
+                <SelectItem value="year">Last Year</SelectItem>
                 <SelectItem value="custom">Custom Range</SelectItem>
               </SelectContent>
             </Select>
             {dateRange === "custom" && (
               <>
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">From:</span>
                   <Input
                     type="date"
                     value={startDate}
@@ -242,13 +373,15 @@ export default function ReportsPage() {
                     className="w-40"
                   />
                 </div>
-                <span className="text-muted-foreground">to</span>
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-40"
-                />
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">To:</span>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-40"
+                  />
+                </div>
               </>
             )}
           </div>
@@ -257,7 +390,7 @@ export default function ReportsPage() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {reportTypes.map((report) => (
-          <Card key={report.id}>
+          <Card key={report.id} className="hover:border-primary/50 transition-colors">
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -291,17 +424,6 @@ export default function ReportsPage() {
           </Card>
         ))}
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Export History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-center py-8 text-muted-foreground">
-            Report exports are generated on-demand and downloaded directly.
-          </p>
-        </CardContent>
-      </Card>
     </div>
   )
 }

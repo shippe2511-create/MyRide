@@ -134,17 +134,19 @@ export function Header() {
   return (
     <header className="flex h-16 items-center justify-between border-b bg-card px-6">
       <div className="flex items-center gap-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search drivers, customers, rides..."
-            className="w-64 pl-9"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={handleSearch}
-          />
-        </div>
+        <button
+          onClick={() => {
+            const event = new KeyboardEvent("keydown", { key: "k", metaKey: true })
+            document.dispatchEvent(event)
+          }}
+          className="flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors w-64"
+        >
+          <Search className="h-4 w-4" />
+          <span className="flex-1 text-left">Search...</span>
+          <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium sm:flex">
+            <span className="text-xs">⌘</span>K
+          </kbd>
+        </button>
       </div>
       <div className="flex items-center gap-2">
         <ThemeToggle />

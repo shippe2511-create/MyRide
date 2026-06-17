@@ -572,9 +572,9 @@ export default function AdminsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium">{permissionsAdmin.full_name}</p>
-                  <p className="text-sm text-muted-foreground">
+                  <div className="text-sm text-muted-foreground flex items-center gap-1">
                     Role: <Badge className={getRoleColor(permissionsAdmin.role)}>{ROLES.find(r => r.value === permissionsAdmin.role)?.label || permissionsAdmin.role}</Badge>
-                  </p>
+                  </div>
                 </div>
                 <Button variant="outline" size="sm" onClick={resetToRoleDefaults}>
                   Reset to Role Defaults

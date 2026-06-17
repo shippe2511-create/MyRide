@@ -50,6 +50,18 @@ export default function RatingsPage() {
 
   useEffect(() => {
     loadData()
+
+    // Real-time subscription
+    const channel = supabase
+      .channel('ratings_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ratings' }, () => {
+        loadData()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const loadData = async () => {

@@ -124,9 +124,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       if (widget.rideId != null) {
         _loadMessages();
         _subscribeToMessages();
-      } else {
-        _loadMockMessages();
       }
+      // No mock messages - show empty chat when no ride
     });
     _messageController.addListener(_onTextChanged);
   }
@@ -185,40 +184,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
   }
 
-  void _loadMockMessages() {
-    _messages.addAll([
-      ChatMessage(
-        id: '1',
-        text: "Hello! I'm on my way to pick you up 🚗",
-        isCustomer: false,
-        time: DateTime.now().subtract(const Duration(minutes: 5)),
-        status: MessageStatus.read,
-      ),
-      ChatMessage(
-        id: '2',
-        text: "Great, thank you! I'm waiting at the main entrance.",
-        isCustomer: true,
-        time: DateTime.now().subtract(const Duration(minutes: 4)),
-        status: MessageStatus.read,
-      ),
-      ChatMessage(
-        id: '3',
-        text: "I'll be there in about 3 minutes. Look for a white Toyota.",
-        isCustomer: false,
-        time: DateTime.now().subtract(const Duration(minutes: 2)),
-        status: MessageStatus.read,
-      ),
-      ChatMessage(
-        id: '4',
-        text: "",
-        isCustomer: false,
-        time: DateTime.now().subtract(const Duration(minutes: 1)),
-        type: MessageType.location,
-        locationName: "Driver's current location",
-        status: MessageStatus.read,
-      ),
-    ]);
-  }
+  // Mock messages removed - chat starts empty
 
   void _onTextChanged() {
     final hasText = _messageController.text.isNotEmpty;

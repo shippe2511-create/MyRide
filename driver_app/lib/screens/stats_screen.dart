@@ -27,7 +27,7 @@ class _DriverStatsScreenState extends State<DriverStatsScreen> {
   Future<void> _loadStats() async {
     setState(() => _isLoading = true);
     try {
-      final stats = await SupabaseService.getDriverEarnings(widget.driverId, _period);
+      final stats = await SupabaseService.getDriverStats(widget.driverId, _period);
       final rides = await SupabaseService.getCompletedRidesForDriver(widget.driverId, _period);
       setState(() {
         _stats = stats;

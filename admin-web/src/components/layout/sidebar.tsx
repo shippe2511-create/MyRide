@@ -22,6 +22,7 @@ import {
   ClipboardCheck,
   Star,
   Radio,
+  Activity,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -44,6 +45,7 @@ const navigation: { name: string; href: string; icon: typeof LayoutDashboard; pe
   { name: "SOS Alerts", href: "/dashboard/sos", icon: AlertTriangle, permission: "sos:view" },
   { name: "Ratings", href: "/dashboard/ratings", icon: Star, permission: "ratings:view" },
   { name: "Reports", href: "/dashboard/reports", icon: BarChart3, permission: "reports:view" },
+  { name: "Activity Log", href: "/dashboard/activity", icon: Activity, permission: "reports:view" },
   { name: "Admins", href: "/dashboard/admins", icon: Shield, permission: "admins:view" },
   { name: "Settings", href: "/dashboard/settings", icon: Settings, permission: "settings:view" },
 ]

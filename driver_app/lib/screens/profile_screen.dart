@@ -7,7 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
-import 'earnings_screen.dart';
+import 'stats_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});

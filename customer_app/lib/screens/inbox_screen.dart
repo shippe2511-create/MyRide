@@ -30,48 +30,7 @@ class InboxScreen extends StatefulWidget {
 }
 
 class _InboxScreenState extends State<InboxScreen> {
-  final List<InboxMessage> _messages = [
-    InboxMessage(
-      id: '1',
-      title: 'Welcome to MyRide!',
-      subtitle: 'Thank you for joining. All rides are free during our beta period. Enjoy!',
-      time: DateTime.now().subtract(const Duration(hours: 1)),
-      isRead: false,
-      category: MessageCategory.system,
-    ),
-    InboxMessage(
-      id: '2',
-      title: 'Trip Completed',
-      subtitle: 'Your trip from Hulhumale to Airport has been completed. Rate your driver!',
-      time: DateTime.now().subtract(const Duration(hours: 3)),
-      isRead: true,
-      category: MessageCategory.trip,
-    ),
-    InboxMessage(
-      id: '3',
-      title: 'Safety Tip',
-      subtitle: 'Always share your trip details with family or friends for added safety.',
-      time: DateTime.now().subtract(const Duration(days: 1)),
-      isRead: true,
-      category: MessageCategory.safety,
-    ),
-    InboxMessage(
-      id: '4',
-      title: 'Invite Friends',
-      subtitle: 'Share MyRide with your friends and help grow our community!',
-      time: DateTime.now().subtract(const Duration(days: 2)),
-      isRead: true,
-      category: MessageCategory.promo,
-    ),
-    InboxMessage(
-      id: '5',
-      title: 'New Feature: Trip Sharing',
-      subtitle: 'You can now share your live trip location with contacts for extra safety.',
-      time: DateTime.now().subtract(const Duration(days: 3)),
-      isRead: true,
-      category: MessageCategory.system,
-    ),
-  ];
+  final List<InboxMessage> _messages = [];
 
   @override
   Widget build(BuildContext context) {

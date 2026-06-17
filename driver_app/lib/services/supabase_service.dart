@@ -628,6 +628,8 @@ class SupabaseService {
     required Map<String, bool> allItems,
     Map<String, List<File>>? issuePhotos,
   }) async {
+    debugPrint('Saving checklist for driver: $driverId, name: $driverName, vehicle: $vehicleNumber');
+
     // Upload photos and build issues with photo URLs
     final issuesWithPhotos = <String, Map<String, dynamic>>{};
 
@@ -658,15 +660,20 @@ class SupabaseService {
       };
     }
 
-    await client.from('vehicle_checklists').insert({
+    final data = {
       'driver_id': driverId,
       'driver_name': driverName,
       'vehicle_number': vehicleNumber,
       'has_issues': hasIssues,
-      'issues': issuesWithPhotos,
+      'issues': issuesWithPhotos.isEmpty ? {} : issuesWithPhotos,
       'all_items': allItems,
       'checked_at': DateTime.now().toUtc().toIso8601String(),
-    });
+    };
+
+    debugPrint('Inserting checklist: $data');
+
+    final response = await client.from('vehicle_checklists').insert(data).select();
+    debugPrint('Checklist saved: $response');
   }
 
   // Real-time subscriptions
@@ -973,8 +980,8 @@ class SupabaseService {
     }
   }
 
-  // Driver Earnings
-  static Future<Map<String, dynamic>> getDriverEarnings(String driverId, String period) async {
+  // Driver Stats
+  static Future<Map<String, dynamic>> getDriverStats(String driverId, String period) async {
     try {
       DateTime startDate;
       final now = DateTime.now();

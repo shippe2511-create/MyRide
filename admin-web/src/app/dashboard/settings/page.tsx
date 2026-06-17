@@ -141,7 +141,7 @@ export default function SettingsPage() {
     setSavingContacts(true)
     try {
       for (const contact of emergencyContacts) {
-        await supabase.from("emergency_contacts").upsert({
+        const { error } = await supabase.from("emergency_contacts").upsert({
           id: contact.id,
           name: contact.name,
           phone: contact.phone,
@@ -150,8 +150,10 @@ export default function SettingsPage() {
           is_active: contact.is_active,
           updated_at: new Date().toISOString()
         })
+        if (error) throw error
       }
       toast.success("Emergency contacts saved")
+      await loadEmergencyContacts()
     } catch {
       toast.error("Failed to save contacts")
     }
@@ -410,7 +412,7 @@ export default function SettingsPage() {
                     <Plus className="h-4 w-4 mr-1" />
                     Add Contact
                   </Button>
-                  <Button size="sm" onClick={saveEmergencyContacts} disabled={savingContacts}>
+                  <Button size="sm" type="button" onClick={saveEmergencyContacts} disabled={savingContacts}>
                     {savingContacts ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
                     Save
                   </Button>

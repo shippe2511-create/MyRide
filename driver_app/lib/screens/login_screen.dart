@@ -340,14 +340,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           width: 24, height: 24,
                           child: CircularProgressIndicator(strokeWidth: 2.5, valueColor: AlwaysStoppedAnimation(Colors.black)),
                         )
-                      : Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text('Login', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                            const SizedBox(width: 8),
-                            const Icon(Icons.arrow_forward, size: 20),
-                          ],
-                        ),
+                      : const Text('Login', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                 ),
               ),
               const SizedBox(height: 24),

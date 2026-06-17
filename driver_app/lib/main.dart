@@ -20,6 +20,7 @@ import 'screens/about_screen.dart';
 import 'theme/app_theme.dart';
 import 'services/supabase_service.dart';
 import 'services/notification_service.dart';
+import 'services/voice_service.dart';
 // import 'services/firebase_service.dart'; // Disabled - requires paid Apple Developer Program
 
 class SmoothPageRoute<T> extends PageRouteBuilder<T> {
@@ -60,6 +61,12 @@ void main() async {
     await NotificationService().requestPermissions();
   } catch (e) {
     debugPrint('Notification init failed: $e');
+  }
+
+  try {
+    await VoiceService().initialize();
+  } catch (e) {
+    debugPrint('Voice service init failed: $e');
   }
 
   SystemChrome.setSystemUIOverlayStyle(

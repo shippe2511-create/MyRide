@@ -99,6 +99,18 @@ export default function VehiclesPage() {
 
   useEffect(() => {
     loadVehicles()
+
+    // Real-time subscription
+    const channel = supabase
+      .channel('vehicles_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_types' }, () => {
+        loadVehicles()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const loadVehicles = async () => {

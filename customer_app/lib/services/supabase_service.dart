@@ -524,12 +524,23 @@ class SupabaseService {
   // Get online driver locations (for map display)
   static Future<List<Map<String, dynamic>>> getOnlineDriverLocations() async {
     try {
-      final fiveMinutesAgo = DateTime.now().subtract(const Duration(minutes: 5)).toIso8601String();
+      // Get all online drivers first
+      final drivers = await client
+          .from('drivers')
+          .select('id')
+          .eq('is_online', true)
+          .eq('is_on_break', false);
+
+      if (drivers.isEmpty) return [];
+
+      final driverIds = (drivers as List).map((d) => d['id'] as String).toList();
+
+      // Get their locations
       final response = await client
           .from('driver_locations')
           .select('lat, lng, heading, speed, driver_id')
-          .eq('is_online', true)
-          .gte('last_updated', fiveMinutesAgo);
+          .inFilter('driver_id', driverIds);
+
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint('Error getting online driver locations: $e');

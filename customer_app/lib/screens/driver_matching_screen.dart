@@ -48,9 +48,15 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
   RealtimeChannel? _rideSubscription;
   bool _driverFound = false;
 
-  final LatLng _userLocation = const LatLng(4.1918, 73.5290);
+  late LatLng _userLocation;
   List<LatLng> _driverLocations = [];
   int _availableDriverCount = 0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _userLocation = LatLng(widget.pickupLat, widget.pickupLng);
+  }
 
   final List<String> _statusMessages = [
     'Finding your driver...',
@@ -80,18 +86,16 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
 
   Future<void> _fetchAvailableDrivers() async {
     try {
-      final drivers = await SupabaseService.getAvailableDrivers();
-      final random = Random();
+      // Get real driver locations from database
+      final locations = await SupabaseService.getOnlineDriverLocations();
 
       setState(() {
-        _availableDriverCount = drivers.length;
-        // Generate locations around user for visualization
-        _driverLocations = List.generate(drivers.length, (i) {
-          return LatLng(
-            _userLocation.latitude + (random.nextDouble() - 0.5) * 0.01,
-            _userLocation.longitude + (random.nextDouble() - 0.5) * 0.01,
-          );
-        });
+        _availableDriverCount = locations.length;
+        _driverLocations = locations.map((loc) {
+          final lat = double.tryParse(loc['lat']?.toString() ?? '') ?? 0;
+          final lng = double.tryParse(loc['lng']?.toString() ?? '') ?? 0;
+          return LatLng(lat, lng);
+        }).where((loc) => loc.latitude != 0 && loc.longitude != 0).toList();
       });
     } catch (e) {
       debugPrint('Error fetching drivers: $e');

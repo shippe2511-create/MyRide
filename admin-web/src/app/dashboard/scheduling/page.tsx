@@ -18,8 +18,15 @@ import {
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
-  Plus, Bus, Ship, Loader2, Clock, MapPin, RefreshCw
+  Plus, Bus, Ship, Loader2, Clock, MapPin, RefreshCw, MoreHorizontal, Pencil, Trash2, X
 } from "lucide-react"
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 
 interface TransportRoute {
@@ -49,20 +56,26 @@ export default function SchedulingPage() {
     direction: "outbound",
     is_active: true,
   })
+  const [editingRoute, setEditingRoute] = useState<TransportRoute | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [timesRoute, setTimesRoute] = useState<TransportRoute | null>(null)
+  const [schedules, setSchedules] = useState<{ id: string; departure_time: string; days_of_week: string[]; is_active: boolean }[]>([])
+  const [newTime, setNewTime] = useState("")
+  const [newDays, setNewDays] = useState<string[]>(["Mon", "Tue", "Wed", "Thu", "Fri"])
 
   useEffect(() => {
     loadRoutes()
   }, [])
 
-  const loadRoutes = async () => {
-    setLoading(true)
+  const loadRoutes = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
     const { data } = await supabase
       .from("transport_routes")
-      .select("*, schedules:route_schedules(departure_time, days_of_week)")
+      .select("*, schedules:route_schedules(id, departure_time, days_of_week, is_active)")
       .order("route_name")
 
     setRoutes(data || [])
-    setLoading(false)
+    if (showLoading) setLoading(false)
   }
 
   const handleSave = async () => {
@@ -91,6 +104,93 @@ export default function SchedulingPage() {
     setSaving(false)
   }
 
+  const handleUpdate = async () => {
+    if (!editingRoute) return
+    setSaving(true)
+
+    const { error } = await supabase.from("transport_routes").update({
+      route_name: editingRoute.route_name,
+      route_code: editingRoute.route_code,
+      direction: editingRoute.direction,
+      is_active: editingRoute.is_active,
+    }).eq("id", editingRoute.id)
+
+    if (error) {
+      toast.error("Failed to update route")
+    } else {
+      toast.success("Route updated")
+      setEditingRoute(null)
+      loadRoutes()
+    }
+    setSaving(false)
+  }
+
+  const handleDelete = async () => {
+    if (!deleteId) return
+
+    const { error } = await supabase.from("transport_routes").delete().eq("id", deleteId)
+
+    if (error) {
+      toast.error("Failed to delete route")
+    } else {
+      toast.success("Route deleted")
+      setDeleteId(null)
+      loadRoutes()
+    }
+  }
+
+  const openTimesDialog = async (route: TransportRoute) => {
+    setTimesRoute(route)
+    const { data } = await supabase
+      .from("route_schedules")
+      .select("*")
+      .eq("route_id", route.id)
+      .order("departure_time")
+    setSchedules(data || [])
+  }
+
+  const addSchedule = async () => {
+    if (!timesRoute || !newTime) {
+      toast.error("Please enter a time")
+      return
+    }
+
+    const { error } = await supabase.from("route_schedules").insert({
+      route_id: timesRoute.id,
+      departure_time: newTime,
+      days_of_week: newDays,
+      is_active: true,
+    })
+
+    if (error) {
+      toast.error("Failed to add time")
+    } else {
+      toast.success("Time added")
+      setNewTime("")
+      // Reload schedules for current route
+      const { data: updatedSchedules } = await supabase
+        .from("route_schedules")
+        .select("id, departure_time, days_of_week, is_active")
+        .eq("route_id", timesRoute.id)
+        .order("departure_time")
+      setSchedules(updatedSchedules || [])
+      loadRoutes(false)
+    }
+  }
+
+  const deleteSchedule = async (scheduleId: string) => {
+    const { error } = await supabase.from("route_schedules").delete().eq("id", scheduleId)
+
+    if (error) {
+      toast.error("Failed to delete time")
+    } else {
+      toast.success("Time deleted")
+      // Update schedules list without closing dialog
+      setSchedules(prev => prev.filter(s => s.id !== scheduleId))
+      loadRoutes(false)
+    }
+  }
+
   const filteredRoutes = routes.filter(r => r.transport_type === activeTab)
 
   const stats = {
@@ -114,7 +214,7 @@ export default function SchedulingPage() {
           <p className="text-sm text-muted-foreground">Manage transport routes and schedules</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={loadRoutes}>
+          <Button variant="outline" size="sm" onClick={() => loadRoutes()}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -176,12 +276,13 @@ export default function SchedulingPage() {
                   <TableHead>Direction</TableHead>
                   <TableHead>Schedules</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredRoutes.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       No routes found
                     </TableCell>
                   </TableRow>
@@ -200,6 +301,29 @@ export default function SchedulingPage() {
                         <Badge className={route.is_active ? "bg-green-500" : "bg-gray-500"}>
                           {route.is_active ? "Active" : "Inactive"}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu modal={false}>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openTimesDialog(route)}>
+                              <Clock className="h-4 w-4 mr-2" />
+                              Manage Times
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setEditingRoute(route)}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setDeleteId(route.id)} className="text-red-500">
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))
@@ -258,6 +382,166 @@ export default function SchedulingPage() {
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Save
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingRoute} onOpenChange={() => setEditingRoute(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Route</DialogTitle>
+          </DialogHeader>
+          {editingRoute && (
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Route Name</label>
+                <Input
+                  value={editingRoute.route_name}
+                  onChange={(e) => setEditingRoute({ ...editingRoute, route_name: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Route Code</label>
+                <Input
+                  value={editingRoute.route_code || ""}
+                  onChange={(e) => setEditingRoute({ ...editingRoute, route_code: e.target.value })}
+                  placeholder="e.g. R01"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Direction</label>
+                <Select
+                  value={editingRoute.direction}
+                  onValueChange={(v) => setEditingRoute({ ...editingRoute, direction: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="outbound">Outbound</SelectItem>
+                    <SelectItem value="inbound">Inbound</SelectItem>
+                    <SelectItem value="round">Round Trip</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="edit-active"
+                  checked={editingRoute.is_active}
+                  onCheckedChange={(c) => setEditingRoute({ ...editingRoute, is_active: !!c })}
+                />
+                <label htmlFor="edit-active" className="text-sm">Active</label>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingRoute(null)}>Cancel</Button>
+            <Button onClick={handleUpdate} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open) setDeleteId(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Route?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this route and all its schedules. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-500 hover:bg-red-600">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Manage Times Dialog */}
+      <Dialog open={!!timesRoute} onOpenChange={() => setTimesRoute(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Trip Times - {timesRoute?.route_name}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Add New Time */}
+            <div className="p-4 border rounded-lg space-y-3">
+              <h4 className="font-medium text-sm">Add New Time</h4>
+              <div className="flex gap-2">
+                <Input
+                  type="time"
+                  value={newTime}
+                  onChange={(e) => setNewTime(e.target.value)}
+                  className="flex-1"
+                />
+                <Button onClick={addSchedule} size="sm">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {DAYS.map(day => (
+                  <Button
+                    key={day}
+                    variant={newDays.includes(day) ? "default" : "outline"}
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => {
+                      if (newDays.includes(day)) {
+                        setNewDays(newDays.filter(d => d !== day))
+                      } else {
+                        setNewDays([...newDays, day])
+                      }
+                    }}
+                  >
+                    {day}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Existing Times */}
+            <div className="space-y-2">
+              <h4 className="font-medium text-sm">Scheduled Times ({schedules.length})</h4>
+              {schedules.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">No times added yet</p>
+              ) : (
+                <div className="max-h-[200px] overflow-y-auto space-y-2">
+                  {schedules.map(schedule => (
+                    <div key={schedule.id} className="flex items-center justify-between p-2 border rounded-lg">
+                      <div>
+                        <p className="font-medium">{schedule.departure_time?.slice(0, 5)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {schedule.days_of_week?.join(", ") || "All days"}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-red-500 hover:text-red-600"
+                        onClick={() => deleteSchedule(schedule.id)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTimesRoute(null)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

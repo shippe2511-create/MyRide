@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../widgets/glass_container.dart';
 import '../widgets/primary_button.dart';
 import '../services/supabase_service.dart';
+import '../services/location_service.dart';
 import 'driver_matching_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -24,6 +25,27 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Map<String, dynamic>> _filteredResults = [];
   List<Map<String, dynamic>> _savedPlaces = [];
   bool _loadingSavedPlaces = true;
+  LatLng _currentLocation = const LatLng(4.1755, 73.5093);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentLocation();
+    _filteredResults = _allResults;
+    _searchController.addListener(_filterResults);
+    if (widget.initialDestination != null) {
+      _searchController.text = widget.initialDestination!;
+    }
+    _loadSavedPlaces();
+    _loadRecentPlaces();
+  }
+
+  Future<void> _loadCurrentLocation() async {
+    final loc = await LocationService.getCurrentLocation();
+    if (mounted) {
+      setState(() => _currentLocation = loc);
+    }
+  }
 
   final List<Map<String, dynamic>> _placeIconOptions = [
     {'icon': Icons.home_rounded, 'label': 'Home'},
@@ -79,17 +101,7 @@ class _SearchScreenState extends State<SearchScreen> {
     {'title': 'Data Centre', 'subtitle': 'Hulhumalé Industrial Zone', 'highlight': false},
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    _filteredResults = _allResults;
-    _searchController.addListener(_filterResults);
-    if (widget.initialDestination != null) {
-      _searchController.text = widget.initialDestination!;
-    }
-    _loadSavedPlaces();
-    _loadRecentPlaces();
-  }
+  // initState moved to top of class (line 31)
 
   Future<void> _loadRecentPlaces() async {
     try {
@@ -1885,7 +1897,7 @@ class NearbyScreen extends StatefulWidget {
 
 class _NearbyScreenState extends State<NearbyScreen> with SingleTickerProviderStateMixin {
   final MapController _mapController = MapController();
-  final LatLng _userLocation = const LatLng(4.1918, 73.5290);
+  LatLng _currentLocation = const LatLng(4.1755, 73.5093);
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
@@ -1895,6 +1907,7 @@ class _NearbyScreenState extends State<NearbyScreen> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
+    _loadCurrentLocation();
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
@@ -1903,6 +1916,11 @@ class _NearbyScreenState extends State<NearbyScreen> with SingleTickerProviderSt
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     _loadNearbyDrivers();
+  }
+
+  Future<void> _loadCurrentLocation() async {
+    final loc = await LocationService.getCurrentLocation();
+    if (mounted) setState(() => _currentLocation = loc);
   }
 
   Future<void> _loadNearbyDrivers() async {
@@ -1939,7 +1957,7 @@ class _NearbyScreenState extends State<NearbyScreen> with SingleTickerProviderSt
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
-              initialCenter: _userLocation,
+              initialCenter: _currentLocation,
               initialZoom: 15,
               onTap: (_, __) {},
             ),
@@ -1955,7 +1973,7 @@ class _NearbyScreenState extends State<NearbyScreen> with SingleTickerProviderSt
                 markers: [
                   // User marker with pulse animation
                   Marker(
-                    point: _userLocation,
+                    point: _currentLocation,
                     width: 80,
                     height: 80,
                     child: AnimatedBuilder(
@@ -2198,8 +2216,8 @@ class _NearbyScreenState extends State<NearbyScreen> with SingleTickerProviderSt
                         pickup: 'Current location',
                         dropoff: widget.destination,
                         rideType: 'Staff Car',
-                        pickupLat: _userLocation.latitude,
-                        pickupLng: _userLocation.longitude,
+                        pickupLat: _currentLocation.latitude,
+                        pickupLng: _currentLocation.longitude,
                         dropoffLat: 4.1755, // Default destination
                         dropoffLng: 73.5093,
                       ),
@@ -2319,11 +2337,17 @@ class FindingScreen extends StatefulWidget {
 class _FindingScreenState extends State<FindingScreen> with TickerProviderStateMixin {
   late AnimationController _radarController;
   late AnimationController _pulseController;
-  final LatLng _userLocation = const LatLng(4.1918, 73.5290);
+  LatLng _currentLocation = const LatLng(4.1755, 73.5093);
+
+  Future<void> _loadCurrentLocation() async {
+    final loc = await LocationService.getCurrentLocation();
+    if (mounted) setState(() => _currentLocation = loc);
+  }
 
   @override
   void initState() {
     super.initState();
+    _loadCurrentLocation();
     _radarController = AnimationController(
       duration: const Duration(milliseconds: 2200),
       vsync: this,
@@ -2360,7 +2384,7 @@ class _FindingScreenState extends State<FindingScreen> with TickerProviderStateM
         children: [
           FlutterMap(
             options: MapOptions(
-              initialCenter: _userLocation,
+              initialCenter: _currentLocation,
               initialZoom: 15,
               interactionOptions: const InteractionOptions(
                 flags: InteractiveFlag.none,
@@ -2377,7 +2401,7 @@ class _FindingScreenState extends State<FindingScreen> with TickerProviderStateM
               MarkerLayer(
                 markers: [
                   Marker(
-                    point: _userLocation,
+                    point: _currentLocation,
                     width: 24,
                     height: 24,
                     child: Container(
@@ -2618,7 +2642,7 @@ class TrackingScreen extends StatefulWidget {
 }
 
 class _TrackingScreenState extends State<TrackingScreen> {
-  final LatLng _userLocation = const LatLng(4.1918, 73.5290);
+  LatLng _currentLocation = const LatLng(4.1755, 73.5093);
   final LatLng _driverLocation = const LatLng(4.1950, 73.5320);
   final LatLng _destination = const LatLng(4.1880, 73.5250);
 
@@ -2632,6 +2656,17 @@ class _TrackingScreenState extends State<TrackingScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadCurrentLocation();
+  }
+
+  Future<void> _loadCurrentLocation() async {
+    final loc = await LocationService.getCurrentLocation();
+    if (mounted) setState(() => _currentLocation = loc);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isDark = context.isDark;
 
@@ -2641,7 +2676,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
         children: [
           FlutterMap(
             options: MapOptions(
-              initialCenter: _userLocation,
+              initialCenter: _currentLocation,
               initialZoom: 15,
             ),
             children: [
@@ -2665,7 +2700,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                 markers: [
                   // User location
                   Marker(
-                    point: _userLocation,
+                    point: _currentLocation,
                     width: 24,
                     height: 24,
                     child: Container(
@@ -3319,32 +3354,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _recordingAnimation = Tween<double>(begin: 1.0, end: 1.3).animate(
       CurvedAnimation(parent: _recordingController, curve: Curves.easeInOut),
     );
-    _loadMockMessages();
+    // No mock messages - chat starts empty
     _messageController.addListener(_onTextChanged);
-  }
-
-  void _loadMockMessages() {
-    _messages.addAll([
-      _ChatMessage(
-        id: '1',
-        text: "Hi, I'm on my way to pick you up. I'm driving the yellow taxi MV 88.",
-        isMe: false,
-        time: DateTime.now().subtract(const Duration(minutes: 5)),
-      ),
-      _ChatMessage(
-        id: '2',
-        text: "Great, thank you! I'm waiting by the main entrance.",
-        isMe: true,
-        time: DateTime.now().subtract(const Duration(minutes: 4)),
-        status: _MessageStatus.read,
-      ),
-      _ChatMessage(
-        id: '3',
-        text: "Perfect! I'll be there in about 2 minutes.",
-        isMe: false,
-        time: DateTime.now().subtract(const Duration(minutes: 3)),
-      ),
-    ]);
   }
 
   void _onTextChanged() {
@@ -4089,9 +4100,20 @@ class TripProgressScreen extends StatefulWidget {
 }
 
 class _TripProgressScreenState extends State<TripProgressScreen> {
-  final LatLng _userLocation = const LatLng(4.1918, 73.5290);
+  LatLng _currentLocation = const LatLng(4.1755, 73.5093);
   final LatLng _driverLocation = const LatLng(4.1930, 73.5300);
   final LatLng _destination = const LatLng(4.1880, 73.5250);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentLocation();
+  }
+
+  Future<void> _loadCurrentLocation() async {
+    final loc = await LocationService.getCurrentLocation();
+    if (mounted) setState(() => _currentLocation = loc);
+  }
 
   final List<LatLng> _routePoints = [
     const LatLng(4.1930, 73.5300),
@@ -4110,7 +4132,7 @@ class _TripProgressScreenState extends State<TripProgressScreen> {
         children: [
           FlutterMap(
             options: MapOptions(
-              initialCenter: _userLocation,
+              initialCenter: _currentLocation,
               initialZoom: 15,
             ),
             children: [
@@ -4134,7 +4156,7 @@ class _TripProgressScreenState extends State<TripProgressScreen> {
                 markers: [
                   // User location
                   Marker(
-                    point: _userLocation,
+                    point: _currentLocation,
                     width: 24,
                     height: 24,
                     child: Container(

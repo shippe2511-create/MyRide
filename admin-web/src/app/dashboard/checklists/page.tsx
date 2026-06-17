@@ -44,6 +44,7 @@ interface VehicleChecklist {
   issues: Record<string, string | IssueDetail> | null
   all_items: Record<string, boolean> | null
   checked_at: string
+  remarks: string | null
 }
 
 const ITEM_LABELS: Record<string, string> = {
@@ -124,6 +125,7 @@ export default function ChecklistsPage() {
       has_issues: editingChecklist.has_issues,
       issues: editingChecklist.issues,
       all_items: editingChecklist.all_items,
+      remarks: editingChecklist.remarks,
     }).eq("id", editingChecklist.id)
 
     if (error) {
@@ -385,6 +387,13 @@ export default function ChecklistsPage() {
                   </div>
                 </div>
               )}
+
+              {selectedChecklist.remarks && (
+                <div className="p-3 border rounded-lg bg-muted/30">
+                  <h3 className="font-medium mb-2">Admin Remarks</h3>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedChecklist.remarks}</p>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
@@ -473,6 +482,18 @@ export default function ChecklistsPage() {
               )}
             </div>
           )}
+
+          {/* Remarks Field */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Admin Remarks</label>
+            <textarea
+              className="w-full min-h-[80px] p-3 rounded-md border bg-background text-sm resize-none"
+              placeholder="Add comments or remarks about this checklist..."
+              value={editingChecklist?.remarks || ""}
+              onChange={(e) => setEditingChecklist(prev => prev ? { ...prev, remarks: e.target.value } : null)}
+            />
+          </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingChecklist(null)}>Cancel</Button>
             <Button onClick={handleSave} disabled={saving}>

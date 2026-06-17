@@ -66,7 +66,8 @@
       "Bash(sed -i '' \"/import 'package:path_provider/d\" /Users/athifabdulla/Downloads/MyRide/driver_app/lib/screens/documents_screen.dart)",
       "Bash(sed -i '' \"/import '..\\\\/widgets\\\\/ride_request_card.dart';/d\" /Users/athifabdulla/Downloads/MyRide/driver_app/lib/screens/home_screen.dart)",
       "Bash(sed -i '' \"/import '..\\\\/widgets\\\\/active_ride_card.dart';/d\" /Users/athifabdulla/Downloads/MyRide/driver_app/lib/screens/home_screen.dart)",
-      "Bash(sed -i '' \"/import 'package:provider\\\\/provider.dart';/d\" /Users/athifabdulla/Downloads/MyRide/driver_app/lib/screens/notifications_settings_screen.dart)"
+      "Bash(sed -i '' \"/import 'package:provider\\\\/provider.dart';/d\" /Users/athifabdulla/Downloads/MyRide/driver_app/lib/screens/notifications_settings_screen.dart)",
+      "Bash(open *)"
     ],
     "additionalDirectories": [
       "/tmp"

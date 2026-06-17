@@ -10,64 +10,7 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  final List<Map<String, dynamic>> _notifications = [
-    {
-      'id': '1',
-      'type': 'ride',
-      'title': 'Ride Completed',
-      'message': 'Your trip to Hulhumale Terminal has been completed. Rate your experience!',
-      'time': DateTime.now().subtract(const Duration(minutes: 15)),
-      'read': false,
-    },
-    {
-      'id': '2',
-      'type': 'promo',
-      'title': 'Free Rides This Week!',
-      'message': 'Enjoy unlimited free rides for MACL staff. Valid until Sunday.',
-      'time': DateTime.now().subtract(const Duration(hours: 2)),
-      'read': false,
-    },
-    {
-      'id': '3',
-      'type': 'ride',
-      'title': 'Driver Assigned',
-      'message': 'Ibrahim Hassan is on the way to pick you up. ETA: 5 minutes.',
-      'time': DateTime.now().subtract(const Duration(hours: 5)),
-      'read': true,
-    },
-    {
-      'id': '4',
-      'type': 'system',
-      'title': 'Profile Updated',
-      'message': 'Your profile information has been updated successfully.',
-      'time': DateTime.now().subtract(const Duration(days: 1)),
-      'read': true,
-    },
-    {
-      'id': '5',
-      'type': 'announcement',
-      'title': 'New Route Available',
-      'message': 'Now serving Male Office to Airport direct route. Book your ride today!',
-      'time': DateTime.now().subtract(const Duration(days: 2)),
-      'read': true,
-    },
-    {
-      'id': '6',
-      'type': 'ride',
-      'title': 'Trip Cancelled',
-      'message': 'Your scheduled trip for 3:00 PM has been cancelled.',
-      'time': DateTime.now().subtract(const Duration(days: 2)),
-      'read': true,
-    },
-    {
-      'id': '7',
-      'type': 'system',
-      'title': 'Welcome to MyRide!',
-      'message': 'Thank you for joining MyRide. Enjoy free staff transport services.',
-      'time': DateTime.now().subtract(const Duration(days: 5)),
-      'read': true,
-    },
-  ];
+  final List<Map<String, dynamic>> _notifications = [];
 
   @override
   Widget build(BuildContext context) {

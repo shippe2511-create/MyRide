@@ -2478,7 +2478,14 @@ For questions about cookies, contact support@myride.mv
             const SizedBox(height: 24),
             Text(title, style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
             const SizedBox(height: 20),
-            ...children,
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: children,
+                ),
+              ),
+            ),
             if (addButton != null) ...[
               const SizedBox(height: 16),
               SizedBox(

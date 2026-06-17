@@ -11,7 +11,8 @@ import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../services/location_service.dart';
-import '../services/haptic_service.dart';
+import '../widgets/animated_button.dart';
+import '../widgets/animated_markers.dart';
 import 'search_screen.dart';
 import 'activity_screen.dart';
 import 'inbox_screen.dart';
@@ -345,9 +346,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildSearchBar(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: GestureDetector(
+      child: AnimatedPressButton(
         onTap: () {
-          HapticFeedback.mediumImpact();
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const SearchScreen()),

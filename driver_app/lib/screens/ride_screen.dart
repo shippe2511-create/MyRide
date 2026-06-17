@@ -12,6 +12,8 @@ import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
+import '../services/map_launcher_service.dart';
+import '../widgets/ride_progress_stepper.dart';
 import 'chat_screen.dart';
 
 class RideScreen extends StatefulWidget {
@@ -81,6 +83,21 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     _destinationChangeTimer?.cancel();
     _mapController.dispose();
     super.dispose();
+  }
+
+  RideStep _getRideStep(RideStatus status) {
+    switch (status) {
+      case RideStatus.accepted:
+        return RideStep.accepted;
+      case RideStatus.arrivedAtPickup:
+        return RideStep.arrivedPickup;
+      case RideStatus.inProgress:
+        return RideStep.inProgress;
+      case RideStatus.completed:
+        return RideStep.completed;
+      default:
+        return RideStep.accepted;
+    }
   }
 
   void _startDestinationChangePolling() {
@@ -603,9 +620,11 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                     // Navigation button
                     if (ride.status == RideStatus.accepted || ride.status == RideStatus.inProgress)
                       GestureDetector(
-                        onTap: () => _openNavigation(
-                          ride.status == RideStatus.inProgress ? ride.dropoffLat : ride.pickupLat,
-                          ride.status == RideStatus.inProgress ? ride.dropoffLng : ride.pickupLng,
+                        onTap: () => MapLauncherService.showNavigationOptions(
+                          context,
+                          latitude: ride.status == RideStatus.inProgress ? ride.dropoffLat : ride.pickupLat,
+                          longitude: ride.status == RideStatus.inProgress ? ride.dropoffLng : ride.pickupLng,
+                          destinationName: ride.status == RideStatus.inProgress ? ride.dropoffLocation : ride.pickupLocation,
                         ),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -791,6 +810,15 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                           ),
                         ),
                       ),
+
+                      // Progress Stepper
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: CompactRideProgress(
+                          currentStep: _getRideStep(ride.status),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
 
                       // Content
                       Expanded(

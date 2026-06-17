@@ -7,6 +7,7 @@ import { DocumentsTable } from "./documents-table"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Users, UserCheck, Clock, FileText, Loader2 } from "lucide-react"
+import { Breadcrumbs } from "@/components/breadcrumbs"
 
 export default function DriversPage() {
   const supabase = createClient()
@@ -79,6 +80,7 @@ export default function DriversPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs />
       <div>
         <h1 className="text-2xl font-bold">Drivers</h1>
         <p className="text-sm text-muted-foreground">Manage driver accounts and documents</p>

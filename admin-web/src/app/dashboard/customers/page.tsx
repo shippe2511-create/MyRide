@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { CustomersTable } from "./customers-table"
+import { Breadcrumbs } from "@/components/breadcrumbs"
 
 export default async function CustomersPage({
   searchParams,
@@ -34,6 +35,7 @@ export default async function CustomersPage({
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs />
       <div>
         <h1 className="text-3xl font-bold">Customers</h1>
         <p className="text-muted-foreground">

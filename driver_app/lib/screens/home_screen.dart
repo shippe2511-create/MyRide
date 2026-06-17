@@ -7,8 +7,6 @@ import '../models/ride_request.dart';
 import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/status_toggle.dart';
-import '../widgets/ride_request_card.dart';
-import '../widgets/active_ride_card.dart';
 import '../widgets/ride_request_popup.dart';
 import 'vehicle_checklist_screen.dart';
 import 'history_screen.dart';

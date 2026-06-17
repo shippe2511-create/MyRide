@@ -1,7 +1,7 @@
 # MyRide Issues List
 
 Investigated: 2026-06-15
-Last Updated: 2026-06-16
+Last Updated: 2026-06-17
 Status: All fixable issues resolved
 Related: [[MyRide — Project Hub]]
 Tags: #project/myride
@@ -128,11 +128,11 @@ Tags: #project/myride
 
 | Category | Fixed | No Issue | External Dependency |
 |----------|-------|----------|---------------------|
-| flutter_app | 6 | 0 | 0 |
-| driver_app | 5 | 1 | 0 |
-| admin-web | 6 | 0 | 0 |
+| flutter_app | 7 | 0 | 0 |
+| driver_app | 6 | 1 | 0 |
+| admin-web | 14 | 0 | 0 |
 | Cross-App | 0 | 0 | 2 |
-| **Total** | **17** | **1** | **2** |
+| **Total** | **27** | **1** | **2** |
 
 All code-level issues have been resolved. The remaining 2 issues require external Firebase/APNs configuration.
 
@@ -140,17 +140,71 @@ All code-level issues have been resolved. The remaining 2 issues require externa
 
 ## Known Runtime Issues
 
-### 21. Driver App White Screen on iOS 26.5 - INVESTIGATING
-- **Status:** App builds successfully, passes analysis, but shows white screen on physical iPhone
-- **Tested:** Even minimal "Hello World" Flutter app shows white screen
-- **Cause:** Likely Flutter/iOS 26.5 toolchain incompatibility
-- **Attempted fixes:**
-  - Flutter upgrade to 3.44.2
-  - Clean rebuild
-  - Disabled NotificationService
-  - Tested minimal app
-- **Next steps:** Test on different iOS version or wait for Flutter update
+### 21. iOS App Lifecycle Crash - FIXED (2026-06-17)
+- **Issue:** Both Flutter apps crashed on iOS (white screen, app comes and goes)
+- **Cause:** Missing SceneDelegate for iOS 13+ scene-based lifecycle
+- **Fix:** Added SceneDelegate.swift and configured Info.plist with UISceneConfiguration
+
+### 22. Admin Panel Dropdown Overlays Block UI - FIXED (2026-06-17)
+- **Issue:** After clicking dropdown actions (Edit, Delete), couldn't click anywhere else
+- **Cause:** Radix UI DropdownMenu `modal` prop defaults to true, leaving overlay
+- **Fix:** Added `modal={false}` to all DropdownMenu components across:
+  - Admins, Vehicles, Drivers, Customers, Content, Eligibility, Zones, Checklists, Header
+
+### 23. Admin Login Auth/Profile ID Mismatch - FIXED (2026-06-17)
+- **Issue:** New admins couldn't login ("Access denied") even with valid credentials
+- **Cause:** Profile ID didn't match Supabase Auth user ID
+- **Fix:** Updated login and middleware to look up profile by email as fallback
+
+### 24. All Tables Missing RLS - FIXED (2026-06-17)
+- **Issue:** 21 tables had policies but RLS not enabled (Supabase Advisor: 42 issues)
+- **Fix:** Enabled RLS on all tables:
+  - announcements, app_settings, audit_logs, documents, faqs, locations, pages
+  - ratings, ride_campaigns, ride_quotas, route_schedules, route_stops
+  - service_zones, staff_corner, transport_routes, transport_schedules
+  - transport_types, vehicle_checklists, vehicle_maintenance, vehicle_types, vehicles
+
+### 25. Role-Based Access Control - IMPLEMENTED (2026-06-17)
+- **Feature:** Full RBAC system with 5 roles:
+  - **Super Admin:** Full access + admin management
+  - **Admin:** Full operational access, no admin management  
+  - **Operator:** Rides, drivers, vehicles, schedules
+  - **Support:** Chat, SOS, ratings
+  - **Viewer:** Read-only
+- **Implementation:**
+  - `permissions.ts` with 30+ granular permissions
+  - `usePermissions` hook with sessionStorage caching
+  - Sidebar filters nav items by permission
+  - Super-admin can assign roles and override individual permissions
+  - `custom_permissions` JSONB column in profiles table
+
+### 26. Timezone Display Wrong - FIXED (2026-06-17)
+- **Issue:** Dates showing in wrong timezone
+- **Fix:** Added `timeZone: "Indian/Maldives"` (UTC+5) to all date formatters in utils.ts
+
+### 27. Emergency Contacts Admin Management - IMPLEMENTED (2026-06-17)
+- **Feature:** Settings page now has Emergency Contacts tab
+- Admin can manage default SOS contacts that load in customer/driver apps
+
+### 28. Password Reset for Admins - IMPLEMENTED (2026-06-17)
+- **Feature:** Super-admin can reset passwords for any admin user
+- Uses Supabase Admin API via `/api/admin/reset-password` endpoint
+- Creates auth user if not exists, updates password if exists
 
 ---
 
-*Updated by Nova on 2026-06-16*
+## Flutter App Warnings - REDUCED (2026-06-17)
+
+| App | Before | After | Errors |
+|-----|--------|-------|--------|
+| Customer App | 102 | 98 | 0 |
+| Driver App | 49 | 46 | 0 |
+
+Fixed:
+- Removed unused imports and methods
+- Suppressed unused field warnings
+- Fixed Share.share syntax errors
+
+---
+
+*Updated by Nova on 2026-06-17*

@@ -3,7 +3,6 @@ import 'package:intl/intl.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_container.dart';
-import '../widgets/skeleton_loader.dart';
 
 class RideHistoryScreen extends StatefulWidget {
   final String? customerId;
@@ -67,14 +66,7 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
           _buildFilterChips(isDark),
           Expanded(
             child: _isLoading
-                ? ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: 5,
-                    itemBuilder: (context, index) => const Padding(
-                      padding: EdgeInsets.only(bottom: 12),
-                      child: SkeletonRideCard(),
-                    ),
-                  )
+                ? const Center(child: CircularProgressIndicator(color: AppColors.yellow))
                 : _filteredRides.isEmpty
                     ? _buildEmptyState()
                     : RefreshIndicator(

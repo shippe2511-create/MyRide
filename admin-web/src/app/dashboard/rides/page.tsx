@@ -11,8 +11,12 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
@@ -63,6 +67,7 @@ export default function RidesPage() {
   const [editRide, setEditRide] = useState<Ride | null>(null)
   const [editStatus, setEditStatus] = useState("")
   const [saving, setSaving] = useState(false)
+  const [deleteRideId, setDeleteRideId] = useState<string | null>(null)
 
   useEffect(() => {
     loadData()
@@ -139,15 +144,16 @@ export default function RidesPage() {
     setSaving(false)
   }
 
-  const deleteRide = async (rideId: string) => {
-    if (!confirm("Are you sure you want to delete this ride?")) return
-    const { error } = await supabase.from("rides").delete().eq("id", rideId)
+  const confirmDeleteRide = async () => {
+    if (!deleteRideId) return
+    const { error } = await supabase.from("rides").delete().eq("id", deleteRideId)
     if (error) {
       toast.error("Failed to delete ride")
     } else {
       toast.success("Ride deleted")
       loadData()
     }
+    setDeleteRideId(null)
   }
 
   const filteredRides = rides.filter(ride => {
@@ -311,7 +317,7 @@ export default function RidesPage() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-red-500"
-                          onClick={(e) => { e.stopPropagation(); deleteRide(ride.id); }}
+                          onClick={(e) => { e.stopPropagation(); setDeleteRideId(ride.id); }}
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
                           Delete
@@ -437,6 +443,27 @@ export default function RidesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteRideId} onOpenChange={() => setDeleteRideId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Ride</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this ride? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteRide}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

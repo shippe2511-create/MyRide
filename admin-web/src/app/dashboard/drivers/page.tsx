@@ -29,15 +29,15 @@ export default function DriversPage() {
 
     const channel = supabase
       .channel('drivers_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => loadData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => loadData(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => loadData(false))
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  const loadData = async () => {
-    setLoading(true)
+  const loadData = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
 
     const [driversRes, driverRecordsRes, totalRes, activeRes, pendingRes] = await Promise.all([
       supabase.from("profiles").select("*", { count: "exact" }).eq("role", "driver").order("created_at", { ascending: false }).range(0, pageSize - 1),
@@ -68,7 +68,7 @@ export default function DriversPage() {
       pending: pendingRes.count || 0,
     })
 
-    setLoading(false)
+    if (showLoading) setLoading(false)
   }
 
   if (loading) {

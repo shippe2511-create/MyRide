@@ -8,7 +8,6 @@ import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/status_toggle.dart';
 import '../widgets/ride_request_popup.dart';
-import '../widgets/glass_card.dart';
 import 'vehicle_checklist_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
@@ -1890,11 +1889,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildStatsCard(BuildContext context, DriverState state) {
     return Column(
       children: [
-        // Main stats row with glass effect
-        GlassCard(
+        // Main stats row
+        Container(
           margin: const EdgeInsets.symmetric(horizontal: 20),
           padding: const EdgeInsets.all(20),
-          borderRadius: BorderRadius.circular(20),
+          decoration: BoxDecoration(
+            color: context.cardColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: context.borderColor),
+          ),
           child: Row(
             children: [
               _buildStatItem(

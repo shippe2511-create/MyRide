@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/ride_request.dart';
 import '../theme/app_theme.dart';
-import 'slide_to_accept.dart';
 
 class RideRequestPopup extends StatefulWidget {
   final RideRequest request;
@@ -586,62 +585,64 @@ class _RideRequestPopupState extends State<RideRequestPopup>
 
   Widget _buildActionButtons() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 0, 0, 24),
-      child: Column(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      child: Row(
         children: [
-          // Slide to accept
-          _isAccepting
-              ? Container(
-                  height: 70,
-                  margin: const EdgeInsets.symmetric(horizontal: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.green,
-                    borderRadius: BorderRadius.circular(35),
-                  ),
-                  child: const Center(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            valueColor: AlwaysStoppedAnimation(Colors.white),
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        Text(
-                          'Accepting...',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : SlideToAccept(
-                  onAccept: () async {
-                    setState(() => _isAccepting = true);
-                    await widget.onAccept();
-                  },
-                  text: 'Slide to Accept',
+          // Accept button (full width)
+          Expanded(
+            child: Container(
+              height: 60,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.yellow, const Color(0xFFFFC107)],
                 ),
-          const SizedBox(height: 12),
-          // Decline button
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: TextButton(
-              onPressed: widget.onDecline,
-              child: Text(
-                'Decline',
-                style: TextStyle(
-                  color: context.mutedColor,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.yellow.withValues(alpha: 0.5),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: _isAccepting
+                      ? null
+                      : () async {
+                          setState(() => _isAccepting = true);
+                          HapticFeedback.heavyImpact();
+                          await widget.onAccept();
+                        },
+                  child: Center(
+                    child: _isAccepting
+                        ? SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              valueColor: AlwaysStoppedAnimation(Colors.black),
+                            ),
+                          )
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.check_circle_rounded, color: Colors.black, size: 26),
+                              const SizedBox(width: 10),
+                              Text(
+                                'Accept Ride',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
                 ),
               ),
             ),

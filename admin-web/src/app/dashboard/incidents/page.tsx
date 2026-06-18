@@ -47,7 +47,9 @@ import {
   Eye,
   Plus,
   XCircle,
+  FileWarning,
 } from "lucide-react"
+import { Card } from "@/components/ui/card"
 
 interface Incident {
   id: string
@@ -224,6 +226,56 @@ export default function IncidentsPage() {
         </Button>
       </div>
 
+      {/* Status Cards */}
+      <div className="grid gap-3 grid-cols-4">
+        <Card className={`p-4 ${incidents.filter(i => i.status === "open").length > 0 ? "border-red-500" : ""}`}>
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${incidents.filter(i => i.status === "open").length > 0 ? "bg-red-500/10" : "bg-muted"}`}>
+              <AlertTriangle className={`h-5 w-5 ${incidents.filter(i => i.status === "open").length > 0 ? "text-red-500" : ""}`} />
+            </div>
+            <div>
+              <p className={`text-2xl font-bold ${incidents.filter(i => i.status === "open").length > 0 ? "text-red-500" : ""}`}>
+                {incidents.filter(i => i.status === "open").length}
+              </p>
+              <p className="text-xs text-muted-foreground">Open</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-yellow-500/10">
+              <Clock className="h-5 w-5 text-yellow-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-yellow-500">{incidents.filter(i => i.status === "investigating").length}</p>
+              <p className="text-xs text-muted-foreground">Investigating</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-green-500/10">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-green-500">{incidents.filter(i => i.status === "resolved").length}</p>
+              <p className="text-xs text-muted-foreground">Resolved</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-muted">
+              <XCircle className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{incidents.filter(i => i.status === "closed").length}</p>
+              <p className="text-xs text-muted-foreground">Closed</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -333,7 +385,7 @@ export default function IncidentsPage() {
                   <TableCell>{incident.location_name || "-"}</TableCell>
                   <TableCell>{formatDate(incident.created_at)}</TableCell>
                   <TableCell>
-                    <DropdownMenu>
+                    <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
                           <MoreHorizontal className="h-4 w-4" />
@@ -372,7 +424,7 @@ export default function IncidentsPage() {
         </Table>
       </div>
 
-      <Dialog open={dialogType === "add"} onOpenChange={() => setDialogType(null)}>
+      <Dialog open={dialogType === "add"} onOpenChange={(open) => { if (!open) setDialogType(null) }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Report New Incident</DialogTitle>
@@ -442,7 +494,7 @@ export default function IncidentsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={dialogType === "view"} onOpenChange={() => setDialogType(null)}>
+      <Dialog open={dialogType === "view"} onOpenChange={(open) => { if (!open) { setDialogType(null); setSelectedIncident(null) } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{selectedIncident?.title}</DialogTitle>
@@ -488,7 +540,7 @@ export default function IncidentsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={dialogType === "resolve"} onOpenChange={() => setDialogType(null)}>
+      <Dialog open={dialogType === "resolve"} onOpenChange={(open) => { if (!open) { setDialogType(null); setSelectedIncident(null); setResolution("") } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Resolve Incident</DialogTitle>

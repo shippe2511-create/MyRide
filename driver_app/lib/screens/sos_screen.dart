@@ -115,13 +115,25 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
     double? lat;
     double? lng;
     try {
+      // Try current position first with longer timeout
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 15));
       lat = position.latitude;
       lng = position.longitude;
     } catch (e) {
-      debugPrint('Could not get location for SOS: $e');
+      debugPrint('Could not get current location for SOS: $e');
+      // Fall back to last known position
+      try {
+        final lastPosition = await Geolocator.getLastKnownPosition();
+        if (lastPosition != null) {
+          lat = lastPosition.latitude;
+          lng = lastPosition.longitude;
+          debugPrint('Using last known position for SOS');
+        }
+      } catch (e2) {
+        debugPrint('Could not get last known location: $e2');
+      }
     }
 
     if (driverId.isNotEmpty) {

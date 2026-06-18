@@ -8,15 +8,20 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import { Download, FileSpreadsheet, FileText, Loader2, Calendar, Users, Car, Star, BarChart3 } from "lucide-react"
+import { Download, FileSpreadsheet, FileText, Loader2, Calendar, Users, Car, Star, BarChart3, TrendingUp, Package, AlertTriangle, Shield, ClipboardCheck, Fuel } from "lucide-react"
 import { toast } from "sonner"
 
 const reportTypes = [
   { id: "rides", name: "Rides Report", description: "All rides with pickup, dropoff, and status", icon: Car },
   { id: "customers", name: "Customers Report", description: "Customer list with contact info", icon: Users },
   { id: "drivers", name: "Drivers Report", description: "Driver list with ratings and trips", icon: Car },
+  { id: "driver_performance", name: "Driver Performance", description: "KPIs: completion rate, cancellations, activity", icon: TrendingUp },
   { id: "ratings", name: "Ratings Report", description: "All ratings and feedback", icon: Star },
   { id: "usage", name: "Daily Usage", description: "Rides per day summary", icon: BarChart3 },
+  { id: "sos_alerts", name: "SOS Alerts", description: "All emergency alerts with status", icon: AlertTriangle },
+  { id: "incidents", name: "Incidents Report", description: "All reported incidents", icon: Shield },
+  { id: "vehicle_checks", name: "Vehicle Checks", description: "Pre-trip inspection results", icon: ClipboardCheck },
+  { id: "vehicle_logs", name: "Vehicle Logs", description: "Fuel, maintenance, odometer records", icon: Fuel },
 ]
 
 // Friendly column names mapping
@@ -56,6 +61,21 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Online Status": "online_status",
     "Joined Date": "joined_date",
   },
+  driver_performance: {
+    "Driver Name": "full_name",
+    "Phone": "phone",
+    "Rating": "rating",
+    "Total Rides": "total_rides",
+    "Completed Rides": "completed_rides",
+    "Cancelled Rides": "cancelled_rides",
+    "Completion Rate": "completion_rate",
+    "Cancellation Rate": "cancellation_rate",
+    "This Week": "this_week",
+    "This Month": "this_month",
+    "Online Status": "online_status",
+    "Vehicle": "vehicle",
+    "License": "license",
+  },
   ratings: {
     "From": "from_name",
     "To": "to_name",
@@ -69,6 +89,44 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Completed": "completed_rides",
     "Cancelled": "cancelled_rides",
     "Completion Rate": "completion_rate",
+  },
+  sos_alerts: {
+    "Alert ID": "id",
+    "User Name": "user_name",
+    "User Phone": "user_phone",
+    "User Type": "user_type",
+    "Status": "status",
+    "Location": "location",
+    "Date": "date",
+    "Time": "time",
+    "Resolved At": "resolved_at",
+  },
+  incidents: {
+    "Incident ID": "id",
+    "Title": "title",
+    "Type": "type",
+    "Severity": "severity",
+    "Status": "status",
+    "Reporter": "reporter",
+    "Date": "date",
+    "Description": "description",
+  },
+  vehicle_checks: {
+    "Check ID": "id",
+    "Driver": "driver_name",
+    "Vehicle": "vehicle",
+    "Status": "status",
+    "Date": "date",
+    "Issues": "issues",
+  },
+  vehicle_logs: {
+    "Log ID": "id",
+    "Driver": "driver_name",
+    "Type": "log_type",
+    "Amount": "amount",
+    "Odometer": "odometer",
+    "Date": "date",
+    "Notes": "notes",
   },
 }
 
@@ -136,8 +194,8 @@ export default function ReportsPage() {
     }
   }
 
-  const generateReport = async (reportType: string) => {
-    setLoading(reportType)
+  const generateReport = async (reportType: string, showLoading = true) => {
+    if (showLoading) setLoading(reportType)
     const dateFilter = getDateFilter()
 
     try {
@@ -238,6 +296,75 @@ export default function ReportsPage() {
           break
         }
 
+        case "driver_performance": {
+          // Get all drivers with profile and vehicle info
+          const { data: driversData } = await supabase
+            .from("drivers")
+            .select(`
+              id, rating, is_online, license_number,
+              profile:profiles!drivers_profile_id_fkey(full_name, phone),
+              vehicle:vehicle_types(plate_no, display_name)
+            `)
+
+          // Get all rides
+          let ridesQuery = supabase.from("rides").select("id, driver_id, status, created_at")
+          if (dateFilter) {
+            ridesQuery = ridesQuery.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          const { data: ridesData } = await ridesQuery
+
+          const now = new Date()
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+          rows = (driversData || []).map((d: Record<string, unknown>) => {
+            const profile = Array.isArray(d.profile) ? d.profile[0] : d.profile
+            const vehicle = Array.isArray(d.vehicle) ? d.vehicle[0] : d.vehicle
+
+            // Calculate stats for this driver
+            const driverRides = (ridesData || []).filter(r => r.driver_id === d.id)
+            const completedRides = driverRides.filter(r => r.status === 'completed').length
+            const cancelledRides = driverRides.filter(r => r.status === 'cancelled').length
+            const totalRides = driverRides.length
+
+            const completionRate = totalRides > 0 ? Math.round((completedRides / totalRides) * 100) : 0
+            const cancellationRate = totalRides > 0 ? Math.round((cancelledRides / totalRides) * 100) : 0
+
+            const thisWeekRides = driverRides.filter(r =>
+              r.status === 'completed' && new Date(r.created_at) >= weekAgo
+            ).length
+            const thisMonthRides = driverRides.filter(r =>
+              r.status === 'completed' && new Date(r.created_at) >= monthAgo
+            ).length
+
+            return {
+              "Driver Name": String(profile?.full_name || "Unknown"),
+              "Phone": formatPhone(profile?.phone as string | null),
+              "Rating": d.rating ? `${d.rating}/5` : "-",
+              "Total Rides": String(totalRides),
+              "Completed Rides": String(completedRides),
+              "Cancelled Rides": String(cancelledRides),
+              "Completion Rate": `${completionRate}%`,
+              "Cancellation Rate": `${cancellationRate}%`,
+              "This Week": String(thisWeekRides),
+              "This Month": String(thisMonthRides),
+              "Online Status": d.is_online ? "Online" : "Offline",
+              "Vehicle": vehicle ? `${vehicle.display_name || ""} (${vehicle.plate_no || ""})` : "-",
+              "License": String(d.license_number || "-"),
+            }
+          })
+
+          // Sort by completion rate descending
+          rows.sort((a, b) => {
+            const rateA = parseInt(a["Completion Rate"]) || 0
+            const rateB = parseInt(b["Completion Rate"]) || 0
+            return rateB - rateA
+          })
+
+          filename = `driver_performance_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
         case "ratings": {
           let query = supabase
             .from("ratings")
@@ -293,11 +420,137 @@ export default function ReportsPage() {
           filename = `daily_usage_${new Date().toISOString().split("T")[0]}.csv`
           break
         }
+
+        case "sos_alerts": {
+          let query = supabase
+            .from("sos_alerts")
+            .select(`
+              id, status, latitude, longitude, location_address, created_at, resolved_at,
+              user:profiles!sos_alerts_user_id_fkey(full_name, phone, role)
+            `)
+            .order("created_at", { ascending: false })
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          const { data: alerts } = await query
+
+          rows = (alerts || []).map((a: Record<string, unknown>) => {
+            const user = a.user as Record<string, unknown> | null
+            return {
+              "Alert ID": String(a.id || "").slice(0, 8),
+              "User Name": String(user?.full_name || "-"),
+              "User Phone": formatPhone(user?.phone as string | null),
+              "User Type": user?.role === "driver" ? "Driver" : "Customer",
+              "Status": formatStatus(String(a.status || "")),
+              "Location": a.location_address ? String(a.location_address) : (a.latitude ? `${a.latitude}, ${a.longitude}` : "-"),
+              "Date": formatDate(String(a.created_at || "")),
+              "Time": formatTime(String(a.created_at || "")),
+              "Resolved At": a.resolved_at ? formatDate(String(a.resolved_at)) : "-",
+            }
+          })
+          filename = `sos_alerts_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "incidents": {
+          let query = supabase
+            .from("incidents")
+            .select(`
+              id, title, type, severity, status, description, created_at,
+              reporter:profiles!incidents_reported_by_fkey(full_name)
+            `)
+            .order("created_at", { ascending: false })
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          const { data: incidents } = await query
+
+          rows = (incidents || []).map((i: Record<string, unknown>) => {
+            const reporter = i.reporter as Record<string, unknown> | null
+            return {
+              "Incident ID": String(i.id || "").slice(0, 8),
+              "Title": String(i.title || "-"),
+              "Type": formatStatus(String(i.type || "")),
+              "Severity": formatStatus(String(i.severity || "")),
+              "Status": formatStatus(String(i.status || "")),
+              "Reporter": String(reporter?.full_name || "-"),
+              "Date": formatDate(String(i.created_at || "")),
+              "Description": String(i.description || "-").slice(0, 100),
+            }
+          })
+          filename = `incidents_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "vehicle_checks": {
+          let query = supabase
+            .from("vehicle_checks")
+            .select(`
+              id, status, created_at, notes,
+              driver:drivers!vehicle_checks_driver_id_fkey(
+                profile:profiles(full_name)
+              ),
+              vehicle:vehicle_types(plate_no, display_name)
+            `)
+            .order("created_at", { ascending: false })
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          const { data: checks } = await query
+
+          rows = (checks || []).map((c: Record<string, unknown>) => {
+            const driver = c.driver as Record<string, unknown> | null
+            const profile = driver?.profile as Record<string, unknown> | null
+            const vehicle = c.vehicle as Record<string, unknown> | null
+            return {
+              "Check ID": String(c.id || "").slice(0, 8),
+              "Driver": String(profile?.full_name || "-"),
+              "Vehicle": vehicle ? `${vehicle.display_name || ""} (${vehicle.plate_no || ""})` : "-",
+              "Status": formatStatus(String(c.status || "")),
+              "Date": formatDate(String(c.created_at || "")),
+              "Issues": String(c.notes || "-"),
+            }
+          })
+          filename = `vehicle_checks_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "vehicle_logs": {
+          let query = supabase
+            .from("vehicle_logs")
+            .select(`
+              id, log_type, amount, odometer, notes, log_date, created_at,
+              driver:drivers!vehicle_logs_driver_id_fkey(
+                profile:profiles(full_name)
+              )
+            `)
+            .order("log_date", { ascending: false })
+          if (dateFilter) {
+            query = query.gte("log_date", dateFilter.start).lte("log_date", dateFilter.end)
+          }
+          const { data: logs } = await query
+
+          rows = (logs || []).map((l: Record<string, unknown>) => {
+            const driver = l.driver as Record<string, unknown> | null
+            const profile = driver?.profile as Record<string, unknown> | null
+            return {
+              "Log ID": String(l.id || "").slice(0, 8),
+              "Driver": String(profile?.full_name || "-"),
+              "Type": formatStatus(String(l.log_type || "")),
+              "Amount": l.amount ? `$${l.amount}` : "-",
+              "Odometer": l.odometer ? `${l.odometer} km` : "-",
+              "Date": formatDate(String(l.log_date || l.created_at || "")),
+              "Notes": String(l.notes || "-"),
+            }
+          })
+          filename = `vehicle_logs_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
       }
 
       if (rows.length === 0) {
         toast.error("No data to export")
-        setLoading(null)
+        if (showLoading) setLoading(null)
         return
       }
 
@@ -327,16 +580,55 @@ export default function ReportsPage() {
       console.error(error)
     }
 
+    if (showLoading) setLoading(null)
+  }
+
+  const downloadAllReports = async () => {
+    setLoading("all")
+    toast.info("Downloading all reports...")
+
+    let successCount = 0
+    for (const report of reportTypes) {
+      try {
+        await generateReport(report.id, false)
+        successCount++
+        await new Promise(r => setTimeout(r, 300))
+      } catch (e) {
+        console.error(`Failed to download ${report.name}`, e)
+      }
+    }
+
     setLoading(null)
+    toast.success(`${successCount} reports downloaded!`)
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Reports</h1>
-        <p className="text-muted-foreground">
-          Generate and export reports in CSV format
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Reports</h1>
+          <p className="text-muted-foreground">
+            Generate and export reports in CSV format
+          </p>
+        </div>
+        <Button
+          onClick={downloadAllReports}
+          disabled={loading !== null}
+          variant="outline"
+          size="lg"
+        >
+          {loading === "all" ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Downloading...
+            </>
+          ) : (
+            <>
+              <Package className="mr-2 h-4 w-4" />
+              Download All Reports
+            </>
+          )}
+        </Button>
       </div>
 
       <Card>

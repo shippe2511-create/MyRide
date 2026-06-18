@@ -126,7 +126,7 @@ class _LoginScreenState extends State<LoginScreen> {
           vehicleModel: vehicleModel,
           phone: fullPhone,
           rating: (driverProfile['rating'] ?? 5.0).toDouble(),
-          avatarUrl: existingUser['avatar_url'] ?? '',
+          avatarUrl: driverProfile['avatar_url'] ?? existingUser['avatar_url'] ?? '',
           employeeId: existingUser['employee_id'] ?? '',
         );
 

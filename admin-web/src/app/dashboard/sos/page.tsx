@@ -20,8 +20,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
-  AlertTriangle, Phone, MapPin, Clock, CheckCircle, XCircle, Loader2, RefreshCw, Shield, MoreVertical, Edit, Trash2
+  AlertTriangle, Phone, MapPin, Clock, CheckCircle, XCircle, Loader2, RefreshCw, Shield, MoreVertical, Edit, Trash2, Plus, GripVertical, Flame, Heart, Building, Save
 } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu"
@@ -59,6 +61,26 @@ export default function SOSPage() {
 
   const [stats, setStats] = useState({ active: 0, responding: 0, resolved: 0 })
 
+  interface EmergencyContact {
+    id: string
+    name: string
+    phone: string
+    icon: string
+    sort_order: number
+    is_active: boolean
+  }
+
+  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([])
+  const [savingContacts, setSavingContacts] = useState(false)
+
+  const CONTACT_ICONS = [
+    { value: "shield", label: "Shield (Police)", icon: Shield },
+    { value: "heart", label: "Heart (Medical)", icon: Heart },
+    { value: "flame", label: "Flame (Fire)", icon: Flame },
+    { value: "building", label: "Building (Office)", icon: Building },
+    { value: "phone", label: "Phone (General)", icon: Phone },
+  ]
+
   const playAlarmSound = () => {
     try {
       const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
@@ -90,6 +112,7 @@ export default function SOSPage() {
 
   useEffect(() => {
     loadAlerts()
+    loadEmergencyContacts()
 
     // Real-time subscription for SOS alerts
     const channel = supabase
@@ -138,6 +161,81 @@ export default function SOSPage() {
       resolved: resolvedRes.count || 0,
     })
     setLoading(false)
+  }
+
+  const loadEmergencyContacts = async () => {
+    const { data } = await supabase
+      .from("emergency_contacts")
+      .select("*")
+      .order("sort_order")
+    setEmergencyContacts(data || [])
+  }
+
+  const addEmergencyContact = () => {
+    setEmergencyContacts(prev => [
+      ...prev,
+      {
+        id: `new_${Date.now()}`,
+        name: "",
+        phone: "",
+        icon: "phone",
+        sort_order: prev.length,
+        is_active: true,
+      }
+    ])
+  }
+
+  const updateContact = (id: string, field: string, value: string | boolean) => {
+    setEmergencyContacts(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c))
+  }
+
+  const removeContact = (id: string) => {
+    setEmergencyContacts(prev => prev.filter(c => c.id !== id))
+  }
+
+  const saveEmergencyContacts = async () => {
+    setSavingContacts(true)
+
+    try {
+      const existingIds = emergencyContacts.filter(c => !c.id.startsWith("new_")).map(c => c.id)
+
+      if (existingIds.length > 0) {
+        await supabase.from("emergency_contacts").delete().not("id", "in", `(${existingIds.join(",")})`)
+      } else {
+        await supabase.from("emergency_contacts").delete().neq("id", "placeholder")
+      }
+
+      const updatedContacts: EmergencyContact[] = []
+
+      for (const contact of emergencyContacts) {
+        if (contact.id.startsWith("new_")) {
+          const { data } = await supabase.from("emergency_contacts").insert({
+            name: contact.name,
+            phone: contact.phone,
+            icon: contact.icon,
+            sort_order: contact.sort_order,
+            is_active: contact.is_active,
+          }).select().single()
+          if (data) updatedContacts.push(data as EmergencyContact)
+        } else {
+          await supabase.from("emergency_contacts").update({
+            name: contact.name,
+            phone: contact.phone,
+            icon: contact.icon,
+            sort_order: contact.sort_order,
+            is_active: contact.is_active,
+          }).eq("id", contact.id)
+          updatedContacts.push(contact)
+        }
+      }
+
+      setEmergencyContacts(updatedContacts)
+      toast.success("Emergency contacts saved")
+    } catch (e) {
+      toast.error("Failed to save contacts")
+    }
+
+    setSavingContacts(false)
   }
 
   const updateStatus = async (alertId: string, newStatus: string) => {
@@ -362,6 +460,74 @@ export default function SOSPage() {
             )}
           </TableBody>
         </Table>
+      </Card>
+
+      {/* Emergency Contacts Section */}
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Phone className="h-5 w-5" />
+            <div>
+              <h3 className="font-semibold">Emergency Contacts</h3>
+              <p className="text-sm text-muted-foreground">SOS screen emergency contact numbers</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={addEmergencyContact}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Contact
+            </Button>
+            <Button size="sm" onClick={saveEmergencyContacts} disabled={savingContacts}>
+              {savingContacts ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              Save
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {emergencyContacts.map((contact, index) => (
+            <div key={contact.id} className="flex items-center gap-3 p-3 border rounded-lg">
+              <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+              <Input
+                value={contact.name}
+                onChange={(e) => updateContact(contact.id, "name", e.target.value)}
+                placeholder="Contact name"
+                className="flex-1"
+              />
+              <Input
+                value={contact.phone}
+                onChange={(e) => updateContact(contact.id, "phone", e.target.value)}
+                placeholder="Phone number"
+                className="w-40"
+              />
+              <Select value={contact.icon} onValueChange={(v) => updateContact(contact.id, "icon", v)}>
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONTACT_ICONS.map(icon => (
+                    <SelectItem key={icon.value} value={icon.value}>
+                      <div className="flex items-center gap-2">
+                        <icon.icon className="h-4 w-4" />
+                        {icon.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Switch
+                checked={contact.is_active}
+                onCheckedChange={(v) => updateContact(contact.id, "is_active", v)}
+              />
+              <Button variant="ghost" size="icon" onClick={() => removeContact(contact.id)}>
+                <Trash2 className="h-4 w-4 text-red-500" />
+              </Button>
+            </div>
+          ))}
+          {emergencyContacts.length === 0 && (
+            <p className="text-center py-8 text-muted-foreground">No emergency contacts configured</p>
+          )}
+        </div>
       </Card>
 
       <Dialog open={!!selectedAlert} onOpenChange={() => setSelectedAlert(null)}>

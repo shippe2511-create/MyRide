@@ -693,7 +693,7 @@ class _SearchScreenState extends State<SearchScreen> {
           const SizedBox(height: 2),
           TextField(
             controller: _searchController,
-            autofocus: true,
+            autofocus: false,
             style: TextStyle(
               color: context.textColor,
               fontSize: 15,
@@ -5332,7 +5332,7 @@ class _ScheduleSearchScreenState extends State<ScheduleSearchScreen> {
           Expanded(
             child: TextField(
               controller: _searchController,
-              autofocus: true,
+              autofocus: false,
               style: TextStyle(color: context.textColor, fontSize: 15),
               decoration: InputDecoration(
                 hintText: 'Where to?',

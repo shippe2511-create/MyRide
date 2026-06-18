@@ -320,15 +320,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(14),
-                child: state.profileImagePath.isNotEmpty
-                    ? Image.file(
-                        File(state.profileImagePath),
-                        width: 50,
-                        height: 50,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _buildInitialsAvatar(state.driverName),
-                      )
-                    : _buildInitialsAvatar(state.driverName),
+                child: _buildProfileAvatar(state, 50),
               ),
             ),
           ),
@@ -368,20 +360,53 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildInitialsAvatar(String name) {
+  Widget _buildProfileAvatar(DriverState state, double size) {
+    // Priority: avatarUrl (cloud) > profileImagePath (local) > initials
+    if (state.avatarUrl.isNotEmpty) {
+      return Image.network(
+        state.avatarUrl,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) {
+          if (state.profileImagePath.isNotEmpty) {
+            return Image.file(
+              File(state.profileImagePath),
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _buildInitialsAvatar(state.driverName, size),
+            );
+          }
+          return _buildInitialsAvatar(state.driverName, size);
+        },
+      );
+    } else if (state.profileImagePath.isNotEmpty) {
+      return Image.file(
+        File(state.profileImagePath),
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildInitialsAvatar(state.driverName, size),
+      );
+    }
+    return _buildInitialsAvatar(state.driverName, size);
+  }
+
+  Widget _buildInitialsAvatar(String name, [double size = 50]) {
     final initials = name.isNotEmpty
         ? name.split(' ').map((n) => n.isNotEmpty ? n[0] : '').take(2).join().toUpperCase()
         : 'DR';
     return Container(
-      width: 50,
-      height: 50,
+      width: size,
+      height: size,
       color: AppColors.yellow,
       child: Center(
         child: Text(
           initials,
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.black,
-            fontSize: 18,
+            fontSize: size * 0.36,
             fontWeight: FontWeight.w700,
           ),
         ),

@@ -14,8 +14,8 @@ import {
   BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, Legend,
 } from "recharts"
 import {
-  TrendingUp, TrendingDown, Users, Car, MapPin, Clock, Star, Loader2,
-  Calendar, Activity, Target, Award, Zap, ArrowUpRight, ArrowDownRight
+  Car, MapPin, Clock, Star, Loader2,
+  Calendar, Activity, Target, Award, Zap
 } from "lucide-react"
 import { Breadcrumbs } from "@/components/breadcrumbs"
 
@@ -286,66 +286,16 @@ export default function AnalyticsPage() {
         </Select>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Rides</CardTitle>
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{stats.totalRides}</div>
-            <div className={`flex items-center text-xs ${stats.ridesChange >= 0 ? "text-green-500" : "text-red-500"}`}>
-              {stats.ridesChange >= 0 ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}
-              {Math.abs(stats.ridesChange)}% vs previous period
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Completion Rate</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-500">{stats.completionRate}%</div>
-            <p className="text-xs text-muted-foreground">{stats.completedRides} completed, {stats.cancelledRides} cancelled</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Avg Trip Duration</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{stats.avgDuration} min</div>
-            <p className="text-xs text-muted-foreground">{stats.avgDistance} km average distance</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">New Customers</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{stats.totalCustomers}</div>
-            <div className={`flex items-center text-xs ${stats.customersChange >= 0 ? "text-green-500" : "text-red-500"}`}>
-              {stats.customersChange >= 0 ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}
-              {Math.abs(stats.customersChange)}% vs previous period
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* Period Summary - Compact insights bar */}
+      <div className="grid gap-4 md:grid-cols-5">
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-yellow-500/10">
               <Zap className="h-5 w-5 text-yellow-500" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Peak Hour</p>
-              <p className="text-xl font-bold">{stats.peakHour}</p>
+              <p className="text-xs text-muted-foreground">Peak Hour</p>
+              <p className="text-lg font-bold">{stats.peakHour}</p>
             </div>
           </div>
         </Card>
@@ -355,19 +305,41 @@ export default function AnalyticsPage() {
               <Calendar className="h-5 w-5 text-blue-500" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Busiest Day</p>
-              <p className="text-xl font-bold">{stats.busiestDay}</p>
+              <p className="text-xs text-muted-foreground">Busiest Day</p>
+              <p className="text-lg font-bold">{stats.busiestDay}</p>
             </div>
           </div>
         </Card>
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-green-500/10">
-              <Car className="h-5 w-5 text-green-500" />
+              <Target className="h-5 w-5 text-green-500" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Active Drivers</p>
-              <p className="text-xl font-bold">{stats.activeDrivers}</p>
+              <p className="text-xs text-muted-foreground">Completion</p>
+              <p className="text-lg font-bold">{stats.completionRate}%</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-purple-500/10">
+              <Clock className="h-5 w-5 text-purple-500" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Avg Duration</p>
+              <p className="text-lg font-bold">{stats.avgDuration} min</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-orange-500/10">
+              <MapPin className="h-5 w-5 text-orange-500" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Avg Distance</p>
+              <p className="text-lg font-bold">{stats.avgDistance} km</p>
             </div>
           </div>
         </Card>

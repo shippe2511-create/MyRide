@@ -209,17 +209,27 @@ class AppState extends ChangeNotifier {
     required String phone,
     String? staffId,
     String? profileId,
+    String? avatarUrl,
   }) {
     _userName = name;
     _userEmail = email;
     _userPhone = phone;
     if (staffId != null) _staffId = staffId;
     if (profileId != null) _profileId = profileId;
+    if (avatarUrl != null && avatarUrl.isNotEmpty) _avatarUrl = avatarUrl;
     _userInitials = name.isNotEmpty
         ? name.split(' ').map((n) => n.isNotEmpty ? n[0] : '').take(2).join().toUpperCase()
         : 'U';
     _saveProfileId();
+    _saveAvatarUrl();
     notifyListeners();
+  }
+
+  Future<void> _saveAvatarUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_avatarUrl != null) {
+      await prefs.setString('avatar_url', _avatarUrl!);
+    }
   }
 
   void setProfileId(String? id) {
@@ -262,8 +272,20 @@ class AppState extends ChangeNotifier {
       SupabaseService.setProfileId(_profileId);
       loadEmergencyContactsFromProfile();
       loadTripHistory();
+      // Fetch latest avatar URL from DB
+      _loadAvatarFromDb();
     }
     notifyListeners();
+  }
+
+  Future<void> _loadAvatarFromDb() async {
+    if (_profileId == null) return;
+    final url = await SupabaseService.getProfileAvatarUrl(_profileId!);
+    if (url != null && url.isNotEmpty) {
+      _avatarUrl = url;
+      _saveAvatarUrl();
+      notifyListeners();
+    }
   }
 
   void updateProfilePhoto(String? path) {

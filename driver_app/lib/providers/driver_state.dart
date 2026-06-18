@@ -230,6 +230,11 @@ class DriverState extends ChangeNotifier {
       _profileImagePath = prefs.getString('profileImagePath') ?? '';
       _avatarUrl = prefs.getString('avatarUrl') ?? '';
 
+      // Fetch latest avatar from DB if logged in
+      if (_isLoggedIn && _driverId.isNotEmpty) {
+        _loadAvatarFromDb();
+      }
+
       // Load break state if saved
       final wasOnBreak = prefs.getBool('isOnBreak') ?? false;
       if (wasOnBreak) {
@@ -280,6 +285,17 @@ class DriverState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     prefs.setString('avatarUrl', url);
     notifyListeners();
+  }
+
+  Future<void> _loadAvatarFromDb() async {
+    if (_driverId.isEmpty) return;
+    final url = await SupabaseService.getDriverAvatarUrl(_driverId);
+    if (url != null && url.isNotEmpty && url != _avatarUrl) {
+      _avatarUrl = url;
+      final prefs = await SharedPreferences.getInstance();
+      prefs.setString('avatarUrl', url);
+      notifyListeners();
+    }
   }
 
   Future<void> setDriverData({

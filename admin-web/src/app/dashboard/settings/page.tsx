@@ -249,7 +249,6 @@ export default function SettingsPage() {
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="rides">Rides</TabsTrigger>
-          <TabsTrigger value="emergency">Emergency</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
@@ -396,84 +395,7 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="emergency" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Phone className="h-5 w-5" />
-                    Emergency Contacts
-                  </CardTitle>
-                  <CardDescription>SOS screen emergency contact numbers</CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={addEmergencyContact}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Contact
-                  </Button>
-                  <Button size="sm" type="button" onClick={saveEmergencyContacts} disabled={savingContacts}>
-                    {savingContacts ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
-                    Save
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {emergencyContacts.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">No emergency contacts configured</p>
-                ) : (
-                  emergencyContacts.map((contact, index) => (
-                    <div key={contact.id} className="flex items-center gap-3 p-3 border rounded-lg">
-                      <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
-                      <div className="flex-1 grid grid-cols-3 gap-3">
-                        <Input
-                          placeholder="Name (e.g., Police)"
-                          value={contact.name}
-                          onChange={(e) => updateContact(contact.id, "name", e.target.value)}
-                        />
-                        <Input
-                          placeholder="Phone (e.g., 119)"
-                          value={contact.phone}
-                          onChange={(e) => updateContact(contact.id, "phone", e.target.value)}
-                        />
-                        <Select
-                          value={contact.icon}
-                          onValueChange={(v) => updateContact(contact.id, "icon", v)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="shield">Shield (Police)</SelectItem>
-                            <SelectItem value="heart">Heart (Medical)</SelectItem>
-                            <SelectItem value="flame">Flame (Fire)</SelectItem>
-                            <SelectItem value="building">Building (Office)</SelectItem>
-                            <SelectItem value="phone">Phone (General)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Switch
-                        checked={contact.is_active}
-                        onCheckedChange={(checked) => updateContact(contact.id, "is_active", checked)}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-red-500 hover:text-red-600"
-                        onClick={() => deleteContact(contact.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
+        
         <TabsContent value="notifications" className="space-y-4">
           <Card>
             <CardHeader>

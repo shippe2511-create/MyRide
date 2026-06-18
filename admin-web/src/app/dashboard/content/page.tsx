@@ -208,12 +208,28 @@ export default function ContentPage() {
 
     if (error) {
       toast.error("Failed to save: " + error.message)
-    } else if (dialogType !== "push") {
-      toast.success("Saved successfully")
+    } else {
+      if (dialogType !== "push") toast.success("Saved successfully")
+      // Update local state instead of full reload
+      if (dialogType === "announcement") {
+        if (selectedItem) {
+          setAnnouncements(prev => prev.map(a => a.id === selectedItem.id ? { ...a, ...formData, message: formData.subtitle } : a))
+        } else {
+          // Reload only announcements for new items
+          const { data } = await supabase.from("announcements").select("*").order("created_at", { ascending: false })
+          if (data) setAnnouncements(data)
+        }
+      } else if (dialogType === "staff") {
+        if (selectedItem) {
+          setStaffCorner(prev => prev.map(s => s.id === selectedItem.id ? { ...s, ...formData } as StaffCornerItem : s))
+        } else {
+          const { data } = await supabase.from("staff_corner").select("*").order("is_pinned", { ascending: false }).order("created_at", { ascending: false })
+          if (data) setStaffCorner(data)
+        }
+      }
     }
     setSaving(false)
     setDialogType(null)
-    loadData()
   }
 
   const handleDelete = async (type: string, id: string) => {
@@ -222,7 +238,11 @@ export default function ContentPage() {
     if (error) toast.error("Failed to delete")
     else {
       toast.success("Deleted")
-      loadData()
+      if (type === "staff") {
+        setStaffCorner(prev => prev.filter(s => s.id !== id))
+      } else if (type === "announcement") {
+        setAnnouncements(prev => prev.filter(a => a.id !== id))
+      }
     }
   }
 
@@ -234,11 +254,11 @@ export default function ContentPage() {
     if (error) toast.error("Failed to update")
     else {
       toast.success(item.is_pinned ? "Unpinned" : "Pinned")
-      loadData()
+      setStaffCorner(prev => prev.map(s => s.id === item.id ? { ...s, is_pinned: !s.is_pinned } : s))
     }
   }
 
-  const toggleAnnouncementPin = async (item: any) => {
+  const toggleAnnouncementPin = async (item: { id: string; is_pinned: boolean }) => {
     const { error } = await supabase
       .from("announcements")
       .update({ is_pinned: !item.is_pinned })
@@ -246,7 +266,7 @@ export default function ContentPage() {
     if (error) toast.error("Failed to update")
     else {
       toast.success(item.is_pinned ? "Unpinned" : "Pinned")
-      loadData()
+      setAnnouncements(prev => prev.map(a => a.id === item.id ? { ...a, is_pinned: !a.is_pinned } : a))
     }
   }
 

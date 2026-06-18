@@ -110,6 +110,7 @@ class _LoginScreenState extends State<LoginScreen> {
           email: existingUser['email'] ?? '',
           phone: fullPhone,
           profileId: existingUser['id'],
+          avatarUrl: existingUser['avatar_url'],
         );
 
         HapticFeedback.lightImpact();

@@ -117,7 +117,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  gradient: appState.profilePhotoPath == null
+                  gradient: (appState.profilePhotoPath == null && appState.avatarUrl == null)
                       ? const LinearGradient(
                           colors: [AppColors.yellow, AppColors.yellow2],
                           begin: Alignment.topLeft,
@@ -125,7 +125,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         )
                       : null,
                   borderRadius: BorderRadius.circular(20),
-                  border: appState.profilePhotoPath != null
+                  border: (appState.profilePhotoPath != null || appState.avatarUrl != null)
                       ? Border.all(color: AppColors.yellow, width: 2)
                       : null,
                   boxShadow: [
@@ -136,18 +136,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ],
                 ),
-                child: appState.profilePhotoPath != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(18),
-                        child: Image.file(
-                          File(appState.profilePhotoPath!),
-                          width: 72,
-                          height: 72,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Icon(Icons.person, color: Colors.black, size: 36),
-                        ),
-                      )
-                    : Icon(Icons.person, color: Colors.black, size: 36),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: _buildProfileAvatar(appState, 72, 36),
+                ),
               ),
               const SizedBox(width: 18),
               Expanded(
@@ -503,26 +495,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         width: 100,
                         height: 100,
                         decoration: BoxDecoration(
-                          gradient: appState.profilePhotoPath == null
+                          gradient: (appState.profilePhotoPath == null && appState.avatarUrl == null)
                               ? const LinearGradient(colors: [AppColors.yellow, AppColors.yellow2])
                               : null,
                           borderRadius: BorderRadius.circular(28),
-                          border: appState.profilePhotoPath != null
+                          border: (appState.profilePhotoPath != null || appState.avatarUrl != null)
                               ? Border.all(color: AppColors.yellow, width: 3)
                               : null,
                         ),
-                        child: appState.profilePhotoPath != null
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(25),
-                                child: Image.file(
-                                  File(appState.profilePhotoPath!),
-                                  width: 100,
-                                  height: 100,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Icon(Icons.person, color: Colors.black, size: 50),
-                                ),
-                              )
-                            : Icon(Icons.person, color: Colors.black, size: 50),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(25),
+                          child: _buildProfileAvatar(appState, 100, 50),
+                        ),
                       ),
                       Positioned(
                         bottom: 0,
@@ -774,6 +758,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildProfileAvatar(AppState appState, double size, double iconSize) {
+    // Priority: avatarUrl (cloud) > profilePhotoPath (local) > icon
+    if (appState.avatarUrl != null && appState.avatarUrl!.isNotEmpty) {
+      return Image.network(
+        appState.avatarUrl!,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) {
+          // Fall back to local file or icon
+          if (appState.profilePhotoPath != null) {
+            return Image.file(
+              File(appState.profilePhotoPath!),
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Icon(Icons.person, color: Colors.black, size: iconSize),
+            );
+          }
+          return Icon(Icons.person, color: Colors.black, size: iconSize);
+        },
+      );
+    } else if (appState.profilePhotoPath != null) {
+      return Image.file(
+        File(appState.profilePhotoPath!),
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Icon(Icons.person, color: Colors.black, size: iconSize),
+      );
+    }
+    return Icon(Icons.person, color: Colors.black, size: iconSize);
   }
 
   void _showSavedPlaces(BuildContext context) {
@@ -1918,7 +1936,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ]);
   }
 
-  void _showFAQs(BuildContext context) {
+  void _showFAQs(BuildContext context) async {
+    List<Map<String, dynamic>> faqs = [];
+    try {
+      final data = await SupabaseService.client
+          .from('help_content')
+          .select()
+          .eq('app_type', 'customer')
+          .eq('content_type', 'faq')
+          .eq('is_active', true)
+          .order('sort_order');
+      faqs = List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('Error loading FAQs: $e');
+    }
+
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1938,13 +1972,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
-                  children: [
-                    _buildFAQItem('How do I book a ride?', 'Open the app, enter your destination, and tap "Book Ride". A driver will be automatically assigned.'),
-                    _buildFAQItem('Is the service free?', 'Yes! MyRide is a free staff transportation service provided by your organization.'),
-                    _buildFAQItem('How do I cancel a ride?', 'You can cancel before the driver arrives by tapping "Cancel" on the tracking screen.'),
-                    _buildFAQItem('What if I left something in the car?', 'Contact support immediately through the app or call our helpline.'),
-                    _buildFAQItem('How do I rate my driver?', 'After each trip, you will be prompted to rate your experience.'),
-                  ],
+                  children: faqs.isEmpty
+                      ? [
+                          _buildFAQItem('How do I book a ride?', 'Open the app, enter your destination, and tap "Book Ride". A driver will be automatically assigned.'),
+                          _buildFAQItem('Is the service free?', 'Yes! MyRide is a free staff transportation service provided by your organization.'),
+                          _buildFAQItem('How do I cancel a ride?', 'You can cancel before the driver arrives by tapping "Cancel" on the tracking screen.'),
+                        ]
+                      : faqs.map((faq) => _buildFAQItem(faq['title'] ?? '', faq['subtitle'] ?? '')).toList(),
                 ),
               ),
             ),

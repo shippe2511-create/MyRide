@@ -34,9 +34,9 @@ interface Zone {
 interface Location {
   id: string
   name: string
-  address: string
-  latitude: number
-  longitude: number
+  address: string | null
+  latitude: number | null
+  longitude: number | null
   location_type: string
   is_active: boolean
 }
@@ -106,15 +106,20 @@ export default function ZonesPage() {
     if (selectedItem) {
       const { error } = await supabase.from("service_zones").update(payload).eq("id", selectedItem.id)
       if (error) toast.error("Failed to update zone")
-      else toast.success("Zone updated")
+      else {
+        toast.success("Zone updated")
+        setZones(prev => prev.map(z => z.id === selectedItem.id ? { ...z, ...payload } : z))
+      }
     } else {
-      const { error } = await supabase.from("service_zones").insert(payload)
+      const { data, error } = await supabase.from("service_zones").insert(payload).select().single()
       if (error) toast.error("Failed to create zone: " + error.message)
-      else toast.success("Zone created")
+      else {
+        toast.success("Zone created")
+        if (data) setZones(prev => [...prev, data])
+      }
     }
     setSaving(false)
     setDialogType(null)
-    loadData()
   }
 
   const handleSaveLocation = async () => {
@@ -150,15 +155,20 @@ export default function ZonesPage() {
     if (selectedItem) {
       const { error } = await supabase.from("locations").update(payload).eq("id", selectedItem.id)
       if (error) toast.error("Failed to update location")
-      else toast.success("Location updated")
+      else {
+        toast.success("Location updated")
+        setLocations(prev => prev.map(l => l.id === selectedItem.id ? { ...l, ...payload } : l))
+      }
     } else {
-      const { error } = await supabase.from("locations").insert(payload)
+      const { data, error } = await supabase.from("locations").insert(payload).select().single()
       if (error) toast.error("Failed to create location: " + error.message)
-      else toast.success("Location created")
+      else {
+        toast.success("Location created")
+        if (data) setLocations(prev => [...prev, data])
+      }
     }
     setSaving(false)
     setDialogType(null)
-    loadData()
   }
 
   const handleDeleteZone = async (e?: React.MouseEvent) => {
@@ -169,9 +179,11 @@ export default function ZonesPage() {
     setSaving(true)
     const { error } = await supabase.from("service_zones").delete().eq("id", itemToDelete.id)
     if (error) toast.error("Failed to delete zone")
-    else toast.success("Zone deleted")
+    else {
+      toast.success("Zone deleted")
+      setZones(prev => prev.filter(z => z.id !== itemToDelete.id))
+    }
     setSaving(false)
-    loadData()
   }
 
   const handleDeleteLocation = async (e?: React.MouseEvent) => {
@@ -182,9 +194,11 @@ export default function ZonesPage() {
     setSaving(true)
     const { error } = await supabase.from("locations").delete().eq("id", itemToDelete.id)
     if (error) toast.error("Failed to delete location")
-    else toast.success("Location deleted")
+    else {
+      toast.success("Location deleted")
+      setLocations(prev => prev.filter(l => l.id !== itemToDelete.id))
+    }
     setSaving(false)
-    loadData()
   }
 
   if (loading) {

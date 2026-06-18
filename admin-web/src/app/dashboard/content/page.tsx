@@ -24,6 +24,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { ImagePicker } from "@/components/ui/image-picker"
 import { ComboboxInput } from "@/components/ui/combobox-input"
 import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Bell, Pin, Users, FileText, Megaphone, Calendar } from "lucide-react"
+import { SkeletonTable } from "@/components/ui/skeleton-card"
 
 const STAFF_CATEGORIES = [
   { value: "news", label: "News" },
@@ -294,8 +295,15 @@ export default function ContentPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="space-y-6">
+        <div>
+          <div className="w-56 h-9 bg-muted rounded animate-pulse" />
+          <div className="w-80 h-4 bg-muted rounded animate-pulse mt-2" />
+        </div>
+        <div className="flex gap-2">
+          {[1, 2, 3].map(i => <div key={i} className="w-32 h-9 bg-muted rounded animate-pulse" />)}
+        </div>
+        <SkeletonTable rows={5} />
       </div>
     )
   }
@@ -309,28 +317,6 @@ export default function ContentPage() {
             Manage staff corner, announcements, and notifications
           </p>
         </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Staff Corner
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{staffCorner.filter(s => s.is_active).length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Announcements</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{announcements.filter(a => a.is_active).length}</div>
-          </CardContent>
-        </Card>
       </div>
 
       <Tabs defaultValue="staff">

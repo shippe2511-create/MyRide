@@ -14,6 +14,7 @@ import {
 import {
   MessageSquare, Search, User, Car, Clock, MapPin, Loader2, RefreshCw, ChevronRight
 } from "lucide-react"
+import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 
 interface ChatMessage {
   id: string
@@ -249,8 +250,15 @@ export default function ChatPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="space-y-6">
+        <div>
+          <div className="w-48 h-9 bg-muted rounded animate-pulse" />
+          <div className="w-80 h-4 bg-muted rounded animate-pulse mt-2" />
+        </div>
+        <div className="grid gap-4 grid-cols-4">
+          {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
+        </div>
+        <SkeletonTable rows={5} />
       </div>
     )
   }
@@ -274,45 +282,59 @@ export default function ChatPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Conversations
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{stats.totalConversations}</div>
-          </CardContent>
+        <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2 rounded-lg bg-slate-500/20">
+                <MessageSquare className="h-4 w-4 text-slate-400" />
+              </div>
+              <span className="text-xs font-medium text-slate-400 bg-slate-500/10 px-2 py-1 rounded-full">all</span>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight">{stats.totalConversations}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Total Conversations</p>
+            </div>
+          </div>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Active Rides
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-500">{stats.activeConversations}</div>
-          </CardContent>
+        <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2 rounded-lg bg-green-500/20">
+                <Car className="h-4 w-4 text-green-500" />
+              </div>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-green-500">{stats.activeConversations}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Active Rides</p>
+            </div>
+          </div>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Messages
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{stats.totalMessages}</div>
-          </CardContent>
+        <Card className="p-5 bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2 rounded-lg bg-purple-500/20">
+                <MessageSquare className="h-4 w-4 text-purple-500" />
+              </div>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-purple-500">{stats.totalMessages}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Total Messages</p>
+            </div>
+          </div>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Today&apos;s Messages
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-blue-500">{stats.todayMessages}</div>
-          </CardContent>
+        <Card className="p-5 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2 rounded-lg bg-blue-500/20">
+                <Clock className="h-4 w-4 text-blue-500" />
+              </div>
+              <span className="text-xs font-medium text-blue-500 bg-blue-500/10 px-2 py-1 rounded-full">today</span>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-blue-500">{stats.todayMessages}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Today&apos;s Messages</p>
+            </div>
+          </div>
         </Card>
       </div>
 

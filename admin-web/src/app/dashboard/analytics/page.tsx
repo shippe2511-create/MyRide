@@ -18,6 +18,7 @@ import {
   Calendar, Activity, Target, Award, Zap
 } from "lucide-react"
 import { Breadcrumbs } from "@/components/breadcrumbs"
+import { SkeletonCard, SkeletonChart } from "@/components/ui/skeleton-card"
 
 interface Ride {
   id: string
@@ -256,8 +257,19 @@ export default function AnalyticsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="space-y-6">
+        <Breadcrumbs />
+        <div>
+          <div className="w-32 h-8 bg-muted rounded animate-pulse" />
+          <div className="w-64 h-4 bg-muted rounded animate-pulse mt-2" />
+        </div>
+        <div className="grid gap-4 grid-cols-5">
+          {[1, 2, 3, 4, 5].map(i => <SkeletonCard key={i} />)}
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <SkeletonChart />
+          <SkeletonChart />
+        </div>
       </div>
     )
   }

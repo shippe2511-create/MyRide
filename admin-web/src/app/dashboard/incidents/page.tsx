@@ -361,37 +361,6 @@ export default function IncidentsPage() {
         }}
       />
 
-      <div className="grid grid-cols-4 gap-4">
-        <div className="rounded-lg border bg-card p-4">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-red-500" />
-            <span className="text-sm text-muted-foreground">Open</span>
-          </div>
-          <p className="mt-2 text-2xl font-bold">{incidents.filter(i => i.status === "open").length}</p>
-        </div>
-        <div className="rounded-lg border bg-card p-4">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-yellow-500" />
-            <span className="text-sm text-muted-foreground">Investigating</span>
-          </div>
-          <p className="mt-2 text-2xl font-bold">{incidents.filter(i => i.status === "investigating").length}</p>
-        </div>
-        <div className="rounded-lg border bg-card p-4">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-green-500" />
-            <span className="text-sm text-muted-foreground">Resolved</span>
-          </div>
-          <p className="mt-2 text-2xl font-bold">{incidents.filter(i => i.status === "resolved").length}</p>
-        </div>
-        <div className="rounded-lg border bg-card p-4">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-orange-500" />
-            <span className="text-sm text-muted-foreground">High Severity</span>
-          </div>
-          <p className="mt-2 text-2xl font-bold">{incidents.filter(i => i.severity === "high").length}</p>
-        </div>
-      </div>
-
       <div className="rounded-lg border bg-card">
         <Table>
           <TableHeader>

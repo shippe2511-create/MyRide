@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Radio, Car, Users, MapPin, Phone, RefreshCw, Loader2, Navigation
 } from "lucide-react"
+import { SkeletonCard } from "@/components/ui/skeleton-card"
 
 const LiveDriverMap = dynamic(
   () => import("@/components/live-driver-map").then(mod => mod.LiveDriverMap),
@@ -87,8 +88,15 @@ export default function TrackingPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="space-y-4">
+        <div>
+          <div className="w-36 h-8 bg-muted rounded animate-pulse" />
+          <div className="w-48 h-4 bg-muted rounded animate-pulse mt-2" />
+        </div>
+        <div className="grid gap-3 grid-cols-2">
+          {[1, 2].map(i => <SkeletonCard key={i} />)}
+        </div>
+        <div className="h-96 bg-muted rounded-lg animate-pulse" />
       </div>
     )
   }

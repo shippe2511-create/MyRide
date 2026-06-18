@@ -21,6 +21,8 @@ import {
 import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Map } from "lucide-react"
 import { formatDate } from "@/lib/utils"
 import { toast } from "sonner"
+import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
+import { EmptyState } from "@/components/ui/empty-state"
 
 interface Zone {
   id: string
@@ -203,8 +205,15 @@ export default function ZonesPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="space-y-6">
+        <div>
+          <div className="w-40 h-9 bg-muted rounded animate-pulse" />
+          <div className="w-72 h-4 bg-muted rounded animate-pulse mt-2" />
+        </div>
+        <div className="grid gap-4 grid-cols-3">
+          {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+        </div>
+        <SkeletonTable rows={5} />
       </div>
     )
   }

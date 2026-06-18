@@ -22,6 +22,8 @@ import {
 import {
   AlertTriangle, Phone, MapPin, Clock, CheckCircle, XCircle, Loader2, RefreshCw, Shield, MoreVertical, Edit, Trash2, Plus, GripVertical, Flame, Heart, Building, Save
 } from "lucide-react"
+import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
+import { EmptyState } from "@/components/ui/empty-state"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import {
@@ -380,8 +382,15 @@ export default function SOSPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="space-y-6">
+        <div>
+          <div className="w-32 h-8 bg-muted rounded animate-pulse" />
+          <div className="w-48 h-4 bg-muted rounded animate-pulse mt-2" />
+        </div>
+        <div className="grid gap-4 grid-cols-3">
+          {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+        </div>
+        <SkeletonTable rows={5} />
       </div>
     )
   }

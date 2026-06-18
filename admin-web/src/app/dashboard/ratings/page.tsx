@@ -18,6 +18,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { Star, Search, TrendingUp, TrendingDown, AlertTriangle, Loader2, Car, Phone, MapPin, Calendar, CheckCircle2, XCircle, Clock, Award, Zap, Target, Activity, Trophy, Medal, Crown } from "lucide-react"
+import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
+import { EmptyState } from "@/components/ui/empty-state"
 import { formatDate } from "@/lib/utils"
 
 // Circular Progress Component
@@ -457,8 +459,15 @@ export default function RatingsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="space-y-6">
+        <div>
+          <div className="w-40 h-9 bg-muted rounded animate-pulse" />
+          <div className="w-72 h-4 bg-muted rounded animate-pulse mt-2" />
+        </div>
+        <div className="grid gap-4 grid-cols-4">
+          {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
+        </div>
+        <SkeletonTable rows={6} />
       </div>
     )
   }

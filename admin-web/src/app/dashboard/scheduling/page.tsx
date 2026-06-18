@@ -28,6 +28,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
+import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
+import { EmptyState } from "@/components/ui/empty-state"
 
 interface TransportRoute {
   id: string
@@ -202,8 +204,15 @@ export default function SchedulingPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="space-y-6">
+        <div>
+          <div className="w-32 h-8 bg-muted rounded animate-pulse" />
+          <div className="w-64 h-4 bg-muted rounded animate-pulse mt-2" />
+        </div>
+        <div className="grid gap-4 grid-cols-2">
+          {[1, 2].map(i => <SkeletonCard key={i} />)}
+        </div>
+        <SkeletonTable rows={5} />
       </div>
     )
   }

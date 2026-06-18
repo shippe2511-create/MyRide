@@ -50,6 +50,9 @@ import {
   FileWarning,
 } from "lucide-react"
 import { Card } from "@/components/ui/card"
+import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
+import { EmptyState } from "@/components/ui/empty-state"
+import { FilterPills } from "@/components/ui/filter-pills"
 
 interface Incident {
   id: string
@@ -212,6 +215,22 @@ export default function IncidentsPage() {
     })
   }
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Breadcrumbs />
+        <div>
+          <div className="w-48 h-8 bg-muted rounded animate-pulse" />
+          <div className="w-64 h-4 bg-muted rounded animate-pulse mt-2" />
+        </div>
+        <div className="grid gap-4 grid-cols-4">
+          {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
+        </div>
+        <SkeletonTable rows={5} />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <Breadcrumbs />
@@ -327,6 +346,21 @@ export default function IncidentsPage() {
         </Select>
       </div>
 
+      <FilterPills
+        filters={[
+          ...(statusFilter !== "all" ? [{ key: "status", label: "Status", value: statusFilter }] : []),
+          ...(severityFilter !== "all" ? [{ key: "severity", label: "Severity", value: severityFilter }] : []),
+        ]}
+        onRemove={(key) => {
+          if (key === "status") setStatusFilter("all")
+          if (key === "severity") setSeverityFilter("all")
+        }}
+        onClearAll={() => {
+          setStatusFilter("all")
+          setSeverityFilter("all")
+        }}
+      />
+
       <div className="grid grid-cols-4 gap-4">
         <div className="rounded-lg border bg-card p-4">
           <div className="flex items-center gap-2">
@@ -372,16 +406,14 @@ export default function IncidentsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? (
+            {filteredIncidents.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                  Loading...
-                </TableCell>
-              </TableRow>
-            ) : filteredIncidents.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                  No incidents found
+                <TableCell colSpan={7} className="py-16">
+                  <EmptyState
+                    icon="incidents"
+                    title="No incidents found"
+                    description={statusFilter !== "all" || severityFilter !== "all" ? "Try adjusting your filters" : "Incidents will appear here when reported"}
+                  />
                 </TableCell>
               </TableRow>
             ) : (

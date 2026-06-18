@@ -26,6 +26,8 @@ import {
 import { Fuel, Loader2, MoreVertical, Edit, Trash2, Plus, Wrench, Sparkles, Car, Filter, TrendingUp, TrendingDown, Calendar, DollarSign, Users } from "lucide-react"
 import { toast } from "sonner"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
+import { SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/skeleton-card"
+import { EmptyState } from "@/components/ui/empty-state"
 
 interface VehicleLog {
   id: string
@@ -261,8 +263,19 @@ export default function VehicleLogsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="space-y-6">
+        <div>
+          <div className="w-36 h-8 bg-muted rounded animate-pulse" />
+          <div className="w-64 h-4 bg-muted rounded animate-pulse mt-2" />
+        </div>
+        <div className="grid gap-4 grid-cols-4">
+          {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <SkeletonChart />
+          <SkeletonChart />
+        </div>
+        <SkeletonTable rows={5} />
       </div>
     )
   }

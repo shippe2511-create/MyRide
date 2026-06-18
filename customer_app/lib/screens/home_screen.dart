@@ -371,10 +371,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           HapticFeedback.mediumImpact();
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const SearchScreen()),
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) => const SearchScreen(),
+              transitionDuration: const Duration(milliseconds: 300),
+              reverseTransitionDuration: const Duration(milliseconds: 250),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                final curve = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+                return FadeTransition(
+                  opacity: curve,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.05),
+                      end: Offset.zero,
+                    ).animate(curve),
+                    child: child,
+                  ),
+                );
+              },
+            ),
           );
         },
-        child: Container(
+        child: Hero(
+          tag: 'search_bar',
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: context.surfaceColor,
@@ -447,6 +468,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ),
             ],
+          ),
+            ),
           ),
         ),
       ),

@@ -473,43 +473,73 @@ export default function RatingsPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Reviews</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{totalReviews}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Average Rating</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <div className="text-3xl font-bold">{overallAvg}</div>
-              <Star className="h-6 w-6 fill-yellow-400 text-yellow-400" />
+        <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-slate-500/20">
+                <Activity className="h-5 w-5 text-slate-400" />
+              </div>
+              <span className="text-xs font-medium text-slate-400 bg-slate-500/10 px-2 py-1 rounded-full">
+                all time
+              </span>
             </div>
-          </CardContent>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight">{totalReviews}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Total Reviews</p>
+            </div>
+          </div>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Top Drivers (4.5+)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-500">{topDrivers}</div>
-          </CardContent>
+        <Card className="p-5 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-yellow-500/20">
+                <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
+              </div>
+              <div className="flex">
+                {[1, 2, 3, 4, 5].map(i => (
+                  <Star key={i} className={`h-3 w-3 ${i <= Math.round(parseFloat(overallAvg)) ? 'text-yellow-500 fill-yellow-500' : 'text-muted'}`} />
+                ))}
+              </div>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-yellow-500">{overallAvg}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Average Rating</p>
+            </div>
+          </div>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-              Low Rated (&lt;3)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-red-500">{lowRatedDrivers}</div>
-          </CardContent>
+        <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-green-500/20">
+                <Trophy className="h-5 w-5 text-green-500" />
+              </div>
+              <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-1 rounded-full">
+                4.5+
+              </span>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-green-500">{topDrivers}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Top Drivers</p>
+            </div>
+          </div>
+        </Card>
+        <Card className={`p-5 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20 ${lowRatedDrivers > 0 ? 'ring-2 ring-red-500/50' : ''}`}>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-red-500/20">
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+              </div>
+              {lowRatedDrivers > 0 && (
+                <span className="text-xs font-medium text-red-500 bg-red-500/10 px-2 py-1 rounded-full animate-pulse">
+                  needs attention
+                </span>
+              )}
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-red-500">{lowRatedDrivers}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Low Rated (&lt;3)</p>
+            </div>
+          </div>
         </Card>
       </div>
 

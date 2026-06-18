@@ -227,50 +227,66 @@ export default function IncidentsPage() {
       </div>
 
       {/* Status Cards */}
-      <div className="grid gap-3 grid-cols-4">
-        <Card className={`p-4 ${incidents.filter(i => i.status === "open").length > 0 ? "border-red-500" : ""}`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${incidents.filter(i => i.status === "open").length > 0 ? "bg-red-500/10" : "bg-muted"}`}>
-              <AlertTriangle className={`h-5 w-5 ${incidents.filter(i => i.status === "open").length > 0 ? "text-red-500" : ""}`} />
+      <div className="grid gap-4 grid-cols-4">
+        <Card className={`p-5 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20 ${incidents.filter(i => i.status === "open").length > 0 ? 'ring-2 ring-red-500/50' : ''}`}>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-red-500/20">
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+              </div>
+              {incidents.filter(i => i.status === "open").length > 0 && (
+                <span className="text-xs font-medium text-red-500 bg-red-500/10 px-2 py-1 rounded-full animate-pulse">
+                  urgent
+                </span>
+              )}
             </div>
-            <div>
-              <p className={`text-2xl font-bold ${incidents.filter(i => i.status === "open").length > 0 ? "text-red-500" : ""}`}>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-red-500">
                 {incidents.filter(i => i.status === "open").length}
               </p>
-              <p className="text-xs text-muted-foreground">Open</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Open</p>
             </div>
           </div>
         </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-yellow-500/10">
-              <Clock className="h-5 w-5 text-yellow-500" />
+        <Card className="p-5 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-yellow-500/20">
+                <Clock className="h-5 w-5 text-yellow-500" />
+              </div>
+              <span className="text-xs font-medium text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded-full">
+                active
+              </span>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-yellow-500">{incidents.filter(i => i.status === "investigating").length}</p>
-              <p className="text-xs text-muted-foreground">Investigating</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-500/10">
-              <CheckCircle className="h-5 w-5 text-green-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-green-500">{incidents.filter(i => i.status === "resolved").length}</p>
-              <p className="text-xs text-muted-foreground">Resolved</p>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-yellow-500">{incidents.filter(i => i.status === "investigating").length}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Investigating</p>
             </div>
           </div>
         </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-muted">
-              <XCircle className="h-5 w-5 text-muted-foreground" />
+        <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-green-500/20">
+                <CheckCircle className="h-5 w-5 text-green-500" />
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold">{incidents.filter(i => i.status === "closed").length}</p>
-              <p className="text-xs text-muted-foreground">Closed</p>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-green-500">{incidents.filter(i => i.status === "resolved").length}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Resolved</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-slate-500/20">
+                <XCircle className="h-5 w-5 text-slate-400" />
+              </div>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight">{incidents.filter(i => i.status === "closed").length}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Closed</p>
             </div>
           </div>
         </Card>

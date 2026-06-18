@@ -193,37 +193,52 @@ export default function RidesPage() {
         </Button>
       </div>
 
-      <div className="grid gap-3 grid-cols-3">
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-muted">
-              <MapPin className="h-5 w-5" />
+      <div className="grid gap-4 grid-cols-3">
+        <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-slate-500/20">
+                <MapPin className="h-5 w-5 text-slate-400" />
+              </div>
+              <span className="text-xs font-medium text-slate-400 bg-slate-500/10 px-2 py-1 rounded-full">
+                all time
+              </span>
             </div>
-            <div>
-              <p className="text-2xl font-bold">{stats.total}</p>
-              <p className="text-xs text-muted-foreground">Total Rides</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/10">
-              <Clock className="h-5 w-5 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-blue-500">{stats.active}</p>
-              <p className="text-xs text-muted-foreground">Active</p>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight">{stats.total.toLocaleString()}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Total Rides</p>
             </div>
           </div>
         </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-500/10">
-              <CheckCircle className="h-5 w-5 text-green-500" />
+        <Card className="p-5 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-blue-500/20">
+                <Clock className="h-5 w-5 text-blue-500" />
+              </div>
+              <span className="text-xs font-medium text-blue-500 bg-blue-500/10 px-2 py-1 rounded-full">
+                live
+              </span>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-green-500">{stats.completed}</p>
-              <p className="text-xs text-muted-foreground">Completed</p>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-blue-500">{stats.active}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Active</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-green-500/20">
+                <CheckCircle className="h-5 w-5 text-green-500" />
+              </div>
+              <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-1 rounded-full">
+                {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
+              </span>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-green-500">{stats.completed.toLocaleString()}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Completed</p>
             </div>
           </div>
         </Card>

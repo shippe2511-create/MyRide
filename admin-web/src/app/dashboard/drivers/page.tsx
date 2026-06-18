@@ -87,37 +87,54 @@ export default function DriversPage() {
         <p className="text-sm text-muted-foreground">Manage driver accounts and documents</p>
       </div>
 
-      <div className="grid gap-3 grid-cols-3">
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-muted">
-              <Users className="h-5 w-5" />
+      <div className="grid gap-4 grid-cols-3">
+        <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-slate-500/20">
+                <Users className="h-5 w-5 text-slate-400" />
+              </div>
+              <span className="text-xs font-medium text-slate-400 bg-slate-500/10 px-2 py-1 rounded-full">
+                all
+              </span>
             </div>
-            <div>
-              <p className="text-2xl font-bold">{stats.total}</p>
-              <p className="text-xs text-muted-foreground">Total Drivers</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-500/10">
-              <UserCheck className="h-5 w-5 text-green-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-green-500">{stats.active}</p>
-              <p className="text-xs text-muted-foreground">Active</p>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight">{stats.total}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Total Drivers</p>
             </div>
           </div>
         </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-yellow-500/10">
-              <Clock className="h-5 w-5 text-yellow-500" />
+        <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-green-500/20">
+                <UserCheck className="h-5 w-5 text-green-500" />
+              </div>
+              <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-1 rounded-full">
+                {stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0}%
+              </span>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-yellow-500">{stats.pending}</p>
-              <p className="text-xs text-muted-foreground">Pending</p>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-green-500">{stats.active}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Active</p>
+            </div>
+          </div>
+        </Card>
+        <Card className={`p-5 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20 ${stats.pending > 0 ? 'ring-2 ring-yellow-500/50' : ''}`}>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-yellow-500/20">
+                <Clock className="h-5 w-5 text-yellow-500" />
+              </div>
+              {stats.pending > 0 && (
+                <span className="text-xs font-medium text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded-full animate-pulse">
+                  needs review
+                </span>
+              )}
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-yellow-500">{stats.pending}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Pending</p>
             </div>
           </div>
         </Card>

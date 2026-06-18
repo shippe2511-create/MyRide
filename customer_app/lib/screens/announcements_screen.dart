@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 
@@ -13,11 +14,34 @@ class AnnouncementsScreen extends StatefulWidget {
 class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   List<Map<String, dynamic>> _announcements = [];
   bool _isLoading = true;
+  RealtimeChannel? _announcementsSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadAnnouncements();
+    _subscribeToAnnouncements();
+  }
+
+  @override
+  void dispose() {
+    _announcementsSubscription?.unsubscribe();
+    super.dispose();
+  }
+
+  void _subscribeToAnnouncements() {
+    _announcementsSubscription = SupabaseService.client
+        .channel('announcements_realtime')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'announcements',
+          callback: (payload) {
+            debugPrint('Announcement update received: ${payload.eventType}');
+            _loadAnnouncements();
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _loadAnnouncements() async {

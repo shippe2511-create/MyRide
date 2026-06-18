@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
@@ -48,6 +49,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   double? _lastDropoffLat;
   double? _lastDropoffLng;
 
+  RealtimeChannel? _announcementsSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -59,6 +62,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _loadContent();
     _checkForScheduledRides();
     _initNotifications();
+    _subscribeToAnnouncements();
+  }
+
+  void _subscribeToAnnouncements() {
+    _announcementsSubscription = SupabaseService.client
+        .channel('home_announcements_realtime')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'announcements',
+          callback: (payload) {
+            debugPrint('Home: Announcement update received');
+            _loadContent();
+          },
+        )
+        .subscribe();
   }
 
   void _initNotifications() {
@@ -145,6 +164,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _pageController.dispose();
     _pulseController.dispose();
     _scheduledRideTimer?.cancel();
+    _announcementsSubscription?.unsubscribe();
     super.dispose();
   }
 

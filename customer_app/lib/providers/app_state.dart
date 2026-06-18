@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 
 class AppState extends ChangeNotifier {
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
+  RealtimeChannel? _profileSubscription;
 
   AppState() {
     _initializeAll();
@@ -274,8 +276,45 @@ class AppState extends ChangeNotifier {
       loadTripHistory();
       // Fetch latest avatar URL from DB
       _loadAvatarFromDb();
+      // Subscribe to profile updates from admin
+      _subscribeToProfileUpdates();
     }
     notifyListeners();
+  }
+
+  void _subscribeToProfileUpdates() {
+    if (_profileId == null) return;
+
+    _profileSubscription?.unsubscribe();
+    _profileSubscription = SupabaseService.client
+        .channel('customer_profile_$_profileId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'profiles',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: _profileId!,
+          ),
+          callback: (payload) {
+            debugPrint('Profile update received: ${payload.newRecord}');
+            final newRecord = payload.newRecord;
+            if (newRecord != null) {
+              final avatarUrl = newRecord['avatar_url'] as String?;
+              if (avatarUrl != null && avatarUrl.isNotEmpty && avatarUrl != _avatarUrl) {
+                _avatarUrl = avatarUrl;
+                _saveAvatarUrl();
+              }
+              final status = newRecord['status'] as String?;
+              if (status != null) {
+                debugPrint('Profile status changed to: $status');
+              }
+            }
+            notifyListeners();
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _loadAvatarFromDb() async {

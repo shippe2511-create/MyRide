@@ -181,37 +181,54 @@ export default function ChecklistsPage() {
         </Button>
       </div>
 
-      <div className="grid gap-3 grid-cols-3">
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-muted">
-              <ClipboardCheck className="h-5 w-5" />
+      <div className="grid gap-4 grid-cols-3">
+        <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-slate-500/20">
+                <ClipboardCheck className="h-5 w-5 text-slate-400" />
+              </div>
+              <span className="text-xs font-medium text-slate-400 bg-slate-500/10 px-2 py-1 rounded-full">
+                all
+              </span>
             </div>
-            <div>
-              <p className="text-2xl font-bold">{stats.total}</p>
-              <p className="text-xs text-muted-foreground">Total</p>
-            </div>
-          </div>
-        </Card>
-        <Card className={`p-4 ${stats.withIssues > 0 ? "border-red-500" : ""}`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${stats.withIssues > 0 ? "bg-red-500/10" : "bg-muted"}`}>
-              <AlertTriangle className={`h-5 w-5 ${stats.withIssues > 0 ? "text-red-500" : ""}`} />
-            </div>
-            <div>
-              <p className={`text-2xl font-bold ${stats.withIssues > 0 ? "text-red-500" : ""}`}>{stats.withIssues}</p>
-              <p className="text-xs text-muted-foreground">With Issues</p>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight">{stats.total}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Total</p>
             </div>
           </div>
         </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-500/10">
-              <CheckCircle className="h-5 w-5 text-green-500" />
+        <Card className={`p-5 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20 ${stats.withIssues > 0 ? 'ring-2 ring-red-500/50' : ''}`}>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-red-500/20">
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+              </div>
+              {stats.withIssues > 0 && (
+                <span className="text-xs font-medium text-red-500 bg-red-500/10 px-2 py-1 rounded-full">
+                  needs attention
+                </span>
+              )}
             </div>
-            <div>
-              <p className="text-2xl font-bold text-green-500">{stats.passed}</p>
-              <p className="text-xs text-muted-foreground">Passed</p>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-red-500">{stats.withIssues}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">With Issues</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-green-500/20">
+                <CheckCircle className="h-5 w-5 text-green-500" />
+              </div>
+              <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-1 rounded-full">
+                {stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0}%
+              </span>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-green-500">{stats.passed}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Passed</p>
             </div>
           </div>
         </Card>

@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../providers/driver_state.dart';
@@ -18,6 +20,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = true;
   List<Map<String, dynamic>> _documents = [];
+  RealtimeChannel? _documentsSubscription;
 
   // Document types with icons
   final Map<String, IconData> _documentIcons = {
@@ -44,6 +47,36 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   void initState() {
     super.initState();
     _loadDocuments();
+    _subscribeToDocumentUpdates();
+  }
+
+  @override
+  void dispose() {
+    _documentsSubscription?.unsubscribe();
+    super.dispose();
+  }
+
+  void _subscribeToDocumentUpdates() {
+    final driverState = Provider.of<DriverState>(context, listen: false);
+    if (driverState.driverId.isEmpty) return;
+
+    _documentsSubscription = SupabaseService.client
+        .channel('driver_documents_${driverState.driverId}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'driver_documents',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'driver_id',
+            value: driverState.driverId,
+          ),
+          callback: (payload) {
+            debugPrint('Document update received: ${payload.eventType}');
+            _loadDocuments();
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _loadDocuments() async {

@@ -20,7 +20,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
-  AlertTriangle, Phone, MapPin, Clock, CheckCircle, XCircle, Loader2, RefreshCw, Shield, MoreVertical, Edit, Trash2, Plus, GripVertical, Flame, Heart, Building, Save, ChevronUp, ChevronDown
+  AlertTriangle, Phone, MapPin, Clock, CheckCircle, XCircle, Loader2, RefreshCw, Shield, MoreVertical, Edit, Trash2, Plus, GripVertical, Flame, Heart, Building, Save
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -28,6 +28,13 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu"
 import { toast } from "sonner"
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent
+} from "@dnd-kit/core"
+import {
+  arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 
 interface SOSAlert {
   id: string
@@ -47,6 +54,71 @@ const STATUS_COLORS: Record<string, string> = {
   responding: "bg-yellow-500",
   resolved: "bg-green-500",
   false_alarm: "bg-gray-500",
+}
+
+interface ContactIcon {
+  value: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+}
+
+interface SortableContactItemProps {
+  contact: { id: string; name: string; phone: string; icon: string; is_active: boolean }
+  updateContact: (id: string, field: string, value: string | boolean) => void
+  removeContact: (id: string) => void
+  icons: ContactIcon[]
+}
+
+function SortableContactItem({ contact, updateContact, removeContact, icons }: SortableContactItemProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: contact.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-3 p-3 border rounded-lg bg-card">
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
+        <GripVertical className="h-5 w-5 text-muted-foreground" />
+      </div>
+      <Input
+        value={contact.name}
+        onChange={(e) => updateContact(contact.id, "name", e.target.value)}
+        placeholder="Contact name"
+        className="flex-1"
+      />
+      <Input
+        value={contact.phone}
+        onChange={(e) => updateContact(contact.id, "phone", e.target.value)}
+        placeholder="Phone number"
+        className="w-40"
+      />
+      <Select value={contact.icon} onValueChange={(v) => updateContact(contact.id, "icon", v)}>
+        <SelectTrigger className="w-44">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {icons.map(icon => (
+            <SelectItem key={icon.value} value={icon.value}>
+              <div className="flex items-center gap-2">
+                <icon.icon className="h-4 w-4" />
+                {icon.label}
+              </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Switch
+        checked={contact.is_active}
+        onCheckedChange={(v) => updateContact(contact.id, "is_active", v)}
+      />
+      <Button variant="ghost" size="icon" onClick={() => removeContact(contact.id)}>
+        <Trash2 className="h-4 w-4 text-red-500" />
+      </Button>
+    </div>
+  )
 }
 
 export default function SOSPage() {
@@ -193,18 +265,21 @@ export default function SOSPage() {
     setEmergencyContacts(prev => prev.filter(c => c.id !== id))
   }
 
-  const moveContact = (index: number, direction: "up" | "down") => {
-    const newIndex = direction === "up" ? index - 1 : index + 1
-    if (newIndex < 0 || newIndex >= emergencyContacts.length) return
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
 
-    setEmergencyContacts(prev => {
-      const updated = [...prev]
-      const temp = updated[index]
-      updated[index] = updated[newIndex]
-      updated[newIndex] = temp
-      // Update sort_order
-      return updated.map((c, i) => ({ ...c, sort_order: i }))
-    })
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (over && active.id !== over.id) {
+      setEmergencyContacts(prev => {
+        const oldIndex = prev.findIndex(c => c.id === active.id)
+        const newIndex = prev.findIndex(c => c.id === over.id)
+        const reordered = arrayMove(prev, oldIndex, newIndex)
+        return reordered.map((c, i) => ({ ...c, sort_order: i }))
+      })
+    }
   }
 
   const saveEmergencyContacts = async () => {
@@ -332,37 +407,53 @@ export default function SOSPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 grid-cols-3">
-        <Card className={`p-4 ${stats.active > 0 ? "border-red-500" : ""}`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${stats.active > 0 ? "bg-red-500/10" : "bg-muted"}`}>
-              <AlertTriangle className={`h-5 w-5 ${stats.active > 0 ? "text-red-500 animate-pulse" : ""}`} />
+      <div className="grid gap-4 grid-cols-3">
+        <Card className={`p-5 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20 ${stats.active > 0 ? 'ring-2 ring-red-500/50' : ''}`}>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-red-500/20">
+                <AlertTriangle className={`h-5 w-5 text-red-500 ${stats.active > 0 ? 'animate-pulse' : ''}`} />
+              </div>
+              {stats.active > 0 && (
+                <span className="text-xs font-medium text-red-500 bg-red-500/10 px-2 py-1 rounded-full animate-pulse">
+                  EMERGENCY
+                </span>
+              )}
             </div>
-            <div>
-              <p className={`text-2xl font-bold ${stats.active > 0 ? "text-red-500" : ""}`}>{stats.active}</p>
-              <p className="text-xs text-muted-foreground">Active</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-yellow-500/10">
-              <Clock className="h-5 w-5 text-yellow-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-yellow-500">{stats.responding}</p>
-              <p className="text-xs text-muted-foreground">Responding</p>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-red-500">{stats.active}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Active</p>
             </div>
           </div>
         </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-500/10">
-              <CheckCircle className="h-5 w-5 text-green-500" />
+        <Card className="p-5 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-yellow-500/20">
+                <Clock className="h-5 w-5 text-yellow-500" />
+              </div>
+              {stats.responding > 0 && (
+                <span className="text-xs font-medium text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded-full">
+                  in progress
+                </span>
+              )}
             </div>
-            <div>
-              <p className="text-2xl font-bold text-green-500">{stats.resolved}</p>
-              <p className="text-xs text-muted-foreground">Resolved</p>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-yellow-500">{stats.responding}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Responding</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-green-500/20">
+                <CheckCircle className="h-5 w-5 text-green-500" />
+              </div>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-green-500">{stats.resolved}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Resolved</p>
             </div>
           </div>
         </Card>
@@ -498,69 +589,24 @@ export default function SOSPage() {
           </div>
         </div>
 
-        <div className="space-y-3">
-          {emergencyContacts.map((contact, index) => (
-            <div key={contact.id} className="flex items-center gap-3 p-3 border rounded-lg">
-              <div className="flex flex-col">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={() => moveContact(index, "up")}
-                  disabled={index === 0}
-                >
-                  <ChevronUp className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={() => moveContact(index, "down")}
-                  disabled={index === emergencyContacts.length - 1}
-                >
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </div>
-              <Input
-                value={contact.name}
-                onChange={(e) => updateContact(contact.id, "name", e.target.value)}
-                placeholder="Contact name"
-                className="flex-1"
-              />
-              <Input
-                value={contact.phone}
-                onChange={(e) => updateContact(contact.id, "phone", e.target.value)}
-                placeholder="Phone number"
-                className="w-40"
-              />
-              <Select value={contact.icon} onValueChange={(v) => updateContact(contact.id, "icon", v)}>
-                <SelectTrigger className="w-44">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CONTACT_ICONS.map(icon => (
-                    <SelectItem key={icon.value} value={icon.value}>
-                      <div className="flex items-center gap-2">
-                        <icon.icon className="h-4 w-4" />
-                        {icon.label}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Switch
-                checked={contact.is_active}
-                onCheckedChange={(v) => updateContact(contact.id, "is_active", v)}
-              />
-              <Button variant="ghost" size="icon" onClick={() => removeContact(contact.id)}>
-                <Trash2 className="h-4 w-4 text-red-500" />
-              </Button>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={emergencyContacts.map(c => c.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-3">
+              {emergencyContacts.map((contact) => (
+                <SortableContactItem
+                  key={contact.id}
+                  contact={contact}
+                  updateContact={updateContact}
+                  removeContact={removeContact}
+                  icons={CONTACT_ICONS}
+                />
+              ))}
+              {emergencyContacts.length === 0 && (
+                <p className="text-center py-8 text-muted-foreground">No emergency contacts configured</p>
+              )}
             </div>
-          ))}
-          {emergencyContacts.length === 0 && (
-            <p className="text-center py-8 text-muted-foreground">No emergency contacts configured</p>
-          )}
-        </div>
+          </SortableContext>
+        </DndContext>
       </Card>
 
       <Dialog open={!!selectedAlert} onOpenChange={() => setSelectedAlert(null)}>

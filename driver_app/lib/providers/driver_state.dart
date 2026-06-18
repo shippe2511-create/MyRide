@@ -47,6 +47,7 @@ class DriverState extends ChangeNotifier {
   DateTime? _shiftEndTime;
   Timer? _locationTimer;
   RealtimeChannel? _rideSubscription;
+  RealtimeChannel? _driverProfileSubscription;
 
   // Default location (Maldives)
   double _currentLat = 4.1755;
@@ -606,6 +607,39 @@ class DriverState extends ChangeNotifier {
 
     // Subscribe to ride cancellations/updates
     _subscribeToRideCancellations();
+
+    // Subscribe to driver profile updates (status changes from admin)
+    _subscribeToDriverProfile();
+  }
+
+  void _subscribeToDriverProfile() {
+    if (_driverId.isEmpty) return;
+
+    _driverProfileSubscription?.unsubscribe();
+    _driverProfileSubscription = Supabase.instance.client
+        .channel('driver_profile_$_driverId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'drivers',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: _driverId,
+          ),
+          callback: (payload) {
+            debugPrint('Driver profile update received: ${payload.newRecord}');
+            final newRecord = payload.newRecord;
+            if (newRecord != null) {
+              final status = newRecord['status'] as String?;
+              if (status != null && status != 'approved') {
+                debugPrint('Driver status changed to: $status');
+              }
+            }
+            notifyListeners();
+          },
+        )
+        .subscribe();
   }
 
   void _subscribeToRideCancellations() {
@@ -730,6 +764,8 @@ class DriverState extends ChangeNotifier {
     _rideSubscription = null;
     _rideCancellationSubscription?.unsubscribe();
     _rideCancellationSubscription = null;
+    _driverProfileSubscription?.unsubscribe();
+    _driverProfileSubscription = null;
   }
 
   void endShift() {

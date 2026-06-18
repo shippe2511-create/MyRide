@@ -23,8 +23,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Fuel, Loader2, MoreVertical, Edit, Trash2, Plus, Wrench, Sparkles, Car, Filter } from "lucide-react"
+import { Fuel, Loader2, MoreVertical, Edit, Trash2, Plus, Wrench, Sparkles, Car, Filter, TrendingUp, TrendingDown, Calendar, DollarSign, Users } from "lucide-react"
 import { toast } from "sonner"
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 
 interface VehicleLog {
   id: string
@@ -67,6 +68,78 @@ export default function VehicleLogsPage() {
     notes: "",
     log_date: new Date().toISOString().split("T")[0],
   })
+
+  // Calculate stats
+  const stats = LOG_TYPES.map(type => {
+    const typeLogs = logs.filter(l => l.log_type === type.value)
+    const total = typeLogs.reduce((sum, l) => sum + (l.amount || 0), 0)
+    return {
+      ...type,
+      count: typeLogs.length,
+      total,
+    }
+  })
+
+  const totalSpent = logs.reduce((sum, l) => sum + (l.amount || 0), 0)
+
+  // This month stats
+  const now = new Date()
+  const thisMonthLogs = logs.filter(l => {
+    const logDate = new Date(l.log_date)
+    return logDate.getMonth() === now.getMonth() && logDate.getFullYear() === now.getFullYear()
+  })
+  const thisMonthSpent = thisMonthLogs.reduce((sum, l) => sum + (l.amount || 0), 0)
+
+  // Last month stats for comparison
+  const lastMonthLogs = logs.filter(l => {
+    const logDate = new Date(l.log_date)
+    const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1
+    const lastMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
+    return logDate.getMonth() === lastMonth && logDate.getFullYear() === lastMonthYear
+  })
+  const lastMonthSpent = lastMonthLogs.reduce((sum, l) => sum + (l.amount || 0), 0)
+  const monthOverMonthChange = lastMonthSpent > 0 ? ((thisMonthSpent - lastMonthSpent) / lastMonthSpent * 100) : 0
+
+  // Average per log
+  const avgPerLog = logs.length > 0 ? totalSpent / logs.length : 0
+
+  // Top spending driver
+  const driverSpending: { [name: string]: number } = {}
+  logs.forEach(log => {
+    const name = log.driver?.profile?.full_name || "Unknown"
+    driverSpending[name] = (driverSpending[name] || 0) + (log.amount || 0)
+  })
+  const topDrivers = Object.entries(driverSpending)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+
+  // Monthly chart data (last 6 months)
+  const getMonthlyData = () => {
+    const months: { [key: string]: { [type: string]: number } } = {}
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const key = d.toLocaleDateString("en-US", { month: "short" })
+      months[key] = {}
+      LOG_TYPES.forEach(t => months[key][t.value] = 0)
+    }
+
+    logs.forEach(log => {
+      const logDate = new Date(log.log_date)
+      const monthKey = logDate.toLocaleDateString("en-US", { month: "short" })
+      if (months[monthKey] && log.amount) {
+        months[monthKey][log.log_type] = (months[monthKey][log.log_type] || 0) + log.amount
+      }
+    })
+
+    return Object.entries(months).map(([month, data]) => ({
+      month,
+      ...data,
+      total: Object.values(data).reduce((a, b) => a + b, 0),
+    }))
+  }
+
+  const monthlyData = getMonthlyData()
 
   useEffect(() => {
     loadLogs()
@@ -204,6 +277,202 @@ export default function VehicleLogsPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Fuel, maintenance, and repair records</p>
         </div>
+      </div>
+
+      {/* Summary Stats Row */}
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-slate-500/20">
+                <DollarSign className="h-5 w-5 text-slate-400" />
+              </div>
+              <span className="text-xs font-medium text-slate-400 bg-slate-500/10 px-2 py-1 rounded-full">
+                {logs.length} logs
+              </span>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight">MVR {totalSpent.toLocaleString()}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Total Spent</p>
+            </div>
+          </div>
+        </Card>
+        <Card className={`p-5 bg-gradient-to-br ${monthOverMonthChange >= 0 ? 'from-red-500/10 to-red-600/5 border-red-500/20' : 'from-green-500/10 to-green-600/5 border-green-500/20'}`}>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className={`p-2.5 rounded-xl ${monthOverMonthChange >= 0 ? 'bg-red-500/20' : 'bg-green-500/20'}`}>
+                <Calendar className={`h-5 w-5 ${monthOverMonthChange >= 0 ? 'text-red-500' : 'text-green-500'}`} />
+              </div>
+              <span className={`text-xs font-medium ${monthOverMonthChange >= 0 ? 'text-red-500 bg-red-500/10' : 'text-green-500 bg-green-500/10'} px-2 py-1 rounded-full flex items-center gap-1`}>
+                {monthOverMonthChange >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                {Math.abs(monthOverMonthChange).toFixed(0)}%
+              </span>
+            </div>
+            <div className="mt-2">
+              <p className={`text-2xl font-bold tracking-tight ${monthOverMonthChange >= 0 ? 'text-red-500' : 'text-green-500'}`}>MVR {thisMonthSpent.toLocaleString()}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">This Month</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-5 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-blue-500/20">
+                <TrendingUp className="h-5 w-5 text-blue-500" />
+              </div>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-blue-500">MVR {avgPerLog.toFixed(0)}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Avg per Log</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-5 bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-purple-500/20">
+                <Users className="h-5 w-5 text-purple-500" />
+              </div>
+              <span className="text-xs font-medium text-purple-500 bg-purple-500/10 px-2 py-1 rounded-full">
+                top spender
+              </span>
+            </div>
+            <div className="mt-2">
+              <p className="text-lg font-bold tracking-tight text-purple-500 truncate">{topDrivers[0]?.[0] || "N/A"}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">MVR {(topDrivers[0]?.[1] || 0).toLocaleString()}</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Category Breakdown Stats */}
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
+        {stats.map(stat => {
+          const Icon = stat.icon
+          const colorClass = stat.color.replace('bg-', '')
+          const percentage = totalSpent > 0 ? (stat.total / totalSpent * 100).toFixed(0) : 0
+          return (
+            <Card key={stat.value} className={`p-5 bg-gradient-to-br from-${colorClass}/10 to-${colorClass}/5 border-${colorClass}/20 hover:border-${colorClass}/40 transition-colors`}>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div className={`p-2.5 rounded-xl ${stat.color}/20`}>
+                    <Icon className={`h-5 w-5 text-${colorClass}`} />
+                  </div>
+                  <span className={`text-xs font-medium text-${colorClass} bg-${colorClass}/10 px-2 py-1 rounded-full`}>
+                    {stat.count} • {percentage}%
+                  </span>
+                </div>
+                <div className="mt-2">
+                  <p className="text-2xl font-bold tracking-tight">MVR {stat.total.toLocaleString()}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">{stat.label}</p>
+                </div>
+              </div>
+            </Card>
+          )
+        })}
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Monthly Bar Chart */}
+        <Card className="p-6 lg:col-span-2">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="font-semibold text-lg">Monthly Spending</h3>
+              <p className="text-sm text-muted-foreground">Last 6 months breakdown by category</p>
+            </div>
+            <div className="flex items-center gap-3">
+              {LOG_TYPES.map(type => (
+                <div key={type.value} className="flex items-center gap-1.5 text-xs">
+                  <div className={`w-2.5 h-2.5 rounded-full ${type.color}`} />
+                  <span className="text-muted-foreground">{type.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={monthlyData} barCategoryGap="20%">
+                <XAxis
+                  dataKey="month"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <YAxis
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v) => `${v}`}
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <Tooltip
+                  formatter={(value) => [`MVR ${Number(value).toLocaleString()}`, '']}
+                  contentStyle={{
+                    background: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                  }}
+                  cursor={{ fill: 'hsl(var(--muted)/0.3)' }}
+                />
+                <Bar dataKey="fuel" stackId="a" fill="#f97316" name="Fuel" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="maintenance" stackId="a" fill="#3b82f6" name="Maintenance" />
+                <Bar dataKey="repair" stackId="a" fill="#ef4444" name="Repair" />
+                <Bar dataKey="cleaning" stackId="a" fill="#22c55e" name="Cleaning" />
+                <Bar dataKey="inspection" stackId="a" fill="#a855f7" name="Inspection" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        {/* Category Pie Chart */}
+        <Card className="p-6">
+          <div className="mb-4">
+            <h3 className="font-semibold text-lg">Category Distribution</h3>
+            <p className="text-sm text-muted-foreground">Spending by type</p>
+          </div>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={stats.filter(s => s.total > 0)}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={2}
+                  dataKey="total"
+                  nameKey="label"
+                >
+                  {stats.filter(s => s.total > 0).map((stat, index) => (
+                    <Cell key={stat.value} fill={['#f97316', '#3b82f6', '#ef4444', '#22c55e', '#a855f7'][index % 5]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(value) => [`MVR ${Number(value).toLocaleString()}`, '']}
+                  contentStyle={{
+                    background: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="space-y-2 mt-4">
+            {stats.filter(s => s.total > 0).map((stat, index) => (
+              <div key={stat.value} className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: ['#f97316', '#3b82f6', '#ef4444', '#22c55e', '#a855f7'][index % 5] }} />
+                  <span className="text-muted-foreground">{stat.label}</span>
+                </div>
+                <span className="font-medium">{totalSpent > 0 ? (stat.total / totalSpent * 100).toFixed(1) : 0}%</span>
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
 
       <Card className="p-4">

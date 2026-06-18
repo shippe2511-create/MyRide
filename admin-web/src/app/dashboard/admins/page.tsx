@@ -332,6 +332,32 @@ export default function AdminsPage() {
         </div>
       </div>
 
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
+        {ROLES.map(role => {
+          const count = admins.filter(a => a.role === role.value).length
+          return (
+            <Card key={role.value} className={`p-5 bg-gradient-to-br from-${role.color.replace('bg-', '')}/10 to-${role.color.replace('bg-', '')}/5 border-${role.color.replace('bg-', '')}/20`}>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div className={`p-2.5 rounded-xl ${role.color}/20`}>
+                    <Shield className={`h-5 w-5 text-${role.color.replace('bg-', '')}`} />
+                  </div>
+                  {count > 0 && (
+                    <span className={`text-xs font-medium text-${role.color.replace('bg-', '')} bg-${role.color.replace('bg-', '')}/10 px-2 py-1 rounded-full`}>
+                      {count}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2">
+                  <p className={`text-xl font-bold tracking-tight ${count > 0 ? `text-${role.color.replace('bg-', '')}` : 'text-muted-foreground'}`}>{count}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">{role.label}</p>
+                </div>
+              </div>
+            </Card>
+          )
+        })}
+      </div>
+
       <Card className="p-4">
         <Table>
           <TableHeader>

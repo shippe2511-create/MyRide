@@ -263,29 +263,50 @@ export default function VehiclesPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Types</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{vehicles.length}</div>
-          </CardContent>
+        <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-slate-500/20">
+                <Car className="h-5 w-5 text-slate-400" />
+              </div>
+              <span className="text-xs font-medium text-slate-400 bg-slate-500/10 px-2 py-1 rounded-full">
+                fleet
+              </span>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight">{vehicles.length}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Total Types</p>
+            </div>
+          </div>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-500">{activeCount}</div>
-          </CardContent>
+        <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-green-500/20">
+                <Car className="h-5 w-5 text-green-500" />
+              </div>
+              <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-1 rounded-full">
+                {vehicles.length > 0 ? Math.round((activeCount / vehicles.length) * 100) : 0}%
+              </span>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-green-500">{activeCount}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Active</p>
+            </div>
+          </div>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Inactive</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-muted-foreground">{vehicles.length - activeCount}</div>
-          </CardContent>
+        <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-slate-500/20">
+                <Car className="h-5 w-5 text-slate-400" />
+              </div>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-muted-foreground">{vehicles.length - activeCount}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Inactive</p>
+            </div>
+          </div>
         </Card>
       </div>
 

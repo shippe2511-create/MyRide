@@ -20,6 +20,18 @@ export function DashboardRefresh() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => {
         router.refresh()
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_documents' }, () => {
+        router.refresh()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
+        router.refresh()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sos_alerts' }, () => {
+        router.refresh()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, () => {
+        router.refresh()
+      })
       .subscribe()
 
     return () => {

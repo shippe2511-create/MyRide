@@ -93,6 +93,8 @@ export default async function DashboardPage() {
       icon: Users,
       trend: stats.customerTrend.percent > 0 ? `${stats.customerTrend.up ? '+' : '-'}${stats.customerTrend.percent}%` : undefined,
       trendUp: stats.customerTrend.up,
+      color: "slate",
+      badge: "all",
     },
     {
       title: "Total Drivers",
@@ -100,6 +102,8 @@ export default async function DashboardPage() {
       icon: Car,
       trend: stats.driverTrend.percent > 0 ? `${stats.driverTrend.up ? '+' : '-'}${stats.driverTrend.percent}%` : undefined,
       trendUp: stats.driverTrend.up,
+      color: "slate",
+      badge: "all",
     },
     {
       title: "Total Rides",
@@ -107,24 +111,26 @@ export default async function DashboardPage() {
       icon: MapPin,
       trend: stats.rideTrend.percent > 0 ? `${stats.rideTrend.up ? '+' : '-'}${stats.rideTrend.percent}%` : undefined,
       trendUp: stats.rideTrend.up,
+      color: "slate",
+      badge: "all",
     },
     {
       title: "Active Rides",
       value: stats.activeRides,
       icon: Clock,
-      color: "text-yellow-500",
+      color: "yellow",
     },
     {
       title: "Completed Rides",
       value: stats.completedRides,
       icon: CheckCircle,
-      color: "text-green-500",
+      color: "green",
     },
     {
       title: "Online Drivers",
       value: stats.onlineDrivers,
       icon: TrendingUp,
-      color: "text-blue-500",
+      color: "blue",
     },
   ]
 
@@ -147,24 +153,40 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {kpis.map((kpi) => (
-          <Card key={kpi.title}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {kpi.title}
-              </CardTitle>
-              <kpi.icon className={`h-5 w-5 ${kpi.color || "text-muted-foreground"}`} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{kpi.value.toLocaleString()}</div>
-              {kpi.trend && (
-                <p className={`text-xs ${kpi.trendUp ? "text-green-500" : "text-red-500"}`}>
-                  {kpi.trend} from last month
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+        {kpis.map((kpi) => {
+          const colorMap: Record<string, { bg: string; icon: string; text: string; border: string }> = {
+            slate: { bg: "from-slate-500/10 to-slate-600/5", icon: "bg-slate-500/20", text: "text-slate-400", border: "border-slate-500/20" },
+            green: { bg: "from-green-500/10 to-green-600/5", icon: "bg-green-500/20", text: "text-green-500", border: "border-green-500/20" },
+            yellow: { bg: "from-yellow-500/10 to-yellow-600/5", icon: "bg-yellow-500/20", text: "text-yellow-500", border: "border-yellow-500/20" },
+            blue: { bg: "from-blue-500/10 to-blue-600/5", icon: "bg-blue-500/20", text: "text-blue-500", border: "border-blue-500/20" },
+          }
+          const colors = colorMap[kpi.color] || colorMap.slate
+          return (
+            <Card key={kpi.title} className={`p-5 bg-gradient-to-br ${colors.bg} ${colors.border}`}>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div className={`p-2 rounded-lg ${colors.icon}`}>
+                    <kpi.icon className={`h-4 w-4 ${colors.text}`} />
+                  </div>
+                  {kpi.badge && (
+                    <span className={`text-xs font-medium ${colors.text} bg-${kpi.color}-500/10 px-2 py-1 rounded-full`}>
+                      {kpi.badge}
+                    </span>
+                  )}
+                  {kpi.trend && (
+                    <span className={`text-xs font-medium ${kpi.trendUp ? "text-green-500 bg-green-500/10" : "text-red-500 bg-red-500/10"} px-2 py-1 rounded-full`}>
+                      {kpi.trend}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2">
+                  <p className={`text-2xl font-bold tracking-tight ${kpi.color !== "slate" ? colors.text : ""}`}>{kpi.value.toLocaleString()}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">{kpi.title}</p>
+                </div>
+              </div>
+            </Card>
+          )
+        })}
       </div>
 
       <DashboardCharts />

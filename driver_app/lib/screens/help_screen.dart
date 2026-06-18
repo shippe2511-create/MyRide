@@ -2,9 +2,54 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
+import '../services/supabase_service.dart';
+import '../widgets/shimmer_loading.dart';
 
-class HelpScreen extends StatelessWidget {
+class HelpScreen extends StatefulWidget {
   const HelpScreen({super.key});
+
+  @override
+  State<HelpScreen> createState() => _HelpScreenState();
+}
+
+class _HelpScreenState extends State<HelpScreen> {
+  List<Map<String, dynamic>> _contacts = [];
+  List<Map<String, dynamic>> _faqs = [];
+  Map<String, dynamic>? _emergency;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadContent();
+  }
+
+  Future<void> _loadContent() async {
+    try {
+      final data = await SupabaseService.client
+          .from('help_content')
+          .select()
+          .eq('app_type', 'driver')
+          .eq('is_active', true)
+          .order('sort_order');
+
+      final items = List<Map<String, dynamic>>.from(data);
+
+      setState(() {
+        _contacts = items.where((i) => i['content_type'] == 'contact').toList();
+        _faqs = items.where((i) => i['content_type'] == 'faq').toList();
+        _emergency = items.firstWhere(
+          (i) => i['content_type'] == 'emergency',
+          orElse: () => <String, dynamic>{},
+        );
+        if (_emergency!.isEmpty) _emergency = null;
+        _loading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading help content: $e');
+      setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,168 +66,155 @@ class HelpScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          // Contact support
-          _buildSection(context, 'Contact Support', [
-            _buildContactTile(
-              context,
-              icon: Icons.phone,
-              title: 'Call Support',
-              subtitle: '+960 3001234',
-              onTap: () => _launchPhone('+9603001234'),
-            ),
-            _buildContactTile(
-              context,
-              icon: Icons.email,
-              title: 'Email Support',
-              subtitle: 'support@myride.mv',
-              onTap: () => _launchEmail('support@myride.mv'),
-            ),
-            _buildContactTile(
-              context,
-              icon: Icons.chat,
-              title: 'WhatsApp',
-              subtitle: '+960 7001234',
-              onTap: () => _launchWhatsApp('+9607001234'),
-            ),
-          ]),
-          const SizedBox(height: 24),
-
-          // FAQs
-          _buildSection(context, 'Frequently Asked Questions', [
-            _buildFaqTile(
-              context,
-              question: 'How do I accept a ride request?',
-              answer:
-                  'When you\'re online and a ride request comes in, tap "Accept Ride" to take the trip. You\'ll see customer details and can navigate to pickup.',
-            ),
-            _buildFaqTile(
-              context,
-              question: 'What if a customer doesn\'t show up?',
-              answer:
-                  'Wait at the pickup location for 5 minutes. If the customer doesn\'t arrive, you can cancel the trip. Contact support if issues persist.',
-            ),
-            _buildFaqTile(
-              context,
-              question: 'How do I update my vehicle info?',
-              answer:
-                  'Contact the admin to update your vehicle information. This ensures accurate records in the system.',
-            ),
-            _buildFaqTile(
-              context,
-              question: 'My app is not receiving ride requests?',
-              answer:
-                  'Make sure you\'re online (green toggle), have a stable internet connection, and location services are enabled.',
-            ),
-          ]),
-          const SizedBox(height: 24),
-
-          // Emergency
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.error.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
-            ),
-            child: Row(
+      body: _loading
+          ? const ShimmerList(itemCount: 5)
+          : ListView(
+              padding: const EdgeInsets.all(20),
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.error,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.emergency,
-                    color: Colors.white,
-                    size: 26,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Emergency?',
-                        style: TextStyle(
-                          color: context.textColor,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
+                if (_contacts.isNotEmpty) ...[
+                  _buildSection(context, 'Contact Support', [
+                    for (final contact in _contacts)
+                      _buildContactTile(
+                        context,
+                        icon: _getIcon(contact['icon']),
+                        title: contact['title'] ?? '',
+                        subtitle: contact['subtitle'] ?? '',
+                        onTap: () => _handleContactTap(contact),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Call emergency services: 119',
-                        style: TextStyle(
-                          color: context.mutedColor,
-                          fontSize: 14,
-                        ),
+                  ]),
+                  const SizedBox(height: 24),
+                ],
+
+                if (_faqs.isNotEmpty) ...[
+                  _buildSection(context, 'Frequently Asked Questions', [
+                    for (final faq in _faqs)
+                      _buildFaqTile(
+                        context,
+                        question: faq['title'] ?? '',
+                        answer: faq['subtitle'] ?? '',
                       ),
-                    ],
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    HapticFeedback.heavyImpact();
-                    _launchPhone('119');
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
+                  ]),
+                  const SizedBox(height: 24),
+                ],
+
+                if (_emergency != null)
+                  Container(
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.error,
-                      borderRadius: BorderRadius.circular(10),
+                      color: AppColors.error.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
                     ),
-                    child: const Text(
-                      'Call 119',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: AppColors.error,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.emergency,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _emergency!['title'] ?? 'Emergency?',
+                                style: TextStyle(
+                                  color: context.textColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                _emergency!['subtitle'] ?? '',
+                                style: TextStyle(
+                                  color: context.mutedColor,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => _launchPhone(_emergency!['value'] ?? '119'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.error,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text('Call ${_emergency!['value'] ?? '119'}'),
+                        ),
+                      ],
                     ),
                   ),
-                ),
+                const SizedBox(height: 40),
               ],
             ),
-          ),
-        ],
-      ),
     );
   }
 
-  Widget _buildSection(
-      BuildContext context, String title, List<Widget> children) {
+  IconData _getIcon(String? iconName) {
+    switch (iconName) {
+      case 'phone':
+        return Icons.phone;
+      case 'email':
+        return Icons.email;
+      case 'whatsapp':
+        return Icons.chat;
+      case 'emergency':
+        return Icons.emergency;
+      default:
+        return Icons.help;
+    }
+  }
+
+  void _handleContactTap(Map<String, dynamic> contact) {
+    final value = contact['value'] as String? ?? '';
+    final icon = contact['icon'] as String? ?? '';
+
+    switch (icon) {
+      case 'phone':
+        _launchPhone(value);
+        break;
+      case 'email':
+        _launchEmail(value);
+        break;
+      case 'whatsapp':
+        _launchWhatsApp(value);
+        break;
+    }
+  }
+
+  Widget _buildSection(BuildContext context, String title, List<Widget> children) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 12),
-          child: Text(
-            title,
-            style: TextStyle(
-              color: context.mutedColor,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
-            ),
+        Text(
+          title,
+          style: TextStyle(
+            color: context.mutedColor,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
           ),
         ),
+        const SizedBox(height: 12),
         Container(
           decoration: BoxDecoration(
             color: context.cardColor,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: context.borderColor),
           ),
-          child: Column(
-            children: children,
-          ),
+          child: Column(children: children),
         ),
       ],
     );
@@ -195,36 +227,55 @@ class HelpScreen extends StatelessWidget {
     required String subtitle,
     required VoidCallback onTap,
   }) {
-    return ListTile(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onTap();
-      },
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: AppColors.yellow.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(10),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.yellow.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: AppColors.yellow, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: context.textColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: context.mutedColor,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: context.mutedColor, size: 22),
+            ],
+          ),
         ),
-        child: Icon(icon, color: AppColors.yellow, size: 22),
       ),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: context.textColor,
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          color: context.mutedColor,
-          fontSize: 13,
-        ),
-      ),
-      trailing: Icon(Icons.chevron_right, color: context.mutedColor),
     );
   }
 
@@ -233,50 +284,60 @@ class HelpScreen extends StatelessWidget {
     required String question,
     required String answer,
   }) {
-    return ExpansionTile(
-      tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      title: Text(
-        question,
-        style: TextStyle(
-          color: context.textColor,
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      iconColor: AppColors.yellow,
-      collapsedIconColor: context.mutedColor,
-      children: [
-        Text(
-          answer,
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        title: Text(
+          question,
           style: TextStyle(
-            color: context.mutedColor,
-            fontSize: 14,
-            height: 1.5,
+            color: context.textColor,
+            fontWeight: FontWeight.w500,
+            fontSize: 15,
           ),
         ),
-      ],
+        iconColor: context.mutedColor,
+        collapsedIconColor: context.mutedColor,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: context.bgColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              answer,
+              style: TextStyle(
+                color: context.mutedColor,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Future<void> _launchPhone(String phone) async {
+  void _launchPhone(String phone) async {
     final uri = Uri.parse('tel:$phone');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     }
   }
 
-  Future<void> _launchEmail(String email) async {
+  void _launchEmail(String email) async {
     final uri = Uri.parse('mailto:$email');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     }
   }
 
-  Future<void> _launchWhatsApp(String phone) async {
+  void _launchWhatsApp(String phone) async {
     final uri = Uri.parse('https://wa.me/$phone');
     if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      await launchUrl(uri);
     }
   }
 }

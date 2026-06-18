@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../providers/driver_state.dart';
+import '../widgets/shimmer_loading.dart';
 
 class DocumentsScreen extends StatefulWidget {
   const DocumentsScreen({super.key});
@@ -180,7 +181,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         ],
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: AppColors.yellow))
+          ? const ShimmerList(itemCount: 5)
           : RefreshIndicator(
               onRefresh: _loadDocuments,
               color: AppColors.yellow,

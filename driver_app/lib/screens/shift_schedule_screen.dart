@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../widgets/shimmer_loading.dart';
 
 class ShiftScheduleScreen extends StatefulWidget {
   const ShiftScheduleScreen({super.key});
@@ -108,7 +109,7 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
         ],
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: AppColors.yellow))
+          ? const ShimmerList(itemCount: 4)
           : RefreshIndicator(
               onRefresh: _loadShifts,
               color: AppColors.yellow,

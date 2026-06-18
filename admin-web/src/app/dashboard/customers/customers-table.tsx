@@ -55,6 +55,8 @@ import {
   CheckSquare,
   Square,
   Users,
+  Mail,
+  Phone,
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { formatDate } from "@/lib/utils"
@@ -405,14 +407,42 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
   const statusBadge = (status: string) => {
     switch (status) {
       case "approved":
-        return <Badge variant="success">Active</Badge>
+        return (
+          <Badge variant="success" className="gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+            Active
+          </Badge>
+        )
       case "pending":
-        return <Badge variant="warning">Pending</Badge>
+        return (
+          <Badge variant="warning" className="gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
+            Pending
+          </Badge>
+        )
       case "suspended":
-        return <Badge variant="destructive">Suspended</Badge>
+        return (
+          <Badge variant="destructive" className="gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+            Suspended
+          </Badge>
+        )
       default:
         return <Badge variant="secondary">{status}</Badge>
     }
+  }
+
+  const formatRelativeDate = (dateStr: string) => {
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+    if (diffDays === 0) return "Today"
+    if (diffDays === 1) return "Yesterday"
+    if (diffDays < 7) return `${diffDays} days ago`
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
+    return formatDate(dateStr)
   }
 
   return (
@@ -504,7 +534,7 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
               </TableRow>
             ) : (
               customers.map((customer) => (
-                <TableRow key={customer.id}>
+                <TableRow key={customer.id} className="group hover:bg-muted/50 transition-colors">
                   <TableCell>
                     <Checkbox
                       checked={selectedIds.has(customer.id)}
@@ -513,21 +543,53 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <Avatar>
+                      <Avatar className="h-9 w-9 border-2 border-background shadow-sm">
                         <AvatarImage src={customer.avatar_url || undefined} />
-                        <AvatarFallback>{getInitials(customer.full_name)}</AvatarFallback>
+                        <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                          {getInitials(customer.full_name)}
+                        </AvatarFallback>
                       </Avatar>
                       <span className="font-medium">{customer.full_name}</span>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="space-y-1">
-                      <p className="text-sm">{customer.email || "-"}</p>
-                      <p className="text-sm text-muted-foreground">{customer.phone || "-"}</p>
+                      {customer.email ? (
+                        <p className="text-sm flex items-center gap-1.5">
+                          <Mail className="h-3 w-3 text-muted-foreground" />
+                          {customer.email}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">-</p>
+                      )}
+                      {customer.phone ? (
+                        <p className="text-sm flex items-center gap-1.5 text-muted-foreground">
+                          <Phone className="h-3 w-3" />
+                          {customer.phone}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">-</p>
+                      )}
                     </div>
                   </TableCell>
-                  <TableCell>{customer.employee_id || "-"}</TableCell>
-                  <TableCell>{customer.department || "-"}</TableCell>
+                  <TableCell>
+                    {customer.employee_id ? (
+                      <code className="px-2 py-1 rounded bg-muted text-xs font-mono">
+                        {customer.employee_id}
+                      </code>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {customer.department ? (
+                      <Badge variant="outline" className="font-normal">
+                        {customer.department}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {statusBadge(customer.status)}
@@ -545,14 +607,27 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>{formatDate(customer.created_at)}</TableCell>
                   <TableCell>
-                    <DropdownMenu modal={false}>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
+                    <span className="text-sm" title={formatDate(customer.created_at)}>
+                      {formatRelativeDate(customer.created_at)}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => openEditDialog(customer)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <DropdownMenu modal={false}>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
@@ -598,6 +673,7 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))

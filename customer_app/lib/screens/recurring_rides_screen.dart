@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../widgets/shimmer_loading.dart';
 
 class RecurringRidesScreen extends StatefulWidget {
   const RecurringRidesScreen({super.key});
@@ -131,7 +132,7 @@ class _RecurringRidesScreenState extends State<RecurringRidesScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.yellow))
+          ? const ShimmerList(itemCount: 4)
           : _recurringRides.isEmpty
               ? _buildEmptyState()
               : RefreshIndicator(

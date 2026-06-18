@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../providers/driver_state.dart';
+import '../widgets/shimmer_loading.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -64,7 +65,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.yellow))
+          ? const ShimmerList(itemCount: 6)
           : _notifications.isEmpty
               ? _buildEmptyState(context)
               : RefreshIndicator(

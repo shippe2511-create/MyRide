@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../widgets/shimmer_loading.dart';
 
 class AnnouncementsScreen extends StatefulWidget {
   const AnnouncementsScreen({super.key});
@@ -68,7 +69,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
             _buildHeader(),
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: AppColors.yellow))
+                  ? const ShimmerList(itemCount: 4)
                   : _announcements.isEmpty
                       ? _buildEmptyState()
                       : _buildAnnouncementsList(),

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../widgets/shimmer_loading.dart';
 
 enum TripStatus { completed, cancelled, ongoing }
 
@@ -128,7 +129,7 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
             _buildTabs(context),
             Expanded(
               child: _isLoading
-                  ? Center(child: CircularProgressIndicator(color: AppColors.yellow))
+                  ? const ShimmerList(itemCount: 5)
                   : TabBarView(
                       controller: _tabController,
                       children: [

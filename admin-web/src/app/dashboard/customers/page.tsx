@@ -62,8 +62,8 @@ export default async function CustomersPage({
         <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-slate-500/20">
-                <Users className="h-5 w-5 text-slate-400" />
+              <div className="p-2 rounded-lg bg-slate-500/20">
+                <Users className="h-4 w-4 text-slate-400" />
               </div>
               <span className="text-xs font-medium text-slate-400 bg-slate-500/10 px-2 py-1 rounded-full">
                 all
@@ -78,8 +78,8 @@ export default async function CustomersPage({
         <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-green-500/20">
-                <UserCheck className="h-5 w-5 text-green-500" />
+              <div className="p-2 rounded-lg bg-green-500/20">
+                <UserCheck className="h-4 w-4 text-green-500" />
               </div>
               <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-1 rounded-full">
                 {stats.total > 0 ? Math.round((stats.approved / stats.total) * 100) : 0}%
@@ -94,8 +94,8 @@ export default async function CustomersPage({
         <Card className={`p-5 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20 ${stats.pending > 0 ? 'ring-2 ring-yellow-500/50' : ''}`}>
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-yellow-500/20">
-                <Clock className="h-5 w-5 text-yellow-500" />
+              <div className="p-2 rounded-lg bg-yellow-500/20">
+                <Clock className="h-4 w-4 text-yellow-500" />
               </div>
               {stats.pending > 0 && (
                 <span className="text-xs font-medium text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded-full animate-pulse">
@@ -112,8 +112,8 @@ export default async function CustomersPage({
         <Card className="p-5 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-red-500/20">
-                <UserX className="h-5 w-5 text-red-500" />
+              <div className="p-2 rounded-lg bg-red-500/20">
+                <UserX className="h-4 w-4 text-red-500" />
               </div>
             </div>
             <div className="mt-2">

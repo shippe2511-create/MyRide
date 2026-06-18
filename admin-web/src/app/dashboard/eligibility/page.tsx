@@ -195,8 +195,8 @@ export default function EligibilityPage() {
         <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-green-500/20">
-                <Zap className="h-5 w-5 text-green-500" />
+              <div className="p-2 rounded-lg bg-green-500/20">
+                <Zap className="h-4 w-4 text-green-500" />
               </div>
               <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-1 rounded-full">
                 live
@@ -211,8 +211,8 @@ export default function EligibilityPage() {
         <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-slate-500/20">
-                <Calendar className="h-5 w-5 text-slate-400" />
+              <div className="p-2 rounded-lg bg-slate-500/20">
+                <Calendar className="h-4 w-4 text-slate-400" />
               </div>
             </div>
             <div className="mt-2">
@@ -224,8 +224,8 @@ export default function EligibilityPage() {
         <Card className="p-5 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-blue-500/20">
-                <Clock className="h-5 w-5 text-blue-500" />
+              <div className="p-2 rounded-lg bg-blue-500/20">
+                <Clock className="h-4 w-4 text-blue-500" />
               </div>
               <span className="text-xs font-medium text-blue-500 bg-blue-500/10 px-2 py-1 rounded-full">
                 auto

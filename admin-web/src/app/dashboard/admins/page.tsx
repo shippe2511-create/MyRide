@@ -339,8 +339,8 @@ export default function AdminsPage() {
             <Card key={role.value} className={`p-5 bg-gradient-to-br from-${role.color.replace('bg-', '')}/10 to-${role.color.replace('bg-', '')}/5 border-${role.color.replace('bg-', '')}/20`}>
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
-                  <div className={`p-2.5 rounded-xl ${role.color}/20`}>
-                    <Shield className={`h-5 w-5 text-${role.color.replace('bg-', '')}`} />
+                  <div className={`p-2 rounded-lg ${role.color}/20`}>
+                    <Shield className={`h-4 w-4 text-${role.color.replace('bg-', '')}`} />
                   </div>
                   {count > 0 && (
                     <span className={`text-xs font-medium text-${role.color.replace('bg-', '')} bg-${role.color.replace('bg-', '')}/10 px-2 py-1 rounded-full`}>
@@ -544,7 +544,7 @@ export default function AdminsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <KeyRound className="h-5 w-5" />
+              <KeyRound className="h-4 w-4" />
               Reset Password
             </DialogTitle>
           </DialogHeader>
@@ -589,7 +589,7 @@ export default function AdminsPage() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Settings2 className="h-5 w-5" />
+              <Settings2 className="h-4 w-4" />
               Manage Permissions
             </DialogTitle>
           </DialogHeader>

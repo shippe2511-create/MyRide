@@ -476,8 +476,8 @@ export default function RatingsPage() {
         <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-slate-500/20">
-                <Activity className="h-5 w-5 text-slate-400" />
+              <div className="p-2 rounded-lg bg-slate-500/20">
+                <Activity className="h-4 w-4 text-slate-400" />
               </div>
               <span className="text-xs font-medium text-slate-400 bg-slate-500/10 px-2 py-1 rounded-full">
                 all time
@@ -492,8 +492,8 @@ export default function RatingsPage() {
         <Card className="p-5 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-yellow-500/20">
-                <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
+              <div className="p-2 rounded-lg bg-yellow-500/20">
+                <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
               </div>
               <div className="flex">
                 {[1, 2, 3, 4, 5].map(i => (
@@ -510,8 +510,8 @@ export default function RatingsPage() {
         <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-green-500/20">
-                <Trophy className="h-5 w-5 text-green-500" />
+              <div className="p-2 rounded-lg bg-green-500/20">
+                <Trophy className="h-4 w-4 text-green-500" />
               </div>
               <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-1 rounded-full">
                 4.5+
@@ -526,8 +526,8 @@ export default function RatingsPage() {
         <Card className={`p-5 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20 ${lowRatedDrivers > 0 ? 'ring-2 ring-red-500/50' : ''}`}>
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-red-500/20">
-                <AlertTriangle className="h-5 w-5 text-red-500" />
+              <div className="p-2 rounded-lg bg-red-500/20">
+                <AlertTriangle className="h-4 w-4 text-red-500" />
               </div>
               {lowRatedDrivers > 0 && (
                 <span className="text-xs font-medium text-red-500 bg-red-500/10 px-2 py-1 rounded-full animate-pulse">
@@ -547,7 +547,7 @@ export default function RatingsPage() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Car className="h-5 w-5" />
+              <Car className="h-4 w-4" />
               Driver Performance
             </CardTitle>
             <CardDescription>Rating summary for all drivers</CardDescription>
@@ -777,7 +777,7 @@ export default function RatingsPage() {
                 </div>
                 <div className="text-right">
                   <div className="flex items-center gap-1 justify-end">
-                    <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                     <span className="text-2xl font-bold">{selectedDriver.rating.toFixed(1)}</span>
                   </div>
                   <p className="text-xs text-muted-foreground">{selectedDriver.total_trips} trips</p>

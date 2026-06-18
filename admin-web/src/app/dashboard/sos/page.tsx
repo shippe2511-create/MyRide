@@ -81,7 +81,7 @@ function SortableContactItem({ contact, updateContact, removeContact, icons }: S
   return (
     <div ref={setNodeRef} style={style} className="flex items-center gap-3 p-3 border rounded-lg bg-card">
       <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
-        <GripVertical className="h-5 w-5 text-muted-foreground" />
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
       </div>
       <Input
         value={contact.name}
@@ -411,8 +411,8 @@ export default function SOSPage() {
         <Card className={`p-5 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20 ${stats.active > 0 ? 'ring-2 ring-red-500/50' : ''}`}>
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-red-500/20">
-                <AlertTriangle className={`h-5 w-5 text-red-500 ${stats.active > 0 ? 'animate-pulse' : ''}`} />
+              <div className="p-2 rounded-lg bg-red-500/20">
+                <AlertTriangle className={`h-4 w-4 text-red-500 ${stats.active > 0 ? 'animate-pulse' : ''}`} />
               </div>
               {stats.active > 0 && (
                 <span className="text-xs font-medium text-red-500 bg-red-500/10 px-2 py-1 rounded-full animate-pulse">
@@ -429,8 +429,8 @@ export default function SOSPage() {
         <Card className="p-5 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-yellow-500/20">
-                <Clock className="h-5 w-5 text-yellow-500" />
+              <div className="p-2 rounded-lg bg-yellow-500/20">
+                <Clock className="h-4 w-4 text-yellow-500" />
               </div>
               {stats.responding > 0 && (
                 <span className="text-xs font-medium text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded-full">
@@ -447,8 +447,8 @@ export default function SOSPage() {
         <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-green-500/20">
-                <CheckCircle className="h-5 w-5 text-green-500" />
+              <div className="p-2 rounded-lg bg-green-500/20">
+                <CheckCircle className="h-4 w-4 text-green-500" />
               </div>
             </div>
             <div className="mt-2">
@@ -571,7 +571,7 @@ export default function SOSPage() {
       <Card className="p-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Phone className="h-5 w-5" />
+            <Phone className="h-4 w-4" />
             <div>
               <h3 className="font-semibold">Emergency Contacts</h3>
               <p className="text-sm text-muted-foreground">SOS screen emergency contact numbers</p>

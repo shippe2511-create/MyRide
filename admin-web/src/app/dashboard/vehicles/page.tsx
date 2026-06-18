@@ -266,8 +266,8 @@ export default function VehiclesPage() {
         <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-slate-500/20">
-                <Car className="h-5 w-5 text-slate-400" />
+              <div className="p-2 rounded-lg bg-slate-500/20">
+                <Car className="h-4 w-4 text-slate-400" />
               </div>
               <span className="text-xs font-medium text-slate-400 bg-slate-500/10 px-2 py-1 rounded-full">
                 fleet
@@ -282,8 +282,8 @@ export default function VehiclesPage() {
         <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-green-500/20">
-                <Car className="h-5 w-5 text-green-500" />
+              <div className="p-2 rounded-lg bg-green-500/20">
+                <Car className="h-4 w-4 text-green-500" />
               </div>
               <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-1 rounded-full">
                 {vehicles.length > 0 ? Math.round((activeCount / vehicles.length) * 100) : 0}%
@@ -298,8 +298,8 @@ export default function VehiclesPage() {
         <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-slate-500/20">
-                <Car className="h-5 w-5 text-slate-400" />
+              <div className="p-2 rounded-lg bg-slate-500/20">
+                <Car className="h-4 w-4 text-slate-400" />
               </div>
             </div>
             <div className="mt-2">
@@ -347,7 +347,7 @@ export default function VehiclesPage() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                            <IconComponent className="h-5 w-5 text-primary" />
+                            <IconComponent className="h-4 w-4 text-primary" />
                           </div>
                           <div>
                             <p className="font-medium">{vehicle.plate_no || "-"}</p>

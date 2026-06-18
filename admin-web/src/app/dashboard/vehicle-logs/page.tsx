@@ -284,8 +284,8 @@ export default function VehicleLogsPage() {
         <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-slate-500/20">
-                <DollarSign className="h-5 w-5 text-slate-400" />
+              <div className="p-2 rounded-lg bg-slate-500/20">
+                <DollarSign className="h-4 w-4 text-slate-400" />
               </div>
               <span className="text-xs font-medium text-slate-400 bg-slate-500/10 px-2 py-1 rounded-full">
                 {logs.length} logs
@@ -300,8 +300,8 @@ export default function VehicleLogsPage() {
         <Card className={`p-5 bg-gradient-to-br ${monthOverMonthChange >= 0 ? 'from-red-500/10 to-red-600/5 border-red-500/20' : 'from-green-500/10 to-green-600/5 border-green-500/20'}`}>
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className={`p-2.5 rounded-xl ${monthOverMonthChange >= 0 ? 'bg-red-500/20' : 'bg-green-500/20'}`}>
-                <Calendar className={`h-5 w-5 ${monthOverMonthChange >= 0 ? 'text-red-500' : 'text-green-500'}`} />
+              <div className={`p-2 rounded-lg ${monthOverMonthChange >= 0 ? 'bg-red-500/20' : 'bg-green-500/20'}`}>
+                <Calendar className={`h-4 w-4 ${monthOverMonthChange >= 0 ? 'text-red-500' : 'text-green-500'}`} />
               </div>
               <span className={`text-xs font-medium ${monthOverMonthChange >= 0 ? 'text-red-500 bg-red-500/10' : 'text-green-500 bg-green-500/10'} px-2 py-1 rounded-full flex items-center gap-1`}>
                 {monthOverMonthChange >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
@@ -317,8 +317,8 @@ export default function VehicleLogsPage() {
         <Card className="p-5 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-blue-500/20">
-                <TrendingUp className="h-5 w-5 text-blue-500" />
+              <div className="p-2 rounded-lg bg-blue-500/20">
+                <TrendingUp className="h-4 w-4 text-blue-500" />
               </div>
             </div>
             <div className="mt-2">
@@ -330,8 +330,8 @@ export default function VehicleLogsPage() {
         <Card className="p-5 bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-purple-500/20">
-                <Users className="h-5 w-5 text-purple-500" />
+              <div className="p-2 rounded-lg bg-purple-500/20">
+                <Users className="h-4 w-4 text-purple-500" />
               </div>
               <span className="text-xs font-medium text-purple-500 bg-purple-500/10 px-2 py-1 rounded-full">
                 top spender
@@ -355,8 +355,8 @@ export default function VehicleLogsPage() {
             <Card key={stat.value} className={`p-5 bg-gradient-to-br from-${colorClass}/10 to-${colorClass}/5 border-${colorClass}/20 hover:border-${colorClass}/40 transition-colors`}>
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
-                  <div className={`p-2.5 rounded-xl ${stat.color}/20`}>
-                    <Icon className={`h-5 w-5 text-${colorClass}`} />
+                  <div className={`p-2 rounded-lg ${stat.color}/20`}>
+                    <Icon className={`h-4 w-4 text-${colorClass}`} />
                   </div>
                   <span className={`text-xs font-medium text-${colorClass} bg-${colorClass}/10 px-2 py-1 rounded-full`}>
                     {stat.count} • {percentage}%

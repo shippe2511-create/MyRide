@@ -231,8 +231,8 @@ export default function IncidentsPage() {
         <Card className={`p-5 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20 ${incidents.filter(i => i.status === "open").length > 0 ? 'ring-2 ring-red-500/50' : ''}`}>
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-red-500/20">
-                <AlertTriangle className="h-5 w-5 text-red-500" />
+              <div className="p-2 rounded-lg bg-red-500/20">
+                <AlertTriangle className="h-4 w-4 text-red-500" />
               </div>
               {incidents.filter(i => i.status === "open").length > 0 && (
                 <span className="text-xs font-medium text-red-500 bg-red-500/10 px-2 py-1 rounded-full animate-pulse">
@@ -251,8 +251,8 @@ export default function IncidentsPage() {
         <Card className="p-5 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-yellow-500/20">
-                <Clock className="h-5 w-5 text-yellow-500" />
+              <div className="p-2 rounded-lg bg-yellow-500/20">
+                <Clock className="h-4 w-4 text-yellow-500" />
               </div>
               <span className="text-xs font-medium text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded-full">
                 active
@@ -267,8 +267,8 @@ export default function IncidentsPage() {
         <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-green-500/20">
-                <CheckCircle className="h-5 w-5 text-green-500" />
+              <div className="p-2 rounded-lg bg-green-500/20">
+                <CheckCircle className="h-4 w-4 text-green-500" />
               </div>
             </div>
             <div className="mt-2">
@@ -280,8 +280,8 @@ export default function IncidentsPage() {
         <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="p-2.5 rounded-xl bg-slate-500/20">
-                <XCircle className="h-5 w-5 text-slate-400" />
+              <div className="p-2 rounded-lg bg-slate-500/20">
+                <XCircle className="h-4 w-4 text-slate-400" />
               </div>
             </div>
             <div className="mt-2">
@@ -330,28 +330,28 @@ export default function IncidentsPage() {
       <div className="grid grid-cols-4 gap-4">
         <div className="rounded-lg border bg-card p-4">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-red-500" />
+            <AlertTriangle className="h-4 w-4 text-red-500" />
             <span className="text-sm text-muted-foreground">Open</span>
           </div>
           <p className="mt-2 text-2xl font-bold">{incidents.filter(i => i.status === "open").length}</p>
         </div>
         <div className="rounded-lg border bg-card p-4">
           <div className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-yellow-500" />
+            <Clock className="h-4 w-4 text-yellow-500" />
             <span className="text-sm text-muted-foreground">Investigating</span>
           </div>
           <p className="mt-2 text-2xl font-bold">{incidents.filter(i => i.status === "investigating").length}</p>
         </div>
         <div className="rounded-lg border bg-card p-4">
           <div className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-500" />
+            <CheckCircle className="h-4 w-4 text-green-500" />
             <span className="text-sm text-muted-foreground">Resolved</span>
           </div>
           <p className="mt-2 text-2xl font-bold">{incidents.filter(i => i.status === "resolved").length}</p>
         </div>
         <div className="rounded-lg border bg-card p-4">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-orange-500" />
+            <AlertTriangle className="h-4 w-4 text-orange-500" />
             <span className="text-sm text-muted-foreground">High Severity</span>
           </div>
           <p className="mt-2 text-2xl font-bold">{incidents.filter(i => i.severity === "high").length}</p>

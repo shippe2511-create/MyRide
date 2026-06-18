@@ -155,7 +155,7 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
         {kpis.map((kpi) => {
           const colorMap: Record<string, { bg: string; icon: string; text: string; border: string }> = {
             slate: { bg: "from-slate-500/10 to-slate-600/5", icon: "bg-slate-500/20", text: "text-slate-400", border: "border-slate-500/20" },
@@ -165,27 +165,20 @@ export default async function DashboardPage() {
           }
           const colors = colorMap[kpi.color] || colorMap.slate
           return (
-            <Card key={kpi.title} className={`p-5 bg-gradient-to-br ${colors.bg} ${colors.border}`}>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <div className={`p-2 rounded-lg ${colors.icon}`}>
-                    <kpi.icon className={`h-4 w-4 ${colors.text}`} />
-                  </div>
-                  {kpi.badge && (
-                    <span className={`text-xs font-medium ${colors.text} bg-${kpi.color}-500/10 px-2 py-1 rounded-full`}>
-                      {kpi.badge}
-                    </span>
-                  )}
-                  {kpi.trend && (
-                    <span className={`text-xs font-medium ${kpi.trendUp ? "text-green-500 bg-green-500/10" : "text-red-500 bg-red-500/10"} px-2 py-1 rounded-full`}>
-                      {kpi.trend}
-                    </span>
-                  )}
+            <Card key={kpi.title} className={`p-4 bg-gradient-to-br ${colors.bg} ${colors.border}`}>
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${colors.icon} shrink-0`}>
+                  <kpi.icon className={`h-4 w-4 ${colors.text}`} />
                 </div>
-                <div className="mt-2">
-                  <p className={`text-2xl font-bold tracking-tight ${kpi.color !== "slate" ? colors.text : ""}`}>{kpi.value.toLocaleString()}</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">{kpi.title}</p>
+                <div className="min-w-0">
+                  <p className={`text-xl font-bold tracking-tight ${kpi.color !== "slate" ? colors.text : ""}`}>{kpi.value.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground truncate">{kpi.title}</p>
                 </div>
+                {kpi.trend && (
+                  <span className={`text-xs font-medium ${kpi.trendUp ? "text-green-500" : "text-red-500"} ml-auto shrink-0`}>
+                    {kpi.trend}
+                  </span>
+                )}
               </div>
             </Card>
           )

@@ -11,6 +11,7 @@ import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
+import '../widgets/status_animation.dart';
 import 'trip_tracking_screen.dart';
 import 'trip_complete_screen.dart';
 import 'chat_screen.dart';
@@ -327,19 +328,22 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
                   children: [
                     Center(child: Container(margin: const EdgeInsets.only(top: 12), width: 40, height: 4, decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2)))),
 
-                    // Status
+                    // Status with animation
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                       child: Row(
                         children: [
-                          Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: _driverArrived ? AppColors.yellow : AppColors.success,
-                              shape: BoxShape.circle,
+                          if (_driverArrived)
+                            const StatusAnimation(
+                              type: TripAnimationType.complete,
+                              size: 28,
+                              repeat: false,
+                            )
+                          else
+                            PulsingDot(
+                              color: AppColors.success,
+                              size: 10,
                             ),
-                          ),
                           const SizedBox(width: 10),
                           Text(
                             _driverArrived ? 'Driver has arrived!' : 'Driver is on the way',

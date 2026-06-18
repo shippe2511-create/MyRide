@@ -10,6 +10,7 @@ import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
+import '../widgets/status_animation.dart';
 import 'trip_complete_screen.dart';
 import 'chat_screen.dart';
 
@@ -351,29 +352,45 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                       ),
                     ),
 
-                    // Simple Status Row
+                    // Status Row with Animation
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                       child: Row(
                         children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: statusColor,
-                              borderRadius: BorderRadius.circular(12),
+                          if (_rideStatus == 'in_progress')
+                            const StatusAnimation(
+                              type: TripAnimationType.inProgress,
+                              size: 44,
+                            )
+                          else
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: statusColor,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(statusIcon, color: Colors.white, size: 22),
                             ),
-                            child: Icon(statusIcon, color: Colors.white, size: 22),
-                          ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Text(
-                              statusText,
-                              style: TextStyle(
-                                color: context.textColor,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                              ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  statusText,
+                                  style: TextStyle(
+                                    color: context.textColor,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                if (_rideStatus == 'in_progress')
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 4),
+                                    child: LoadingDots(size: 6),
+                                  ),
+                              ],
                             ),
                           ),
                           Container(

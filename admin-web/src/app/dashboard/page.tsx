@@ -8,12 +8,15 @@ import {
   TrendingUp,
   Clock,
   CheckCircle,
-  XCircle,
-  AlertCircle
+  AlertCircle,
+  ArrowUpRight,
+  FileText,
+  ChevronRight
 } from "lucide-react"
 import { DashboardCharts } from "./charts"
 import { DashboardRefresh } from "./dashboard-refresh"
 import { ActivityFeed } from "@/components/activity-feed"
+import Link from "next/link"
 
 async function getStats() {
   const supabase = await createClient()
@@ -192,34 +195,75 @@ export default async function DashboardPage() {
       <DashboardCharts />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Recent Rides</CardTitle>
+        <Card className="lg:col-span-2 overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-lg font-semibold">Recent Rides</CardTitle>
+            <Link
+              href="/dashboard/rides"
+              className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+            >
+              View all
+              <ChevronRight className="h-4 w-4" />
+            </Link>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             {stats.recentRides.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No rides yet</p>
+              <div className="flex flex-col items-center justify-center py-12 px-4">
+                <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-3">
+                  <Car className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <p className="text-sm text-muted-foreground">No rides yet</p>
+              </div>
             ) : (
-              <div className="space-y-4">
-                {stats.recentRides.map((ride: Record<string, unknown>) => (
-                  <div key={ride.id as string} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0 hover:bg-muted/50 -mx-2 px-2 rounded transition-colors">
-                    <div>
-                      <p className="font-medium">{(ride.customer as { full_name: string })?.full_name || "Unknown"}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {ride.pickup_name as string} → {ride.dropoff_name as string}
-                      </p>
-                    </div>
-                    <Badge
-                      variant={
-                        ride.status === "completed" ? "success" :
-                        ride.status === "cancelled" ? "destructive" :
-                        ride.status === "in_progress" ? "default" : "secondary"
-                      }
+              <div className="divide-y">
+                {stats.recentRides.map((ride: Record<string, unknown>) => {
+                  const createdAt = new Date(ride.created_at as string)
+                  const now = new Date()
+                  const diffMs = now.getTime() - createdAt.getTime()
+                  const diffMins = Math.floor(diffMs / 60000)
+                  let timeAgo = ""
+                  if (diffMins < 1) timeAgo = "Just now"
+                  else if (diffMins < 60) timeAgo = `${diffMins}m ago`
+                  else if (diffMins < 1440) timeAgo = `${Math.floor(diffMins / 60)}h ago`
+                  else timeAgo = `${Math.floor(diffMins / 1440)}d ago`
+
+                  return (
+                    <Link
+                      key={ride.id as string}
+                      href={`/dashboard/rides?id=${ride.id}`}
+                      className="flex items-center justify-between px-6 py-4 hover:bg-muted/50 transition-colors group"
                     >
-                      {(ride.status as string)?.replace("_", " ")}
-                    </Badge>
-                  </div>
-                ))}
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Car className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium group-hover:text-primary transition-colors">
+                            {(ride.customer as { full_name: string })?.full_name || "Unknown"}
+                          </p>
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {(ride.pickup_name as string)?.split(",")[0]} → {(ride.dropoff_name as string)?.split(",")[0]}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-muted-foreground">{timeAgo}</span>
+                        <Badge
+                          variant={
+                            ride.status === "completed" ? "success" :
+                            ride.status === "cancelled" ? "destructive" :
+                            ride.status === "in_progress" ? "default" : "secondary"
+                          }
+                          className="gap-1"
+                        >
+                          {ride.status === "in_progress" && <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />}
+                          {(ride.status as string)?.replace("_", " ")}
+                        </Badge>
+                      </div>
+                    </Link>
+                  )
+                })}
               </div>
             )}
           </CardContent>
@@ -228,35 +272,85 @@ export default async function DashboardPage() {
         <ActivityFeed />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-2 sm:grid-cols-3">
-            <a href="/dashboard/drivers?status=pending" className="flex items-center gap-2 rounded-lg border p-3 hover:bg-accent transition-colors">
-              <AlertCircle className="h-5 w-5 text-yellow-500" />
-              <div>
-                <p className="font-medium text-sm">Pending Approvals</p>
-                <p className="text-xs text-muted-foreground">{stats.pendingApprovals} awaiting</p>
-              </div>
-            </a>
-            <a href="/dashboard/rides?status=active" className="flex items-center gap-2 rounded-lg border p-3 hover:bg-accent transition-colors">
-              <Clock className="h-5 w-5 text-blue-500" />
-              <div>
-                <p className="font-medium text-sm">Active Rides</p>
-                <p className="text-xs text-muted-foreground">{stats.activeRides} in progress</p>
-              </div>
-            </a>
-            <a href="/dashboard/reports" className="flex items-center gap-2 rounded-lg border p-3 hover:bg-accent transition-colors">
-              <TrendingUp className="h-5 w-5 text-green-500" />
-              <div>
-                <p className="font-medium text-sm">Reports</p>
-                <p className="text-xs text-muted-foreground">Export data</p>
-              </div>
-            </a>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Link
+          href="/dashboard/drivers?status=pending"
+          className={`group relative overflow-hidden rounded-xl p-5 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg ${
+            stats.pendingApprovals > 0
+              ? 'bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border border-yellow-500/30'
+              : 'bg-gradient-to-br from-slate-500/10 to-slate-600/5 border border-slate-500/20'
+          }`}
+        >
+          <div className="flex items-start justify-between">
+            <div className={`p-2.5 rounded-xl ${stats.pendingApprovals > 0 ? 'bg-yellow-500/20' : 'bg-slate-500/20'}`}>
+              <AlertCircle className={`h-5 w-5 ${stats.pendingApprovals > 0 ? 'text-yellow-500' : 'text-slate-400'}`} />
+            </div>
+            <ArrowUpRight className="h-5 w-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+          <div className="mt-4">
+            <p className={`text-3xl font-bold ${stats.pendingApprovals > 0 ? 'text-yellow-500' : ''}`}>
+              {stats.pendingApprovals}
+            </p>
+            <p className="text-sm font-medium mt-1">Pending Approvals</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Drivers awaiting review</p>
+          </div>
+          {stats.pendingApprovals > 0 && (
+            <div className="absolute top-3 right-3">
+              <span className="flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-500 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500" />
+              </span>
+            </div>
+          )}
+        </Link>
+
+        <Link
+          href="/dashboard/rides?status=active"
+          className={`group relative overflow-hidden rounded-xl p-5 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg ${
+            stats.activeRides > 0
+              ? 'bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/30'
+              : 'bg-gradient-to-br from-slate-500/10 to-slate-600/5 border border-slate-500/20'
+          }`}
+        >
+          <div className="flex items-start justify-between">
+            <div className={`p-2.5 rounded-xl ${stats.activeRides > 0 ? 'bg-blue-500/20' : 'bg-slate-500/20'}`}>
+              <Clock className={`h-5 w-5 ${stats.activeRides > 0 ? 'text-blue-500' : 'text-slate-400'}`} />
+            </div>
+            <ArrowUpRight className="h-5 w-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+          <div className="mt-4">
+            <p className={`text-3xl font-bold ${stats.activeRides > 0 ? 'text-blue-500' : ''}`}>
+              {stats.activeRides}
+            </p>
+            <p className="text-sm font-medium mt-1">Active Rides</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Currently in progress</p>
+          </div>
+          {stats.activeRides > 0 && (
+            <div className="absolute top-3 right-3">
+              <span className="flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
+              </span>
+            </div>
+          )}
+        </Link>
+
+        <Link
+          href="/dashboard/reports"
+          className="group relative overflow-hidden rounded-xl p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border border-green-500/20 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
+        >
+          <div className="flex items-start justify-between">
+            <div className="p-2.5 rounded-xl bg-green-500/20">
+              <FileText className="h-5 w-5 text-green-500" />
+            </div>
+            <ArrowUpRight className="h-5 w-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+          <div className="mt-4">
+            <p className="text-3xl font-bold text-green-500">Reports</p>
+            <p className="text-sm font-medium mt-1">Export Data</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Download CSV reports</p>
+          </div>
+        </Link>
       </div>
     </div>
   )

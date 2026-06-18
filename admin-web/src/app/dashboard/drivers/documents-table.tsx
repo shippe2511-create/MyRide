@@ -206,54 +206,80 @@ export function DocumentsTable() {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-5">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Documents</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
+        <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2 rounded-lg bg-slate-500/20">
+                <FileText className="h-4 w-4 text-slate-400" />
+              </div>
+              <span className="text-xs font-medium text-slate-400 bg-slate-500/10 px-2 py-1 rounded-full">all</span>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight">{stats.total}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Total Documents</p>
+            </div>
+          </div>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Clock className="h-4 w-4 text-yellow-500" /> Pending
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-500">{stats.pending}</div>
-          </CardContent>
+        <Card className={`p-5 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20 ${stats.pending > 0 ? 'ring-2 ring-yellow-500/50' : ''}`}>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2 rounded-lg bg-yellow-500/20">
+                <Clock className="h-4 w-4 text-yellow-500" />
+              </div>
+              {stats.pending > 0 && (
+                <span className="text-xs font-medium text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded-full animate-pulse">review</span>
+              )}
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-yellow-500">{stats.pending}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Pending</p>
+            </div>
+          </div>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-500" /> Approved
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-500">{stats.verified}</div>
-          </CardContent>
+        <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2 rounded-lg bg-green-500/20">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+              </div>
+              <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-1 rounded-full">
+                {stats.total > 0 ? Math.round((stats.verified / stats.total) * 100) : 0}%
+              </span>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-green-500">{stats.verified}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Approved</p>
+            </div>
+          </div>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <XCircle className="h-4 w-4 text-red-500" /> Rejected
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-500">{stats.rejected}</div>
-          </CardContent>
+        <Card className="p-5 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2 rounded-lg bg-red-500/20">
+                <XCircle className="h-4 w-4 text-red-500" />
+              </div>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-red-500">{stats.rejected}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Rejected</p>
+            </div>
+          </div>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-orange-500" /> Expiring Soon
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-500">{stats.expiringSoon}</div>
-            <p className="text-xs text-muted-foreground">Next 30 days</p>
-          </CardContent>
+        <Card className={`p-5 bg-gradient-to-br from-orange-500/10 to-orange-600/5 border-orange-500/20 ${stats.expiringSoon > 0 ? 'ring-2 ring-orange-500/50' : ''}`}>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2 rounded-lg bg-orange-500/20">
+                <AlertTriangle className="h-4 w-4 text-orange-500" />
+              </div>
+              {stats.expiringSoon > 0 && (
+                <span className="text-xs font-medium text-orange-500 bg-orange-500/10 px-2 py-1 rounded-full animate-pulse">alert</span>
+              )}
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-orange-500">{stats.expiringSoon}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Expiring Soon</p>
+            </div>
+          </div>
         </Card>
       </div>
 

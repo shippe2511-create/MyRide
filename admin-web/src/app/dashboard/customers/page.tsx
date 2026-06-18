@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
 import { CustomersTable } from "./customers-table"
-import { Breadcrumbs } from "@/components/breadcrumbs"
 import { Card } from "@/components/ui/card"
 import { Users, UserCheck, Clock, UserX } from "lucide-react"
 
@@ -50,7 +49,6 @@ export default async function CustomersPage({
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Users className="h-6 w-6" />

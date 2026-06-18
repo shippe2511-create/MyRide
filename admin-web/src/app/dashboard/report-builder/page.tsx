@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { Breadcrumbs } from "@/components/breadcrumbs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -245,7 +244,6 @@ export default function ReportBuilderPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
       <div>
         <h1 className="text-3xl font-bold">Report Builder</h1>
         <p className="text-muted-foreground">Create custom reports from your data</p>

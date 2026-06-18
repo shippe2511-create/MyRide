@@ -8,7 +8,6 @@ import { ShiftsTable } from "./shifts-table"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Users, UserCheck, Clock, FileText, Loader2, Calendar } from "lucide-react"
-import { Breadcrumbs } from "@/components/breadcrumbs"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 
 export default function DriversPage() {
@@ -75,7 +74,6 @@ export default function DriversPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <Breadcrumbs />
         <div>
           <div className="w-32 h-8 bg-muted rounded animate-pulse" />
           <div className="w-64 h-4 bg-muted rounded animate-pulse mt-2" />
@@ -90,7 +88,6 @@ export default function DriversPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
       <div>
         <h1 className="text-2xl font-bold">Drivers</h1>
         <p className="text-sm text-muted-foreground">Manage driver accounts and documents</p>

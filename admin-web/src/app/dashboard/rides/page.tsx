@@ -31,7 +31,6 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu"
 import { toast } from "sonner"
-import { Breadcrumbs } from "@/components/breadcrumbs"
 
 interface Ride {
   id: string
@@ -224,7 +223,6 @@ export default function RidesPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Rides</h1>

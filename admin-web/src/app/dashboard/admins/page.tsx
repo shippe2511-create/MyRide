@@ -32,7 +32,6 @@ import { ROLE_DESCRIPTIONS, type Role, type Permission, getPermissionsForRole } 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Switch } from "@/components/ui/switch"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Breadcrumbs } from "@/components/breadcrumbs"
 
 interface AdminUser {
   id: string
@@ -320,7 +319,6 @@ export default function AdminsPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

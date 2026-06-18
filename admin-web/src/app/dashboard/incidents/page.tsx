@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { Breadcrumbs } from "@/components/breadcrumbs"
 import {
   Table,
   TableBody,
@@ -218,7 +217,6 @@ export default function IncidentsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <Breadcrumbs />
         <div>
           <div className="w-48 h-8 bg-muted rounded animate-pulse" />
           <div className="w-64 h-4 bg-muted rounded animate-pulse mt-2" />
@@ -233,7 +231,6 @@ export default function IncidentsPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

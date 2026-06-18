@@ -22,7 +22,6 @@ import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Car, Bus, Truck, Bike, Shi
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
-import { Breadcrumbs } from "@/components/breadcrumbs"
 
 interface VehicleType {
   id: string
@@ -253,7 +252,6 @@ export default function VehiclesPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

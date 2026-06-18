@@ -17,7 +17,6 @@ import {
   Car, MapPin, Clock, Star, Loader2,
   Calendar, Activity, Target, Award, Zap
 } from "lucide-react"
-import { Breadcrumbs } from "@/components/breadcrumbs"
 import { SkeletonCard, SkeletonChart } from "@/components/ui/skeleton-card"
 
 interface Ride {
@@ -258,7 +257,6 @@ export default function AnalyticsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <Breadcrumbs />
         <div>
           <div className="w-32 h-8 bg-muted rounded animate-pulse" />
           <div className="w-64 h-4 bg-muted rounded animate-pulse mt-2" />
@@ -276,7 +274,6 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

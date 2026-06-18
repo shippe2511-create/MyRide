@@ -28,7 +28,6 @@ import { toast } from "sonner"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import { SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
-import { Breadcrumbs } from "@/components/breadcrumbs"
 
 interface VehicleLog {
   id: string
@@ -283,7 +282,6 @@ export default function VehicleLogsPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

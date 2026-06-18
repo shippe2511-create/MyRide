@@ -21,7 +21,6 @@ import { Star, Search, TrendingUp, TrendingDown, AlertTriangle, Loader2, Car, Ph
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { formatDate } from "@/lib/utils"
-import { Breadcrumbs } from "@/components/breadcrumbs"
 
 // Circular Progress Component
 const CircularProgress = ({ value, size = 120, strokeWidth = 10, color = "yellow" }: { value: number, size?: number, strokeWidth?: number, color?: string }) => {
@@ -475,7 +474,6 @@ export default function RatingsPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Star className="h-6 w-6 text-yellow-500" />

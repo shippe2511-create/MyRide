@@ -3,7 +3,6 @@ import { Header } from "@/components/layout/header"
 import { SOSAlertListener } from "@/components/sos-alert-listener"
 import { GlobalSearch } from "@/components/global-search"
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts"
-import { QuickStatsBar } from "@/components/quick-stats-bar"
 
 export default function DashboardLayout({
   children,
@@ -18,7 +17,6 @@ export default function DashboardLayout({
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />
-        <QuickStatsBar />
         <main className="flex-1 overflow-auto bg-muted/30 p-6">
           {children}
         </main>

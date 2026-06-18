@@ -10,7 +10,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Download, FileSpreadsheet, FileText, Loader2, Calendar, Users, Car, Star, BarChart3, TrendingUp, Package, AlertTriangle, Shield, ClipboardCheck, Fuel } from "lucide-react"
 import { toast } from "sonner"
-import { Breadcrumbs } from "@/components/breadcrumbs"
 
 const reportTypes = [
   { id: "rides", name: "Rides Report", description: "All rides with pickup, dropoff, and status", icon: Car },
@@ -605,7 +604,6 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

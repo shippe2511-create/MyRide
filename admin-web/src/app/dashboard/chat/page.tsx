@@ -15,7 +15,6 @@ import {
   MessageSquare, Search, User, Car, Clock, MapPin, Loader2, RefreshCw, ChevronRight
 } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
-import { Breadcrumbs } from "@/components/breadcrumbs"
 
 interface ChatMessage {
   id: string
@@ -266,7 +265,6 @@ export default function ChatPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

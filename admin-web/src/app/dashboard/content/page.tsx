@@ -25,7 +25,6 @@ import { ImagePicker } from "@/components/ui/image-picker"
 import { ComboboxInput } from "@/components/ui/combobox-input"
 import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Bell, Pin, Users, FileText, Megaphone, Calendar } from "lucide-react"
 import { SkeletonTable } from "@/components/ui/skeleton-card"
-import { Breadcrumbs } from "@/components/breadcrumbs"
 
 const STAFF_CATEGORIES = [
   { value: "news", label: "News" },
@@ -311,7 +310,6 @@ export default function ContentPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

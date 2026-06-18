@@ -37,7 +37,6 @@ import {
   arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { Breadcrumbs } from "@/components/breadcrumbs"
 
 interface SOSAlert {
   id: string
@@ -399,7 +398,6 @@ export default function SOSPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

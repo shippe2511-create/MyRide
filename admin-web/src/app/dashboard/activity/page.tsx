@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/select"
 import { Search, RefreshCw, User, Car, MapPin, AlertTriangle, Settings } from 'lucide-react'
 import { format } from 'date-fns'
-import { Breadcrumbs } from "@/components/breadcrumbs"
 
 interface ActivityLog {
   id: string
@@ -121,7 +120,6 @@ export default function ActivityPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

@@ -23,7 +23,6 @@ import { formatDate } from "@/lib/utils"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
-import { Breadcrumbs } from "@/components/breadcrumbs"
 
 interface Zone {
   id: string
@@ -221,7 +220,6 @@ export default function ZonesPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

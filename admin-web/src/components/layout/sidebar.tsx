@@ -43,6 +43,7 @@ const navigation: { name: string; href: string; icon: typeof LayoutDashboard; pe
   { name: "Service Zones", href: "/dashboard/zones", icon: Map, permission: "zones:view" },
   { name: "Chat", href: "/dashboard/chat", icon: MessageSquare, permission: "chat:view" },
   { name: "SOS Alerts", href: "/dashboard/sos", icon: AlertTriangle, permission: "sos:view" },
+  { name: "Incidents", href: "/dashboard/incidents", icon: AlertTriangle, permission: "sos:view" },
   { name: "Ratings", href: "/dashboard/ratings", icon: Star, permission: "ratings:view" },
   { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3, permission: "reports:view" },
   { name: "Reports", href: "/dashboard/reports", icon: FileText, permission: "reports:view" },

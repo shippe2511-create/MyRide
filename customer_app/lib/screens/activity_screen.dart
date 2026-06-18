@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 
@@ -639,12 +640,12 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.support_agent, size: 18),
-                    label: Text('Support'),
+                    onPressed: () => _exportTripReceipt(trip),
+                    icon: Icon(Icons.receipt_long, size: 18),
+                    label: Text('Export'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.textDark,
-                      side: BorderSide(color: context.borderColor),
+                      foregroundColor: AppColors.yellow,
+                      side: BorderSide(color: AppColors.yellow),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
@@ -722,5 +723,55 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
         ],
       ),
     );
+  }
+
+  void _exportTripReceipt(TripHistory trip) {
+    Navigator.pop(context);
+
+    final months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    final dateStr = '${trip.date.day} ${months[trip.date.month - 1]} ${trip.date.year}';
+    final timeStr = '${trip.date.hour.toString().padLeft(2, '0')}:${trip.date.minute.toString().padLeft(2, '0')}';
+
+    final receipt = '''
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       MYRIDE TRIP RECEIPT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Trip ID: ${trip.id.substring(0, 8).toUpperCase()}
+Date: $dateStr
+Time: $timeStr
+Status: ${trip.status == TripStatus.completed ? 'Completed' : 'Cancelled'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+         TRIP DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 Pickup:
+   ${trip.pickup}
+
+📍 Dropoff:
+   ${trip.dropoff}
+
+⏱️ Duration: ${trip.duration} minutes
+📏 Distance: ${trip.distance} km
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        DRIVER DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Driver: ${trip.driverName}
+Vehicle: ${trip.vehicleNumber}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This is a complimentary ride provided
+by your organization through MyRide.
+
+Thank you for riding with us!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+''';
+
+    Share.share(receipt, subject: 'MyRide Trip Receipt - ${trip.id.substring(0, 8).toUpperCase()}');
   }
 }

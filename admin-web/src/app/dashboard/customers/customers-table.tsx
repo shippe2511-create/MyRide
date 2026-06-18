@@ -52,7 +52,11 @@ import {
   UserPlus,
   CheckCircle,
   XCircle,
+  CheckSquare,
+  Square,
+  Users,
 } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 import { formatDate } from "@/lib/utils"
 
 interface Customer {
@@ -96,6 +100,8 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
     status: "approved",
     role: "customer"
   })
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
 
   const totalPages = Math.ceil(totalCount / pageSize)
 
@@ -293,6 +299,79 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
     setLoading(false)
   }
 
+  const toggleSelectAll = () => {
+    if (selectedIds.size === customers.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(customers.map(c => c.id)))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    const newSet = new Set(selectedIds)
+    if (newSet.has(id)) {
+      newSet.delete(id)
+    } else {
+      newSet.add(id)
+    }
+    setSelectedIds(newSet)
+  }
+
+  const handleBulkApprove = async () => {
+    if (selectedIds.size === 0) return
+    setBulkLoading(true)
+    const { error } = await supabase
+      .from("profiles")
+      .update({ status: "approved" })
+      .in("id", Array.from(selectedIds))
+
+    if (error) {
+      toast.error("Failed to approve customers")
+    } else {
+      toast.success(`${selectedIds.size} customers approved`)
+      setSelectedIds(new Set())
+      router.refresh()
+    }
+    setBulkLoading(false)
+  }
+
+  const handleBulkSuspend = async () => {
+    if (selectedIds.size === 0) return
+    setBulkLoading(true)
+    const { error } = await supabase
+      .from("profiles")
+      .update({ status: "suspended" })
+      .in("id", Array.from(selectedIds))
+
+    if (error) {
+      toast.error("Failed to suspend customers")
+    } else {
+      toast.success(`${selectedIds.size} customers suspended`)
+      setSelectedIds(new Set())
+      router.refresh()
+    }
+    setBulkLoading(false)
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    if (!window.confirm(`Are you sure you want to delete ${selectedIds.size} customers?`)) return
+    setBulkLoading(true)
+    const { error } = await supabase
+      .from("profiles")
+      .delete()
+      .in("id", Array.from(selectedIds))
+
+    if (error) {
+      toast.error("Failed to delete customers")
+    } else {
+      toast.success(`${selectedIds.size} customers deleted`)
+      setSelectedIds(new Set())
+      router.refresh()
+    }
+    setBulkLoading(false)
+  }
+
   const exportCSV = () => {
     const headers = ["Name", "Email", "Phone", "Employee ID", "Department", "Status", "Created At"]
     const rows = customers.map(c => [
@@ -374,10 +453,39 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
         </div>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-4 rounded-lg border bg-muted/50 p-3">
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={handleBulkApprove} disabled={bulkLoading}>
+              <CheckCircle className="mr-2 h-4 w-4" />
+              Approve
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleBulkSuspend} disabled={bulkLoading}>
+              <Ban className="mr-2 h-4 w-4" />
+              Suspend
+            </Button>
+            <Button size="sm" variant="destructive" onClick={handleBulkDelete} disabled={bulkLoading}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </Button>
+          </div>
+          <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())} className="ml-auto">
+            Clear
+          </Button>
+        </div>
+      )}
+
       <div className="rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12">
+                <Checkbox
+                  checked={selectedIds.size === customers.length && customers.length > 0}
+                  onCheckedChange={toggleSelectAll}
+                />
+              </TableHead>
               <TableHead>Customer</TableHead>
               <TableHead>Contact</TableHead>
               <TableHead>Employee ID</TableHead>
@@ -390,13 +498,19 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
           <TableBody>
             {customers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   No customers found
                 </TableCell>
               </TableRow>
             ) : (
               customers.map((customer) => (
                 <TableRow key={customer.id}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds.has(customer.id)}
+                      onCheckedChange={() => toggleSelect(customer.id)}
+                    />
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar>

@@ -1389,4 +1389,83 @@ class SupabaseService {
       return false;
     }
   }
+
+  // ============ Multi-stop Rides ============
+
+  static Future<List<Map<String, dynamic>>> getRideStops(String rideId) async {
+    try {
+      final response = await client
+          .from('ride_stops')
+          .select()
+          .eq('ride_id', rideId)
+          .order('stop_order', ascending: true);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error getting ride stops: $e');
+      return [];
+    }
+  }
+
+  static Future<bool> addRideStop({
+    required String rideId,
+    required int stopOrder,
+    required String locationName,
+    required double latitude,
+    required double longitude,
+    String? notes,
+  }) async {
+    try {
+      await client.from('ride_stops').insert({
+        'ride_id': rideId,
+        'stop_order': stopOrder,
+        'location_name': locationName,
+        'latitude': latitude,
+        'longitude': longitude,
+        'notes': notes,
+        'status': 'pending',
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error adding ride stop: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> updateRideStopStatus(String stopId, String status, {DateTime? time}) async {
+    try {
+      final updates = <String, dynamic>{'status': status};
+      if (status == 'arrived') {
+        updates['arrival_time'] = (time ?? DateTime.now()).toIso8601String();
+      } else if (status == 'departed') {
+        updates['departed_time'] = (time ?? DateTime.now()).toIso8601String();
+      }
+      await client.from('ride_stops').update(updates).eq('id', stopId);
+      return true;
+    } catch (e) {
+      debugPrint('Error updating ride stop status: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> removeRideStop(String stopId) async {
+    try {
+      await client.from('ride_stops').delete().eq('id', stopId);
+      return true;
+    } catch (e) {
+      debugPrint('Error removing ride stop: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> reorderRideStops(String rideId, List<String> stopIds) async {
+    try {
+      for (int i = 0; i < stopIds.length; i++) {
+        await client.from('ride_stops').update({'stop_order': i}).eq('id', stopIds[i]);
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error reordering ride stops: $e');
+      return false;
+    }
+  }
 }

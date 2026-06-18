@@ -21,7 +21,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
-  MapPin, Clock, CheckCircle, XCircle, Search, Loader2, RefreshCw, Car, MoreVertical, Edit, Trash2, TrendingUp
+  MapPin, Clock, CheckCircle, XCircle, Search, Loader2, RefreshCw, Car, MoreVertical, Edit, Trash2, TrendingUp, ChevronLeft, ChevronRight
 } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -74,6 +74,8 @@ export default function RidesPage() {
   const [saving, setSaving] = useState(false)
   const [deleteRideId, setDeleteRideId] = useState<string | null>(null)
   const [chartData, setChartData] = useState<{ date: string; rides: number }[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 20
 
   useEffect(() => {
     loadData(true)
@@ -195,6 +197,13 @@ export default function RidesPage() {
       ride.dropoff_name?.toLowerCase().includes(s)
     )
   })
+
+  const totalPages = Math.ceil(filteredRides.length / pageSize)
+  const paginatedRides = filteredRides.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, statusFilter])
 
   if (loading) {
     return (
@@ -357,7 +366,7 @@ export default function RidesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredRides.length === 0 ? (
+            {paginatedRides.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="p-0">
                   <EmptyState
@@ -368,7 +377,7 @@ export default function RidesPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredRides.map(ride => (
+              paginatedRides.map(ride => (
                 <TableRow
                   key={ride.id}
                   className="cursor-pointer hover:bg-muted/50"
@@ -432,6 +441,32 @@ export default function RidesPage() {
             )}
           </TableBody>
         </Table>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-2 pt-4">
+            <p className="text-sm text-muted-foreground">
+              Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, filteredRides.length)} of {filteredRides.length} rides
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => p - 1)}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => p + 1)}
+                disabled={currentPage === totalPages}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       <Dialog open={!!selectedRide} onOpenChange={() => setSelectedRide(null)}>

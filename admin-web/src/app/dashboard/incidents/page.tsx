@@ -372,7 +372,7 @@ export default function IncidentsPage() {
               </TableRow>
             ) : (
               filteredIncidents.map((incident) => (
-                <TableRow key={incident.id}>
+                <TableRow key={incident.id} className="hover:bg-muted/50 transition-colors">
                   <TableCell>
                     <div>
                       <p className="font-medium">{incident.title}</p>

@@ -27,7 +27,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { DialogFooter } from "@/components/ui/dialog"
 import {
   ClipboardCheck, AlertTriangle, CheckCircle, XCircle, Car,
-  Loader2, RefreshCw, Download, MoreHorizontal, Pencil, Trash2
+  Loader2, RefreshCw, Download, MoreHorizontal, Pencil, Trash2, Search
 } from "lucide-react"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
@@ -59,6 +59,7 @@ export default function ChecklistsPage() {
   const supabase = createClient()
   const [checklists, setChecklists] = useState<VehicleChecklist[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState("")
   const [filter, setFilter] = useState("all")
   const [selectedChecklist, setSelectedChecklist] = useState<VehicleChecklist | null>(null)
   const [editingChecklist, setEditingChecklist] = useState<VehicleChecklist | null>(null)
@@ -233,6 +234,15 @@ export default function ChecklistsPage() {
 
       <Card className="p-4">
         <div className="flex items-center gap-3 mb-4">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search driver or vehicle..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
           <Select value={filter} onValueChange={setFilter}>
             <SelectTrigger className="w-36">
               <SelectValue />
@@ -257,17 +267,31 @@ export default function ChecklistsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {checklists.length === 0 ? (
+            {checklists.filter(c => {
+              if (!search) return true
+              const s = search.toLowerCase()
+              return (
+                c.driver_name?.toLowerCase().includes(s) ||
+                c.vehicle_number?.toLowerCase().includes(s)
+              )
+            }).length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  No checklists found
+                  {search ? "No matching checklists" : "No checklists found"}
                 </TableCell>
               </TableRow>
             ) : (
-              checklists.map(checklist => {
+              checklists.filter(c => {
+                if (!search) return true
+                const s = search.toLowerCase()
+                return (
+                  c.driver_name?.toLowerCase().includes(s) ||
+                  c.vehicle_number?.toLowerCase().includes(s)
+                )
+              }).map(checklist => {
                 const failedItems = getFailedItems(checklist)
                 return (
-                  <TableRow key={checklist.id} className={checklist.has_issues ? "bg-red-50 dark:bg-red-950/20" : ""}>
+                  <TableRow key={checklist.id} className={`hover:bg-muted/50 transition-colors ${checklist.has_issues ? "bg-red-50 dark:bg-red-950/20" : ""}`}>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Avatar className="h-8 w-8">

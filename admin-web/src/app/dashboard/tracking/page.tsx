@@ -117,26 +117,38 @@ export default function TrackingPage() {
         </Button>
       </div>
 
-      <div className="grid gap-3 grid-cols-2">
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-500/10">
-              <Car className="h-5 w-5 text-green-500" />
+      <div className="grid gap-4 grid-cols-2">
+        <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2 rounded-lg bg-green-500/20">
+                <Car className="h-4 w-4 text-green-500" />
+              </div>
+              {stats.online > 0 && (
+                <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-1 rounded-full animate-pulse">
+                  live
+                </span>
+              )}
             </div>
-            <div>
-              <p className="text-2xl font-bold text-green-500">{stats.online}</p>
-              <p className="text-xs text-muted-foreground">Online Now</p>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-green-500">{stats.online}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Online Now</p>
             </div>
           </div>
         </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-muted">
-              <Users className="h-5 w-5" />
+        <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2 rounded-lg bg-slate-500/20">
+                <Users className="h-4 w-4 text-slate-400" />
+              </div>
+              <span className="text-xs font-medium text-slate-400 bg-slate-500/10 px-2 py-1 rounded-full">
+                all
+              </span>
             </div>
-            <div>
-              <p className="text-2xl font-bold">{stats.total}</p>
-              <p className="text-xs text-muted-foreground">Total Drivers</p>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight">{stats.total}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Total Drivers</p>
             </div>
           </div>
         </Card>

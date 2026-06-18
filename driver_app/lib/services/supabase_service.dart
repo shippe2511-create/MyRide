@@ -955,11 +955,11 @@ class SupabaseService {
     }
   }
 
-  static Future<bool> updateDriverAvatarUrl(String userId, String avatarUrl) async {
+  static Future<bool> updateDriverAvatarUrl(String driverId, String avatarUrl) async {
     try {
       await client.from('drivers').update({
         'avatar_url': avatarUrl,
-      }).eq('user_id', userId);
+      }).eq('id', driverId);
       return true;
     } catch (e) {
       debugPrint('Error updating driver avatar: $e');
@@ -967,12 +967,12 @@ class SupabaseService {
     }
   }
 
-  static Future<String?> getDriverAvatarUrl(String userId) async {
+  static Future<String?> getDriverAvatarUrl(String driverId) async {
     try {
       final response = await client
           .from('drivers')
           .select('avatar_url')
-          .eq('user_id', userId)
+          .eq('id', driverId)
           .maybeSingle();
       return response?['avatar_url'] as String?;
     } catch (e) {

@@ -84,58 +84,60 @@ export default function SchedulingPage() {
       return
     }
 
+    setDialogOpen(false)
     setSaving(true)
-    const { error } = await supabase.from("transport_routes").insert({
+    const { data, error } = await supabase.from("transport_routes").insert({
       transport_type: formData.transport_type,
       route_name: formData.route_name,
       route_code: formData.route_code || null,
       direction: formData.direction,
       is_active: formData.is_active,
-    })
+    }).select().single()
 
     if (error) {
       toast.error("Failed to create route")
     } else {
       toast.success("Route created")
-      setDialogOpen(false)
       setFormData({ transport_type: activeTab, route_name: "", route_code: "", direction: "outbound", is_active: true })
-      loadRoutes()
+      if (data) setRoutes(prev => [...prev, data])
     }
     setSaving(false)
   }
 
   const handleUpdate = async () => {
     if (!editingRoute) return
+    const routeToUpdate = editingRoute
+    setEditingRoute(null)
     setSaving(true)
 
     const { error } = await supabase.from("transport_routes").update({
-      route_name: editingRoute.route_name,
-      route_code: editingRoute.route_code,
-      direction: editingRoute.direction,
-      is_active: editingRoute.is_active,
-    }).eq("id", editingRoute.id)
+      route_name: routeToUpdate.route_name,
+      route_code: routeToUpdate.route_code,
+      direction: routeToUpdate.direction,
+      is_active: routeToUpdate.is_active,
+    }).eq("id", routeToUpdate.id)
 
     if (error) {
       toast.error("Failed to update route")
     } else {
       toast.success("Route updated")
-      setEditingRoute(null)
-      loadRoutes()
+      setRoutes(prev => prev.map(r => r.id === routeToUpdate.id ? { ...r, ...routeToUpdate } : r))
     }
     setSaving(false)
   }
 
   const handleDelete = async () => {
     if (!deleteId) return
+    const idToDelete = deleteId
+    setDeleteId(null)
 
-    const { error } = await supabase.from("transport_routes").delete().eq("id", deleteId)
+    const { error } = await supabase.from("transport_routes").delete().eq("id", idToDelete)
 
     if (error) {
       toast.error("Failed to delete route")
     } else {
       toast.success("Route deleted")
-      setDeleteId(null)
-      loadRoutes()
+      setRoutes(prev => prev.filter(r => r.id !== idToDelete))
     }
   }
 

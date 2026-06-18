@@ -141,6 +141,7 @@ export default function SOSPage() {
   }
 
   const updateStatus = async (alertId: string, newStatus: string) => {
+    setSelectedAlert(null)
     setSaving(true)
     const updates: Record<string, unknown> = { status: newStatus }
     if (newStatus === "resolved" || newStatus === "false_alarm") {
@@ -153,8 +154,7 @@ export default function SOSPage() {
       toast.error("Failed to update")
     } else {
       toast.success("Alert updated")
-      setSelectedAlert(null)
-      loadAlerts()
+      setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, status: newStatus } : a))
     }
     setSaving(false)
   }
@@ -178,15 +178,17 @@ export default function SOSPage() {
 
   const deleteAlert = async () => {
     if (!alertToDelete) return
-    const { error } = await supabase.from("sos_alerts").delete().eq("id", alertToDelete)
+    const idToDelete = alertToDelete
+    setDeleteDialogOpen(false)
+    setAlertToDelete(null)
+
+    const { error } = await supabase.from("sos_alerts").delete().eq("id", idToDelete)
     if (error) {
       toast.error("Failed to delete")
     } else {
       toast.success("Alert deleted")
-      loadAlerts()
+      setAlerts(prev => prev.filter(a => a.id !== idToDelete))
     }
-    setDeleteDialogOpen(false)
-    setAlertToDelete(null)
   }
 
   if (loading) {

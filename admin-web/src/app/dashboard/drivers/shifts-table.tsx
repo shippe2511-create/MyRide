@@ -203,15 +203,16 @@ export function ShiftsTable() {
 
   const handleDelete = async () => {
     if (!deleteId) return
+    const idToDelete = deleteId
+    setDeleteId(null)
 
-    const { error } = await supabase.from("shifts").delete().eq("id", deleteId)
+    const { error } = await supabase.from("shifts").delete().eq("id", idToDelete)
 
     if (error) {
       toast.error("Failed to delete shift")
     } else {
+      setShifts(prev => prev.filter(s => s.id !== idToDelete))
       toast.success("Shift deleted")
-      setDeleteId(null)
-      loadData()
     }
   }
 

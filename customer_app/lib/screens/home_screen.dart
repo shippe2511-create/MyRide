@@ -1036,6 +1036,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildBottomNav(BuildContext context) {
+    final isDark = context.isDark;
+    final navBgColor = isDark
+        ? const Color(0xFF1A1A1A).withValues(alpha: 0.85)
+        : Colors.white.withValues(alpha: 0.9);
+    final navBorderColor = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.black.withValues(alpha: 0.08);
+
     return Container(
       color: Colors.transparent,
       child: SafeArea(
@@ -1048,15 +1056,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               child: Container(
                 height: 64,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A).withValues(alpha: 0.85),
+                  color: navBgColor,
                   borderRadius: BorderRadius.circular(40),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.08),
+                    color: navBorderColor,
                     width: 1,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
+                      color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                       spreadRadius: -5,
@@ -1082,6 +1090,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildNavItem(int index, IconData activeIcon, IconData inactiveIcon) {
     final isActive = _currentIndex == index;
+    final isDark = context.isDark;
+    final activeColor = isDark ? Colors.white : Colors.black;
+    final inactiveColor = isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.4);
+    final activeBgColor = isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.08);
 
     return GestureDetector(
       onTap: () => _onTabTapped(index),
@@ -1091,16 +1103,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         curve: Curves.easeOutCubic,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isActive
-              ? Colors.white.withValues(alpha: 0.15)
-              : Colors.transparent,
+          color: isActive ? activeBgColor : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Icon(
           isActive ? activeIcon : inactiveIcon,
-          color: isActive
-              ? Colors.white
-              : Colors.white.withValues(alpha: 0.5),
+          color: isActive ? activeColor : inactiveColor,
           size: 26,
         ),
       ),

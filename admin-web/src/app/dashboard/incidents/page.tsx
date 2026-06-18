@@ -125,26 +125,32 @@ export default function IncidentsPage() {
       toast.error("Title is required")
       return
     }
-    const { error } = await supabase.from("incidents").insert({
+    setDialogType(null)
+    const { data, error } = await supabase.from("incidents").insert({
       type: formData.type,
       severity: formData.severity,
       title: formData.title,
       description: formData.description || null,
       location_name: formData.location_name || null,
       status: "open",
-    })
+    }).select().single()
     if (error) {
       toast.error("Failed to create incident")
     } else {
       toast.success("Incident created")
-      setDialogType(null)
       setFormData({ type: "complaint", severity: "medium", title: "", description: "", location_name: "" })
-      loadIncidents()
+      if (data) {
+        setIncidents(prev => [data, ...prev])
+      }
     }
   }
 
   const handleResolve = async () => {
     if (!selectedIncident) return
+    const incidentId = selectedIncident.id
+    setDialogType(null)
+    setSelectedIncident(null)
+
     const { error } = await supabase
       .from("incidents")
       .update({
@@ -152,15 +158,16 @@ export default function IncidentsPage() {
         resolution: resolution || null,
         resolved_at: new Date().toISOString(),
       })
-      .eq("id", selectedIncident.id)
+      .eq("id", incidentId)
 
     if (error) {
       toast.error("Failed to resolve incident")
     } else {
       toast.success("Incident resolved")
-      setDialogType(null)
       setResolution("")
-      loadIncidents()
+      setIncidents(prev => prev.map(i =>
+        i.id === incidentId ? { ...i, status: "resolved", resolution: resolution || null } : i
+      ))
     }
   }
 
@@ -170,7 +177,7 @@ export default function IncidentsPage() {
       toast.error("Failed to update status")
     } else {
       toast.success("Status updated")
-      loadIncidents()
+      setIncidents(prev => prev.map(i => i.id === id ? { ...i, status } : i))
     }
   }
 

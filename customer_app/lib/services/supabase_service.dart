@@ -1230,4 +1230,82 @@ class SupabaseService {
       return false;
     }
   }
+
+  // Favorite Drivers
+  static Future<List<Map<String, dynamic>>> getFavoriteDrivers() async {
+    final uid = userId;
+    if (uid == null) return [];
+
+    try {
+      final response = await client
+          .from('favorite_drivers')
+          .select('''
+            id,
+            driver_id,
+            created_at,
+            driver:drivers(
+              id,
+              rating,
+              profile:profiles(full_name, avatar_url, phone)
+            )
+          ''')
+          .eq('customer_id', uid)
+          .order('created_at', ascending: false);
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error getting favorite drivers: $e');
+      return [];
+    }
+  }
+
+  static Future<bool> addFavoriteDriver(String driverId) async {
+    final uid = userId;
+    if (uid == null) return false;
+
+    try {
+      await client.from('favorite_drivers').insert({
+        'customer_id': uid,
+        'driver_id': driverId,
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error adding favorite driver: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> removeFavoriteDriver(String driverId) async {
+    final uid = userId;
+    if (uid == null) return false;
+
+    try {
+      await client
+          .from('favorite_drivers')
+          .delete()
+          .eq('customer_id', uid)
+          .eq('driver_id', driverId);
+      return true;
+    } catch (e) {
+      debugPrint('Error removing favorite driver: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> isFavoriteDriver(String driverId) async {
+    final uid = userId;
+    if (uid == null) return false;
+
+    try {
+      final response = await client
+          .from('favorite_drivers')
+          .select('id')
+          .eq('customer_id', uid)
+          .eq('driver_id', driverId)
+          .maybeSingle();
+      return response != null;
+    } catch (e) {
+      return false;
+    }
+  }
 }

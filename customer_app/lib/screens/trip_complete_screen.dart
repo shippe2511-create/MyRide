@@ -274,7 +274,8 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
                       );
                     }
 
-                    if (_addToFavorites) {
+                    if (_addToFavorites && widget.driverId != null) {
+                      await SupabaseService.addFavoriteDriver(widget.driverId!);
                       appState.addFavoriteDriver(_driverInfo);
                     }
 

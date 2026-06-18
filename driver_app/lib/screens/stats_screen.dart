@@ -225,13 +225,110 @@ class _DriverStatsScreenState extends State<DriverStatsScreen> {
   Widget _buildStatsGrid(bool isDark, Color textColor, Color mutedColor) {
     final avgRating = _stats['avg_rating'] ?? 5.0;
     final completionRate = _stats['completion_rate'] ?? 100;
+    final cancelledRides = _stats['cancelled_rides'] ?? 0;
+    final totalRides = _stats['total_rides'] ?? 0;
+    final totalDistance = _stats['total_distance'] ?? 0.0;
 
-    return Row(
+    return Column(
       children: [
-        Expanded(child: _buildStatCard('Avg Rating', avgRating.toStringAsFixed(1), Icons.star, Colors.amber, isDark, textColor)),
-        const SizedBox(width: 12),
-        Expanded(child: _buildStatCard('Completion', '$completionRate%', Icons.check_circle, Colors.green, isDark, textColor)),
+        Row(
+          children: [
+            Expanded(child: _buildStatCard('Avg Rating', avgRating.toStringAsFixed(1), Icons.star, Colors.amber, isDark, textColor)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildStatCard('Completion', '$completionRate%', Icons.check_circle, Colors.green, isDark, textColor)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _buildStatCard('Cancelled', '$cancelledRides', Icons.cancel, Colors.red, isDark, textColor)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildStatCard('Avg Distance', totalRides > 0 ? '${(totalDistance / totalRides).toStringAsFixed(1)} km' : '0 km', Icons.straighten, Colors.blue, isDark, textColor)),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _buildGoalProgress(isDark, textColor, mutedColor),
       ],
+    );
+  }
+
+  Widget _buildGoalProgress(bool isDark, Color textColor, Color mutedColor) {
+    final totalRides = _stats['total_rides'] ?? 0;
+    int goal;
+    String goalLabel;
+
+    switch (_period) {
+      case 'today':
+        goal = 10;
+        goalLabel = 'Daily Goal: $totalRides / $goal rides';
+        break;
+      case 'week':
+        goal = 50;
+        goalLabel = 'Weekly Goal: $totalRides / $goal rides';
+        break;
+      case 'month':
+        goal = 200;
+        goalLabel = 'Monthly Goal: $totalRides / $goal rides';
+        break;
+      default:
+        goal = 10;
+        goalLabel = 'Daily Goal: $totalRides / $goal rides';
+    }
+
+    final progress = (totalRides / goal).clamp(0.0, 1.0);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.flag, color: AppColors.yellow, size: 20),
+                  const SizedBox(width: 8),
+                  Text('Goal Progress', style: TextStyle(color: textColor, fontWeight: FontWeight.w600)),
+                ],
+              ),
+              Text(
+                '${(progress * 100).toInt()}%',
+                style: TextStyle(color: AppColors.yellow, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 10,
+              backgroundColor: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.1),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                progress >= 1.0 ? Colors.green : AppColors.yellow,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(goalLabel, style: TextStyle(color: mutedColor, fontSize: 12)),
+          if (progress >= 1.0) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.emoji_events, color: Colors.amber, size: 16),
+                const SizedBox(width: 4),
+                Text('Goal achieved!', style: TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 

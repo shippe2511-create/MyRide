@@ -1308,4 +1308,85 @@ class SupabaseService {
       return false;
     }
   }
+
+  // Recurring Rides
+  static Future<List<Map<String, dynamic>>> getRecurringRides() async {
+    final uid = userId;
+    if (uid == null) return [];
+
+    try {
+      final response = await client
+          .from('recurring_rides')
+          .select()
+          .eq('customer_id', uid)
+          .order('schedule_time');
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error getting recurring rides: $e');
+      return [];
+    }
+  }
+
+  static Future<Map<String, dynamic>?> createRecurringRide({
+    required String pickupName,
+    required double pickupLat,
+    required double pickupLng,
+    required String dropoffName,
+    required double dropoffLat,
+    required double dropoffLng,
+    required String scheduleTime,
+    required List<String> daysOfWeek,
+  }) async {
+    final uid = userId;
+    if (uid == null) return null;
+
+    try {
+      final response = await client.from('recurring_rides').insert({
+        'customer_id': uid,
+        'pickup_name': pickupName,
+        'pickup_lat': pickupLat,
+        'pickup_lng': pickupLng,
+        'dropoff_name': dropoffName,
+        'dropoff_lat': dropoffLat,
+        'dropoff_lng': dropoffLng,
+        'schedule_time': scheduleTime,
+        'days_of_week': daysOfWeek,
+        'is_active': true,
+      }).select().single();
+      return response;
+    } catch (e) {
+      debugPrint('Error creating recurring ride: $e');
+      return null;
+    }
+  }
+
+  static Future<bool> updateRecurringRide(String id, Map<String, dynamic> updates) async {
+    try {
+      await client.from('recurring_rides').update(updates).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('Error updating recurring ride: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> deleteRecurringRide(String id) async {
+    try {
+      await client.from('recurring_rides').delete().eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting recurring ride: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> toggleRecurringRide(String id, bool isActive) async {
+    try {
+      await client.from('recurring_rides').update({'is_active': isActive}).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('Error toggling recurring ride: $e');
+      return false;
+    }
+  }
 }

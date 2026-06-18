@@ -8,6 +8,7 @@ import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import 'stats_screen.dart';
+import 'vehicle_logs_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -285,6 +286,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => DriverStatsScreen(driverId: state.driverId)),
+                      );
+                    },
+                  ),
+                  _buildSettingTile(
+                    context,
+                    icon: Icons.local_gas_station,
+                    title: 'Vehicle Logs',
+                    trailing: Icon(Icons.chevron_right, color: context.mutedColor),
+                    iconColor: Colors.orange,
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const VehicleLogsScreen()),
                       );
                     },
                   ),

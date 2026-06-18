@@ -1213,4 +1213,115 @@ class SupabaseService {
       return false;
     }
   }
+
+  // Vehicle Logs (Fuel & Maintenance)
+  static Future<List<Map<String, dynamic>>> getVehicleLogs({String? logType, int limit = 50}) async {
+    final id = _driverId;
+    if (id == null || id.isEmpty) return [];
+
+    try {
+      dynamic response;
+      if (logType != null && logType.isNotEmpty) {
+        response = await client
+            .from('vehicle_logs')
+            .select()
+            .eq('driver_id', id)
+            .eq('log_type', logType)
+            .order('log_date', ascending: false)
+            .limit(limit);
+      } else {
+        response = await client
+            .from('vehicle_logs')
+            .select()
+            .eq('driver_id', id)
+            .order('log_date', ascending: false)
+            .limit(limit);
+      }
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error getting vehicle logs: $e');
+      return [];
+    }
+  }
+
+  static Future<Map<String, dynamic>?> addVehicleLog({
+    required String logType,
+    double? amount,
+    int? odometer,
+    String? notes,
+    DateTime? logDate,
+  }) async {
+    final id = _driverId;
+    if (id == null || id.isEmpty) return null;
+
+    try {
+      final response = await client.from('vehicle_logs').insert({
+        'driver_id': id,
+        'log_type': logType,
+        'amount': amount,
+        'odometer': odometer,
+        'notes': notes,
+        'log_date': (logDate ?? DateTime.now()).toIso8601String().split('T')[0],
+      }).select().single();
+      return response;
+    } catch (e) {
+      debugPrint('Error adding vehicle log: $e');
+      return null;
+    }
+  }
+
+  static Future<bool> deleteVehicleLog(String logId) async {
+    try {
+      await client.from('vehicle_logs').delete().eq('id', logId);
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting vehicle log: $e');
+      return false;
+    }
+  }
+
+  static Future<Map<String, dynamic>> getVehicleLogStats() async {
+    final id = _driverId;
+    if (id == null || id.isEmpty) return {};
+
+    try {
+      final now = DateTime.now();
+      final monthStart = DateTime(now.year, now.month, 1);
+
+      final response = await client
+          .from('vehicle_logs')
+          .select('log_type, amount')
+          .eq('driver_id', id)
+          .gte('log_date', monthStart.toIso8601String().split('T')[0]);
+
+      final logs = List<Map<String, dynamic>>.from(response);
+
+      double fuelTotal = 0;
+      double maintenanceTotal = 0;
+      int fuelCount = 0;
+      int maintenanceCount = 0;
+
+      for (final log in logs) {
+        final amount = (log['amount'] ?? 0).toDouble();
+        if (log['log_type'] == 'fuel') {
+          fuelTotal += amount;
+          fuelCount++;
+        } else {
+          maintenanceTotal += amount;
+          maintenanceCount++;
+        }
+      }
+
+      return {
+        'fuel_total': fuelTotal,
+        'fuel_count': fuelCount,
+        'maintenance_total': maintenanceTotal,
+        'maintenance_count': maintenanceCount,
+        'total': fuelTotal + maintenanceTotal,
+      };
+    } catch (e) {
+      debugPrint('Error getting vehicle log stats: $e');
+      return {};
+    }
+  }
 }

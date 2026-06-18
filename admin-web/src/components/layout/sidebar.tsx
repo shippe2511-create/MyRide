@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -29,6 +30,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { usePermissions } from "@/hooks/usePermissions"
 import type { Permission } from "@/lib/permissions"
+import { Badge } from "@/components/ui/badge"
 
 const navigation: { name: string; href: string; icon: typeof LayoutDashboard; permission: Permission }[] = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard:view" },
@@ -60,6 +62,44 @@ export function Sidebar() {
   const router = useRouter()
   const supabase = createClient()
   const { can, loading } = usePermissions()
+  const [badges, setBadges] = useState<Record<string, number>>({})
+
+  useEffect(() => {
+    loadBadges()
+
+    const channel = supabase
+      .channel('sidebar_badges')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => loadBadges())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => loadBadges())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sos_alerts' }, () => loadBadges())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, () => loadBadges())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_documents' }, () => loadBadges())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_checklists' }, () => loadBadges())
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
+  const loadBadges = async () => {
+    const [pendingCustomers, pendingDrivers, activeSOS, openIncidents, pendingDocs, checklistIssues] = await Promise.all([
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'customer').eq('status', 'pending'),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'driver').eq('status', 'pending'),
+      supabase.from('sos_alerts').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+      supabase.from('incidents').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+      supabase.from('driver_documents').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('vehicle_checklists').select('*', { count: 'exact', head: true }).eq('has_issues', true),
+    ])
+
+    setBadges({
+      '/dashboard/customers': pendingCustomers.count || 0,
+      '/dashboard/drivers': (pendingDrivers.count || 0) + (pendingDocs.count || 0),
+      '/dashboard/sos': activeSOS.count || 0,
+      '/dashboard/incidents': openIncidents.count || 0,
+      '/dashboard/checklists': checklistIssues.count || 0,
+    })
+  }
 
   const handleLogout = async () => {
     sessionStorage.removeItem("myride_admin_role")
@@ -97,7 +137,18 @@ export function Sidebar() {
               )}
             >
               <item.icon className="h-4 w-4" />
-              {item.name}
+              <span className="flex-1">{item.name}</span>
+              {badges[item.href] > 0 && (
+                <Badge
+                  variant={item.href === '/dashboard/sos' ? 'destructive' : 'secondary'}
+                  className={cn(
+                    "h-5 min-w-5 px-1.5 text-xs",
+                    item.href === '/dashboard/sos' && "animate-pulse"
+                  )}
+                >
+                  {badges[item.href]}
+                </Badge>
+              )}
             </Link>
           )
         })}

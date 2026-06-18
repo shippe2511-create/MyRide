@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { DashboardCharts } from "./charts"
 import { DashboardRefresh } from "./dashboard-refresh"
+import { ActivityFeed } from "@/components/activity-feed"
 
 async function getStats() {
   const supabase = await createClient()
@@ -168,8 +169,8 @@ export default async function DashboardPage() {
 
       <DashboardCharts />
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Recent Rides</CardTitle>
           </CardHeader>
@@ -179,7 +180,7 @@ export default async function DashboardPage() {
             ) : (
               <div className="space-y-4">
                 {stats.recentRides.map((ride: Record<string, unknown>) => (
-                  <div key={ride.id as string} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
+                  <div key={ride.id as string} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0 hover:bg-muted/50 -mx-2 px-2 rounded transition-colors">
                     <div>
                       <p className="font-medium">{(ride.customer as { full_name: string })?.full_name || "Unknown"}</p>
                       <p className="text-sm text-muted-foreground">
@@ -202,30 +203,34 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <ActivityFeed />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-2">
-            <a href="/dashboard/drivers?status=pending" className="flex items-center gap-2 rounded-lg border p-3 hover:bg-accent">
+          <CardContent className="grid gap-2 sm:grid-cols-3">
+            <a href="/dashboard/drivers?status=pending" className="flex items-center gap-2 rounded-lg border p-3 hover:bg-accent transition-colors">
               <AlertCircle className="h-5 w-5 text-yellow-500" />
               <div>
-                <p className="font-medium">Pending Driver Approvals</p>
-                <p className="text-sm text-muted-foreground">{stats.pendingApprovals} awaiting review</p>
+                <p className="font-medium text-sm">Pending Approvals</p>
+                <p className="text-xs text-muted-foreground">{stats.pendingApprovals} awaiting</p>
               </div>
             </a>
-            <a href="/dashboard/rides?status=active" className="flex items-center gap-2 rounded-lg border p-3 hover:bg-accent">
+            <a href="/dashboard/rides?status=active" className="flex items-center gap-2 rounded-lg border p-3 hover:bg-accent transition-colors">
               <Clock className="h-5 w-5 text-blue-500" />
               <div>
-                <p className="font-medium">Active Rides</p>
-                <p className="text-sm text-muted-foreground">{stats.activeRides} in progress</p>
+                <p className="font-medium text-sm">Active Rides</p>
+                <p className="text-xs text-muted-foreground">{stats.activeRides} in progress</p>
               </div>
             </a>
-            <a href="/dashboard/reports" className="flex items-center gap-2 rounded-lg border p-3 hover:bg-accent">
+            <a href="/dashboard/reports" className="flex items-center gap-2 rounded-lg border p-3 hover:bg-accent transition-colors">
               <TrendingUp className="h-5 w-5 text-green-500" />
               <div>
-                <p className="font-medium">Generate Reports</p>
-                <p className="text-sm text-muted-foreground">Export CSV or PDF reports</p>
+                <p className="font-medium text-sm">Reports</p>
+                <p className="text-xs text-muted-foreground">Export data</p>
               </div>
             </a>
           </CardContent>

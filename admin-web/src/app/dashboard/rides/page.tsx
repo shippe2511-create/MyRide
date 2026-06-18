@@ -21,8 +21,12 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
-  MapPin, Clock, CheckCircle, XCircle, Search, Loader2, RefreshCw, Car, MoreVertical, Edit, Trash2
+  MapPin, Clock, CheckCircle, XCircle, Search, Loader2, RefreshCw, Car, MoreVertical, Edit, Trash2, TrendingUp
 } from "lucide-react"
+import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
+import { EmptyState } from "@/components/ui/empty-state"
+import { FilterPills } from "@/components/ui/filter-pills"
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu"
@@ -63,11 +67,12 @@ export default function RidesPage() {
   const [selectedRide, setSelectedRide] = useState<Ride | null>(null)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
-  const [stats, setStats] = useState({ total: 0, active: 0, completed: 0 })
+  const [stats, setStats] = useState({ total: 0, active: 0, completed: 0, cancelled: 0 })
   const [editRide, setEditRide] = useState<Ride | null>(null)
   const [editStatus, setEditStatus] = useState("")
   const [saving, setSaving] = useState(false)
   const [deleteRideId, setDeleteRideId] = useState<string | null>(null)
+  const [chartData, setChartData] = useState<{ date: string; rides: number }[]>([])
 
   useEffect(() => {
     loadData(true)
@@ -102,11 +107,13 @@ export default function RidesPage() {
       }
     }
 
-    const [ridesRes, totalRes, activeRes, completedRes] = await Promise.all([
+    const [ridesRes, totalRes, activeRes, completedRes, cancelledRes, last7DaysRes] = await Promise.all([
       query,
       supabase.from("rides").select("*", { count: "exact", head: true }),
       supabase.from("rides").select("*", { count: "exact", head: true }).in("status", ["pending", "accepted", "arrived", "in_progress"]),
       supabase.from("rides").select("*", { count: "exact", head: true }).eq("status", "completed"),
+      supabase.from("rides").select("*", { count: "exact", head: true }).eq("status", "cancelled"),
+      supabase.from("rides").select("created_at").gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
     ])
 
     setRides(ridesRes.data || [])
@@ -114,7 +121,23 @@ export default function RidesPage() {
       total: totalRes.count || 0,
       active: activeRes.count || 0,
       completed: completedRes.count || 0,
+      cancelled: cancelledRes.count || 0,
     })
+
+    // Build chart data for last 7 days
+    const last7Days = last7DaysRes.data || []
+    const dateCount: Record<string, number> = {}
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
+      const key = d.toLocaleDateString("en-US", { weekday: "short" })
+      dateCount[key] = 0
+    }
+    last7Days.forEach(r => {
+      const key = new Date(r.created_at).toLocaleDateString("en-US", { weekday: "short" })
+      if (dateCount[key] !== undefined) dateCount[key]++
+    })
+    setChartData(Object.entries(dateCount).map(([date, rides]) => ({ date, rides })))
+
     setLoading(false)
   }
 
@@ -174,8 +197,17 @@ export default function RidesPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="w-32 h-8 bg-muted rounded animate-pulse" />
+            <div className="w-48 h-4 bg-muted rounded animate-pulse mt-2" />
+          </div>
+        </div>
+        <div className="grid gap-4 grid-cols-4">
+          {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
+        </div>
+        <SkeletonTable rows={5} />
       </div>
     )
   }
@@ -193,7 +225,7 @@ export default function RidesPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 grid-cols-3">
+      <div className="grid gap-4 grid-cols-4">
         <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
@@ -242,7 +274,49 @@ export default function RidesPage() {
             </div>
           </div>
         </Card>
+        <Card className="p-5 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2 rounded-lg bg-red-500/20">
+                <XCircle className="h-4 w-4 text-red-500" />
+              </div>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-red-500">{stats.cancelled}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Cancelled</p>
+            </div>
+          </div>
+        </Card>
       </div>
+
+      {/* Rides Chart */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-semibold">Rides This Week</h3>
+            <p className="text-sm text-muted-foreground">Daily ride count for the last 7 days</p>
+          </div>
+          <TrendingUp className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <div className="h-48">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData}>
+              <defs>
+                <linearGradient id="ridesGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="date" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis fontSize={12} tickLine={false} axisLine={false} />
+              <Tooltip
+                contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+              />
+              <Area type="monotone" dataKey="rides" stroke="#3b82f6" strokeWidth={2} fill="url(#ridesGradient)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
 
       <Card className="p-4">
         <div className="flex items-center gap-3 mb-4">
@@ -268,6 +342,21 @@ export default function RidesPage() {
           </Select>
         </div>
 
+        <FilterPills
+          filters={[
+            ...(statusFilter !== "all" ? [{ key: "status", label: "Status", value: statusFilter }] : []),
+            ...(search ? [{ key: "search", label: "Search", value: search }] : []),
+          ]}
+          onRemove={(key) => {
+            if (key === "status") setStatusFilter("all")
+            if (key === "search") setSearch("")
+          }}
+          onClearAll={() => {
+            setStatusFilter("all")
+            setSearch("")
+          }}
+        />
+
         <Table>
           <TableHeader>
             <TableRow>
@@ -282,8 +371,12 @@ export default function RidesPage() {
           <TableBody>
             {filteredRides.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  No rides found
+                <TableCell colSpan={6} className="p-0">
+                  <EmptyState
+                    icon="rides"
+                    title="No rides found"
+                    description={search ? "Try adjusting your search or filters" : "Rides will appear here when customers book them"}
+                  />
                 </TableCell>
               </TableRow>
             ) : (

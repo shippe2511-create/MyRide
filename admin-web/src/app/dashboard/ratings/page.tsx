@@ -21,6 +21,7 @@ import { Star, Search, TrendingUp, TrendingDown, AlertTriangle, Loader2, Car, Ph
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { formatDate } from "@/lib/utils"
+import { Breadcrumbs } from "@/components/breadcrumbs"
 
 // Circular Progress Component
 const CircularProgress = ({ value, size = 120, strokeWidth = 10, color = "yellow" }: { value: number, size?: number, strokeWidth?: number, color?: string }) => {
@@ -474,6 +475,7 @@ export default function RatingsPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs />
       <div>
         <h1 className="text-3xl font-bold">Driver Ratings</h1>
         <p className="text-muted-foreground">
@@ -481,72 +483,49 @@ export default function RatingsPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-slate-500/20">
-                <Activity className="h-4 w-4 text-slate-400" />
-              </div>
-              <span className="text-xs font-medium text-slate-400 bg-slate-500/10 px-2 py-1 rounded-full">
-                all time
-              </span>
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+        <Card className="p-4 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-slate-500/20 shrink-0">
+              <Activity className="h-4 w-4 text-slate-400" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight">{totalReviews}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Total Reviews</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight">{totalReviews}</p>
+              <p className="text-xs text-muted-foreground truncate">Total Reviews</p>
             </div>
           </div>
         </Card>
-        <Card className="p-5 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-yellow-500/20">
-                <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-              </div>
-              <div className="flex">
-                {[1, 2, 3, 4, 5].map(i => (
-                  <Star key={i} className={`h-3 w-3 ${i <= Math.round(parseFloat(overallAvg)) ? 'text-yellow-500 fill-yellow-500' : 'text-muted'}`} />
-                ))}
-              </div>
+        <Card className="p-4 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-yellow-500/20 shrink-0">
+              <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-yellow-500">{overallAvg}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Average Rating</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-yellow-500">{overallAvg}</p>
+              <p className="text-xs text-muted-foreground truncate">Average Rating</p>
             </div>
           </div>
         </Card>
-        <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-green-500/20">
-                <Trophy className="h-4 w-4 text-green-500" />
-              </div>
-              <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-1 rounded-full">
-                4.5+
-              </span>
+        <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-green-500/20 shrink-0">
+              <Trophy className="h-4 w-4 text-green-500" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-green-500">{topDrivers}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Top Drivers</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-green-500">{topDrivers}</p>
+              <p className="text-xs text-muted-foreground truncate">Top Drivers</p>
             </div>
+            <span className="text-xs font-medium text-green-500 ml-auto shrink-0">4.5+</span>
           </div>
         </Card>
-        <Card className={`p-5 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20 ${lowRatedDrivers > 0 ? 'ring-2 ring-red-500/50' : ''}`}>
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-red-500/20">
-                <AlertTriangle className="h-4 w-4 text-red-500" />
-              </div>
-              {lowRatedDrivers > 0 && (
-                <span className="text-xs font-medium text-red-500 bg-red-500/10 px-2 py-1 rounded-full animate-pulse">
-                  needs attention
-                </span>
-              )}
+        <Card className={`p-4 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20 ${lowRatedDrivers > 0 ? 'ring-2 ring-red-500/50' : ''}`}>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-red-500/20 shrink-0">
+              <AlertTriangle className="h-4 w-4 text-red-500" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-red-500">{lowRatedDrivers}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Low Rated (&lt;3)</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-red-500">{lowRatedDrivers}</p>
+              <p className="text-xs text-muted-foreground truncate">Low Rated (&lt;3)</p>
             </div>
           </div>
         </Card>

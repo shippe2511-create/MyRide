@@ -15,6 +15,7 @@ import {
   MessageSquare, Search, User, Car, Clock, MapPin, Loader2, RefreshCw, ChevronRight
 } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
+import { Breadcrumbs } from "@/components/breadcrumbs"
 
 interface ChatMessage {
   id: string
@@ -265,6 +266,7 @@ export default function ChatPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-3">
@@ -281,58 +283,48 @@ export default function ChatPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-slate-500/20">
-                <MessageSquare className="h-4 w-4 text-slate-400" />
-              </div>
-              <span className="text-xs font-medium text-slate-400 bg-slate-500/10 px-2 py-1 rounded-full">all</span>
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+        <Card className="p-4 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-slate-500/20 shrink-0">
+              <MessageSquare className="h-4 w-4 text-slate-400" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight">{stats.totalConversations}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Total Conversations</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight">{stats.totalConversations}</p>
+              <p className="text-xs text-muted-foreground truncate">Total Chats</p>
             </div>
           </div>
         </Card>
-        <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-green-500/20">
-                <Car className="h-4 w-4 text-green-500" />
-              </div>
+        <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-green-500/20 shrink-0">
+              <Car className="h-4 w-4 text-green-500" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-green-500">{stats.activeConversations}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Active Rides</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-green-500">{stats.activeConversations}</p>
+              <p className="text-xs text-muted-foreground truncate">Active Rides</p>
             </div>
           </div>
         </Card>
-        <Card className="p-5 bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-purple-500/20">
-                <MessageSquare className="h-4 w-4 text-purple-500" />
-              </div>
+        <Card className="p-4 bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-purple-500/20 shrink-0">
+              <MessageSquare className="h-4 w-4 text-purple-500" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-purple-500">{stats.totalMessages}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Total Messages</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-purple-500">{stats.totalMessages}</p>
+              <p className="text-xs text-muted-foreground truncate">Total Messages</p>
             </div>
           </div>
         </Card>
-        <Card className="p-5 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-blue-500/20">
-                <Clock className="h-4 w-4 text-blue-500" />
-              </div>
-              <span className="text-xs font-medium text-blue-500 bg-blue-500/10 px-2 py-1 rounded-full">today</span>
+        <Card className="p-4 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-blue-500/20 shrink-0">
+              <Clock className="h-4 w-4 text-blue-500" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-blue-500">{stats.todayMessages}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Today&apos;s Messages</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-blue-500">{stats.todayMessages}</p>
+              <p className="text-xs text-muted-foreground truncate">Today</p>
             </div>
           </div>
         </Card>

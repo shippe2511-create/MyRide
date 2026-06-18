@@ -13,6 +13,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Settings, Globe, Bell, Shield, Database, Save, Loader2, KeyRound, Phone, Plus, Trash2, GripVertical, Eye, EyeOff } from "lucide-react"
 import { toast } from "sonner"
+import { Breadcrumbs } from "@/components/breadcrumbs"
 
 interface AppSettings {
   id: string
@@ -223,6 +224,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Settings</h1>

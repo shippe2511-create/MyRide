@@ -28,6 +28,7 @@ import { toast } from "sonner"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import { SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
+import { Breadcrumbs } from "@/components/breadcrumbs"
 
 interface VehicleLog {
   id: string
@@ -282,6 +283,7 @@ export default function VehicleLogsPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -293,92 +295,74 @@ export default function VehicleLogsPage() {
       </div>
 
       {/* Summary Stats Row */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-slate-500/20">
-                <DollarSign className="h-4 w-4 text-slate-400" />
-              </div>
-              <span className="text-xs font-medium text-slate-400 bg-slate-500/10 px-2 py-1 rounded-full">
-                {logs.length} logs
-              </span>
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+        <Card className="p-4 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-slate-500/20 shrink-0">
+              <DollarSign className="h-4 w-4 text-slate-400" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight">MVR {totalSpent.toLocaleString()}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Total Spent</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight">MVR {totalSpent.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground truncate">Total Spent</p>
+            </div>
+            <span className="text-xs font-medium text-slate-400 ml-auto shrink-0">{logs.length}</span>
+          </div>
+        </Card>
+        <Card className={`p-4 bg-gradient-to-br ${monthOverMonthChange >= 0 ? 'from-red-500/10 to-red-600/5 border-red-500/20' : 'from-green-500/10 to-green-600/5 border-green-500/20'}`}>
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg shrink-0 ${monthOverMonthChange >= 0 ? 'bg-red-500/20' : 'bg-green-500/20'}`}>
+              <Calendar className={`h-4 w-4 ${monthOverMonthChange >= 0 ? 'text-red-500' : 'text-green-500'}`} />
+            </div>
+            <div className="min-w-0">
+              <p className={`text-xl font-bold tracking-tight ${monthOverMonthChange >= 0 ? 'text-red-500' : 'text-green-500'}`}>MVR {thisMonthSpent.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground truncate">This Month</p>
+            </div>
+            <span className={`text-xs font-medium ml-auto shrink-0 flex items-center gap-0.5 ${monthOverMonthChange >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+              {monthOverMonthChange >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+              {Math.abs(monthOverMonthChange).toFixed(0)}%
+            </span>
+          </div>
+        </Card>
+        <Card className="p-4 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-blue-500/20 shrink-0">
+              <TrendingUp className="h-4 w-4 text-blue-500" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-blue-500">MVR {avgPerLog.toFixed(0)}</p>
+              <p className="text-xs text-muted-foreground truncate">Avg per Log</p>
             </div>
           </div>
         </Card>
-        <Card className={`p-5 bg-gradient-to-br ${monthOverMonthChange >= 0 ? 'from-red-500/10 to-red-600/5 border-red-500/20' : 'from-green-500/10 to-green-600/5 border-green-500/20'}`}>
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className={`p-2 rounded-lg ${monthOverMonthChange >= 0 ? 'bg-red-500/20' : 'bg-green-500/20'}`}>
-                <Calendar className={`h-4 w-4 ${monthOverMonthChange >= 0 ? 'text-red-500' : 'text-green-500'}`} />
-              </div>
-              <span className={`text-xs font-medium ${monthOverMonthChange >= 0 ? 'text-red-500 bg-red-500/10' : 'text-green-500 bg-green-500/10'} px-2 py-1 rounded-full flex items-center gap-1`}>
-                {monthOverMonthChange >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                {Math.abs(monthOverMonthChange).toFixed(0)}%
-              </span>
+        <Card className="p-4 bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-purple-500/20 shrink-0">
+              <Users className="h-4 w-4 text-purple-500" />
             </div>
-            <div className="mt-2">
-              <p className={`text-2xl font-bold tracking-tight ${monthOverMonthChange >= 0 ? 'text-red-500' : 'text-green-500'}`}>MVR {thisMonthSpent.toLocaleString()}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">This Month</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-5 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-blue-500/20">
-                <TrendingUp className="h-4 w-4 text-blue-500" />
-              </div>
-            </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-blue-500">MVR {avgPerLog.toFixed(0)}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Avg per Log</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-5 bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-purple-500/20">
-                <Users className="h-4 w-4 text-purple-500" />
-              </div>
-              <span className="text-xs font-medium text-purple-500 bg-purple-500/10 px-2 py-1 rounded-full">
-                top spender
-              </span>
-            </div>
-            <div className="mt-2">
+            <div className="min-w-0">
               <p className="text-lg font-bold tracking-tight text-purple-500 truncate">{topDrivers[0]?.[0] || "N/A"}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">MVR {(topDrivers[0]?.[1] || 0).toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground truncate">MVR {(topDrivers[0]?.[1] || 0).toLocaleString()}</p>
             </div>
           </div>
         </Card>
       </div>
 
       {/* Category Breakdown Stats */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
         {stats.map(stat => {
           const Icon = stat.icon
-          const colorClass = stat.color.replace('bg-', '')
           const percentage = totalSpent > 0 ? (stat.total / totalSpent * 100).toFixed(0) : 0
           return (
-            <Card key={stat.value} className={`p-5 bg-gradient-to-br from-${colorClass}/10 to-${colorClass}/5 border-${colorClass}/20 hover:border-${colorClass}/40 transition-colors`}>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <div className={`p-2 rounded-lg ${stat.color}/20`}>
-                    <Icon className={`h-4 w-4 text-${colorClass}`} />
-                  </div>
-                  <span className={`text-xs font-medium text-${colorClass} bg-${colorClass}/10 px-2 py-1 rounded-full`}>
-                    {stat.count} • {percentage}%
-                  </span>
+            <Card key={stat.value} className={`p-4 ${stat.color.replace('bg-', 'bg-gradient-to-br from-')}/10 to-${stat.color.replace('bg-', '')}/5 border-${stat.color.replace('bg-', '')}/20 hover:border-${stat.color.replace('bg-', '')}/40 transition-colors`}>
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${stat.color}/20 shrink-0`}>
+                  <Icon className={`h-4 w-4 ${stat.color.replace('bg-', 'text-')}`} />
                 </div>
-                <div className="mt-2">
-                  <p className="text-2xl font-bold tracking-tight">MVR {stat.total.toLocaleString()}</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">{stat.label}</p>
+                <div className="min-w-0">
+                  <p className="text-xl font-bold tracking-tight">MVR {stat.total.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground truncate">{stat.label}</p>
                 </div>
+                <span className="text-xs font-medium text-muted-foreground ml-auto shrink-0">{stat.count}</span>
               </div>
             </Card>
           )

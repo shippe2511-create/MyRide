@@ -32,6 +32,7 @@ import { ROLE_DESCRIPTIONS, type Role, type Permission, getPermissionsForRole } 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Switch } from "@/components/ui/switch"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Breadcrumbs } from "@/components/breadcrumbs"
 
 interface AdminUser {
   id: string
@@ -319,6 +320,7 @@ export default function AdminsPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -341,25 +343,18 @@ export default function AdminsPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
         {ROLES.map(role => {
           const count = admins.filter(a => a.role === role.value).length
           return (
-            <Card key={role.value} className={`p-5 bg-gradient-to-br from-${role.color.replace('bg-', '')}/10 to-${role.color.replace('bg-', '')}/5 border-${role.color.replace('bg-', '')}/20`}>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <div className={`p-2 rounded-lg ${role.color}/20`}>
-                    <Shield className={`h-4 w-4 text-${role.color.replace('bg-', '')}`} />
-                  </div>
-                  {count > 0 && (
-                    <span className={`text-xs font-medium text-${role.color.replace('bg-', '')} bg-${role.color.replace('bg-', '')}/10 px-2 py-1 rounded-full`}>
-                      {count}
-                    </span>
-                  )}
+            <Card key={role.value} className={`p-4 bg-gradient-to-br from-${role.color.replace('bg-', '')}/10 to-${role.color.replace('bg-', '')}/5 border-${role.color.replace('bg-', '')}/20`}>
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${role.color}/20 shrink-0`}>
+                  <Shield className={`h-4 w-4 text-${role.color.replace('bg-', '')}`} />
                 </div>
-                <div className="mt-2">
+                <div className="min-w-0">
                   <p className={`text-xl font-bold tracking-tight ${count > 0 ? `text-${role.color.replace('bg-', '')}` : 'text-muted-foreground'}`}>{count}</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">{role.label}</p>
+                  <p className="text-xs text-muted-foreground truncate">{role.label}</p>
                 </div>
               </div>
             </Card>

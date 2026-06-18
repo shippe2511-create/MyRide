@@ -205,79 +205,62 @@ export function DocumentsTable() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-5">
-        <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-slate-500/20">
-                <FileText className="h-4 w-4 text-slate-400" />
-              </div>
-              <span className="text-xs font-medium text-slate-400 bg-slate-500/10 px-2 py-1 rounded-full">all</span>
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
+        <Card className="p-4 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-slate-500/20 shrink-0">
+              <FileText className="h-4 w-4 text-slate-400" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight">{stats.total}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Total Documents</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight">{stats.total}</p>
+              <p className="text-xs text-muted-foreground truncate">Total</p>
             </div>
           </div>
         </Card>
-        <Card className={`p-5 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20 ${stats.pending > 0 ? 'ring-2 ring-yellow-500/50' : ''}`}>
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-yellow-500/20">
-                <Clock className="h-4 w-4 text-yellow-500" />
-              </div>
-              {stats.pending > 0 && (
-                <span className="text-xs font-medium text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded-full animate-pulse">review</span>
-              )}
+        <Card className={`p-4 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20 ${stats.pending > 0 ? 'ring-2 ring-yellow-500/50' : ''}`}>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-yellow-500/20 shrink-0">
+              <Clock className="h-4 w-4 text-yellow-500" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-yellow-500">{stats.pending}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Pending</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-yellow-500">{stats.pending}</p>
+              <p className="text-xs text-muted-foreground truncate">Pending</p>
             </div>
           </div>
         </Card>
-        <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-green-500/20">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-              </div>
-              <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-1 rounded-full">
-                {stats.total > 0 ? Math.round((stats.verified / stats.total) * 100) : 0}%
-              </span>
+        <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-green-500/20 shrink-0">
+              <CheckCircle className="h-4 w-4 text-green-500" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-green-500">{stats.verified}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Approved</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-green-500">{stats.verified}</p>
+              <p className="text-xs text-muted-foreground truncate">Approved</p>
+            </div>
+            <span className="text-xs font-medium text-green-500 ml-auto shrink-0">
+              {stats.total > 0 ? Math.round((stats.verified / stats.total) * 100) : 0}%
+            </span>
+          </div>
+        </Card>
+        <Card className="p-4 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-red-500/20 shrink-0">
+              <XCircle className="h-4 w-4 text-red-500" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-red-500">{stats.rejected}</p>
+              <p className="text-xs text-muted-foreground truncate">Rejected</p>
             </div>
           </div>
         </Card>
-        <Card className="p-5 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-red-500/20">
-                <XCircle className="h-4 w-4 text-red-500" />
-              </div>
+        <Card className={`p-4 bg-gradient-to-br from-orange-500/10 to-orange-600/5 border-orange-500/20 ${stats.expiringSoon > 0 ? 'ring-2 ring-orange-500/50' : ''}`}>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-orange-500/20 shrink-0">
+              <AlertTriangle className="h-4 w-4 text-orange-500" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-red-500">{stats.rejected}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Rejected</p>
-            </div>
-          </div>
-        </Card>
-        <Card className={`p-5 bg-gradient-to-br from-orange-500/10 to-orange-600/5 border-orange-500/20 ${stats.expiringSoon > 0 ? 'ring-2 ring-orange-500/50' : ''}`}>
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-orange-500/20">
-                <AlertTriangle className="h-4 w-4 text-orange-500" />
-              </div>
-              {stats.expiringSoon > 0 && (
-                <span className="text-xs font-medium text-orange-500 bg-orange-500/10 px-2 py-1 rounded-full animate-pulse">alert</span>
-              )}
-            </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-orange-500">{stats.expiringSoon}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Expiring Soon</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-orange-500">{stats.expiringSoon}</p>
+              <p className="text-xs text-muted-foreground truncate">Expiring</p>
             </div>
           </div>
         </Card>

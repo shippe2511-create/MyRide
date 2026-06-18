@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Users, UserCheck, Clock, FileText, Loader2, Calendar } from "lucide-react"
 import { Breadcrumbs } from "@/components/breadcrumbs"
+import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 
 export default function DriversPage() {
   const supabase = createClient()
@@ -73,8 +74,16 @@ export default function DriversPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="space-y-6">
+        <Breadcrumbs />
+        <div>
+          <div className="w-32 h-8 bg-muted rounded animate-pulse" />
+          <div className="w-64 h-4 bg-muted rounded animate-pulse mt-2" />
+        </div>
+        <div className="grid gap-4 grid-cols-3">
+          {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+        </div>
+        <SkeletonTable rows={5} />
       </div>
     )
   }
@@ -87,54 +96,40 @@ export default function DriversPage() {
         <p className="text-sm text-muted-foreground">Manage driver accounts and documents</p>
       </div>
 
-      <div className="grid gap-4 grid-cols-3">
-        <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-slate-500/20">
-                <Users className="h-4 w-4 text-slate-400" />
-              </div>
-              <span className="text-xs font-medium text-slate-400 bg-slate-500/10 px-2 py-1 rounded-full">
-                all
-              </span>
+      <div className="grid gap-3 grid-cols-3">
+        <Card className="p-4 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-slate-500/20 shrink-0">
+              <Users className="h-4 w-4 text-slate-400" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight">{stats.total}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Total Drivers</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight">{stats.total}</p>
+              <p className="text-xs text-muted-foreground truncate">Total Drivers</p>
             </div>
           </div>
         </Card>
-        <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-green-500/20">
-                <UserCheck className="h-4 w-4 text-green-500" />
-              </div>
-              <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-1 rounded-full">
-                {stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0}%
-              </span>
+        <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-green-500/20 shrink-0">
+              <UserCheck className="h-4 w-4 text-green-500" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-green-500">{stats.active}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Active</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-green-500">{stats.active}</p>
+              <p className="text-xs text-muted-foreground truncate">Active</p>
             </div>
+            <span className="text-xs font-medium text-green-500 ml-auto shrink-0">
+              {stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0}%
+            </span>
           </div>
         </Card>
-        <Card className={`p-5 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20 ${stats.pending > 0 ? 'ring-2 ring-yellow-500/50' : ''}`}>
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-yellow-500/20">
-                <Clock className="h-4 w-4 text-yellow-500" />
-              </div>
-              {stats.pending > 0 && (
-                <span className="text-xs font-medium text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded-full animate-pulse">
-                  needs review
-                </span>
-              )}
+        <Card className={`p-4 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20 ${stats.pending > 0 ? 'ring-2 ring-yellow-500/50' : ''}`}>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-yellow-500/20 shrink-0">
+              <Clock className="h-4 w-4 text-yellow-500" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-yellow-500">{stats.pending}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Pending</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-yellow-500">{stats.pending}</p>
+              <p className="text-xs text-muted-foreground truncate">Pending</p>
             </div>
           </div>
         </Card>

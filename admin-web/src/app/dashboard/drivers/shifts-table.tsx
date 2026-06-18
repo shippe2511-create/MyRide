@@ -383,63 +383,51 @@ export function ShiftsTable() {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 grid-cols-4">
-        <Card className="p-5 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-slate-500/20">
-                <Calendar className="h-4 w-4 text-slate-400" />
-              </div>
-              <span className="text-xs font-medium text-slate-400 bg-slate-500/10 px-2 py-1 rounded-full">all</span>
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+        <Card className="p-4 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-slate-500/20 shrink-0">
+              <Calendar className="h-4 w-4 text-slate-400" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight">{stats.total}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Total Shifts</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight">{stats.total}</p>
+              <p className="text-xs text-muted-foreground truncate">Total Shifts</p>
             </div>
           </div>
         </Card>
-        <Card className="p-5 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-blue-500/20">
-                <Clock className="h-4 w-4 text-blue-500" />
-              </div>
-              {stats.scheduled > 0 && (
-                <span className="text-xs font-medium text-blue-500 bg-blue-500/10 px-2 py-1 rounded-full">upcoming</span>
-              )}
+        <Card className="p-4 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-blue-500/20 shrink-0">
+              <Clock className="h-4 w-4 text-blue-500" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-blue-500">{stats.scheduled}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Scheduled</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-blue-500">{stats.scheduled}</p>
+              <p className="text-xs text-muted-foreground truncate">Scheduled</p>
             </div>
           </div>
         </Card>
-        <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-green-500/20">
-                <Clock className="h-4 w-4 text-green-500" />
-              </div>
-              <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-1 rounded-full">
-                {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
-              </span>
+        <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-green-500/20 shrink-0">
+              <Clock className="h-4 w-4 text-green-500" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-green-500">{stats.completed}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Completed</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-green-500">{stats.completed}</p>
+              <p className="text-xs text-muted-foreground truncate">Completed</p>
             </div>
+            <span className="text-xs font-medium text-green-500 ml-auto shrink-0">
+              {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
+            </span>
           </div>
         </Card>
-        <Card className="p-5 bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-purple-500/20">
-                <Users className="h-4 w-4 text-purple-500" />
-              </div>
+        <Card className="p-4 bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-purple-500/20 shrink-0">
+              <Users className="h-4 w-4 text-purple-500" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-purple-500">{stats.driversScheduled}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Drivers</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-purple-500">{stats.driversScheduled}</p>
+              <p className="text-xs text-muted-foreground truncate">Drivers</p>
             </div>
           </div>
         </Card>

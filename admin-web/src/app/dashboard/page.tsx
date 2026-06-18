@@ -265,83 +265,64 @@ export default async function DashboardPage() {
         <ActivityFeed />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-3 grid-cols-3">
         <Link
           href="/dashboard/drivers?status=pending"
-          className={`group relative overflow-hidden rounded-xl p-5 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg ${
+          className={`group p-4 rounded-lg transition-all hover:scale-[1.02] ${
             stats.pendingApprovals > 0
-              ? 'bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border border-yellow-500/30'
+              ? 'bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border border-yellow-500/20'
               : 'bg-gradient-to-br from-slate-500/10 to-slate-600/5 border border-slate-500/20'
           }`}
         >
-          <div className="flex items-start justify-between">
-            <div className={`p-2.5 rounded-xl ${stats.pendingApprovals > 0 ? 'bg-yellow-500/20' : 'bg-slate-500/20'}`}>
-              <AlertCircle className={`h-5 w-5 ${stats.pendingApprovals > 0 ? 'text-yellow-500' : 'text-slate-400'}`} />
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg shrink-0 ${stats.pendingApprovals > 0 ? 'bg-yellow-500/20' : 'bg-slate-500/20'}`}>
+              <AlertCircle className={`h-4 w-4 ${stats.pendingApprovals > 0 ? 'text-yellow-500' : 'text-slate-400'}`} />
             </div>
-            <ArrowUpRight className="h-5 w-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
-          <div className="mt-4">
-            <p className={`text-3xl font-bold ${stats.pendingApprovals > 0 ? 'text-yellow-500' : ''}`}>
-              {stats.pendingApprovals}
-            </p>
-            <p className="text-sm font-medium mt-1">Pending Approvals</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Drivers awaiting review</p>
-          </div>
-          {stats.pendingApprovals > 0 && (
-            <div className="absolute top-3 right-3">
-              <span className="flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-500 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500" />
-              </span>
+            <div className="min-w-0">
+              <p className={`text-xl font-bold ${stats.pendingApprovals > 0 ? 'text-yellow-500' : ''}`}>
+                {stats.pendingApprovals}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">Pending Approvals</p>
             </div>
-          )}
+            <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
         </Link>
 
         <Link
           href="/dashboard/rides?status=active"
-          className={`group relative overflow-hidden rounded-xl p-5 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg ${
+          className={`group p-4 rounded-lg transition-all hover:scale-[1.02] ${
             stats.activeRides > 0
-              ? 'bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/30'
+              ? 'bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20'
               : 'bg-gradient-to-br from-slate-500/10 to-slate-600/5 border border-slate-500/20'
           }`}
         >
-          <div className="flex items-start justify-between">
-            <div className={`p-2.5 rounded-xl ${stats.activeRides > 0 ? 'bg-blue-500/20' : 'bg-slate-500/20'}`}>
-              <Clock className={`h-5 w-5 ${stats.activeRides > 0 ? 'text-blue-500' : 'text-slate-400'}`} />
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg shrink-0 ${stats.activeRides > 0 ? 'bg-blue-500/20' : 'bg-slate-500/20'}`}>
+              <Clock className={`h-4 w-4 ${stats.activeRides > 0 ? 'text-blue-500' : 'text-slate-400'}`} />
             </div>
-            <ArrowUpRight className="h-5 w-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
-          <div className="mt-4">
-            <p className={`text-3xl font-bold ${stats.activeRides > 0 ? 'text-blue-500' : ''}`}>
-              {stats.activeRides}
-            </p>
-            <p className="text-sm font-medium mt-1">Active Rides</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Currently in progress</p>
-          </div>
-          {stats.activeRides > 0 && (
-            <div className="absolute top-3 right-3">
-              <span className="flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
-              </span>
+            <div className="min-w-0">
+              <p className={`text-xl font-bold ${stats.activeRides > 0 ? 'text-blue-500' : ''}`}>
+                {stats.activeRides}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">Active Rides</p>
             </div>
-          )}
+            <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
         </Link>
 
         <Link
           href="/dashboard/reports"
-          className="group relative overflow-hidden rounded-xl p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border border-green-500/20 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
+          className="group p-4 rounded-lg bg-gradient-to-br from-green-500/10 to-green-600/5 border border-green-500/20 transition-all hover:scale-[1.02]"
         >
-          <div className="flex items-start justify-between">
-            <div className="p-2.5 rounded-xl bg-green-500/20">
-              <FileText className="h-5 w-5 text-green-500" />
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-green-500/20 shrink-0">
+              <FileText className="h-4 w-4 text-green-500" />
             </div>
-            <ArrowUpRight className="h-5 w-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
-          <div className="mt-4">
-            <p className="text-3xl font-bold text-green-500">Reports</p>
-            <p className="text-sm font-medium mt-1">Export Data</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Download CSV reports</p>
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Reports</p>
+              <p className="text-xs text-muted-foreground truncate">Export CSV</p>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         </Link>
       </div>

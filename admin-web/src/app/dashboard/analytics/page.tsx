@@ -299,59 +299,59 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Period Summary - Compact insights bar */}
-      <div className="grid gap-4 md:grid-cols-5">
-        <Card className="p-5 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="p-2 rounded-lg bg-yellow-500/20 w-fit">
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
+        <Card className="p-4 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-yellow-500/20 shrink-0">
               <Zap className="h-4 w-4 text-yellow-500" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-yellow-500">{stats.peakHour}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Peak Hour</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-yellow-500">{stats.peakHour}</p>
+              <p className="text-xs text-muted-foreground truncate">Peak Hour</p>
             </div>
           </div>
         </Card>
-        <Card className="p-5 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="p-2 rounded-lg bg-blue-500/20 w-fit">
+        <Card className="p-4 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-blue-500/20 shrink-0">
               <Calendar className="h-4 w-4 text-blue-500" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-blue-500">{stats.busiestDay}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Busiest Day</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-blue-500">{stats.busiestDay}</p>
+              <p className="text-xs text-muted-foreground truncate">Busiest Day</p>
             </div>
           </div>
         </Card>
-        <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="p-2 rounded-lg bg-green-500/20 w-fit">
+        <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-green-500/20 shrink-0">
               <Target className="h-4 w-4 text-green-500" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-green-500">{stats.completionRate}%</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Completion</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-green-500">{stats.completionRate}%</p>
+              <p className="text-xs text-muted-foreground truncate">Completion</p>
             </div>
           </div>
         </Card>
-        <Card className="p-5 bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="p-2 rounded-lg bg-purple-500/20 w-fit">
+        <Card className="p-4 bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-purple-500/20 shrink-0">
               <Clock className="h-4 w-4 text-purple-500" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-purple-500">{stats.avgDuration} min</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Avg Duration</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-purple-500">{stats.avgDuration} min</p>
+              <p className="text-xs text-muted-foreground truncate">Avg Duration</p>
             </div>
           </div>
         </Card>
-        <Card className="p-5 bg-gradient-to-br from-orange-500/10 to-orange-600/5 border-orange-500/20">
-          <div className="flex flex-col gap-2">
-            <div className="p-2 rounded-lg bg-orange-500/20 w-fit">
+        <Card className="p-4 bg-gradient-to-br from-orange-500/10 to-orange-600/5 border-orange-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-orange-500/20 shrink-0">
               <MapPin className="h-4 w-4 text-orange-500" />
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight text-orange-500">{stats.avgDistance} km</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Avg Distance</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold tracking-tight text-orange-500">{stats.avgDistance} km</p>
+              <p className="text-xs text-muted-foreground truncate">Avg Distance</p>
             </div>
           </div>
         </Card>

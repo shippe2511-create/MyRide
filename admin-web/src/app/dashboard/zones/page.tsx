@@ -234,29 +234,52 @@ export default function ZonesPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Active Zones</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{zones.filter(z => z.is_active).length}</div>
-          </CardContent>
+        <Card className="p-5 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2 rounded-lg bg-green-500/20">
+                <Map className="h-4 w-4 text-green-500" />
+              </div>
+              <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-1 rounded-full">
+                active
+              </span>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-green-500">{zones.filter(z => z.is_active).length}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Active Zones</p>
+            </div>
+          </div>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Saved Locations</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{locations.length}</div>
-          </CardContent>
+        <Card className="p-5 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2 rounded-lg bg-blue-500/20">
+                <Plus className="h-4 w-4 text-blue-500" />
+              </div>
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-blue-500">{locations.length}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Saved Locations</p>
+            </div>
+          </div>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Restricted Zones</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{zones.filter(z => z.zone_type === "restricted").length}</div>
-          </CardContent>
+        <Card className="p-5 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="p-2 rounded-lg bg-red-500/20">
+                <Map className="h-4 w-4 text-red-500" />
+              </div>
+              {zones.filter(z => z.zone_type === "restricted").length > 0 && (
+                <span className="text-xs font-medium text-red-500 bg-red-500/10 px-2 py-1 rounded-full">
+                  restricted
+                </span>
+              )}
+            </div>
+            <div className="mt-2">
+              <p className="text-2xl font-bold tracking-tight text-red-500">{zones.filter(z => z.zone_type === "restricted").length}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Restricted Zones</p>
+            </div>
+          </div>
         </Card>
       </div>
 

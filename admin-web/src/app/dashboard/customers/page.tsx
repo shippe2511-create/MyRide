@@ -52,8 +52,11 @@ export default async function CustomersPage({
     <div className="space-y-6">
       <Breadcrumbs />
       <div>
-        <h1 className="text-3xl font-bold">Customers</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <Users className="h-6 w-6" />
+          Customers
+        </h1>
+        <p className="text-sm text-muted-foreground">
           Manage customer profiles, ride history, and account status
         </p>
       </div>

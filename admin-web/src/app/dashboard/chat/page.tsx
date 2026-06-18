@@ -269,11 +269,11 @@ export default function ChatPage() {
       <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <MessageSquare className="h-8 w-8" />
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <MessageSquare className="h-6 w-6" />
             Chat Monitoring
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             View conversations between customers and drivers
           </p>
         </div>

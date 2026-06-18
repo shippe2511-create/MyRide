@@ -477,8 +477,11 @@ export default function RatingsPage() {
     <div className="space-y-6">
       <Breadcrumbs />
       <div>
-        <h1 className="text-3xl font-bold">Driver Ratings</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <Star className="h-6 w-6 text-yellow-500" />
+          Driver Ratings
+        </h1>
+        <p className="text-sm text-muted-foreground">
           Monitor driver performance and customer feedback
         </p>
       </div>

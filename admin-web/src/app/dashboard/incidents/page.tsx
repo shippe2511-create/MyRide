@@ -236,8 +236,11 @@ export default function IncidentsPage() {
       <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Incident Management</h1>
-          <p className="text-muted-foreground">Track and resolve service incidents</p>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <AlertTriangle className="h-6 w-6" />
+            Incident Management
+          </h1>
+          <p className="text-sm text-muted-foreground">Track and resolve service incidents</p>
         </div>
         <Button onClick={() => setDialogType("add")}>
           <Plus className="mr-2 h-4 w-4" />

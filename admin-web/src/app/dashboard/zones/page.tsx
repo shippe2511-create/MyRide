@@ -224,8 +224,11 @@ export default function ZonesPage() {
       <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Service Zones</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Map className="h-6 w-6" />
+            Service Zones
+          </h1>
+          <p className="text-sm text-muted-foreground">
             Define pickup/dropoff areas and coverage boundaries
           </p>
         </div>

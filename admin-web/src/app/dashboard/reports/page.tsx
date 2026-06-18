@@ -608,8 +608,11 @@ export default function ReportsPage() {
       <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Reports</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <FileSpreadsheet className="h-6 w-6" />
+            Reports
+          </h1>
+          <p className="text-sm text-muted-foreground">
             Generate and export reports in CSV format
           </p>
         </div>

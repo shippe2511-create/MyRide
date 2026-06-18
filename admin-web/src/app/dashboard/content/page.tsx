@@ -314,8 +314,11 @@ export default function ContentPage() {
       <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Content Management</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Megaphone className="h-6 w-6" />
+            Content Management
+          </h1>
+          <p className="text-sm text-muted-foreground">
             Manage staff corner, announcements, and notifications
           </p>
         </div>

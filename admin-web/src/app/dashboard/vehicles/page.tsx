@@ -256,8 +256,11 @@ export default function VehiclesPage() {
       <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Vehicle Types</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Car className="h-6 w-6" />
+            Vehicle Types
+          </h1>
+          <p className="text-sm text-muted-foreground">
             Manage vehicle categories shown in customer and driver apps
           </p>
         </div>

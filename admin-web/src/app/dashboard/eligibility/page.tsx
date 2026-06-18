@@ -191,8 +191,11 @@ export default function EligibilityPage() {
       <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Eligibility & Campaigns</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Zap className="h-6 w-6" />
+            Eligibility & Campaigns
+          </h1>
+          <p className="text-sm text-muted-foreground">
             Manage ride limits, time restrictions, and eligibility rules
           </p>
         </div>

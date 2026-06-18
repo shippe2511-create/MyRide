@@ -124,8 +124,11 @@ export default function ActivityPage() {
       <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Activity Log</h1>
-          <p className="text-muted-foreground">Track all admin actions and changes</p>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Settings className="h-6 w-6" />
+            Activity Log
+          </h1>
+          <p className="text-sm text-muted-foreground">Track all admin actions and changes</p>
         </div>
         <Button onClick={loadActivities} variant="outline" disabled={loading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />

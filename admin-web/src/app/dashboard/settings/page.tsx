@@ -227,8 +227,11 @@ export default function SettingsPage() {
       <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Settings</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Settings className="h-6 w-6" />
+            Settings
+          </h1>
+          <p className="text-sm text-muted-foreground">
             Configure application settings and preferences
           </p>
         </div>

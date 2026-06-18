@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../providers/app_state.dart';
+import '../widgets/status_animation.dart';
 import 'driver_arriving_screen.dart';
 
 class DriverMatchingScreen extends StatefulWidget {
@@ -217,13 +218,6 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
     _rideSubscription?.unsubscribe();
     _statusPollingTimer?.cancel();
 
-    // Show notification
-    NotificationService().showDriverAcceptedNotification(
-      driverName: 'Driver',
-      vehicle: 'On the way',
-      minutesAway: 5,
-    );
-
     // Get the ACTUAL driver who accepted from the ride record
     String driverName = 'Driver';
     double driverRating = 5.0;
@@ -235,12 +229,18 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
 
     try {
       if (_rideId != null) {
+        // Small delay to ensure DB is consistent after driver acceptance
+        await Future.delayed(const Duration(milliseconds: 500));
+
         // Fetch the ride with actual driver info
         final ride = await SupabaseService.getRideById(_rideId!);
+        debugPrint('Ride response: $ride');
 
         if (ride != null && ride['driver'] != null) {
           final driver = ride['driver'];
+          debugPrint('Driver data: $driver');
           final profile = driver['profile'];
+          debugPrint('Profile data: $profile');
           final vehicle = driver['vehicle'];
 
           driverName = profile?['full_name'] ?? 'Driver';
@@ -255,11 +255,20 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
           }
 
           debugPrint('Found actual driver: $driverName, profileId: $driverProfileId');
+        } else {
+          debugPrint('No driver in ride response. Ride driver_id: ${ride?['driver_id']}');
         }
       }
     } catch (e) {
       debugPrint('Error fetching driver: $e');
     }
+
+    // Show notification after we have the actual driver name
+    NotificationService().showDriverAcceptedNotification(
+      driverName: driverName,
+      vehicle: vehicleModel.isNotEmpty ? vehicleModel : 'On the way',
+      minutesAway: 5,
+    );
 
     if (!mounted) return;
 
@@ -455,22 +464,25 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
                   ),
                   const SizedBox(height: 20),
 
-                  // Simple loading with text
+                  // Animated loading with Lottie
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.yellow),
-                        ),
+                      const StatusAnimation(
+                        type: TripAnimationType.searching,
+                        size: 40,
                       ),
                       const SizedBox(width: 12),
-                      Text(
-                        _statusText,
-                        style: TextStyle(color: context.textColor, fontSize: 17, fontWeight: FontWeight.w600),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _statusText,
+                            style: TextStyle(color: context.textColor, fontSize: 17, fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 2),
+                          const LoadingDots(size: 6),
+                        ],
                       ),
                     ],
                   ),

@@ -5,6 +5,7 @@ import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_container.dart';
 import '../widgets/primary_button.dart';
+import '../widgets/status_animation.dart';
 import '../services/supabase_service.dart';
 
 class TripCompleteScreen extends StatefulWidget {
@@ -106,21 +107,10 @@ class _TripCompleteScreenState extends State<TripCompleteScreen> with SingleTick
       children: [
         ScaleTransition(
           scale: _scaleAnimation,
-          child: Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: AppColors.yellow,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.yellow.withValues(alpha: 0.3),
-                  blurRadius: 40,
-                  offset: const Offset(0, 16),
-                ),
-              ],
-            ),
-            child: Icon(Icons.check, color: context.isDark ? AppColors.bgDark : Colors.white, size: 40),
+          child: const StatusAnimation(
+            type: TripAnimationType.complete,
+            size: 120,
+            repeat: false,
           ),
         ),
         const SizedBox(height: 20),

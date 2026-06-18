@@ -12,6 +12,7 @@ import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../services/location_service.dart';
+import '../widgets/onboarding_tooltip.dart';
 import 'search_screen.dart';
 import 'activity_screen.dart';
 import 'inbox_screen.dart';
@@ -182,21 +183,49 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.bgDark : AppColors.bgLight,
-      extendBody: true,
-      body: PageView(
-        controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(),
-        onPageChanged: (index) => setState(() => _currentIndex = index),
-        children: [
-          _buildHomeTab(context),
-          const ActivityScreen(),
-          const InboxScreen(),
-          const ProfileScreen(),
-        ],
+    return OnboardingOverlay(
+      steps: const [
+        OnboardingStep(
+          key: 'customer_welcome',
+          title: 'Welcome to MyRide',
+          description: 'Your free corporate transport service. Book rides to anywhere within the company network.',
+          icon: Icons.local_taxi_rounded,
+        ),
+        OnboardingStep(
+          key: 'customer_book',
+          title: 'Book a Ride',
+          description: 'Tap the search bar to enter your destination and request a ride instantly.',
+          icon: Icons.search_rounded,
+        ),
+        OnboardingStep(
+          key: 'customer_schedule',
+          title: 'Schedule Ahead',
+          description: 'Use the quick actions to schedule rides in advance or set up recurring trips.',
+          icon: Icons.schedule_rounded,
+        ),
+        OnboardingStep(
+          key: 'customer_track',
+          title: 'Track Your Ride',
+          description: 'Once matched with a driver, track their location in real-time until arrival.',
+          icon: Icons.my_location_rounded,
+        ),
+      ],
+      child: Scaffold(
+        backgroundColor: isDark ? AppColors.bgDark : AppColors.bgLight,
+        extendBody: true,
+        body: PageView(
+          controller: _pageController,
+          physics: const NeverScrollableScrollPhysics(),
+          onPageChanged: (index) => setState(() => _currentIndex = index),
+          children: [
+            _buildHomeTab(context),
+            const ActivityScreen(),
+            const InboxScreen(),
+            const ProfileScreen(),
+          ],
+        ),
+        bottomNavigationBar: _buildBottomNav(context),
       ),
-      bottomNavigationBar: _buildBottomNav(context),
     );
   }
 

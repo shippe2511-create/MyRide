@@ -20,7 +20,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
-  AlertTriangle, Phone, MapPin, Clock, CheckCircle, XCircle, Loader2, RefreshCw, Shield, MoreVertical, Edit, Trash2, Plus, GripVertical, Flame, Heart, Building, Save
+  AlertTriangle, Phone, MapPin, Clock, CheckCircle, XCircle, Loader2, RefreshCw, Shield, MoreVertical, Edit, Trash2, Plus, GripVertical, Flame, Heart, Building, Save, ChevronUp, ChevronDown
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -191,6 +191,20 @@ export default function SOSPage() {
 
   const removeContact = (id: string) => {
     setEmergencyContacts(prev => prev.filter(c => c.id !== id))
+  }
+
+  const moveContact = (index: number, direction: "up" | "down") => {
+    const newIndex = direction === "up" ? index - 1 : index + 1
+    if (newIndex < 0 || newIndex >= emergencyContacts.length) return
+
+    setEmergencyContacts(prev => {
+      const updated = [...prev]
+      const temp = updated[index]
+      updated[index] = updated[newIndex]
+      updated[newIndex] = temp
+      // Update sort_order
+      return updated.map((c, i) => ({ ...c, sort_order: i }))
+    })
   }
 
   const saveEmergencyContacts = async () => {
@@ -487,7 +501,26 @@ export default function SOSPage() {
         <div className="space-y-3">
           {emergencyContacts.map((contact, index) => (
             <div key={contact.id} className="flex items-center gap-3 p-3 border rounded-lg">
-              <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+              <div className="flex flex-col">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => moveContact(index, "up")}
+                  disabled={index === 0}
+                >
+                  <ChevronUp className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => moveContact(index, "down")}
+                  disabled={index === emergencyContacts.length - 1}
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </div>
               <Input
                 value={contact.name}
                 onChange={(e) => updateContact(contact.id, "name", e.target.value)}

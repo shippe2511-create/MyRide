@@ -374,10 +374,116 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _openNavigation(double lat, double lng) async {
-    final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: context.cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: context.borderColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Open in Navigation',
+              style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildNavOption(
+                    icon: Icons.map,
+                    label: 'Google Maps',
+                    color: const Color(0xFF4285F4),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving');
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildNavOption(
+                    icon: Icons.navigation,
+                    label: 'Waze',
+                    color: const Color(0xFF33CCFF),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final uri = Uri.parse('https://waze.com/ul?ll=$lat,$lng&navigate=yes');
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel', style: TextStyle(color: context.mutedColor)),
+            ),
+            SizedBox(height: MediaQuery.of(ctx).padding.bottom),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavOption({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: Colors.white, size: 28),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _makeCall(String phone) async {

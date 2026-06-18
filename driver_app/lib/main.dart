@@ -22,6 +22,7 @@ import 'services/supabase_service.dart';
 import 'services/notification_service.dart';
 import 'services/voice_service.dart';
 import 'services/offline_service.dart';
+import 'widgets/offline_banner.dart';
 // import 'services/firebase_service.dart'; // Disabled - requires paid Apple Developer Program
 
 class SmoothPageRoute<T> extends PageRouteBuilder<T> {
@@ -121,7 +122,9 @@ class DriverApp extends StatelessWidget {
             '/about': (_) => const AboutScreen(),
           },
           builder: (context, child) {
-            return _GlobalRideRequestOverlay(child: child!);
+            return OfflineBanner(
+              child: _GlobalRideRequestOverlay(child: child!),
+            );
           },
         );
       },

@@ -36,6 +36,7 @@ class _RideRequestPopupState extends State<RideRequestPopup>
   Timer? _timer;
   int _remainingSeconds = 30;
   bool _isAccepting = false;
+  double _swipeProgress = 0;
 
   @override
   void initState() {
@@ -586,69 +587,154 @@ class _RideRequestPopupState extends State<RideRequestPopup>
   Widget _buildActionButtons() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-      child: Row(
-        children: [
-          // Accept button (full width)
-          Expanded(
-            child: Container(
-              height: 60,
+      child: _isAccepting
+          ? _buildAcceptingState()
+          : _buildSwipeToAccept(),
+    );
+  }
+
+  Widget _buildAcceptingState() {
+    return Container(
+      height: 64,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppColors.yellow, const Color(0xFFFFC107)],
+        ),
+        borderRadius: BorderRadius.circular(32),
+      ),
+      child: Center(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation(Colors.black),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Accepting...',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSwipeToAccept() {
+    return GestureDetector(
+      onHorizontalDragEnd: (details) {
+        if (_swipeProgress >= 0.8) {
+          _triggerAccept();
+        } else {
+          setState(() => _swipeProgress = 0);
+        }
+      },
+      onHorizontalDragUpdate: (details) {
+        final width = MediaQuery.of(context).size.width - 40 - 64; // padding and thumb
+        final delta = details.delta.dx / width;
+        setState(() {
+          _swipeProgress = (_swipeProgress + delta).clamp(0.0, 1.0);
+          if (_swipeProgress > 0.3) {
+            HapticFeedback.selectionClick();
+          }
+        });
+      },
+      child: Container(
+        height: 64,
+        decoration: BoxDecoration(
+          color: context.isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(
+            color: AppColors.yellow.withValues(alpha: 0.3 + (_swipeProgress * 0.7)),
+            width: 2,
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Progress fill
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 50),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [AppColors.yellow, const Color(0xFFFFC107)],
+                  colors: [
+                    AppColors.yellow.withValues(alpha: 0.3),
+                    AppColors.yellow.withValues(alpha: 0.1),
+                  ],
                 ),
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.yellow.withValues(alpha: 0.5),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(30),
               ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(18),
-                  onTap: _isAccepting
-                      ? null
-                      : () async {
-                          setState(() => _isAccepting = true);
-                          HapticFeedback.heavyImpact();
-                          await widget.onAccept();
-                        },
-                  child: Center(
-                    child: _isAccepting
-                        ? SizedBox(
-                            width: 28,
-                            height: 28,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 3,
-                              valueColor: AlwaysStoppedAnimation(Colors.black),
-                            ),
-                          )
-                        : Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.check_circle_rounded, color: Colors.black, size: 26),
-                              const SizedBox(width: 10),
-                              Text(
-                                'Accept Ride',
-                                style: TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                            ],
-                          ),
-                  ),
+              width: (MediaQuery.of(context).size.width - 40) * _swipeProgress,
+            ),
+            // Center text
+            Center(
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 150),
+                opacity: _swipeProgress < 0.3 ? 1 : (1 - _swipeProgress).clamp(0.0, 1.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.chevron_right, color: AppColors.yellow, size: 20),
+                    Icon(Icons.chevron_right, color: AppColors.yellow.withValues(alpha: 0.6), size: 20),
+                    Icon(Icons.chevron_right, color: AppColors.yellow.withValues(alpha: 0.3), size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Swipe to Accept',
+                      style: TextStyle(
+                        color: context.textColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ),
-        ],
+            // Thumb
+            Positioned(
+              left: 4 + ((MediaQuery.of(context).size.width - 40 - 64 - 8) * _swipeProgress),
+              top: 4,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 50),
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [AppColors.yellow, const Color(0xFFFFC107)],
+                  ),
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.yellow.withValues(alpha: 0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  _swipeProgress >= 0.8 ? Icons.check : Icons.chevron_right,
+                  color: Colors.black,
+                  size: 28,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  void _triggerAccept() async {
+    HapticFeedback.heavyImpact();
+    setState(() => _isAccepting = true);
+    await widget.onAccept();
   }
 }

@@ -22,6 +22,7 @@ import 'services/notification_service.dart';
 import 'services/cache_service.dart';
 import 'services/supabase_service.dart';
 import 'services/location_service.dart';
+import 'widgets/offline_banner.dart';
 
 // Custom page route with smooth fade + slide transition
 class SmoothPageRoute<T> extends PageRouteBuilder<T> {
@@ -112,6 +113,9 @@ class MyRideApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           theme: appState.isDarkMode ? AppTheme.darkTheme : AppTheme.lightTheme,
           home: const SplashScreen(),
+          builder: (context, child) {
+            return OfflineBanner(child: child!);
+          },
           onGenerateRoute: (settings) {
             Widget page;
             switch (settings.name) {

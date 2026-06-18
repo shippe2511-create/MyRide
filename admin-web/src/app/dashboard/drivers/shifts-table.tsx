@@ -21,7 +21,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
-  Plus, Loader2, Clock, Calendar, Trash2, Pencil, Users
+  Plus, Loader2, Clock, Calendar, Trash2, Pencil, Users, Wand2
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -65,6 +65,8 @@ export function ShiftsTable() {
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [editingShift, setEditingShift] = useState<Shift | null>(null)
+  const [autoScheduleOpen, setAutoScheduleOpen] = useState(false)
+  const [autoScheduling, setAutoScheduling] = useState(false)
 
   const [weekOffset, setWeekOffset] = useState(0)
   const [selectedDriver, setSelectedDriver] = useState<string>("all")
@@ -289,6 +291,80 @@ export function ShiftsTable() {
     ? shifts
     : shifts.filter(s => s.driver_id === selectedDriver)
 
+  const handleAutoSchedule = async () => {
+    if (drivers.length === 0) {
+      toast.error("No drivers available")
+      return
+    }
+
+    setAutoScheduling(true)
+
+    const shiftsToCreate: { driver_id: string; shift_date: string; start_time: string; end_time: string; shift_type: string; status: string }[] = []
+    const today = new Date()
+    const startDate = new Date(today)
+    startDate.setDate(startDate.getDate() + 1)
+
+    for (let day = 0; day < 7; day++) {
+      const date = new Date(startDate)
+      date.setDate(date.getDate() + day)
+      const dateStr = date.toISOString().split("T")[0]
+      const dayOfWeek = date.getDay()
+
+      if (dayOfWeek === 0 || dayOfWeek === 6) continue
+
+      const shuffledDrivers = [...drivers].sort(() => Math.random() - 0.5)
+      const morningDrivers = shuffledDrivers.slice(0, Math.ceil(shuffledDrivers.length / 2))
+      const afternoonDrivers = shuffledDrivers.slice(Math.ceil(shuffledDrivers.length / 2))
+
+      for (const driver of morningDrivers) {
+        const existingShift = shifts.find(s => s.driver_id === driver.id && s.shift_date === dateStr)
+        if (!existingShift) {
+          shiftsToCreate.push({
+            driver_id: driver.id,
+            shift_date: dateStr,
+            start_time: "06:00:00",
+            end_time: "14:00:00",
+            shift_type: "morning",
+            status: "scheduled",
+          })
+        }
+      }
+
+      for (const driver of afternoonDrivers) {
+        const existingShift = shifts.find(s => s.driver_id === driver.id && s.shift_date === dateStr)
+        if (!existingShift) {
+          shiftsToCreate.push({
+            driver_id: driver.id,
+            shift_date: dateStr,
+            start_time: "14:00:00",
+            end_time: "22:00:00",
+            shift_type: "afternoon",
+            status: "scheduled",
+          })
+        }
+      }
+    }
+
+    if (shiftsToCreate.length === 0) {
+      toast.info("All shifts already scheduled for next week")
+      setAutoScheduling(false)
+      setAutoScheduleOpen(false)
+      return
+    }
+
+    const { error } = await supabase.from("shifts").insert(shiftsToCreate)
+
+    if (error) {
+      toast.error("Failed to create shifts: " + error.message)
+    } else {
+      toast.success(`Created ${shiftsToCreate.length} shifts for next week`)
+      loadData()
+    }
+
+    setAutoScheduling(false)
+    setAutoScheduleOpen(false)
+  }
+
   const stats = {
     total: shifts.length,
     scheduled: shifts.filter(s => s.status === "scheduled").length,
@@ -388,6 +464,10 @@ export function ShiftsTable() {
                 })}
               </SelectContent>
             </Select>
+            <Button size="sm" variant="outline" onClick={() => setAutoScheduleOpen(true)}>
+              <Wand2 className="h-4 w-4 mr-2" />
+              Auto Schedule
+            </Button>
             <Button size="sm" onClick={() => setDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Add Shift
@@ -653,6 +733,31 @@ export function ShiftsTable() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={autoScheduleOpen} onOpenChange={setAutoScheduleOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Auto-Schedule Shifts</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will automatically generate shifts for the next 7 weekdays.
+              Drivers will be randomly assigned to morning (6am-2pm) or afternoon (2pm-10pm) shifts.
+              Existing shifts will not be overwritten.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              <strong>{drivers.length}</strong> drivers will be scheduled across <strong>5</strong> weekdays.
+            </p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={autoScheduling}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleAutoSchedule} disabled={autoScheduling}>
+              {autoScheduling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Wand2 className="h-4 w-4 mr-2" />}
+              Generate Shifts
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

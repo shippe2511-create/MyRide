@@ -21,6 +21,7 @@ import 'theme/app_theme.dart';
 import 'services/supabase_service.dart';
 import 'services/notification_service.dart';
 import 'services/voice_service.dart';
+import 'services/offline_service.dart';
 // import 'services/firebase_service.dart'; // Disabled - requires paid Apple Developer Program
 
 class SmoothPageRoute<T> extends PageRouteBuilder<T> {
@@ -67,6 +68,12 @@ void main() async {
     await VoiceService().initialize();
   } catch (e) {
     debugPrint('Voice service init failed: $e');
+  }
+
+  try {
+    await OfflineService.initialize();
+  } catch (e) {
+    debugPrint('Offline service init failed: $e');
   }
 
   SystemChrome.setSystemUIOverlayStyle(

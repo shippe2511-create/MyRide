@@ -47,6 +47,7 @@ const navigation: { name: string; href: string; icon: typeof LayoutDashboard; pe
   { name: "Ratings", href: "/dashboard/ratings", icon: Star, permission: "ratings:view" },
   { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3, permission: "reports:view" },
   { name: "Reports", href: "/dashboard/reports", icon: FileText, permission: "reports:view" },
+  { name: "Report Builder", href: "/dashboard/report-builder", icon: BarChart3, permission: "reports:view" },
   { name: "Activity Log", href: "/dashboard/activity", icon: Activity, permission: "reports:view" },
   { name: "Admins", href: "/dashboard/admins", icon: Shield, permission: "admins:view" },
   { name: "Settings", href: "/dashboard/settings", icon: Settings, permission: "settings:view" },

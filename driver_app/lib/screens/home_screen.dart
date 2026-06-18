@@ -8,6 +8,7 @@ import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/status_toggle.dart';
 import '../widgets/ride_request_popup.dart';
+import '../widgets/break_timer.dart';
 import 'vehicle_checklist_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
@@ -741,96 +742,44 @@ class _HomeScreenState extends State<HomeScreen> {
           // Stats card
           _buildStatsCard(context, state),
 
-          // Break status card
+          const SizedBox(height: 16),
+
+          // Break timer widget with animation
+          if (state.breakStartTime != null)
+            BreakTimerWidget(
+              startTime: state.breakStartTime!,
+              breakType: state.breakType,
+              onEndBreak: () {
+                HapticFeedback.heavyImpact();
+                state.endBreak();
+              },
+            ),
+
+          // Additional info
           Padding(
-            padding: const EdgeInsets.fromLTRB(32, 24, 32, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Break icon
-                Container(
-                  width: 90,
-                  height: 90,
-                  decoration: BoxDecoration(
-                    color: AppColors.warning.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: AppColors.warning.withValues(alpha: 0.3),
-                      width: 2,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: context.cardColor,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: context.borderColor),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: context.mutedColor, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'You won\'t receive ride requests while on break',
+                      style: TextStyle(
+                        color: context.mutedColor,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
-                  child: Icon(
-                    _getBreakIcon(state.breakType),
-                    size: 42,
-                    color: AppColors.warning,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'On ${state.breakType} Break',
-                  style: TextStyle(
-                    color: context.textColor,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                // Break timer
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: context.cardColor,
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: context.borderColor),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.timer, color: AppColors.warning, size: 20),
-                      const SizedBox(width: 8),
-                      StreamBuilder(
-                        stream: Stream.periodic(const Duration(seconds: 1)),
-                        builder: (context, snapshot) {
-                          final totalMinutes = state.breakDurationMinutes;
-                          final hours = totalMinutes ~/ 60;
-                          final minutes = totalMinutes % 60;
-                          final timeText = hours > 0 ? '$hours hr $minutes min' : '$minutes min';
-                          return Text(
-                            timeText,
-                            style: TextStyle(
-                              color: context.textColor,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'You won\'t receive ride requests while on break',
-                  style: TextStyle(color: context.mutedColor, fontSize: 13),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-                // End break button
-                ElevatedButton.icon(
-                  onPressed: () {
-                    HapticFeedback.heavyImpact();
-                    state.endBreak();
-                  },
-                  icon: const Icon(Icons.play_arrow),
-                  label: const Text('End Break'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.success,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

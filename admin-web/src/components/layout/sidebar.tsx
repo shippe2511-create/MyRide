@@ -32,29 +32,76 @@ import { usePermissions } from "@/hooks/usePermissions"
 import type { Permission } from "@/lib/permissions"
 import { Badge } from "@/components/ui/badge"
 
-const navigation: { name: string; href: string; icon: typeof LayoutDashboard; permission: Permission }[] = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard:view" },
-  { name: "Customers", href: "/dashboard/customers", icon: Users, permission: "customers:view" },
-  { name: "Drivers", href: "/dashboard/drivers", icon: Car, permission: "drivers:view" },
-  { name: "Vehicles", href: "/dashboard/vehicles", icon: CarFront, permission: "vehicles:view" },
-  { name: "Vehicle Logs", href: "/dashboard/vehicle-logs", icon: Fuel, permission: "vehicles:view" },
-  { name: "Rides", href: "/dashboard/rides", icon: MapPin, permission: "rides:view" },
-  { name: "Live Tracking", href: "/dashboard/tracking", icon: Radio, permission: "tracking:view" },
-  { name: "Schedules", href: "/dashboard/scheduling", icon: Calendar, permission: "schedules:view" },
-  { name: "Pre-trip Checks", href: "/dashboard/checklists", icon: ClipboardCheck, permission: "pretrip:view" },
-  { name: "Service Zones", href: "/dashboard/zones", icon: Map, permission: "zones:view" },
-  { name: "Chat", href: "/dashboard/chat", icon: MessageSquare, permission: "chat:view" },
-  { name: "SOS Alerts", href: "/dashboard/sos", icon: AlertTriangle, permission: "sos:view" },
-  { name: "Incidents", href: "/dashboard/incidents", icon: AlertTriangle, permission: "sos:view" },
-  { name: "Ratings", href: "/dashboard/ratings", icon: Star, permission: "ratings:view" },
-  { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3, permission: "reports:view" },
-  { name: "Reports", href: "/dashboard/reports", icon: FileText, permission: "reports:view" },
-  { name: "Activity Log", href: "/dashboard/activity", icon: Activity, permission: "reports:view" },
-  { name: "Eligibility", href: "/dashboard/eligibility", icon: Ticket, permission: "eligibility:view" },
-  { name: "Content", href: "/dashboard/content", icon: FileText, permission: "content:view" },
-  { name: "Help Center", href: "/dashboard/help", icon: FileText, permission: "content:view" },
-  { name: "Admins", href: "/dashboard/admins", icon: Shield, permission: "admins:view" },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings, permission: "settings:view" },
+interface NavItem {
+  name: string
+  href: string
+  icon: typeof LayoutDashboard
+  permission: Permission
+}
+
+interface NavSection {
+  title: string | null
+  items: NavItem[]
+}
+
+const navigationSections: NavSection[] = [
+  {
+    title: null,
+    items: [
+      { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard:view" },
+    ]
+  },
+  {
+    title: "People",
+    items: [
+      { name: "Customers", href: "/dashboard/customers", icon: Users, permission: "customers:view" },
+      { name: "Drivers", href: "/dashboard/drivers", icon: Car, permission: "drivers:view" },
+      { name: "Eligibility", href: "/dashboard/eligibility", icon: Ticket, permission: "eligibility:view" },
+    ]
+  },
+  {
+    title: "Fleet",
+    items: [
+      { name: "Vehicles", href: "/dashboard/vehicles", icon: CarFront, permission: "vehicles:view" },
+      { name: "Vehicle Logs", href: "/dashboard/vehicle-logs", icon: Fuel, permission: "vehicles:view" },
+      { name: "Pre-trip Checks", href: "/dashboard/checklists", icon: ClipboardCheck, permission: "pretrip:view" },
+    ]
+  },
+  {
+    title: "Operations",
+    items: [
+      { name: "Rides", href: "/dashboard/rides", icon: MapPin, permission: "rides:view" },
+      { name: "Live Tracking", href: "/dashboard/tracking", icon: Radio, permission: "tracking:view" },
+      { name: "Schedules", href: "/dashboard/scheduling", icon: Calendar, permission: "schedules:view" },
+      { name: "Service Zones", href: "/dashboard/zones", icon: Map, permission: "zones:view" },
+    ]
+  },
+  {
+    title: "Safety",
+    items: [
+      { name: "SOS Alerts", href: "/dashboard/sos", icon: AlertTriangle, permission: "sos:view" },
+      { name: "Incidents", href: "/dashboard/incidents", icon: AlertTriangle, permission: "sos:view" },
+    ]
+  },
+  {
+    title: "Insights",
+    items: [
+      { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3, permission: "reports:view" },
+      { name: "Reports", href: "/dashboard/reports", icon: FileText, permission: "reports:view" },
+      { name: "Ratings", href: "/dashboard/ratings", icon: Star, permission: "ratings:view" },
+      { name: "Activity Log", href: "/dashboard/activity", icon: Activity, permission: "reports:view" },
+    ]
+  },
+  {
+    title: "System",
+    items: [
+      { name: "Chat", href: "/dashboard/chat", icon: MessageSquare, permission: "chat:view" },
+      { name: "Content", href: "/dashboard/content", icon: FileText, permission: "content:view" },
+      { name: "Help Center", href: "/dashboard/help", icon: FileText, permission: "content:view" },
+      { name: "Admins", href: "/dashboard/admins", icon: Shield, permission: "admins:view" },
+      { name: "Settings", href: "/dashboard/settings", icon: Settings, permission: "settings:view" },
+    ]
+  },
 ]
 
 export function Sidebar() {
@@ -108,7 +155,15 @@ export function Sidebar() {
     router.push("/login")
   }
 
-  const visibleNavigation = loading ? navigation : navigation.filter(item => can(item.permission))
+  const getVisibleSections = () => {
+    if (loading) return navigationSections
+    return navigationSections.map(section => ({
+      ...section,
+      items: section.items.filter(item => can(item.permission))
+    })).filter(section => section.items.length > 0)
+  }
+
+  const visibleSections = getVisibleSections()
 
   return (
     <div className="flex h-full w-56 flex-col border-r bg-card">
@@ -120,38 +175,49 @@ export function Sidebar() {
           <span className="font-bold">MyRide</span>
         </Link>
       </div>
-      <nav className="flex-1 space-y-0.5 p-3 overflow-y-auto">
-        {visibleNavigation.map((item) => {
-          const isActive = item.href === "/dashboard"
-              ? pathname === "/dashboard"
-              : pathname === item.href || pathname.startsWith(item.href + "/")
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              )}
-            >
-              <item.icon className="h-4 w-4" />
-              <span className="flex-1">{item.name}</span>
-              {badges[item.href] > 0 && (
-                <Badge
-                  variant={item.href === '/dashboard/sos' ? 'destructive' : 'secondary'}
-                  className={cn(
-                    "h-5 min-w-5 px-1.5 text-xs",
-                    item.href === '/dashboard/sos' && "animate-pulse"
-                  )}
-                >
-                  {badges[item.href]}
-                </Badge>
-              )}
-            </Link>
-          )
-        })}
+      <nav className="flex-1 p-3 overflow-y-auto">
+        {visibleSections.map((section, sectionIdx) => (
+          <div key={section.title || 'main'} className={cn(sectionIdx > 0 && "mt-4")}>
+            {section.title && (
+              <p className="px-2.5 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                {section.title}
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const isActive = item.href === "/dashboard"
+                    ? pathname === "/dashboard"
+                    : pathname === item.href || pathname.startsWith(item.href + "/")
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span className="flex-1">{item.name}</span>
+                    {badges[item.href] > 0 && (
+                      <Badge
+                        variant={item.href === '/dashboard/sos' ? 'destructive' : 'secondary'}
+                        className={cn(
+                          "h-5 min-w-5 px-1.5 text-xs",
+                          item.href === '/dashboard/sos' && "animate-pulse"
+                        )}
+                      >
+                        {badges[item.href]}
+                      </Badge>
+                    )}
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
       <div className="border-t p-3">
         <button

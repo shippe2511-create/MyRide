@@ -52,52 +52,14 @@ export default function ActivityPage() {
     setLoading(true)
     const supabase = createClient()
 
-    // For now, we'll create mock activity data since the activity_logs table may not exist
-    // In production, this would query the actual activity_logs table
-    const mockActivities: ActivityLog[] = [
-      {
-        id: '1',
-        action: 'update',
-        entity_type: 'settings',
-        entity_id: 'emergency-contacts',
-        details: { field: 'emergency_contacts', changed: true },
-        admin_id: 'admin-1',
-        admin_name: 'Admin User',
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: '2',
-        action: 'view',
-        entity_type: 'customer',
-        entity_id: 'cust-123',
-        details: { customer_name: 'John Doe' },
-        admin_id: 'admin-1',
-        admin_name: 'Admin User',
-        created_at: new Date(Date.now() - 3600000).toISOString(),
-      },
-      {
-        id: '3',
-        action: 'create',
-        entity_type: 'driver',
-        entity_id: 'driver-456',
-        details: { driver_name: 'Jane Smith' },
-        admin_id: 'admin-1',
-        admin_name: 'Admin User',
-        created_at: new Date(Date.now() - 7200000).toISOString(),
-      },
-    ]
-
-    // Try to fetch from actual table, fallback to mock
     const { data, error } = await supabase
       .from('activity_logs')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(100)
 
-    if (!error && data && data.length > 0) {
+    if (!error && data) {
       setActivities(data)
-    } else {
-      setActivities(mockActivities)
     }
 
     setLoading(false)
@@ -176,7 +138,8 @@ export default function ActivityPage() {
             </div>
           ) : filteredActivities.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              No activity logs found
+              <p>No activity logs yet</p>
+              <p className="text-sm mt-1">Actions like approving customers or updating settings will appear here</p>
             </div>
           ) : (
             <div className="space-y-3">

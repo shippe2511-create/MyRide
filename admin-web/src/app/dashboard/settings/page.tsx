@@ -13,6 +13,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Settings, Globe, Bell, Shield, Database, Save, Loader2, KeyRound, Phone, Plus, Trash2, GripVertical, Eye, EyeOff } from "lucide-react"
 import { toast } from "sonner"
+import { logActivity } from "@/lib/activity-logger"
 
 interface AppSettings {
   id: string
@@ -119,6 +120,7 @@ export default function SettingsPage() {
 
       if (error) throw error
       toast.success("Settings saved successfully")
+      logActivity({ action: 'update', entityType: 'settings', entityId: 'app-settings', details: { company_name: settings.company_name } })
     } catch {
       toast.error("Failed to save settings")
     }
@@ -153,6 +155,7 @@ export default function SettingsPage() {
         if (error) throw error
       }
       toast.success("Emergency contacts saved")
+      logActivity({ action: 'update', entityType: 'settings', entityId: 'emergency-contacts', details: { count: emergencyContacts.length } })
       await loadEmergencyContacts()
     } catch {
       toast.error("Failed to save contacts")

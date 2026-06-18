@@ -60,6 +60,7 @@ import {
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { formatDate } from "@/lib/utils"
+import { logActivity } from "@/lib/activity-logger"
 
 interface Customer {
   id: string
@@ -159,6 +160,7 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
       toast.error("Failed to update customer status")
     } else {
       toast.success(`Customer ${newStatus === "suspended" ? "suspended" : "activated"}`)
+      logActivity({ action: 'update', entityType: 'customer', entityId: customer.id, details: { status: newStatus, name: customer.full_name } })
       router.refresh()
     }
     setLoading(false)
@@ -175,6 +177,7 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
       toast.error("Failed to approve customer")
     } else {
       toast.success("Customer approved")
+      logActivity({ action: 'update', entityType: 'customer', entityId: customer.id, details: { status: 'approved', name: customer.full_name } })
       router.refresh()
     }
     setLoading(false)
@@ -191,6 +194,7 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
       toast.error("Failed to reject customer")
     } else {
       toast.success("Customer rejected")
+      logActivity({ action: 'update', entityType: 'customer', entityId: customer.id, details: { status: 'rejected', name: customer.full_name } })
       router.refresh()
     }
     setLoading(false)
@@ -212,6 +216,7 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
       toast.error("Failed to delete customer")
     } else {
       toast.success("Customer deleted")
+      logActivity({ action: 'delete', entityType: 'customer', entityId: customerToDelete.id, details: { name: customerToDelete.full_name } })
       router.refresh()
     }
     setLoading(false)
@@ -273,6 +278,7 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
         toast.error("Failed to update customer")
       } else {
         toast.success("Customer updated")
+        logActivity({ action: 'update', entityType: 'customer', entityId: selectedCustomer.id, details: { name: formData.full_name } })
         setDialogType(null)
         router.refresh()
       }
@@ -294,6 +300,7 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
         toast.error("Failed to add customer: " + error.message)
       } else {
         toast.success("Customer added")
+        logActivity({ action: 'create', entityType: 'customer', details: { name: formData.full_name } })
         setDialogType(null)
         router.refresh()
       }

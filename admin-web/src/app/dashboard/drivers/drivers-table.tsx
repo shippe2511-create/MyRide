@@ -64,6 +64,7 @@ interface Vehicle {
   icon: string
 }
 import { formatDate } from "@/lib/utils"
+import { logActivity } from "@/lib/activity-logger"
 
 interface Driver {
   id: string
@@ -166,6 +167,7 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
       console.error("Approve error:", error)
     } else {
       toast.success("Driver approved")
+      logActivity({ action: 'update', entityType: 'driver', entityId: driver.id, details: { status: 'approved', name: driver.full_name } })
       router.refresh()
     }
     setLoading(false)
@@ -183,6 +185,7 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
       console.error("Reject error:", error)
     } else {
       toast.success("Driver rejected")
+      logActivity({ action: 'update', entityType: 'driver', entityId: driver.id, details: { status: 'rejected', name: driver.full_name } })
       router.refresh()
     }
     setLoading(false)
@@ -201,6 +204,7 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
       console.error("Suspend error:", error)
     } else {
       toast.success(`Driver ${newStatus === "suspended" ? "suspended" : "activated"}`)
+      logActivity({ action: 'update', entityType: 'driver', entityId: driver.id, details: { status: newStatus, name: driver.full_name } })
       router.refresh()
     }
     setLoading(false)
@@ -231,6 +235,7 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
         toast.error("Failed to delete driver: " + error.message)
       } else {
         toast.success("Driver deleted")
+        logActivity({ action: 'delete', entityType: 'driver', entityId: driverToDelete.id, details: { name: driverToDelete.full_name } })
         router.refresh()
       }
     } catch (e) {
@@ -316,6 +321,7 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
             toast.error("Failed to assign vehicle: " + driverError.message)
           } else {
             toast.success("Driver updated")
+            logActivity({ action: 'update', entityType: 'driver', entityId: selectedDriver.id, details: { name: formData.full_name } })
           }
         } else {
           // Create new driver record
@@ -331,6 +337,7 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
             toast.error("Failed to assign vehicle: " + driverError.message)
           } else {
             toast.success("Driver updated")
+            logActivity({ action: 'update', entityType: 'driver', entityId: selectedDriver.id, details: { name: formData.full_name } })
           }
         }
         setDialogType(null)
@@ -371,6 +378,7 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
           }
         }
         toast.success("Driver added")
+        logActivity({ action: 'create', entityType: 'driver', entityId: newProfile?.id, details: { name: formData.full_name } })
         setDialogType(null)
         router.refresh()
       }

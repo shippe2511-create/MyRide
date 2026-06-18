@@ -47,9 +47,7 @@ are documented there. Keep those notes updated as the project evolves.
 ## Supabase (shared backend)
 - Project URL: https://lwkndyyfmmrzazdvrsnk.supabase.co
 - Inspect tables before coding. Schema is documented in the vault's Supabase Schema note.
-- 5 tables still have RLS disabled (transport_routes, route_stops, route_schedules,
-  saved_places, chat_messages) — RLS fix SQL is drafted but NOT yet applied. Review
-  before applying to the live database.
+- All tables have RLS enabled with proper policies (fixed 2026-06-19).
 
 ## Working rules — ALWAYS follow (added by Athif)
 - **No dead buttons or fields, ever.** Every button, field, toggle, and feature you

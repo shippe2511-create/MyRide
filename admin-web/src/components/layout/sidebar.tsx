@@ -25,6 +25,13 @@ import {
   Radio,
   Activity,
   Fuel,
+  UserCircle,
+  Truck,
+  Navigation,
+  ShieldAlert,
+  TrendingUp,
+  Cog,
+  HelpCircle,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -40,19 +47,19 @@ interface NavItem {
 }
 
 interface NavSection {
-  title: string | null
-  items: NavItem[]
+  name: string
+  icon: typeof LayoutDashboard
+  href?: string
+  permission: Permission
+  items?: NavItem[]
 }
 
 const navigationSections: NavSection[] = [
+  { name: "Dashboard", icon: LayoutDashboard, href: "/dashboard", permission: "dashboard:view" },
   {
-    title: null,
-    items: [
-      { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard:view" },
-    ]
-  },
-  {
-    title: "People",
+    name: "People",
+    icon: UserCircle,
+    permission: "customers:view",
     items: [
       { name: "Customers", href: "/dashboard/customers", icon: Users, permission: "customers:view" },
       { name: "Drivers", href: "/dashboard/drivers", icon: Car, permission: "drivers:view" },
@@ -60,7 +67,9 @@ const navigationSections: NavSection[] = [
     ]
   },
   {
-    title: "Fleet",
+    name: "Fleet",
+    icon: Truck,
+    permission: "vehicles:view",
     items: [
       { name: "Vehicles", href: "/dashboard/vehicles", icon: CarFront, permission: "vehicles:view" },
       { name: "Vehicle Logs", href: "/dashboard/vehicle-logs", icon: Fuel, permission: "vehicles:view" },
@@ -68,7 +77,9 @@ const navigationSections: NavSection[] = [
     ]
   },
   {
-    title: "Operations",
+    name: "Operations",
+    icon: Navigation,
+    permission: "rides:view",
     items: [
       { name: "Rides", href: "/dashboard/rides", icon: MapPin, permission: "rides:view" },
       { name: "Live Tracking", href: "/dashboard/tracking", icon: Radio, permission: "tracking:view" },
@@ -77,14 +88,18 @@ const navigationSections: NavSection[] = [
     ]
   },
   {
-    title: "Safety",
+    name: "Safety",
+    icon: ShieldAlert,
+    permission: "sos:view",
     items: [
       { name: "SOS Alerts", href: "/dashboard/sos", icon: AlertTriangle, permission: "sos:view" },
       { name: "Incidents", href: "/dashboard/incidents", icon: AlertTriangle, permission: "sos:view" },
     ]
   },
   {
-    title: "Insights",
+    name: "Insights",
+    icon: TrendingUp,
+    permission: "reports:view",
     items: [
       { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3, permission: "reports:view" },
       { name: "Reports", href: "/dashboard/reports", icon: FileText, permission: "reports:view" },
@@ -93,11 +108,13 @@ const navigationSections: NavSection[] = [
     ]
   },
   {
-    title: "System",
+    name: "System",
+    icon: Cog,
+    permission: "settings:view",
     items: [
       { name: "Chat", href: "/dashboard/chat", icon: MessageSquare, permission: "chat:view" },
       { name: "Content", href: "/dashboard/content", icon: FileText, permission: "content:view" },
-      { name: "Help Center", href: "/dashboard/help", icon: FileText, permission: "content:view" },
+      { name: "Help Center", href: "/dashboard/help", icon: HelpCircle, permission: "content:view" },
       { name: "Admins", href: "/dashboard/admins", icon: Shield, permission: "admins:view" },
       { name: "Settings", href: "/dashboard/settings", icon: Settings, permission: "settings:view" },
     ]
@@ -110,6 +127,7 @@ export function Sidebar() {
   const supabase = createClient()
   const { can, loading } = usePermissions()
   const [badges, setBadges] = useState<Record<string, number>>({})
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     loadBadges()
@@ -157,13 +175,25 @@ export function Sidebar() {
 
   const getVisibleSections = () => {
     if (loading) return navigationSections
-    return navigationSections.map(section => ({
-      ...section,
-      items: section.items.filter(item => can(item.permission))
-    })).filter(section => section.items.length > 0)
+    return navigationSections.map(section => {
+      if (!section.items) return section
+      return {
+        ...section,
+        items: section.items.filter(item => can(item.permission))
+      }
+    }).filter(section => !section.items || section.items.length > 0)
   }
 
   const visibleSections = getVisibleSections()
+
+  const isSectionActive = (section: NavSection) => {
+    if (section.href) {
+      return pathname === section.href
+    }
+    return section.items?.some(item =>
+      pathname === item.href || pathname.startsWith(item.href + "/")
+    )
+  }
 
   return (
     <div className="flex h-full w-56 flex-col border-r bg-card">
@@ -176,48 +206,86 @@ export function Sidebar() {
         </Link>
       </div>
       <nav className="flex-1 p-3 overflow-y-auto">
-        {visibleSections.map((section, sectionIdx) => (
-          <div key={section.title || 'main'} className={cn(sectionIdx > 0 && "mt-4")}>
-            {section.title && (
-              <p className="px-2.5 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-                {section.title}
-              </p>
-            )}
-            <div className="space-y-0.5">
-              {section.items.map((item) => {
-                const isActive = item.href === "/dashboard"
-                    ? pathname === "/dashboard"
-                    : pathname === item.href || pathname.startsWith(item.href + "/")
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    className={cn(
-                      "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
-                      isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                    )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    <span className="flex-1">{item.name}</span>
-                    {badges[item.href] > 0 && (
-                      <Badge
-                        variant={item.href === '/dashboard/sos' ? 'destructive' : 'secondary'}
-                        className={cn(
-                          "h-5 min-w-5 px-1.5 text-xs",
-                          item.href === '/dashboard/sos' && "animate-pulse"
-                        )}
-                      >
-                        {badges[item.href]}
-                      </Badge>
-                    )}
-                  </Link>
-                )
-              })}
-            </div>
-          </div>
-        ))}
+        <div className="space-y-1">
+          {visibleSections.map((section) => {
+            const isExpanded = expanded[section.name] ?? isSectionActive(section)
+            const sectionBadgeCount = section.items?.reduce((sum, item) => sum + (badges[item.href] || 0), 0) || 0
+
+            if (section.href) {
+              const isActive = pathname === section.href
+              return (
+                <Link
+                  key={section.name}
+                  href={section.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  )}
+                >
+                  <section.icon className="h-5 w-5" />
+                  <span>{section.name}</span>
+                </Link>
+              )
+            }
+
+            return (
+              <div key={section.name}>
+                <button
+                  onClick={() => setExpanded(prev => ({ ...prev, [section.name]: !isExpanded }))}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                    isSectionActive(section)
+                      ? "text-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  )}
+                >
+                  <section.icon className="h-5 w-5" />
+                  <span className="flex-1 text-left">{section.name}</span>
+                  {sectionBadgeCount > 0 && !isExpanded && (
+                    <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-xs">
+                      {sectionBadgeCount}
+                    </Badge>
+                  )}
+                </button>
+                {isExpanded && section.items && (
+                  <div className="ml-8 mt-1 space-y-0.5">
+                    {section.items.map((item) => {
+                      const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+                      return (
+                        <Link
+                          key={item.name}
+                          href={item.href}
+                          className={cn(
+                            "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors",
+                            isActive
+                              ? "bg-primary text-primary-foreground font-medium"
+                              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                          )}
+                        >
+                          <item.icon className="h-4 w-4" />
+                          <span className="flex-1">{item.name}</span>
+                          {badges[item.href] > 0 && (
+                            <Badge
+                              variant={item.href === '/dashboard/sos' ? 'destructive' : 'secondary'}
+                              className={cn(
+                                "h-5 min-w-5 px-1.5 text-xs",
+                                item.href === '/dashboard/sos' && "animate-pulse"
+                              )}
+                            >
+                              {badges[item.href]}
+                            </Badge>
+                          )}
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
       </nav>
       <div className="border-t p-3">
         <button

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/ride_request.dart';
 import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
@@ -1237,7 +1238,22 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showSupportSheet(BuildContext context) {
+  void _showSupportSheet(BuildContext context) async {
+    // Fetch support info from admin settings
+    String supportPhone = '+960 333-3333';
+    try {
+      final response = await Supabase.instance.client
+          .from('app_settings')
+          .select('support_phone')
+          .limit(1)
+          .maybeSingle();
+      if (response != null && response['support_phone'] != null) {
+        supportPhone = response['support_phone'];
+      }
+    } catch (_) {}
+
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1279,10 +1295,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: const Icon(Icons.phone, color: AppColors.success),
               ),
               title: Text('Call Support', style: TextStyle(color: context.textColor, fontWeight: FontWeight.w600)),
-              subtitle: Text('24/7 helpline', style: TextStyle(color: context.mutedColor)),
+              subtitle: Text(supportPhone, style: TextStyle(color: context.mutedColor)),
               onTap: () async {
                 Navigator.pop(ctx);
-                final uri = Uri.parse('tel:+9607777777');
+                final cleanPhone = supportPhone.replaceAll(RegExp(r'[^\d+]'), '');
+                final uri = Uri.parse('tel:$cleanPhone');
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri);
                 }
@@ -1299,10 +1316,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: const Icon(Icons.chat, color: AppColors.info),
               ),
               title: Text('Live Chat', style: TextStyle(color: context.textColor, fontWeight: FontWeight.w600)),
-              subtitle: Text('Chat with an agent', style: TextStyle(color: context.mutedColor)),
+              subtitle: Text('Chat with support team', style: TextStyle(color: context.mutedColor)),
               onTap: () {
                 Navigator.pop(ctx);
-                // Open chat
+                Navigator.pushNamed(context, '/support-chat');
               },
             ),
             SizedBox(height: MediaQuery.of(ctx).padding.bottom + 16),

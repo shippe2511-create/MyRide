@@ -734,32 +734,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Widget _buildTextField(String label, String hint) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(color: context.mutedColor, fontSize: 13, fontWeight: FontWeight.w500)),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: context.borderColor),
-          ),
-          child: TextField(
-            style: TextStyle(color: context.textColor),
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: TextStyle(color: context.faintColor),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildProfileAvatar(AppState appState, double size, double iconSize) {
     // Priority: avatarUrl (cloud) > profilePhotoPath (local) > icon
     if (appState.avatarUrl != null && appState.avatarUrl!.isNotEmpty) {
@@ -2540,50 +2514,6 @@ For questions about cookies, contact support@myride.mv
     );
   }
 
-  Widget _buildSavedPlace(String name, String address, IconData icon) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5), borderRadius: BorderRadius.circular(14), border: Border.all(color: context.borderColor)),
-      child: Row(
-        children: [
-          Container(width: 44, height: 44, decoration: BoxDecoration(color: AppColors.yellow.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: AppColors.yellow, size: 22)),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(name, style: TextStyle(color: context.textColor, fontSize: 15, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 2),
-              Text(address, style: TextStyle(color: context.mutedColor, fontSize: 13)),
-            ]),
-          ),
-          Icon(Icons.more_vert, color: context.mutedColor, size: 20),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContactItem(String name, String phone, String relation) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5), borderRadius: BorderRadius.circular(14), border: Border.all(color: context.borderColor)),
-      child: Row(
-        children: [
-          Container(width: 44, height: 44, decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)), child: Center(child: Text(name[0], style: TextStyle(color: AppColors.error, fontSize: 18, fontWeight: FontWeight.w700)))),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(name, style: TextStyle(color: context.textColor, fontSize: 15, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 2),
-              Text('$phone • $relation', style: TextStyle(color: context.mutedColor, fontSize: 13)),
-            ]),
-          ),
-          Icon(Icons.phone, color: AppColors.success, size: 20),
-        ],
-      ),
-    );
-  }
-
   Widget _buildInfoItem(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -2606,27 +2536,6 @@ For questions about cookies, contact support@myride.mv
           Text(label, style: TextStyle(color: context.textColor, fontSize: 15)),
           Switch(value: value, onChanged: onChanged, activeColor: AppColors.yellow),
         ],
-      ),
-    );
-  }
-
-  Widget _buildLanguageOption(String label, bool selected) {
-    return GestureDetector(
-      onTap: () => HapticFeedback.lightImpact(),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.yellow.withValues(alpha: 0.15) : (context.isDark ? context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5) : const Color(0xFFF5F5F5)),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: selected ? AppColors.yellow : context.borderColor),
-        ),
-        child: Row(
-          children: [
-            Expanded(child: Text(label, style: TextStyle(color: context.textColor, fontSize: 15, fontWeight: selected ? FontWeight.w600 : FontWeight.normal))),
-            if (selected) Icon(Icons.check_circle, color: AppColors.yellow, size: 22),
-          ],
-        ),
       ),
     );
   }

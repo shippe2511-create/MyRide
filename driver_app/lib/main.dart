@@ -17,6 +17,7 @@ import 'screens/sos_screen.dart';
 import 'screens/shift_schedule_screen.dart';
 import 'screens/help_screen.dart';
 import 'screens/about_screen.dart';
+import 'screens/support_chat_screen.dart';
 import 'theme/app_theme.dart';
 import 'services/supabase_service.dart';
 import 'services/notification_service.dart';
@@ -120,6 +121,7 @@ class DriverApp extends StatelessWidget {
             '/shift-schedule': (_) => const ShiftScheduleScreen(),
             '/help': (_) => const HelpScreen(),
             '/about': (_) => const AboutScreen(),
+            '/support-chat': (_) => const SupportChatScreen(),
           },
           builder: (context, child) {
             return OfflineBanner(

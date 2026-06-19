@@ -1128,6 +1128,8 @@ class _SearchScreenState extends State<SearchScreen> {
     final nameController = TextEditingController();
     String selectedAddress = '';
     String selectedLocationName = '';
+    double? selectedLat;
+    double? selectedLng;
     int selectedIconIndex = 0;
     int selectedColorIndex = 0;
 
@@ -1292,6 +1294,8 @@ class _SearchScreenState extends State<SearchScreen> {
                         setModalState(() {
                           selectedAddress = result['address'] as String;
                           selectedLocationName = (result['name'] as String?) ?? '';
+                          selectedLat = result['lat'] as double?;
+                          selectedLng = result['lng'] as double?;
                         });
                       }
                     },
@@ -1369,6 +1373,8 @@ class _SearchScreenState extends State<SearchScreen> {
                             address: selectedAddress,
                             icon: iconLabel,
                             color: colorName,
+                            latitude: selectedLat,
+                            longitude: selectedLng,
                             staffId: appState.staffId,
                             profileId: appState.profileId,
                           );

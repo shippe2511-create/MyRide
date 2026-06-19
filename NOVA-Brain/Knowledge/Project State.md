@@ -1,6 +1,6 @@
 # MyRide — Project State
 
-Last Updated: 2026-06-16
+Last Updated: 2026-06-19
 Related: [[MyRide — Project Hub]]
 Tags: #project/myride
 
@@ -85,6 +85,9 @@ MyRide is a corporate **free-ride** transport platform with three apps sharing o
 **Stub/Placeholder Pages:**
 - None currently — all sidebar items are wired to real pages
 
+**Recent Additions (2026-06-19):**
+- `/dashboard/activity` — Activity log showing all admin actions (create, update, delete)
+
 ---
 
 ## Database (Supabase)
@@ -104,9 +107,7 @@ MyRide is a corporate **free-ride** transport platform with three apps sharing o
 - `vehicle_types` — Individual vehicles
 
 **RLS Status:**
-- Most tables have RLS enabled
-- `documents` table has RLS disabled (temporary for development)
-- 5 tables still need RLS review: transport_routes, route_stops, route_schedules, saved_places, chat_messages
+- All tables have RLS enabled with proper policies (fixed 2026-06-19)
 
 ---
 
@@ -120,4 +121,19 @@ MyRide is a corporate **free-ride** transport platform with three apps sharing o
 
 ---
 
-*Updated by Nova on 2026-06-16*
+---
+
+## UI/UX Improvements (2026-06-19)
+
+Both Flutter apps now include:
+- **Shimmer loading states** — Skeleton placeholders during data load
+- **Onboarding tooltips** — First-time user walkthrough for key features
+- **Lottie animations** — Smooth animations for trip status states
+
+Driver app additions:
+- **Break timer widget** — Animated countdown during driver breaks
+- **Code cleanup** — Removed ~170 lines of dead code
+
+---
+
+*Updated by Nova on 2026-06-19*

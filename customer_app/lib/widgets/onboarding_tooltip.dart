@@ -367,6 +367,7 @@ class _OnboardingOverlayState extends State<OnboardingOverlay> with SingleTicker
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.6),
                         fontSize: 14,
+                        decoration: TextDecoration.none,
                       ),
                     ),
                     GestureDetector(
@@ -377,6 +378,7 @@ class _OnboardingOverlayState extends State<OnboardingOverlay> with SingleTicker
                           color: Colors.white.withValues(alpha: 0.6),
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
+                          decoration: TextDecoration.none,
                         ),
                       ),
                     ),
@@ -416,6 +418,7 @@ class _OnboardingOverlayState extends State<OnboardingOverlay> with SingleTicker
                         color: Colors.white,
                         fontSize: 26,
                         fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.none,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -426,6 +429,7 @@ class _OnboardingOverlayState extends State<OnboardingOverlay> with SingleTicker
                         color: Colors.white.withValues(alpha: 0.7),
                         fontSize: 16,
                         height: 1.5,
+                        decoration: TextDecoration.none,
                       ),
                       textAlign: TextAlign.center,
                     ),

@@ -1,7 +1,7 @@
 # MyRide Issues List
 
 Investigated: 2026-06-15
-Last Updated: 2026-06-17
+Last Updated: 2026-06-19
 Status: All fixable issues resolved
 Related: [[MyRide — Project Hub]]
 Tags: #project/myride
@@ -49,8 +49,8 @@ Tags: #project/myride
   - Changed to use driverId from DriverState provider instead of getDriverProfile()
   - Added unique constraint on (driver_id, document_type) for upsert
   - Fixed document_type to use `vehicle_reg` instead of `vehicle_registration`
-  - Disabled RLS on documents table for now (to be properly secured later)
   - Fixed admin panel to use `verified` status instead of `approved`
+  - RLS properly secured (2026-06-19): drivers own their docs, admins can view/update all
 
 ### 19. Document Preview Shows Icon Instead of Image - FIXED (2026-06-16)
 - **Fix:** Updated preview dialog to load and display actual uploaded image from Supabase Storage
@@ -207,4 +207,43 @@ Fixed:
 
 ---
 
-*Updated by Nova on 2026-06-17*
+### 29. RLS Fix for 5 Tables - FIXED (2026-06-19)
+- **Issue:** 5 tables had overly permissive RLS policies (transport_routes, route_stops, route_schedules, saved_places, chat_messages)
+- **Fix:** 
+  - Dropped "Anyone can manage X" policies that bypassed security
+  - Added proper scoped policies:
+    - Routes/stops/schedules: public can READ, only admins can write
+    - saved_places: users own their data, admins can view all
+    - chat_messages: users see own sent/received, can only send as themselves
+  - Removed 13 overly permissive policies total
+
+### 30. Activity Logging System - IMPLEMENTED (2026-06-19)
+- **Feature:** Track all admin actions in Activity Log page
+- **Implementation:**
+  - Created `activity_logs` table with RLS policies
+  - Created `activity-logger.ts` utility for consistent logging
+  - Wired into customers, drivers, and settings pages
+  - Activity page now uses real data instead of mock
+
+---
+
+## UI/UX Improvements (2026-06-19)
+
+### 31. Shimmer Loading States - IMPLEMENTED
+- Added shimmer loading effects to replace plain spinners across customer and driver apps
+
+### 32. Break Timer Widget - IMPLEMENTED  
+- Driver app shows animated countdown timer during break with visual feedback
+
+### 33. Onboarding Tooltips - IMPLEMENTED
+- First-time user walkthrough highlighting key features in both apps
+
+### 34. Lottie Animations - IMPLEMENTED
+- Added smooth Lottie animations for trip status states (searching, driver arriving, in progress, complete, cancelled)
+
+### 35. Dead Code Cleanup - COMPLETED
+- Removed ~170 lines of unused methods from driver_app home screen
+
+---
+
+*Updated by Nova on 2026-06-19*

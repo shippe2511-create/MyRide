@@ -1,6 +1,6 @@
 # MyRide — Decisions Log
 
-Last Updated: 2026-06-16
+Last Updated: 2026-06-19
 Related: [[MyRide — Project Hub]] | [[Project State]]
 Tags: #project/myride #decisions
 
@@ -98,4 +98,12 @@ Never scaffold or regenerate code that already exists. When unsure, inspect the 
 
 ---
 
-*Updated by Nova on 2026-06-16*
+### 2026-06-19
+- **Fixed RLS on 5 tables** — Removed overly permissive policies, added proper scoped access
+- **Activity logging system** — All admin actions now tracked in `activity_logs` table
+- **UI/UX polish** — Added shimmer loading, break timer, onboarding tooltips, Lottie animations
+- **Code cleanup** — Removed ~170 lines of dead code from driver_app
+
+---
+
+*Updated by Nova on 2026-06-19*

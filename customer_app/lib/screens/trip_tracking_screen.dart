@@ -154,7 +154,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
             final end = DateTime.tryParse(completedAt);
             if (start != null && end != null) {
               duration = end.difference(start).inMinutes;
-              if (duration! < 1) duration = 1; // Minimum 1 minute
+              if (duration < 1) duration = 1; // Minimum 1 minute
             }
           }
         }
@@ -1287,67 +1287,6 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
         );
       },
     );
-  }
-
-  void _showCancelDialog() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: context.surfaceColor,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2))),
-            const SizedBox(height: 24),
-            Container(width: 60, height: 60, decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.15), shape: BoxShape.circle), child: Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 30)),
-            const SizedBox(height: 16),
-            Text('Cancel Trip?', style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            Text('Are you sure you want to cancel?', style: TextStyle(color: context.mutedColor, fontSize: 15)),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 50,
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: OutlinedButton.styleFrom(foregroundColor: context.textColor, side: BorderSide(color: context.borderColor), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                      child: Text('Keep Trip', style: TextStyle(fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: SizedBox(
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        Navigator.popUntil(context, (route) => route.isFirst);
-                      },
-                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0),
-                      child: Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: MediaQuery.of(ctx).padding.bottom + 10),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _completeTrip() {
-    HapticFeedback.heavyImpact();
-    _onTripCompleted();
   }
 
   void _showSOSOptions() {

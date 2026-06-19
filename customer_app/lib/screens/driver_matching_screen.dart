@@ -10,7 +10,6 @@ import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../providers/app_state.dart';
-import '../widgets/status_animation.dart';
 import 'driver_arriving_screen.dart';
 
 class DriverMatchingScreen extends StatefulWidget {
@@ -464,27 +463,10 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
                   ),
                   const SizedBox(height: 20),
 
-                  // Animated loading with Lottie
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const StatusAnimation(
-                        type: TripAnimationType.searching,
-                        size: 40,
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _statusText,
-                            style: TextStyle(color: context.textColor, fontSize: 17, fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 2),
-                          const LoadingDots(size: 6),
-                        ],
-                      ),
-                    ],
+                  // Status text
+                  Text(
+                    _statusText,
+                    style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 16),
 

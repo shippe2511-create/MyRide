@@ -240,8 +240,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             const SizedBox(height: 20),
             if (_ongoingTrip != null) _buildOngoingTripBanner(context),
             _buildSearchBar(context),
-            const SizedBox(height: 16),
-            _buildQuickActions(context),
             const SizedBox(height: 24),
             _buildTransportSchedules(context),
             const SizedBox(height: 24),
@@ -501,91 +499,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildQuickActions(BuildContext context) {
-    final actions = [
-      {
-        'icon': Icons.local_taxi_rounded,
-        'label': 'Book Now',
-        'color': AppColors.yellow,
-        'onTap': () {
-          HapticFeedback.mediumImpact();
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const SearchScreen()));
-        },
-      },
-      {
-        'icon': Icons.schedule_rounded,
-        'label': 'Schedule',
-        'color': const Color(0xFF4DA6FF),
-        'onTap': () {
-          HapticFeedback.mediumImpact();
-          _showSchedulePicker(context);
-        },
-      },
-      {
-        'icon': Icons.repeat_rounded,
-        'label': 'Recurring',
-        'color': const Color(0xFF34C759),
-        'onTap': () {
-          HapticFeedback.mediumImpact();
-          Navigator.pushNamed(context, '/recurring-rides');
-        },
-      },
-      {
-        'icon': Icons.warning_rounded,
-        'label': 'SOS',
-        'color': AppColors.error,
-        'onTap': () {
-          HapticFeedback.heavyImpact();
-          Navigator.pushNamed(context, '/sos');
-        },
-      },
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: actions.map((action) {
-          return Expanded(
-            child: GestureDetector(
-              onTap: action['onTap'] as VoidCallback,
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: (action['color'] as Color).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: (action['color'] as Color).withValues(alpha: 0.2),
-                  ),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      action['icon'] as IconData,
-                      color: action['color'] as Color,
-                      size: 24,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      action['label'] as String,
-                      style: TextStyle(
-                        color: context.textColor,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }).toList(),
       ),
     );
   }

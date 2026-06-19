@@ -140,8 +140,13 @@ All code-level issues have been resolved. The remaining 2 issues require externa
 
 ## Known Runtime Issues
 
-### 21. iOS App Lifecycle Crash - FIXED (2026-06-17)
+### 21. iOS App Lifecycle Crash - FIXED (2026-06-17, driver_app re-fixed 2026-06-19)
 - **Issue:** Both Flutter apps crashed on iOS (white screen, app comes and goes)
+- **driver_app re-fix (2026-06-19):** Simplified AppDelegate to match customer_app pattern:
+  - Removed custom FlutterEngine and scene delegation
+  - Removed UIApplicationSceneManifest from Info.plist  
+  - Deleted SceneDelegate.swift and its Xcode project references
+  - Build now succeeds without scene delegation
 - **Cause:** Missing SceneDelegate for iOS 13+ scene-based lifecycle
 - **Fix:** Added SceneDelegate.swift and configured Info.plist with UISceneConfiguration
 

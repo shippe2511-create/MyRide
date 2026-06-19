@@ -56,7 +56,6 @@ MyRide is a corporate **free-ride** transport platform with three apps sharing o
 
 **Known Limitations:**
 - Push notifications disabled
-- iOS 26.5 compatibility issue causing white screen on physical device (Flutter toolchain issue, code is correct)
 - NotificationService temporarily disabled for testing
 
 ---
@@ -116,7 +115,7 @@ MyRide is a corporate **free-ride** transport platform with three apps sharing o
 | App | Builds | Runs | Notes |
 |-----|--------|------|-------|
 | flutter_app | ✓ | ✓ | Works on iOS device |
-| driver_app | ✓ | ⚠ | iOS 26.5 white screen issue |
+| driver_app | ✓ | ✓ | Works on iOS device |
 | admin-web | ✓ | ✓ | localhost:3000 |
 
 ---

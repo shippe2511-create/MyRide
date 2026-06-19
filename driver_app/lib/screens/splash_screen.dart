@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:geolocator/geolocator.dart';
 import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 
@@ -58,7 +59,30 @@ class _SplashScreenState extends State<SplashScreen>
       _textController.forward();
     });
 
-    Future.delayed(const Duration(seconds: 2), _navigate);
+    // Request location permission first, then navigate
+    _requestLocationAndNavigate();
+  }
+
+  Future<void> _requestLocationAndNavigate() async {
+    // Wait for animations
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    // Request location permission
+    await _requestLocationPermission();
+
+    // Then navigate
+    _navigate();
+  }
+
+  Future<void> _requestLocationPermission() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+    } catch (e) {
+      debugPrint('Location permission error: $e');
+    }
   }
 
   void _navigate() {

@@ -631,102 +631,33 @@ class _RideRequestPopupState extends State<RideRequestPopup>
 
   Widget _buildSwipeToAccept() {
     return GestureDetector(
-      onHorizontalDragEnd: (details) {
-        if (_swipeProgress >= 0.8) {
-          _triggerAccept();
-        } else {
-          setState(() => _swipeProgress = 0);
-        }
-      },
-      onHorizontalDragUpdate: (details) {
-        final width = MediaQuery.of(context).size.width - 40 - 64; // padding and thumb
-        final delta = details.delta.dx / width;
-        setState(() {
-          _swipeProgress = (_swipeProgress + delta).clamp(0.0, 1.0);
-          if (_swipeProgress > 0.3) {
-            HapticFeedback.selectionClick();
-          }
-        });
-      },
+      onTap: _triggerAccept,
       child: Container(
         height: 64,
         decoration: BoxDecoration(
-          color: context.isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(32),
-          border: Border.all(
-            color: AppColors.yellow.withValues(alpha: 0.3 + (_swipeProgress * 0.7)),
-            width: 2,
+          gradient: const LinearGradient(
+            colors: [AppColors.yellow, Color(0xFFFFC107)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-        ),
-        child: Stack(
-          children: [
-            // Progress fill
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 50),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.yellow.withValues(alpha: 0.3),
-                    AppColors.yellow.withValues(alpha: 0.1),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(30),
-              ),
-              width: (MediaQuery.of(context).size.width - 40) * _swipeProgress,
-            ),
-            // Center text
-            Center(
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 150),
-                opacity: _swipeProgress < 0.3 ? 1 : (1 - _swipeProgress).clamp(0.0, 1.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.chevron_right, color: AppColors.yellow, size: 20),
-                    Icon(Icons.chevron_right, color: AppColors.yellow.withValues(alpha: 0.6), size: 20),
-                    Icon(Icons.chevron_right, color: AppColors.yellow.withValues(alpha: 0.3), size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Swipe to Accept',
-                      style: TextStyle(
-                        color: context.textColor,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            // Thumb
-            Positioned(
-              left: 4 + ((MediaQuery.of(context).size.width - 40 - 64 - 8) * _swipeProgress),
-              top: 4,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 50),
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [AppColors.yellow, const Color(0xFFFFC107)],
-                  ),
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.yellow.withValues(alpha: 0.4),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  _swipeProgress >= 0.8 ? Icons.check : Icons.chevron_right,
-                  color: Colors.black,
-                  size: 28,
-                ),
-              ),
+          borderRadius: BorderRadius.circular(32),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.yellow.withValues(alpha: 0.4),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
             ),
           ],
+        ),
+        child: const Center(
+          child: Text(
+            'Accept Ride',
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ),
       ),
     );

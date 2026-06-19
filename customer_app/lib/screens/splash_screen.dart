@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
+import 'package:geolocator/geolocator.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/brand_mark.dart';
@@ -69,6 +70,10 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _checkAuthAndNavigate() async {
+    if (!mounted) return;
+
+    // Request location permission early
+    await _requestLocationPermission();
     if (!mounted) return;
 
     final appState = Provider.of<AppState>(context, listen: false);
@@ -159,6 +164,17 @@ class _SplashScreenState extends State<SplashScreen>
     // User is approved, go to home
     if (mounted) {
       Navigator.pushReplacementNamed(context, '/home');
+    }
+  }
+
+  Future<void> _requestLocationPermission() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+    } catch (e) {
+      debugPrint('Location permission error: $e');
     }
   }
 

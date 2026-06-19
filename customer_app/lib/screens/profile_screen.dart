@@ -1124,8 +1124,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(color: context.surfaceColor, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+        padding: EdgeInsets.fromLTRB(24, 12, 24, MediaQuery.of(ctx).padding.bottom + 24),
+        decoration: BoxDecoration(color: context.surfaceColor, borderRadius: const BorderRadius.vertical(top: Radius.circular(28))),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1134,7 +1134,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(
               width: 80, height: 80,
               decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
-              child: Icon(Icons.card_giftcard, color: AppColors.success, size: 40),
+              child: const Icon(Icons.card_giftcard, color: AppColors.success, size: 40),
             ),
             const SizedBox(height: 20),
             Text('Invite Friends', style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
@@ -1147,7 +1147,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(referralCode, style: TextStyle(color: AppColors.yellow, fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: 2)),
+                  Text(referralCode, style: const TextStyle(color: AppColors.yellow, fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: 2)),
                   const SizedBox(width: 12),
                   GestureDetector(
                     onTap: () {
@@ -1155,7 +1155,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Clipboard.setData(const ClipboardData(text: referralCode));
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code copied!'), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating));
                     },
-                    child: Icon(Icons.copy, color: AppColors.yellow, size: 20),
+                    child: const Icon(Icons.copy, color: AppColors.yellow, size: 20),
                   ),
                 ],
               ),
@@ -1171,12 +1171,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     subject: 'Join MyRide',
                   );
                 },
-                icon: Icon(Icons.share, size: 18),
-                label: Text('Share Invite Link'),
+                icon: const Icon(Icons.share, size: 18),
+                label: const Text('Share Invite Link'),
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.yellow, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
               ),
             ),
-            SizedBox(height: MediaQuery.of(context).padding.bottom),
           ],
         ),
       ),

@@ -939,17 +939,17 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
                           )
                         : ListView.builder(
                             key: const ValueKey('list'),
-                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
                             itemCount: filteredPlaces.length,
                             itemBuilder: (context, index) {
                               final place = filteredPlaces[index];
                               final isSelected = selectedDestination == place['name'];
                               return TweenAnimationBuilder<double>(
                                 tween: Tween(begin: 0.0, end: 1.0),
-                                duration: Duration(milliseconds: 200 + (index * 50)),
+                                duration: Duration(milliseconds: 150 + (index * 30)),
                                 curve: Curves.easeOutCubic,
                                 builder: (context, value, child) => Transform.translate(
-                                  offset: Offset(0, 20 * (1 - value)),
+                                  offset: Offset(0, 15 * (1 - value)),
                                   child: Opacity(opacity: value, child: child),
                                 ),
                                 child: GestureDetector(
@@ -964,57 +964,98 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
                                   },
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 200),
-                                    margin: const EdgeInsets.only(bottom: 12),
-                                    padding: const EdgeInsets.all(16),
+                                    margin: const EdgeInsets.only(bottom: 10),
+                                    padding: const EdgeInsets.all(14),
                                     decoration: BoxDecoration(
                                       gradient: isSelected
-                                          ? LinearGradient(colors: [AppColors.yellow.withValues(alpha: 0.2), AppColors.yellow.withValues(alpha: 0.1)])
+                                          ? LinearGradient(
+                                              colors: [AppColors.yellow.withValues(alpha: 0.15), AppColors.yellow.withValues(alpha: 0.05)],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            )
                                           : null,
-                                      color: isSelected ? null : (context.isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white),
-                                      borderRadius: BorderRadius.circular(18),
+                                      color: isSelected ? null : context.cardColor,
+                                      borderRadius: BorderRadius.circular(16),
                                       border: Border.all(
-                                        color: isSelected ? AppColors.yellow : (context.isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
-                                        width: isSelected ? 2 : 1,
+                                        color: isSelected ? AppColors.yellow.withValues(alpha: 0.5) : context.borderColor,
+                                        width: isSelected ? 1.5 : 1,
                                       ),
-                                      boxShadow: isSelected ? [BoxShadow(color: AppColors.yellow.withValues(alpha: 0.2), blurRadius: 12, offset: const Offset(0, 4))] : null,
+                                      boxShadow: isSelected ? [
+                                        BoxShadow(color: AppColors.yellow.withValues(alpha: 0.15), blurRadius: 16, offset: const Offset(0, 4)),
+                                      ] : null,
                                     ),
                                     child: Row(
                                       children: [
                                         AnimatedContainer(
                                           duration: const Duration(milliseconds: 200),
-                                          width: 52,
-                                          height: 52,
+                                          width: 48,
+                                          height: 48,
                                           decoration: BoxDecoration(
                                             gradient: isSelected
-                                                ? LinearGradient(colors: [AppColors.yellow, AppColors.yellow.withValues(alpha: 0.7)])
+                                                ? const LinearGradient(
+                                                    colors: [AppColors.yellow, Color(0xFFFFC107)],
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
+                                                  )
                                                 : null,
-                                            color: isSelected ? null : (context.isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.04)),
+                                            color: isSelected ? null : context.bgColor,
                                             borderRadius: BorderRadius.circular(14),
+                                            boxShadow: isSelected ? [
+                                              BoxShadow(color: AppColors.yellow.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 2)),
+                                            ] : null,
                                           ),
-                                          child: Icon(place['icon'], color: isSelected ? Colors.black : context.mutedColor, size: 24),
+                                          child: Icon(
+                                            place['icon'],
+                                            color: isSelected ? Colors.black : context.mutedColor,
+                                            size: 22,
+                                          ),
                                         ),
                                         const SizedBox(width: 14),
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Text(place['name'], style: TextStyle(color: isSelected ? AppColors.yellow : context.textColor, fontSize: 16, fontWeight: FontWeight.w700)),
+                                              Text(
+                                                place['name'],
+                                                style: TextStyle(
+                                                  color: context.textColor,
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w700,
+                                                  letterSpacing: -0.3,
+                                                ),
+                                              ),
                                               const SizedBox(height: 3),
-                                              Text(place['address'], style: TextStyle(color: context.mutedColor, fontSize: 13)),
+                                              Text(
+                                                place['address'],
+                                                style: TextStyle(
+                                                  color: context.mutedColor,
+                                                  fontSize: 12,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
                                             ],
                                           ),
                                         ),
+                                        const SizedBox(width: 8),
                                         AnimatedContainer(
                                           duration: const Duration(milliseconds: 200),
-                                          width: 28,
-                                          height: 28,
+                                          width: 24,
+                                          height: 24,
                                           decoration: BoxDecoration(
-                                            gradient: isSelected ? LinearGradient(colors: [AppColors.yellow, AppColors.yellow.withValues(alpha: 0.8)]) : null,
+                                            gradient: isSelected
+                                                ? const LinearGradient(colors: [AppColors.yellow, Color(0xFFFFC107)])
+                                                : null,
                                             color: isSelected ? null : Colors.transparent,
                                             shape: BoxShape.circle,
-                                            border: Border.all(color: isSelected ? Colors.transparent : context.borderColor, width: 2),
+                                            border: Border.all(
+                                              color: isSelected ? Colors.transparent : context.borderColor,
+                                              width: 1.5,
+                                            ),
                                           ),
-                                          child: isSelected ? const Icon(Icons.check_rounded, color: Colors.black, size: 18) : null,
+                                          child: isSelected
+                                              ? const Icon(Icons.check_rounded, color: Colors.black, size: 16)
+                                              : null,
                                         ),
                                       ],
                                     ),
@@ -1028,44 +1069,59 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
 
                 // Bottom button
                 Container(
-                  padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(ctx).padding.bottom + 20),
+                  padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(ctx).padding.bottom + 16),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: context.isDark
-                          ? [Colors.transparent, const Color(0xFF121212)]
-                          : [Colors.transparent, const Color(0xFFF8F9FA)],
-                    ),
+                    color: context.cardColor,
+                    border: Border(top: BorderSide(color: context.borderColor, width: 0.5)),
                   ),
-                  child: SizedBox(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
                     width: double.infinity,
-                    height: 58,
-                    child: ElevatedButton(
-                      onPressed: selectedDestination != null ? () {
-                        HapticFeedback.mediumImpact();
-                        Navigator.pop(ctx);
-                        _showWaitingForDriverApproval(selectedName!, selectedName!, lat: selectedLat, lng: selectedLng);
-                      } : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.yellow,
-                        foregroundColor: Colors.black,
-                        disabledBackgroundColor: context.isDark ? Colors.white12 : Colors.black12,
-                        disabledForegroundColor: context.mutedColor,
-                        elevation: selectedDestination != null ? 8 : 0,
-                        shadowColor: AppColors.yellow.withValues(alpha: 0.4),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(selectedDestination != null ? Icons.send_rounded : Icons.location_off_rounded, size: 20),
-                          const SizedBox(width: 10),
-                          Text(
-                            selectedDestination != null ? 'Request Change' : 'Select a destination',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.3),
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: selectedDestination != null
+                          ? const LinearGradient(
+                              colors: [AppColors.yellow, Color(0xFFFFC107)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : null,
+                      color: selectedDestination == null ? context.bgColor : null,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: selectedDestination != null ? [
+                        BoxShadow(color: AppColors.yellow.withValues(alpha: 0.4), blurRadius: 16, offset: const Offset(0, 4)),
+                      ] : null,
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: selectedDestination != null ? () {
+                          HapticFeedback.mediumImpact();
+                          Navigator.pop(ctx);
+                          _showWaitingForDriverApproval(selectedName!, selectedName!, lat: selectedLat, lng: selectedLng);
+                        } : null,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Center(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                selectedDestination != null ? Icons.send_rounded : Icons.touch_app_rounded,
+                                size: 20,
+                                color: selectedDestination != null ? Colors.black : context.mutedColor,
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                selectedDestination != null ? 'Confirm Destination' : 'Select a destination',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: selectedDestination != null ? Colors.black : context.mutedColor,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),

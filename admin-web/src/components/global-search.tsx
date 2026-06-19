@@ -35,6 +35,7 @@ const PAGES = [
   { name: "Pre-trip Checks", href: "/dashboard/checklists", icon: ClipboardCheck },
   { name: "Eligibility", href: "/dashboard/eligibility", icon: Ticket },
   { name: "Content", href: "/dashboard/content", icon: FileText },
+  { name: "App Config", href: "/dashboard/app-config", icon: Settings },
   { name: "Service Zones", href: "/dashboard/zones", icon: Map },
   { name: "Chat", href: "/dashboard/chat", icon: MessageSquare },
   { name: "SOS Alerts", href: "/dashboard/sos", icon: Shield },

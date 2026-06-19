@@ -32,12 +32,12 @@ import {
   TrendingUp,
   Cog,
   HelpCircle,
+  Smartphone,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { usePermissions } from "@/hooks/usePermissions"
 import type { Permission } from "@/lib/permissions"
-import { Badge } from "@/components/ui/badge"
 
 interface NavItem {
   name: string
@@ -112,9 +112,9 @@ const navigationSections: NavSection[] = [
     icon: Cog,
     permission: "settings:view",
     items: [
-      { name: "Chat", href: "/dashboard/chat", icon: MessageSquare, permission: "chat:view" },
+      { name: "App Config", href: "/dashboard/app-config", icon: Smartphone, permission: "settings:view" },
       { name: "Content", href: "/dashboard/content", icon: FileText, permission: "content:view" },
-      { name: "Help Center", href: "/dashboard/help", icon: HelpCircle, permission: "content:view" },
+      { name: "Chat", href: "/dashboard/chat", icon: MessageSquare, permission: "chat:view" },
       { name: "Admins", href: "/dashboard/admins", icon: Shield, permission: "admins:view" },
       { name: "Settings", href: "/dashboard/settings", icon: Settings, permission: "settings:view" },
     ]
@@ -126,45 +126,7 @@ export function Sidebar() {
   const router = useRouter()
   const supabase = createClient()
   const { can, loading } = usePermissions()
-  const [badges, setBadges] = useState<Record<string, number>>({})
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-
-  useEffect(() => {
-    loadBadges()
-
-    const channel = supabase
-      .channel('sidebar_badges')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => loadBadges())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => loadBadges())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sos_alerts' }, () => loadBadges())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, () => loadBadges())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_documents' }, () => loadBadges())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_checklists' }, () => loadBadges())
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [])
-
-  const loadBadges = async () => {
-    const [pendingCustomers, pendingDrivers, activeSOS, openIncidents, pendingDocs, checklistIssues] = await Promise.all([
-      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'customer').eq('status', 'pending'),
-      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'driver').eq('status', 'pending'),
-      supabase.from('sos_alerts').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-      supabase.from('incidents').select('*', { count: 'exact', head: true }).eq('status', 'open'),
-      supabase.from('driver_documents').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-      supabase.from('vehicle_checklists').select('*', { count: 'exact', head: true }).eq('has_issues', true),
-    ])
-
-    setBadges({
-      '/dashboard/customers': pendingCustomers.count || 0,
-      '/dashboard/drivers': (pendingDrivers.count || 0) + (pendingDocs.count || 0),
-      '/dashboard/sos': activeSOS.count || 0,
-      '/dashboard/incidents': openIncidents.count || 0,
-      '/dashboard/checklists': checklistIssues.count || 0,
-    })
-  }
 
   const handleLogout = async () => {
     sessionStorage.removeItem("myride_admin_role")
@@ -209,7 +171,6 @@ export function Sidebar() {
         <div className="space-y-1">
           {visibleSections.map((section) => {
             const isExpanded = expanded[section.name] ?? isSectionActive(section)
-            const sectionBadgeCount = section.items?.reduce((sum, item) => sum + (badges[item.href] || 0), 0) || 0
 
             if (section.href) {
               const isActive = pathname === section.href
@@ -243,11 +204,6 @@ export function Sidebar() {
                 >
                   <section.icon className="h-5 w-5" />
                   <span className="flex-1 text-left">{section.name}</span>
-                  {sectionBadgeCount > 0 && !isExpanded && (
-                    <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-xs">
-                      {sectionBadgeCount}
-                    </Badge>
-                  )}
                 </button>
                 {isExpanded && section.items && (
                   <div className="ml-8 mt-1 space-y-0.5">
@@ -266,17 +222,6 @@ export function Sidebar() {
                         >
                           <item.icon className="h-4 w-4" />
                           <span className="flex-1">{item.name}</span>
-                          {badges[item.href] > 0 && (
-                            <Badge
-                              variant={item.href === '/dashboard/sos' ? 'destructive' : 'secondary'}
-                              className={cn(
-                                "h-5 min-w-5 px-1.5 text-xs",
-                                item.href === '/dashboard/sos' && "animate-pulse"
-                              )}
-                            >
-                              {badges[item.href]}
-                            </Badge>
-                          )}
                         </Link>
                       )
                     })}

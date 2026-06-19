@@ -1784,7 +1784,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
-          String selectedLang = appState.currentLanguage == 'dv' ? 'Dhivehi' : 'English';
+          String selectedLang = 'English';
           return Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(color: context.surfaceColor, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
@@ -1796,17 +1796,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 24),
                 Text('Language', style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 20),
-                _buildSelectableOption('English', selectedLang == 'English', () {
-                  setSheetState(() => selectedLang = 'English');
+                _buildSelectableOption('English', true, () {
                   appState.setCurrentLanguage('en');
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Language set to English'), backgroundColor: AppColors.success));
-                }),
-                _buildSelectableOption('Dhivehi', selectedLang == 'Dhivehi', () {
-                  setSheetState(() => selectedLang = 'Dhivehi');
-                  appState.setCurrentLanguage('dv');
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Language set to Dhivehi'), backgroundColor: AppColors.success));
                 }),
                 SizedBox(height: MediaQuery.of(context).padding.bottom),
               ],
@@ -1894,10 +1887,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _buildActionItem('How to Book a Ride', Icons.local_taxi, () {
         Navigator.pop(context);
         _showHowToBook(context);
-      }),
-      _buildActionItem('Payment Issues', Icons.payment, () {
-        Navigator.pop(context);
-        _showPaymentHelp(context);
       }),
       _buildActionItem('Safety Guidelines', Icons.shield, () {
         Navigator.pop(context);
@@ -2221,37 +2210,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showContactSupport(BuildContext context) {
+  void _showContactSupport(BuildContext context) async {
+    // Fetch support info from database
+    String supportPhone = '+960 333-3333';
+    String supportEmail = 'itadminsupport@macl.aero';
+
+    try {
+      final settings = await SupabaseService.client
+          .from('app_settings')
+          .select('support_phone, support_email')
+          .eq('id', 'default')
+          .maybeSingle();
+      if (settings != null) {
+        supportPhone = settings['support_phone'] ?? supportPhone;
+        supportEmail = settings['support_email'] ?? supportEmail;
+      }
+    } catch (e) {
+      debugPrint('Failed to load support settings: $e');
+    }
+
+    if (!mounted) return;
+
     _showBottomSheet(context, 'Contact Support', [
       _buildActionItem('Call Support', Icons.phone, () async {
         Navigator.pop(context);
-        final uri = Uri.parse('tel:+9603330000');
+        final phone = supportPhone.replaceAll(RegExp(r'[^0-9+]'), '');
+        final uri = Uri.parse('tel:$phone');
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri);
         }
-      }, subtitle: '+960 333 0000'),
+      }, subtitle: supportPhone),
       _buildActionItem('Email Support', Icons.email, () async {
         Navigator.pop(context);
-        final uri = Uri.parse('mailto:support@myride.mv?subject=Support%20Request');
+        final uri = Uri.parse('mailto:$supportEmail?subject=Support%20Request');
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri);
         }
-      }, subtitle: 'support@myride.mv'),
+      }, subtitle: supportEmail),
       _buildActionItem('Live Chat', Icons.chat, () {
         Navigator.pop(context);
         Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(
           driverName: 'MyRide Support',
-          driverPhone: '+960 333 0000',
+          driverPhone: supportPhone,
           vehicleNumber: 'Support',
         )));
       }),
-      _buildActionItem('WhatsApp', Icons.message, () async {
-        Navigator.pop(context);
-        final uri = Uri.parse('https://wa.me/9607770000');
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        }
-      }, subtitle: '+960 777 0000'),
     ]);
   }
 
@@ -2259,40 +2262,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(color: context.surfaceColor, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2))),
-            const SizedBox(height: 24),
-            Container(
-              width: 80, height: 80,
-              decoration: BoxDecoration(color: AppColors.yellow, borderRadius: BorderRadius.circular(20)),
-              child: Icon(Icons.local_taxi, color: Colors.black, size: 40),
-            ),
-            const SizedBox(height: 16),
-            Text('MyRide', style: TextStyle(color: context.textColor, fontSize: 24, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 4),
-            Text('Version 1.0.0 (Beta)', style: TextStyle(color: context.mutedColor, fontSize: 14)),
-            const SizedBox(height: 20),
-            Text('Your trusted transportation partner in Maldives.', style: TextStyle(color: context.mutedColor, fontSize: 14), textAlign: TextAlign.center),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildSocialIcon(Icons.language),
-                const SizedBox(width: 16),
-                _buildSocialIcon(Icons.facebook),
-                const SizedBox(width: 16),
-                _buildSocialIcon(Icons.camera_alt),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Text('© 2024 MyRide. All rights reserved.', style: TextStyle(color: context.faintColor, fontSize: 12)),
-            SizedBox(height: MediaQuery.of(context).padding.bottom),
-          ],
+      builder: (ctx) => SingleChildScrollView(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(color: context.surfaceColor, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 24),
+              Container(
+                width: 80, height: 80,
+                decoration: BoxDecoration(color: AppColors.yellow, borderRadius: BorderRadius.circular(20)),
+                child: Icon(Icons.local_taxi, color: Colors.black, size: 40),
+              ),
+              const SizedBox(height: 16),
+              Text('MyRide', style: TextStyle(color: context.textColor, fontSize: 24, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              Text('Version 1.0.0 (Beta)', style: TextStyle(color: context.mutedColor, fontSize: 14)),
+              const SizedBox(height: 20),
+              Text('Your trusted transportation partner in Maldives.', style: TextStyle(color: context.mutedColor, fontSize: 14), textAlign: TextAlign.center),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildSocialIcon(Icons.language),
+                  const SizedBox(width: 16),
+                  _buildSocialIcon(Icons.facebook),
+                  const SizedBox(width: 16),
+                  _buildSocialIcon(Icons.camera_alt),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Text('© 2024 MyRide. All rights reserved.', style: TextStyle(color: context.faintColor, fontSize: 12)),
+              SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
+            ],
+          ),
         ),
       ),
     );
@@ -2300,23 +2305,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _showTerms(BuildContext context) {
     _showBottomSheet(context, 'Legal', [
-      _buildActionItem('Terms of Service', Icons.description_outlined, () {
+      _buildActionItem('Terms of Service', Icons.description_outlined, () async {
         Navigator.pop(context);
-        _showLegalDocument(context, 'Terms of Service', _termsOfService);
+        await _showLegalFromDatabase(context, 'terms-of-service', 'Terms of Service', _termsOfService);
       }),
-      _buildActionItem('Privacy Policy', Icons.privacy_tip_outlined, () {
+      _buildActionItem('Privacy Policy', Icons.privacy_tip_outlined, () async {
         Navigator.pop(context);
-        _showLegalDocument(context, 'Privacy Policy', _privacyPolicy);
-      }),
-      _buildActionItem('Cookie Policy', Icons.cookie_outlined, () {
-        Navigator.pop(context);
-        _showLegalDocument(context, 'Cookie Policy', _cookiePolicy);
+        await _showLegalFromDatabase(context, 'privacy-policy', 'Privacy Policy', _privacyPolicy);
       }),
       _buildActionItem('Licenses', Icons.article_outlined, () {
         Navigator.pop(context);
         _showLicenses(context);
       }),
     ]);
+  }
+
+  Future<void> _showLegalFromDatabase(BuildContext context, String slug, String title, String fallback) async {
+    String content = fallback;
+    try {
+      final page = await SupabaseService.client
+          .from('pages')
+          .select('content')
+          .eq('slug', slug)
+          .eq('is_active', true)
+          .maybeSingle();
+      if (page != null && page['content'] != null) {
+        content = page['content'];
+      }
+    } catch (e) {
+      debugPrint('Failed to load legal content: $e');
+    }
+    if (!mounted) return;
+    _showLegalDocument(context, title, content);
   }
 
   void _showLegalDocument(BuildContext context, String title, String content) {
@@ -2357,14 +2377,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showLicenses(BuildContext context) {
-    showLicensePage(
+    showModalBottomSheet(
       context: context,
-      applicationName: 'MyRide',
-      applicationVersion: '1.0.0',
-      applicationIcon: Container(
-        width: 60, height: 60,
-        decoration: BoxDecoration(color: AppColors.yellow, borderRadius: BorderRadius.circular(16)),
-        child: Icon(Icons.local_taxi, color: Colors.black, size: 30),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(color: context.surfaceColor, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+        child: Column(
+          children: [
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 24),
+            Text('Open Source Licenses', style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'This app is built using Flutter and includes the following open source packages:\n\n'
+                      '• Flutter SDK - BSD License\n'
+                      '• Provider - MIT License\n'
+                      '• Supabase Flutter - MIT License\n'
+                      '• Google Maps Flutter - Apache 2.0\n'
+                      '• Flutter Local Notifications - BSD License\n'
+                      '• Image Picker - Apache 2.0\n'
+                      '• Geolocator - MIT License\n'
+                      '• Share Plus - BSD License\n'
+                      '• URL Launcher - BSD License\n'
+                      '• Connectivity Plus - BSD License\n\n'
+                      'Full license texts are available in the respective package repositories.',
+                      style: TextStyle(color: context.mutedColor, fontSize: 14, height: 1.6),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
+          ],
+        ),
       ),
     );
   }

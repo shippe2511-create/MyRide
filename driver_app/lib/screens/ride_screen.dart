@@ -462,8 +462,14 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _openNavigation(double lat, double lng) async {
+  Future<void> _openNavigation(double lat, double lng, {String? address}) async {
     HapticFeedback.mediumImpact();
+
+    // Use address if available for better navigation, fallback to coordinates
+    final destination = address != null && address.isNotEmpty
+        ? Uri.encodeComponent(address)
+        : '$lat,$lng';
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -486,8 +492,11 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
             ),
             const SizedBox(height: 20),
             Text(
-              'Open in Navigation',
+              'Navigate to ${address ?? "Location"}',
               style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w700),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 20),
             Row(
@@ -499,7 +508,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                     color: const Color(0xFF4285F4),
                     onTap: () async {
                       Navigator.pop(ctx);
-                      final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving');
+                      final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$destination&travelmode=driving');
                       if (await canLaunchUrl(uri)) {
                         await launchUrl(uri, mode: LaunchMode.externalApplication);
                       }
@@ -707,6 +716,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                         onTap: () => _openNavigation(
                           ride.status == RideStatus.inProgress ? ride.dropoffLat : ride.pickupLat,
                           ride.status == RideStatus.inProgress ? ride.dropoffLng : ride.pickupLng,
+                          address: ride.status == RideStatus.inProgress ? ride.dropoffAddress : ride.pickupAddress,
                         ),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1232,6 +1242,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
               _openNavigation(
                 title == 'PICKUP' ? ride.pickupLat : ride.dropoffLat,
                 title == 'PICKUP' ? ride.pickupLng : ride.dropoffLng,
+                address: title == 'PICKUP' ? ride.pickupAddress : ride.dropoffAddress,
               );
             },
             child: Container(

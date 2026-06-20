@@ -4,6 +4,8 @@ class RideRequest {
   final String customerName;
   final String customerPhone;
   final String? customerPhoto;
+  final double? customerRating;
+  final int tripsTogether;
   final String pickupLocation;
   final String dropoffLocation;
   final String pickupAddress;
@@ -25,6 +27,8 @@ class RideRequest {
     required this.customerName,
     required this.customerPhone,
     this.customerPhoto,
+    this.customerRating,
+    this.tripsTogether = 0,
     required this.pickupLocation,
     required this.dropoffLocation,
     required this.pickupAddress,
@@ -43,13 +47,15 @@ class RideRequest {
 
   bool get isScheduled => scheduledTime != null;
 
-  RideRequest copyWith({RideStatus? status}) {
+  RideRequest copyWith({RideStatus? status, double? customerRating, int? tripsTogether}) {
     return RideRequest(
       id: id,
       customerId: customerId,
       customerName: customerName,
       customerPhone: customerPhone,
       customerPhoto: customerPhoto,
+      customerRating: customerRating ?? this.customerRating,
+      tripsTogether: tripsTogether ?? this.tripsTogether,
       pickupLocation: pickupLocation,
       dropoffLocation: dropoffLocation,
       pickupAddress: pickupAddress,

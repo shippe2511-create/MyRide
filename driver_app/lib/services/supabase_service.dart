@@ -631,6 +631,38 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(response);
   }
 
+  static Future<Map<String, dynamic>> getCustomerStatsForDriver(String customerId, String driverId) async {
+    try {
+      // Get customer's average rating
+      final ratingsRes = await client
+          .from('ratings')
+          .select('rating')
+          .eq('to_user_id', customerId);
+
+      double? avgRating;
+      if (ratingsRes.isNotEmpty) {
+        final ratings = ratingsRes.map((r) => (r['rating'] as num).toDouble()).toList();
+        avgRating = ratings.reduce((a, b) => a + b) / ratings.length;
+      }
+
+      // Count trips together
+      final tripsRes = await client
+          .from('rides')
+          .select('id')
+          .eq('customer_id', customerId)
+          .eq('driver_id', driverId)
+          .eq('status', 'completed');
+
+      return {
+        'rating': avgRating,
+        'tripsTogether': tripsRes.length,
+      };
+    } catch (e) {
+      debugPrint('Error getting customer stats: $e');
+      return {'rating': null, 'tripsTogether': 0};
+    }
+  }
+
   // Vehicle Checklist methods
   static Future<void> saveVehicleChecklist({
     required String driverId,

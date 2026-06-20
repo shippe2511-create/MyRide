@@ -1094,12 +1094,15 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                         color: AppColors.success,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.star, color: Colors.white, size: 10),
-                          SizedBox(width: 2),
-                          Text('4.8', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                          const Icon(Icons.star, color: Colors.white, size: 10),
+                          const SizedBox(width: 2),
+                          Text(
+                            ride.customerRating?.toStringAsFixed(1) ?? '-',
+                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
                         ],
                       ),
                     ),
@@ -1124,13 +1127,14 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.history, color: context.mutedColor, size: 14),
-                        const SizedBox(width: 4),
-                        Text('12 trips together', style: TextStyle(color: context.mutedColor, fontSize: 12)),
-                      ],
-                    ),
+                    if (ride.tripsTogether > 0)
+                      Row(
+                        children: [
+                          Icon(Icons.history, color: context.mutedColor, size: 14),
+                          const SizedBox(width: 4),
+                          Text('${ride.tripsTogether} trip${ride.tripsTogether > 1 ? 's' : ''} together', style: TextStyle(color: context.mutedColor, fontSize: 12)),
+                        ],
+                      ),
                   ],
                 ),
               ),

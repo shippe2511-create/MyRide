@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:geolocator/geolocator.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
@@ -362,9 +363,21 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
   }
 
-  void _sendLocation() {
+  Future<void> _sendLocation() async {
     HapticFeedback.mediumImpact();
-    _sendMessage("My location", type: MessageType.location, locationName: "Driver's current location");
+    try {
+      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final mapUrl = 'https://maps.google.com/?q=${position.latitude},${position.longitude}';
+      _sendMessage(
+        "📍 My location: $mapUrl",
+        type: MessageType.location,
+        locationName: "Current location (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})",
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to get location'), backgroundColor: AppColors.error),
+      );
+    }
   }
 
   Future<void> _pickAndSendImage(ImageSource source) async {

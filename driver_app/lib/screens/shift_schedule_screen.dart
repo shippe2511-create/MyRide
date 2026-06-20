@@ -499,12 +499,104 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
 
   void _showMonthView(BuildContext context) {
     HapticFeedback.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Monthly view coming soon'),
-        backgroundColor: AppColors.yellow,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    final now = DateTime.now();
+    final firstDayOfMonth = DateTime(now.year, now.month, 1);
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    final startWeekday = firstDayOfMonth.weekday;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: BoxDecoration(
+          color: context.cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2))),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][now.month - 1]} ${now.year}',
+                    style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w700),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    icon: Icon(Icons.close, color: context.textColor),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d) => SizedBox(
+                  width: 40,
+                  child: Center(child: Text(d, style: TextStyle(color: context.mutedColor, fontSize: 12, fontWeight: FontWeight.w600))),
+                )).toList(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: GridView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, childAspectRatio: 1),
+                itemCount: 42,
+                itemBuilder: (context, index) {
+                  final dayOffset = index - (startWeekday - 1);
+                  if (dayOffset < 1 || dayOffset > daysInMonth) {
+                    return const SizedBox();
+                  }
+                  final isToday = dayOffset == now.day;
+                  final hasShift = _shifts.any((s) {
+                    final shiftDate = DateTime.tryParse(s['shift_date'] ?? '');
+                    return shiftDate?.day == dayOffset && shiftDate?.month == now.month;
+                  });
+                  return Container(
+                    margin: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: isToday ? AppColors.yellow : (hasShift ? AppColors.yellow.withValues(alpha: 0.2) : Colors.transparent),
+                      borderRadius: BorderRadius.circular(8),
+                      border: isToday ? null : Border.all(color: context.borderColor.withValues(alpha: 0.3)),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$dayOffset',
+                        style: TextStyle(
+                          color: isToday ? Colors.black : context.textColor,
+                          fontWeight: isToday || hasShift ? FontWeight.w700 : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Container(width: 12, height: 12, decoration: BoxDecoration(color: AppColors.yellow, borderRadius: BorderRadius.circular(3))),
+                  const SizedBox(width: 8),
+                  Text('Today', style: TextStyle(color: context.textColor, fontSize: 13)),
+                  const SizedBox(width: 20),
+                  Container(width: 12, height: 12, decoration: BoxDecoration(color: AppColors.yellow.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(3))),
+                  const SizedBox(width: 8),
+                  Text('Scheduled shift', style: TextStyle(color: context.textColor, fontSize: 13)),
+                ],
+              ),
+            ),
+            SizedBox(height: MediaQuery.of(ctx).padding.bottom),
+          ],
+        ),
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import '../models/ride_request.dart';
 import '../services/notification_service.dart';
 import '../services/supabase_service.dart';
@@ -444,11 +445,23 @@ class DriverState extends ChangeNotifier {
         final customer = activeRide['customer'] as Map<String, dynamic>?;
         final status = activeRide['status'] as String;
 
+        // Fetch customer rating and trips together
+        final customerId = activeRide['customer_id'] as String?;
+        double? customerRating;
+        int tripsTogether = 0;
+        if (customerId != null && _driverId.isNotEmpty) {
+          final stats = await SupabaseService.getCustomerStatsForDriver(customerId, _driverId);
+          customerRating = stats['rating'];
+          tripsTogether = stats['tripsTogether'] ?? 0;
+        }
+
         _currentRide = RideRequest(
           id: activeRide['id'],
-          customerId: activeRide['customer_id'] as String?,
+          customerId: customerId,
           customerName: customer?['full_name'] ?? 'Customer',
           customerPhone: customer?['phone'] ?? '',
+          customerRating: customerRating,
+          tripsTogether: tripsTogether,
           pickupLocation: activeRide['pickup_name'] ?? 'Pickup',
           pickupAddress: activeRide['pickup_name'] ?? '',
           pickupLat: (activeRide['pickup_lat'] as num?)?.toDouble() ?? 0,
@@ -546,16 +559,21 @@ class DriverState extends ChangeNotifier {
   Future<void> _sendLocationUpdate() async {
     if (_driverId.isEmpty) return;
     try {
-      // Simulate slight movement for demo
-      _currentLat += (DateTime.now().millisecond % 10 - 5) * 0.0001;
-      _currentLng += (DateTime.now().millisecond % 10 - 5) * 0.0001;
+      // Get real GPS location
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+
+      _currentLat = position.latitude;
+      _currentLng = position.longitude;
 
       await SupabaseService.updateLocation(
         _driverId,
         _currentLat,
         _currentLng,
-        heading: 0,
-        speed: _isOnline && !_isOnBreak ? 25.0 : 0,
+        heading: position.heading,
+        speed: position.speed,
       );
     } catch (e) {
       debugPrint('Location update error: $e');

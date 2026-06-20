@@ -431,15 +431,18 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     return '$minutes min';
   }
 
+  bool _isValidLat(double lat) => lat >= 3.5 && lat <= 7.5;
+  bool _isValidLng(double lng) => lng >= 72.0 && lng <= 74.0;
+
   void _fitBounds(RideRequest ride) {
     if (_mapController == null) return;
     try {
-      final pickupLat = ride.pickupLat != 0 ? ride.pickupLat : 4.1755;
-      final pickupLng = ride.pickupLng != 0 ? ride.pickupLng : 73.5093;
-      final dropoffLat = ride.dropoffLat != 0 ? ride.dropoffLat : pickupLat + 0.01;
-      final dropoffLng = ride.dropoffLng != 0 ? ride.dropoffLng : pickupLng + 0.01;
-      final driverLat = (_driverLat > 1 && _driverLat < 90) ? _driverLat : pickupLat;
-      final driverLng = (_driverLng > 1 && _driverLng < 180) ? _driverLng : pickupLng;
+      final pickupLat = _isValidLat(ride.pickupLat) ? ride.pickupLat : 4.2286;
+      final pickupLng = _isValidLng(ride.pickupLng) ? ride.pickupLng : 73.5400;
+      final dropoffLat = _isValidLat(ride.dropoffLat) ? ride.dropoffLat : pickupLat + 0.01;
+      final dropoffLng = _isValidLng(ride.dropoffLng) ? ride.dropoffLng : pickupLng + 0.01;
+      final driverLat = _isValidLat(_driverLat) ? _driverLat : pickupLat;
+      final driverLng = _isValidLng(_driverLng) ? _driverLng : pickupLng;
 
       final bounds = LatLngBounds(
         southwest: LatLng(
@@ -454,7 +457,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
       _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
     } catch (e) {
       _mapController!.animateCamera(CameraUpdate.newLatLngZoom(
-        LatLng(ride.pickupLat, ride.pickupLng), 15,
+        const LatLng(4.2286, 73.5400), 14,
       ));
     }
   }
@@ -621,7 +624,10 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
               Positioned.fill(
                 child: GoogleMap(
                   initialCameraPosition: CameraPosition(
-                    target: LatLng(ride.pickupLat, ride.pickupLng),
+                    target: LatLng(
+                      _isValidLat(ride.pickupLat) ? ride.pickupLat : 4.2286,
+                      _isValidLng(ride.pickupLng) ? ride.pickupLng : 73.5400,
+                    ),
                     zoom: 14,
                   ),
                   onMapCreated: (controller) {

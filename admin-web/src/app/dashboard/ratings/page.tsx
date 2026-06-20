@@ -458,16 +458,15 @@ export default function RatingsPage() {
   })
 
   const exportCSV = () => {
-    const headers = ["Driver", "Rating", "Total Ratings", "5 Star", "4 Star", "3 Star", "2 Star", "1 Star"]
+    const headers = ["Driver", "Phone", "Avg Rating", "Total Ratings", "5 Star Count", "1 Star Count", "Trend"]
     const rows = filteredDrivers.map(d => [
       d.full_name,
+      d.phone || "",
       d.avg_rating.toFixed(1),
       d.total_ratings,
-      d.rating_breakdown[5] || 0,
-      d.rating_breakdown[4] || 0,
-      d.rating_breakdown[3] || 0,
-      d.rating_breakdown[2] || 0,
-      d.rating_breakdown[1] || 0
+      d.five_star,
+      d.one_star,
+      d.recent_trend
     ])
 
     const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n")

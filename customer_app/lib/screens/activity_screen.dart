@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../widgets/shimmer_loading.dart';
+import 'search_screen.dart';
 
 enum TripStatus { completed, cancelled, ongoing }
 
@@ -655,7 +656,15 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SearchScreen(initialDestination: trip.dropoff),
+                        ),
+                      );
+                    },
                     icon: Icon(Icons.replay, size: 18),
                     label: Text('Book Again'),
                     style: ElevatedButton.styleFrom(

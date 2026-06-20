@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
+import '../services/supabase_service.dart';
+import '../widgets/shimmer_loading.dart';
 
 class InboxMessage {
   final String id;
@@ -18,6 +20,30 @@ class InboxMessage {
     required this.isRead,
     required this.category,
   });
+
+  factory InboxMessage.fromJson(Map<String, dynamic> json) {
+    return InboxMessage(
+      id: json['id'],
+      title: json['title'] ?? 'Notification',
+      subtitle: json['message'] ?? json['body'] ?? '',
+      time: DateTime.parse(json['created_at']),
+      isRead: json['is_read'] ?? false,
+      category: _parseCategory(json['category']),
+    );
+  }
+
+  static MessageCategory _parseCategory(String? cat) {
+    switch (cat) {
+      case 'promo':
+        return MessageCategory.promo;
+      case 'trip':
+        return MessageCategory.trip;
+      case 'safety':
+        return MessageCategory.safety;
+      default:
+        return MessageCategory.system;
+    }
+  }
 }
 
 enum MessageCategory { promo, trip, safety, system }
@@ -30,15 +56,46 @@ class InboxScreen extends StatefulWidget {
 }
 
 class _InboxScreenState extends State<InboxScreen> {
-  final List<InboxMessage> _messages = [];
-  bool _isRefreshing = false;
+  List<InboxMessage> _messages = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMessages();
+  }
+
+  Future<void> _loadMessages() async {
+    setState(() => _isLoading = true);
+    try {
+      final messages = await SupabaseService.getInboxMessages();
+      setState(() {
+        _messages = messages.map((m) => InboxMessage.fromJson(m)).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
 
   Future<void> _onRefresh() async {
-    setState(() => _isRefreshing = true);
     HapticFeedback.lightImpact();
-    // TODO: Load messages from Supabase
-    await Future.delayed(const Duration(milliseconds: 800));
-    setState(() => _isRefreshing = false);
+    await _loadMessages();
+  }
+
+  Future<void> _markAllRead() async {
+    HapticFeedback.lightImpact();
+    await SupabaseService.markAllMessagesRead();
+    setState(() {
+      _messages = _messages.map((m) => InboxMessage(
+        id: m.id,
+        title: m.title,
+        subtitle: m.subtitle,
+        time: m.time,
+        isRead: true,
+        category: m.category,
+      )).toList();
+    });
   }
 
   @override
@@ -51,21 +108,23 @@ class _InboxScreenState extends State<InboxScreen> {
           children: [
             _buildHeader(context),
             Expanded(
-              child: RefreshIndicator(
-                onRefresh: _onRefresh,
-                color: AppColors.yellow,
-                child: _messages.isEmpty
-                    ? ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        children: [_buildEmptyState()],
-                      )
-                    : ListView.builder(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        itemCount: _messages.length,
-                        itemBuilder: (context, index) => _buildMessageCard(_messages[index]),
-                      ),
-              ),
+              child: _isLoading
+                  ? const ShimmerList(itemCount: 5)
+                  : RefreshIndicator(
+                      onRefresh: _onRefresh,
+                      color: AppColors.yellow,
+                      child: _messages.isEmpty
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: [_buildEmptyState()],
+                            )
+                          : ListView.builder(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              itemCount: _messages.length,
+                              itemBuilder: (context, index) => _buildMessageCard(_messages[index]),
+                            ),
+                    ),
             ),
           ],
         ),
@@ -98,39 +157,26 @@ class _InboxScreenState extends State<InboxScreen> {
                 ),
             ],
           ),
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              setState(() {
-                for (var msg in _messages) {
-                  _messages[_messages.indexOf(msg)] = InboxMessage(
-                    id: msg.id,
-                    title: msg.title,
-                    subtitle: msg.subtitle,
-                    time: msg.time,
-                    isRead: true,
-                    category: msg.category,
-                  );
-                }
-              });
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: context.surfaceColor,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: context.borderColor),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.done_all, color: AppColors.yellow, size: 16),
-                  const SizedBox(width: 6),
-                  Text('Mark all read', style: TextStyle(color: context.textColor, fontSize: 12, fontWeight: FontWeight.w500)),
-                ],
+          if (unreadCount > 0)
+            GestureDetector(
+              onTap: _markAllRead,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: context.surfaceColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: context.borderColor),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.done_all, color: AppColors.yellow, size: 16),
+                    const SizedBox(width: 6),
+                    Text('Mark all read', style: TextStyle(color: context.textColor, fontSize: 12, fontWeight: FontWeight.w500)),
+                  ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -141,6 +187,7 @@ class _InboxScreenState extends State<InboxScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          const SizedBox(height: 100),
           Container(
             width: 80,
             height: 80,
@@ -275,7 +322,8 @@ class _InboxScreenState extends State<InboxScreen> {
     }
   }
 
-  void _showMessageDetail(InboxMessage message) {
+  void _showMessageDetail(InboxMessage message) async {
+    await SupabaseService.markMessageRead(message.id);
     setState(() {
       final index = _messages.indexWhere((m) => m.id == message.id);
       if (index != -1) {

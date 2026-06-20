@@ -123,6 +123,10 @@ class SupabaseService {
     await client.auth.resetPasswordForEmail(email);
   }
 
+  static Future<void> changePassword(String newPassword) async {
+    await client.auth.updateUser(UserAttributes(password: newPassword));
+  }
+
   // Profile methods
   static Future<Map<String, dynamic>?> getProfile() async {
     final id = userId;
@@ -412,6 +416,70 @@ class SupabaseService {
 
   static Future<void> deleteSavedPlace(String placeId) async {
     await client.from('saved_places').delete().eq('id', placeId);
+  }
+
+  static Future<String> exportUserData() async {
+    final id = userId;
+    if (id == null) throw Exception('Not logged in');
+
+    final profile = await client.from('profiles').select().eq('id', id).single();
+    final rides = await client.from('rides').select().eq('customer_id', id).order('created_at', ascending: false).limit(100);
+    final savedPlaces = await client.from('saved_places').select().eq('user_id', id);
+
+    final buffer = StringBuffer();
+    buffer.writeln('=== MY MYRIDE DATA EXPORT ===');
+    buffer.writeln('Generated: ${DateTime.now().toIso8601String()}');
+    buffer.writeln('');
+    buffer.writeln('--- PROFILE ---');
+    buffer.writeln('Name: ${profile['full_name']}');
+    buffer.writeln('Phone: ${profile['phone']}');
+    buffer.writeln('Email: ${profile['email'] ?? 'Not set'}');
+    buffer.writeln('Employee ID: ${profile['employee_id'] ?? 'Not set'}');
+    buffer.writeln('Joined: ${profile['created_at']}');
+    buffer.writeln('');
+    buffer.writeln('--- SAVED PLACES (${savedPlaces.length}) ---');
+    for (final place in savedPlaces) {
+      buffer.writeln('${place['name']}: ${place['address']}');
+    }
+    buffer.writeln('');
+    buffer.writeln('--- RIDE HISTORY (${rides.length}) ---');
+    for (final ride in rides) {
+      buffer.writeln('${ride['created_at']}: ${ride['pickup_name']} → ${ride['dropoff_name']} (${ride['status']})');
+    }
+    return buffer.toString();
+  }
+
+  static Future<void> clearSearchHistory() async {
+    final id = userId;
+    if (id == null) return;
+    await client.from('saved_places').delete().eq('user_id', id).eq('type', 'recent');
+  }
+
+  // Inbox / Notifications
+  static Future<List<Map<String, dynamic>>> getInboxMessages() async {
+    final id = userId;
+    if (id == null) return [];
+    final response = await client
+        .from('notifications')
+        .select()
+        .eq('user_id', id)
+        .order('created_at', ascending: false)
+        .limit(50);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<void> markMessageRead(String messageId) async {
+    await client.from('notifications').update({'is_read': true}).eq('id', messageId);
+  }
+
+  static Future<void> markAllMessagesRead() async {
+    final id = userId;
+    if (id == null) return;
+    await client.from('notifications').update({'is_read': true}).eq('user_id', id);
+  }
+
+  static Future<void> deleteNotification(String notificationId) async {
+    await client.from('notifications').delete().eq('id', notificationId);
   }
 
   static Future<bool> upsertSavedPlace({

@@ -1409,28 +1409,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 12),
                 _buildPasswordField('Confirm Password', confirmController, obscureConfirm, () => setSheetState(() => obscureConfirm = !obscureConfirm)),
                 const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      if (currentController.text.isEmpty || newController.text.isEmpty || confirmController.text.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all fields'), backgroundColor: AppColors.error));
-                        return;
-                      }
-                      if (newController.text != confirmController.text) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Passwords do not match'), backgroundColor: AppColors.error));
-                        return;
-                      }
-                      if (newController.text.length < 6) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password must be at least 6 characters'), backgroundColor: AppColors.error));
-                        return;
-                      }
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password changed successfully'), backgroundColor: AppColors.success));
-                    },
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.yellow, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                    child: Text('Update Password', style: TextStyle(fontWeight: FontWeight.w600)),
-                  ),
+                StatefulBuilder(
+                  builder: (context, setButtonState) {
+                    bool isLoading = false;
+                    return SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          if (currentController.text.isEmpty || newController.text.isEmpty || confirmController.text.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all fields'), backgroundColor: AppColors.error));
+                            return;
+                          }
+                          if (newController.text != confirmController.text) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Passwords do not match'), backgroundColor: AppColors.error));
+                            return;
+                          }
+                          if (newController.text.length < 6) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password must be at least 6 characters'), backgroundColor: AppColors.error));
+                            return;
+                          }
+                          setButtonState(() => isLoading = true);
+                          try {
+                            await SupabaseService.changePassword(newController.text);
+                            if (context.mounted) {
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password changed successfully'), backgroundColor: AppColors.success));
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to change password: $e'), backgroundColor: AppColors.error));
+                            }
+                          }
+                          setButtonState(() => isLoading = false);
+                        },
+                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.yellow, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                        child: isLoading
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                            : Text('Update Password', style: TextStyle(fontWeight: FontWeight.w600)),
+                      ),
+                    );
+                  },
                 ),
                 SizedBox(height: MediaQuery.of(context).padding.bottom),
               ],
@@ -1622,13 +1640,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 24),
             Text('Data & Privacy', style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
             const SizedBox(height: 20),
-            _buildActionItem('Download My Data', Icons.download, () {
+            _buildActionItem('Download My Data', Icons.download, () async {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Data export request sent. You will receive an email.'), backgroundColor: AppColors.success));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Preparing your data...'), backgroundColor: AppColors.info));
+              try {
+                final data = await SupabaseService.exportUserData();
+                if (context.mounted) {
+                  await Share.share(data, subject: 'My MyRide Data Export');
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to export data: $e'), backgroundColor: AppColors.error));
+                }
+              }
             }),
-            _buildActionItem('Clear Search History', Icons.history, () {
+            _buildActionItem('Clear Search History', Icons.history, () async {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Search history cleared'), backgroundColor: AppColors.success));
+              try {
+                await SupabaseService.clearSearchHistory();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Search history cleared'), backgroundColor: AppColors.success));
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to clear history'), backgroundColor: AppColors.error));
+                }
+              }
             }),
             _buildActionItem('Manage Permissions', Icons.admin_panel_settings, () {
               Navigator.pop(ctx);

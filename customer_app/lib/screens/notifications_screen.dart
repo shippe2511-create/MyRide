@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
+import '../services/supabase_service.dart';
+import '../widgets/shimmer_loading.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -10,11 +12,31 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  final List<Map<String, dynamic>> _notifications = [];
+  List<Map<String, dynamic>> _notifications = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    setState(() => _isLoading = true);
+    try {
+      final notifications = await SupabaseService.getInboxMessages();
+      setState(() {
+        _notifications = notifications;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final unreadCount = _notifications.where((n) => !n['read']).length;
+    final unreadCount = _notifications.where((n) => !(n['is_read'] ?? false)).length;
 
     return Scaffold(
       backgroundColor: context.bgColor,
@@ -33,15 +55,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
         ],
       ),
-      body: _notifications.isEmpty
-          ? _buildEmptyState(context)
-          : ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: _notifications.length,
-              itemBuilder: (context, index) {
-                final notification = _notifications[index];
-                return _buildNotificationCard(context, notification, index);
-              },
+      body: _isLoading
+          ? const ShimmerList(itemCount: 5)
+          : RefreshIndicator(
+              onRefresh: _loadNotifications,
+              color: AppColors.yellow,
+              child: _notifications.isEmpty
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [_buildEmptyState(context)],
+                    )
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: _notifications.length,
+                      itemBuilder: (context, index) {
+                        final notification = _notifications[index];
+                        return _buildNotificationCard(context, notification, index);
+                      },
+                    ),
             ),
     );
   }
@@ -51,6 +83,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          const SizedBox(height: 100),
           Container(
             width: 100,
             height: 100,
@@ -83,14 +116,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Widget _buildNotificationCard(BuildContext context, Map<String, dynamic> notification, int index) {
-    final type = notification['type'] as String;
-    final isRead = notification['read'] as bool;
+    final type = notification['category'] as String? ?? 'system';
+    final isRead = notification['is_read'] as bool? ?? false;
 
     IconData icon;
     Color iconColor;
 
     switch (type) {
       case 'ride':
+      case 'trip':
         icon = Icons.directions_car;
         iconColor = AppColors.yellow;
         break;
@@ -102,9 +136,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         icon = Icons.campaign;
         iconColor = Colors.blue;
         break;
-      case 'system':
-        icon = Icons.info;
-        iconColor = context.mutedColor;
+      case 'safety':
+        icon = Icons.shield;
+        iconColor = AppColors.error;
         break;
       default:
         icon = Icons.notifications;
@@ -120,30 +154,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         color: AppColors.error,
         child: Icon(Icons.delete, color: Colors.white),
       ),
-      onDismissed: (_) {
-        setState(() => _notifications.removeAt(index));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Notification deleted'),
-            backgroundColor: context.cardColor,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            action: SnackBarAction(
-              label: 'Undo',
-              textColor: AppColors.yellow,
-              onPressed: () {
-                setState(() => _notifications.insert(index, notification));
-              },
-            ),
-          ),
-        );
+      onDismissed: (_) async {
+        final removed = _notifications.removeAt(index);
+        setState(() {});
+        try {
+          await SupabaseService.deleteNotification(notification['id']);
+        } catch (e) {
+          _notifications.insert(index, removed);
+          setState(() {});
+        }
       },
       child: GestureDetector(
         onTap: () {
           HapticFeedback.lightImpact();
-          if (!isRead) {
-            setState(() => notification['read'] = true);
-          }
           _showNotificationDetail(context, notification);
         },
         child: Container(
@@ -177,7 +200,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            notification['title'] as String,
+                            notification['title'] as String? ?? 'Notification',
                             style: TextStyle(
                               color: context.textColor,
                               fontSize: 15,
@@ -198,7 +221,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      notification['message'] as String,
+                      notification['message'] as String? ?? notification['body'] as String? ?? '',
                       style: TextStyle(
                         color: context.mutedColor,
                         fontSize: 13,
@@ -208,7 +231,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _formatTime(notification['time'] as DateTime),
+                      _formatTime(DateTime.parse(notification['created_at'])),
                       style: TextStyle(
                         color: context.mutedColor.withValues(alpha: 0.7),
                         fontSize: 11,
@@ -224,7 +247,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  void _showNotificationDetail(BuildContext context, Map<String, dynamic> notification) {
+  void _showNotificationDetail(BuildContext context, Map<String, dynamic> notification) async {
+    final notifId = notification['id'];
+    await SupabaseService.markMessageRead(notifId);
+
+    final index = _notifications.indexWhere((n) => n['id'] == notifId);
+    if (index != -1) {
+      setState(() => _notifications[index]['is_read'] = true);
+    }
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -250,7 +281,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              notification['title'] as String,
+              notification['title'] as String? ?? 'Notification',
               style: TextStyle(
                 color: context.textColor,
                 fontSize: 20,
@@ -259,7 +290,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              _formatTime(notification['time'] as DateTime),
+              _formatTime(DateTime.parse(notification['created_at'])),
               style: TextStyle(
                 color: context.mutedColor,
                 fontSize: 13,
@@ -267,7 +298,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              notification['message'] as String,
+              notification['message'] as String? ?? notification['body'] as String? ?? '',
               style: TextStyle(
                 color: context.textColor,
                 fontSize: 15,
@@ -294,11 +325,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  void _markAllAsRead() {
+  void _markAllAsRead() async {
     HapticFeedback.mediumImpact();
+    await SupabaseService.markAllMessagesRead();
     setState(() {
       for (var notification in _notifications) {
-        notification['read'] = true;
+        notification['is_read'] = true;
       }
     });
     ScaffoldMessenger.of(context).showSnackBar(

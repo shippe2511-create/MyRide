@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 
 class NotificationsSettingsScreen extends StatefulWidget {
@@ -17,6 +18,30 @@ class _NotificationsSettingsScreenState
   bool _promotions = false;
   bool _sounds = true;
   bool _vibration = true;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _rideRequests = prefs.getBool('notif_ride_requests') ?? true;
+      _tripUpdates = prefs.getBool('notif_trip_updates') ?? true;
+      _promotions = prefs.getBool('notif_promotions') ?? false;
+      _sounds = prefs.getBool('notif_sounds') ?? true;
+      _vibration = prefs.getBool('notif_vibration') ?? true;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _saveSetting(String key, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(key, value);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,74 +58,78 @@ class _NotificationsSettingsScreenState
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          // Push notifications section
-          _buildSection(context, 'Push Notifications', [
-            _buildSwitchTile(
-              context,
-              icon: Icons.local_taxi,
-              title: 'Ride Requests',
-              subtitle: 'Get notified when a new ride request comes in',
-              value: _rideRequests,
-              onChanged: (v) {
-                HapticFeedback.selectionClick();
-                setState(() => _rideRequests = v);
-              },
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator(color: AppColors.yellow))
+          : ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                _buildSection(context, 'Push Notifications', [
+                  _buildSwitchTile(
+                    context,
+                    icon: Icons.local_taxi,
+                    title: 'Ride Requests',
+                    subtitle: 'Get notified when a new ride request comes in',
+                    value: _rideRequests,
+                    onChanged: (v) {
+                      HapticFeedback.selectionClick();
+                      setState(() => _rideRequests = v);
+                      _saveSetting('notif_ride_requests', v);
+                    },
+                  ),
+                  _buildSwitchTile(
+                    context,
+                    icon: Icons.update,
+                    title: 'Trip Updates',
+                    subtitle: 'Updates about your ongoing trips',
+                    value: _tripUpdates,
+                    onChanged: (v) {
+                      HapticFeedback.selectionClick();
+                      setState(() => _tripUpdates = v);
+                      _saveSetting('notif_trip_updates', v);
+                    },
+                  ),
+                  _buildSwitchTile(
+                    context,
+                    icon: Icons.campaign,
+                    title: 'Promotions',
+                    subtitle: 'News and special announcements',
+                    value: _promotions,
+                    onChanged: (v) {
+                      HapticFeedback.selectionClick();
+                      setState(() => _promotions = v);
+                      _saveSetting('notif_promotions', v);
+                    },
+                  ),
+                ]),
+                const SizedBox(height: 24),
+                _buildSection(context, 'Alert Preferences', [
+                  _buildSwitchTile(
+                    context,
+                    icon: Icons.volume_up,
+                    title: 'Sounds',
+                    subtitle: 'Play sound for notifications',
+                    value: _sounds,
+                    onChanged: (v) {
+                      HapticFeedback.selectionClick();
+                      setState(() => _sounds = v);
+                      _saveSetting('notif_sounds', v);
+                    },
+                  ),
+                  _buildSwitchTile(
+                    context,
+                    icon: Icons.vibration,
+                    title: 'Vibration',
+                    subtitle: 'Vibrate for notifications',
+                    value: _vibration,
+                    onChanged: (v) {
+                      HapticFeedback.selectionClick();
+                      setState(() => _vibration = v);
+                      _saveSetting('notif_vibration', v);
+                    },
+                  ),
+                ]),
+              ],
             ),
-            _buildSwitchTile(
-              context,
-              icon: Icons.update,
-              title: 'Trip Updates',
-              subtitle: 'Updates about your ongoing trips',
-              value: _tripUpdates,
-              onChanged: (v) {
-                HapticFeedback.selectionClick();
-                setState(() => _tripUpdates = v);
-              },
-            ),
-            _buildSwitchTile(
-              context,
-              icon: Icons.campaign,
-              title: 'Promotions',
-              subtitle: 'News and special announcements',
-              value: _promotions,
-              onChanged: (v) {
-                HapticFeedback.selectionClick();
-                setState(() => _promotions = v);
-              },
-            ),
-          ]),
-          const SizedBox(height: 24),
-
-          // Alert preferences
-          _buildSection(context, 'Alert Preferences', [
-            _buildSwitchTile(
-              context,
-              icon: Icons.volume_up,
-              title: 'Sounds',
-              subtitle: 'Play sound for notifications',
-              value: _sounds,
-              onChanged: (v) {
-                HapticFeedback.selectionClick();
-                setState(() => _sounds = v);
-              },
-            ),
-            _buildSwitchTile(
-              context,
-              icon: Icons.vibration,
-              title: 'Vibration',
-              subtitle: 'Vibrate on notifications',
-              value: _vibration,
-              onChanged: (v) {
-                HapticFeedback.selectionClick();
-                setState(() => _vibration = v);
-              },
-            ),
-          ]),
-        ],
-      ),
     );
   }
 
@@ -109,27 +138,23 @@ class _NotificationsSettingsScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 12),
-          child: Text(
-            title,
-            style: TextStyle(
-              color: context.mutedColor,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
-            ),
+        Text(
+          title,
+          style: TextStyle(
+            color: context.mutedColor,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
           ),
         ),
+        const SizedBox(height: 12),
         Container(
           decoration: BoxDecoration(
             color: context.cardColor,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: context.borderColor),
           ),
-          child: Column(
-            children: children,
-          ),
+          child: Column(children: children),
         ),
       ],
     );
@@ -143,35 +168,49 @@ class _NotificationsSettingsScreenState
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
-    return ListTile(
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: AppColors.yellow.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: AppColors.yellow, size: 22),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: context.textColor,
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          color: context.mutedColor,
-          fontSize: 13,
-        ),
-      ),
-      trailing: Switch(
-        value: value,
-        onChanged: onChanged,
-        activeColor: AppColors.yellow,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.yellow.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: AppColors.yellow, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: context.textColor,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: context.mutedColor,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch.adaptive(
+            value: value,
+            onChanged: onChanged,
+            activeColor: AppColors.yellow,
+          ),
+        ],
       ),
     );
   }

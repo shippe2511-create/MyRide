@@ -597,7 +597,7 @@ class SupabaseService {
   }
 
   // Ratings methods
-  static Future<Map<String, dynamic>> getDriverRatings() async {
+  static Future<Map<String, dynamic>> getDriverRatingsMap() async {
     final driver = await getDriverProfile();
     if (driver == null) return {'average': 0.0, 'total': 0, 'ratings': []};
 
@@ -619,6 +619,16 @@ class SupabaseService {
       'total': total,
       'ratings': ratings,
     };
+  }
+
+  static Future<List<Map<String, dynamic>>> getDriverRatings(String driverId) async {
+    final response = await client
+        .from('ratings')
+        .select('*, from_user:profiles!ratings_from_user_id_fkey(full_name)')
+        .eq('to_user_id', visibleUserId ?? driverId)
+        .order('created_at', ascending: false)
+        .limit(100);
+    return List<Map<String, dynamic>>.from(response);
   }
 
   // Vehicle Checklist methods

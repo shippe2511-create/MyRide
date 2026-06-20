@@ -556,10 +556,10 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
                     return const SizedBox();
                   }
                   final isToday = dayOffset == now.day;
-                  final hasShift = _shifts.any((s) {
-                    final shiftDate = DateTime.tryParse(s['shift_date'] ?? '');
-                    return shiftDate?.day == dayOffset && shiftDate?.month == now.month;
-                  });
+                  // Check if any day in _weekSchedule has shifts for this day
+                  final dayIndex = DateTime(now.year, now.month, dayOffset).weekday - 1;
+                  final hasShift = dayIndex >= 0 && dayIndex < 7 &&
+                      (_weekSchedule[dayIndex]['shifts'] as List).isNotEmpty;
                   return Container(
                     margin: const EdgeInsets.all(2),
                     decoration: BoxDecoration(

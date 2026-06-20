@@ -393,14 +393,16 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
       // For now, send as a text message indicating image was shared
       // Full implementation would upload to Supabase Storage
-      _addMessage(ChatMessage(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        text: '📷 Shared an image',
-        isCustomer: true,
-        time: DateTime.now(),
-        type: MessageType.image,
-        status: MessageStatus.sent,
-      ));
+      setState(() {
+        _messages.add(ChatMessage(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          text: '📷 Shared an image',
+          isCustomer: true,
+          time: DateTime.now(),
+          type: MessageType.image,
+          status: MessageStatus.sent,
+        ));
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Image sent'), backgroundColor: AppColors.success),

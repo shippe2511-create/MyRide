@@ -536,7 +536,7 @@ https://maps.google.com/?q=${_pickupLocation.latitude},${_pickupLocation.longitu
     HapticFeedback.mediumImpact();
     // Update ride status to cancelled with reason
     if (widget.rideId != null) {
-      await SupabaseService.cancelRide(widget.rideId!, reason);
+      await SupabaseService.cancelRide(widget.rideId!, reason: reason);
     }
     if (mounted) {
       Navigator.popUntil(context, (route) => route.isFirst);

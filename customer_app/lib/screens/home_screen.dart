@@ -1457,7 +1457,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           }
                         },
                         child: Container(
-                          padding: const EdgeInsets.all(18),
+                          padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: context.isDark
@@ -1474,14 +1474,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 decoration: BoxDecoration(color: AppColors.yellow.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
                                 child: Icon(Icons.calendar_month_rounded, color: AppColors.yellow, size: 20),
                               ),
-                              const SizedBox(width: 14),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('DATE', style: TextStyle(color: context.mutedColor, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-                                  const SizedBox(height: 2),
-                                  Text('${selectedDate.day}/${selectedDate.month}/${selectedDate.year}', style: TextStyle(color: context.textColor, fontSize: 15, fontWeight: FontWeight.w700)),
-                                ],
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('DATE', style: TextStyle(color: context.mutedColor, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+                                    const SizedBox(height: 2),
+                                    Text('${selectedDate.day}/${selectedDate.month}/${selectedDate.year}', style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w700)),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -1509,7 +1511,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           }
                         },
                         child: Container(
-                          padding: const EdgeInsets.all(18),
+                          padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: context.isDark
@@ -1526,17 +1528,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 decoration: BoxDecoration(color: AppColors.yellow.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
                                 child: Icon(Icons.access_time_rounded, color: AppColors.yellow, size: 20),
                               ),
-                              const SizedBox(width: 14),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('TIME', style: TextStyle(color: context.mutedColor, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}',
-                                    style: TextStyle(color: context.textColor, fontSize: 15, fontWeight: FontWeight.w700),
-                                  ),
-                                ],
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('TIME', style: TextStyle(color: context.mutedColor, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}',
+                                      style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w700),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),

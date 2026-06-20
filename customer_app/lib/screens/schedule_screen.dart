@@ -26,7 +26,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
   List<Map<String, dynamic>> _routes = [];
   List<Map<String, dynamic>> _schedules = [];
   bool _isLoading = true;
-  bool _hidePastTimes = true;
+  bool _hidePastTimes = false;
   Set<String> _favoriteRoutes = {};
 
   late AnimationController _fabController;
@@ -87,7 +87,24 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
   }
 
   List<Map<String, dynamic>> _getFilteredRoutes() {
-    return _routes.where((r) => r['transport_type'] == _selectedType).toList();
+    // Map display name to transport_type
+    String transportType;
+    switch (_selectedType) {
+      case 'Internal':
+      case 'Internal Bus':
+        transportType = 'internal_bus';
+        break;
+      case 'MTCC':
+      case 'MTCC Bus':
+        transportType = 'mtcc_bus';
+        break;
+      case 'Ferry':
+        transportType = 'ferry';
+        break;
+      default:
+        transportType = _selectedType;
+    }
+    return _routes.where((r) => r['transport_type'] == transportType).toList();
   }
 
   List<Map<String, dynamic>> _getSchedulesForRoute(String routeId) {
@@ -689,8 +706,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
           children: _transportTypes.map((type) {
             final isActive = _selectedType == type['name'];
             final icon = _getTypeIcon(type['name']);
-            final typeColor = _getTypeColor(type['name']);
-            final iconColor = _getTypeIconColor(type['name'] ?? '');
+            // Use color from database if available
+            final colorHex = type['color'] as String? ?? '#FFD60A';
+            final typeColor = Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
+            final iconColor = typeColor;
             return Expanded(
               child: GestureDetector(
                 onTap: () {
@@ -711,19 +730,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   padding: const EdgeInsets.fromLTRB(8, 14, 8, 12),
                   decoration: BoxDecoration(
-                    color: isActive ? typeColor : context.surfaceColor,
+                    color: context.surfaceColor,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: typeColor.withValues(alpha: isActive ? 1.0 : 0.4),
-                      width: 2,
+                      color: typeColor.withValues(alpha: isActive ? 0.8 : 0.3),
+                      width: 1.5,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: typeColor.withValues(alpha: isActive ? 0.4 : 0.15),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -732,24 +744,22 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                         width: 52,
                         height: 52,
                         decoration: BoxDecoration(
-                          color: isActive
-                              ? Colors.black.withValues(alpha: 0.15)
-                              : typeColor.withValues(alpha: 0.2),
+                          color: typeColor.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Icon(
                           icon,
-                          color: isActive ? Colors.black : iconColor,
-                          size: 30,
+                          color: typeColor,
+                          size: 28,
                         ),
                       ),
                       const SizedBox(height: 10),
                       Text(
                         _getDisplayName(type['name'] ?? ''),
                         style: TextStyle(
-                          color: isActive ? Colors.black : iconColor,
+                          color: typeColor,
                           fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1019,7 +1029,57 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     }
 
     if (remainingSchedules.isEmpty) {
-      return const SliverToBoxAdapter(child: SizedBox.shrink());
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.yellow.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.nightlight_round, color: AppColors.yellow, size: 24),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Last ride for today',
+                        style: TextStyle(
+                          color: context.textColor,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'No more departures after this. See you tomorrow!',
+                        style: TextStyle(
+                          color: context.mutedColor,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     return SliverPadding(
@@ -1119,19 +1179,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                         ),
                       ),
                       const SizedBox(height: 4),
-                      if (trip['stops']?.isNotEmpty == true) ...[
-                        Text(
-                          _getStopsPreview(trip['stops']!),
-                          style: TextStyle(
-                            color: isPast ? context.mutedColor.withValues(alpha: 0.6) : AppColors.yellow.withValues(alpha: 0.9),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 3),
-                      ],
                       Row(
                         children: [
                           Icon(Icons.timer_outlined, size: 12, color: context.mutedColor),
@@ -1252,8 +1299,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                           Icon(Icons.route, color: AppColors.yellow, size: 16),
                           const SizedBox(width: 8),
                           Text('Route Stops', style: TextStyle(color: context.mutedColor, fontSize: 13, fontWeight: FontWeight.w600)),
-                          const SizedBox(width: 8),
-                          Text('(estimated)', style: TextStyle(color: context.mutedColor.withValues(alpha: 0.5), fontSize: 11, fontStyle: FontStyle.italic)),
                         ],
                       ),
                       const SizedBox(height: 12),

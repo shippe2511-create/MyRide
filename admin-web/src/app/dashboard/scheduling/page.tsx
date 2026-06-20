@@ -488,7 +488,7 @@ export default function SchedulingPage() {
                   </TableRow>
                 ) : (
                   filteredRoutes.map(route => (
-                    <TableRow key={route.id}>
+                    <TableRow key={route.id} className="group hover:bg-muted/50 transition-colors">
                       <TableCell className="font-medium">{route.route_name}</TableCell>
                       <TableCell>{route.route_code || "-"}</TableCell>
                       <TableCell>
@@ -503,27 +503,37 @@ export default function SchedulingPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <DropdownMenu modal={false}>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openTimesDialog(route)}>
-                              <Clock className="h-4 w-4 mr-2" />
-                              Manage Times
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setEditingRoute(route)}>
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setDeleteId(route.id)} className="text-red-500">
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setEditingRoute(route)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openTimesDialog(route)}>
+                                <Clock className="h-4 w-4 mr-2" />
+                                Manage Times
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setEditingRoute(route)}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setDeleteId(route.id)} className="text-red-500">
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

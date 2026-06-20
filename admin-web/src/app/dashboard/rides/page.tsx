@@ -21,7 +21,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
-  MapPin, Clock, CheckCircle, XCircle, Search, Loader2, RefreshCw, Car, MoreVertical, Edit, Trash2, TrendingUp, ChevronLeft, ChevronRight, Download
+  MapPin, Clock, CheckCircle, XCircle, Search, Loader2, RefreshCw, Car, MoreVertical, Edit, Trash2, TrendingUp, ChevronLeft, ChevronRight, Download, Eye
 } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -408,7 +408,7 @@ export default function RidesPage() {
               paginatedRides.map(ride => (
                 <TableRow
                   key={ride.id}
-                  className="cursor-pointer hover:bg-muted/50"
+                  className="group cursor-pointer hover:bg-muted/50"
                   onClick={() => setSelectedRide(ride)}
                 >
                   <TableCell>
@@ -442,27 +442,41 @@ export default function RidesPage() {
                     {formatDate(ride.created_at)}
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu modal={false}>
-                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditRide(ride); setEditStatus(ride.status); }}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit Status
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-red-500"
-                          onClick={(e) => { e.stopPropagation(); setDeleteRideId(ride.id); }}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={(e) => { e.stopPropagation(); setEditRide(ride); setEditStatus(ride.status); }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <DropdownMenu modal={false}>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedRide(ride); }}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditRide(ride); setEditStatus(ride.status); }}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit Status
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-red-500"
+                            onClick={(e) => { e.stopPropagation(); setDeleteRideId(ride.id); }}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))

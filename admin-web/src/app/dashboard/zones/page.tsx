@@ -342,7 +342,7 @@ export default function ZonesPage() {
                   </TableRow>
                 ) : (
                   zones.map((zone) => (
-                    <TableRow key={zone.id}>
+                    <TableRow key={zone.id} className="group hover:bg-muted/50 transition-colors">
                       <TableCell className="font-medium">{zone.name}</TableCell>
                       <TableCell>
                         <Badge variant={zone.zone_type === "restricted" ? "destructive" : "secondary"}>
@@ -355,22 +355,32 @@ export default function ZonesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <DropdownMenu modal={false}>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openZoneDialog(zone)}>
-                              <Edit className="mr-2 h-4 w-4" />Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive" onClick={() => {
-                              setSelectedItem(zone)
-                              setDialogType("delete-zone")
-                            }}>
-                              <Trash2 className="mr-2 h-4 w-4" />Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => openZoneDialog(zone)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openZoneDialog(zone)}>
+                                <Edit className="mr-2 h-4 w-4" />Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive" onClick={() => {
+                                setSelectedItem(zone)
+                                setDialogType("delete-zone")
+                              }}>
+                                <Trash2 className="mr-2 h-4 w-4" />Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -407,7 +417,7 @@ export default function ZonesPage() {
                   </TableRow>
                 ) : (
                   locations.map((loc) => (
-                    <TableRow key={loc.id}>
+                    <TableRow key={loc.id} className="group hover:bg-muted/50 transition-colors">
                       <TableCell className="font-medium">{loc.name}</TableCell>
                       <TableCell><Badge variant="secondary">{loc.location_type}</Badge></TableCell>
                       <TableCell>
@@ -416,22 +426,32 @@ export default function ZonesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <DropdownMenu modal={false}>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openLocationDialog(loc)}>
-                              <Edit className="mr-2 h-4 w-4" />Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive" onClick={() => {
-                              setSelectedItem(loc)
-                              setDialogType("delete-location")
-                            }}>
-                              <Trash2 className="mr-2 h-4 w-4" />Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => openLocationDialog(loc)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openLocationDialog(loc)}>
+                                <Edit className="mr-2 h-4 w-4" />Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive" onClick={() => {
+                                setSelectedItem(loc)
+                                setDialogType("delete-location")
+                              }}>
+                                <Trash2 className="mr-2 h-4 w-4" />Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

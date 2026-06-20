@@ -407,7 +407,7 @@ export default function AdminsPage() {
               </TableRow>
             ) : (
               admins.map(admin => (
-                <TableRow key={admin.id}>
+                <TableRow key={admin.id} className="group hover:bg-muted/50 transition-colors">
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8">
@@ -436,34 +436,44 @@ export default function AdminsPage() {
                   </TableCell>
                   <TableCell>
                     {isSuperAdmin && (
-                      <DropdownMenu modal={false}>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEdit(admin)}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openPermissions(admin)}>
-                            <Settings2 className="h-4 w-4 mr-2" />
-                            Manage Permissions
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setResetPasswordAdmin(admin)}>
-                            <KeyRound className="h-4 w-4 mr-2" />
-                            Reset Password
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-500"
-                            onClick={() => setDeleteId(admin.id)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Remove
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openEdit(admin)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <DropdownMenu modal={false}>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEdit(admin)}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openPermissions(admin)}>
+                              <Settings2 className="h-4 w-4 mr-2" />
+                              Manage Permissions
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setResetPasswordAdmin(admin)}>
+                              <KeyRound className="h-4 w-4 mr-2" />
+                              Reset Password
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-red-500"
+                              onClick={() => setDeleteId(admin.id)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Remove
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     )}
                   </TableCell>
                 </TableRow>

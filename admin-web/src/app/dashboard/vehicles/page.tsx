@@ -369,7 +369,7 @@ export default function VehiclesPage() {
                 vehicles.map((vehicle) => {
                   const IconComponent = getIconComponent(vehicle.icon)
                   return (
-                    <TableRow key={vehicle.id}>
+                    <TableRow key={vehicle.id} className="group hover:bg-muted/50 transition-colors">
                       <TableCell>
                         <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
                       </TableCell>
@@ -397,28 +397,38 @@ export default function VehiclesPage() {
                         />
                       </TableCell>
                       <TableCell>
-                        <DropdownMenu modal={false}>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => openEditDialog(vehicle)}>
-                              <Edit className="mr-2 h-4 w-4" />Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onSelect={() => {
-                                setSelectedVehicle(vehicle)
-                                setDeleteDialogOpen(true)
-                              }}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => openEditDialog(vehicle)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onSelect={() => openEditDialog(vehicle)}>
+                                <Edit className="mr-2 h-4 w-4" />Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onSelect={() => {
+                                  setSelectedVehicle(vehicle)
+                                  setDeleteDialogOpen(true)
+                                }}
+                              >
+                                  <Trash2 className="mr-2 h-4 w-4" />Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )

@@ -1671,7 +1671,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Future<LatLng> _getCurrentLocation() async {
-    return await LocationService.getCurrentLocation();
+    final loc = await LocationService.getCurrentLocation();
+    return LatLng(loc.latitude, loc.longitude);
   }
 
   Future<Map<String, dynamic>?> _showLocationPicker(BuildContext context, String title, Color accentColor) async {
@@ -1851,7 +1852,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                           showSearchResults = false;
                                           searchController.text = place['name'] as String;
                                         });
-                                        mapController.move(selectedLocation, 16);
+                                        googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(selectedLocation, 16));
                                       },
                                       child: Container(
                                         margin: const EdgeInsets.only(bottom: 8),

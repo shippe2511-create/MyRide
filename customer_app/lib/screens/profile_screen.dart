@@ -2701,7 +2701,6 @@ class _AddPlaceScreenState extends State<_AddPlaceScreen> {
   void dispose() {
     _nameController.dispose();
     _searchController.dispose();
-    _mapController.dispose();
     super.dispose();
   }
 

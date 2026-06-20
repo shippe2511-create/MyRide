@@ -53,7 +53,6 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
   @override
   void initState() {
     super.initState();
-    _mapController = MapController();
     _dropoff = widget.tripData['dropoff'] ?? 'Velana International Airport';
     _rideStatus = widget.tripData['status'] as String? ?? 'accepted';
     _startDriverSimulation();

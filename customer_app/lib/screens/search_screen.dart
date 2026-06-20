@@ -2,8 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart' hide Path;
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_container.dart';
@@ -11,6 +10,17 @@ import '../widgets/primary_button.dart';
 import '../services/supabase_service.dart';
 import '../services/location_service.dart';
 import 'driver_matching_screen.dart';
+
+const String _darkMapStyle = '''
+[
+  {"elementType": "geometry", "stylers": [{"color": "#212121"}]},
+  {"elementType": "labels.icon", "stylers": [{"visibility": "off"}]},
+  {"elementType": "labels.text.fill", "stylers": [{"color": "#757575"}]},
+  {"elementType": "labels.text.stroke", "stylers": [{"color": "#212121"}]},
+  {"featureType": "road", "elementType": "geometry.fill", "stylers": [{"color": "#2c2c2c"}]},
+  {"featureType": "water", "elementType": "geometry", "stylers": [{"color": "#000000"}]}
+]
+''';
 
 class SearchScreen extends StatefulWidget {
   final String? initialDestination;
@@ -43,7 +53,7 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<void> _loadCurrentLocation() async {
     final loc = await LocationService.getCurrentLocation();
     if (mounted) {
-      setState(() => _currentLocation = loc);
+      setState(() => _currentLocation = LatLng(loc.latitude, loc.longitude));
     }
   }
 
@@ -333,7 +343,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _showMapPicker(bool isDark) {
     LatLng selectedLocation = const LatLng(4.1918, 73.5290);
-    final mapController = MapController();
+    GoogleMapController? googleMapController;
     String locationName = 'Velana International Airport';
     String locationAddress = 'Velana International Airport';
 
@@ -386,52 +396,29 @@ class _SearchScreenState extends State<SearchScreen> {
                 Expanded(
                   child: Stack(
                     children: [
-                      FlutterMap(
-                        mapController: mapController,
-                        options: MapOptions(
-                          initialCenter: selectedLocation,
-                          initialZoom: 15,
-                          onTap: (tapPosition, point) {
-                            HapticFeedback.lightImpact();
-                            setSheetState(() {
-                              selectedLocation = point;
-                              locationName = 'Selected Location';
-                              locationAddress = '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
-                            });
-                          },
-                        ),
-                        children: [
-                          TileLayer(
-                            urlTemplate: isDark
-                                ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                                : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                            subdomains: const ['a', 'b', 'c', 'd'],
-                            userAgentPackageName: 'com.myride.app',
+                      GoogleMap(
+                        initialCameraPosition: CameraPosition(target: selectedLocation, zoom: 15),
+                        onMapCreated: (controller) => googleMapController = controller,
+                        onTap: (point) {
+                          HapticFeedback.lightImpact();
+                          setSheetState(() {
+                            selectedLocation = point;
+                            locationName = 'Selected Location';
+                            locationAddress = '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
+                          });
+                        },
+                        markers: {
+                          Marker(
+                            markerId: const MarkerId('selected'),
+                            position: selectedLocation,
+                            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
                           ),
-                          MarkerLayer(
-                            markers: [
-                              Marker(
-                                point: selectedLocation,
-                                width: 50,
-                                height: 50,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: AppColors.yellow,
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppColors.yellow.withValues(alpha: 0.4),
-                                        blurRadius: 12,
-                                        spreadRadius: 4,
-                                      ),
-                                    ],
-                                  ),
-                                  child: Icon(Icons.location_on, color: Colors.black, size: 30),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                        },
+                        myLocationEnabled: true,
+                        myLocationButtonEnabled: false,
+                        zoomControlsEnabled: false,
+                        mapToolbarEnabled: false,
+                        style: isDark ? _darkMapStyle : null,
                       ),
                       // Zoom controls
                       Positioned(
@@ -441,17 +428,17 @@ class _SearchScreenState extends State<SearchScreen> {
                           children: [
                             _buildMapButton(Icons.add, () {
                               HapticFeedback.lightImpact();
-                              mapController.move(mapController.camera.center, mapController.camera.zoom + 1);
+                              googleMapController?.animateCamera(CameraUpdate.zoomIn());
                             }, isDark),
                             const SizedBox(height: 8),
                             _buildMapButton(Icons.remove, () {
                               HapticFeedback.lightImpact();
-                              mapController.move(mapController.camera.center, mapController.camera.zoom - 1);
+                              googleMapController?.animateCamera(CameraUpdate.zoomOut());
                             }, isDark),
                             const SizedBox(height: 8),
                             _buildMapButton(Icons.my_location, () {
                               HapticFeedback.mediumImpact();
-                              mapController.move(const LatLng(4.1918, 73.5290), 15);
+                              googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(const LatLng(4.1918, 73.5290), 15));
                             }, isDark, isHighlighted: true),
                           ],
                         ),
@@ -1444,7 +1431,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<Map<String, dynamic>?> _showLocationPicker(BuildContext context, String title, Color accentColor, bool isDark) async {
     LatLng selectedLocation = const LatLng(4.1755, 73.5093);
-    final mapController = MapController();
+    GoogleMapController? googleMapController;
     final searchController = TextEditingController();
     String addressText = '';
     String selectedName = '';
@@ -1613,7 +1600,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                           showSearchResults = false;
                                           searchController.text = place['name'] as String;
                                         });
-                                        mapController.move(selectedLocation, 16);
+                                        googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(selectedLocation, 16));
                                       },
                                       child: Container(
                                         margin: const EdgeInsets.only(bottom: 8),
@@ -1662,70 +1649,31 @@ class _SearchScreenState extends State<SearchScreen> {
                         )
                       : Stack(
                           children: [
-                            FlutterMap(
-                              mapController: mapController,
-                              options: MapOptions(
-                                initialCenter: selectedLocation,
-                                initialZoom: 14,
-                                onTap: (tapPosition, point) {
-                                  setModalState(() {
-                                    selectedLocation = point;
-                                    addressText = '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
-                                    selectedName = 'Pinned Location';
-                                    searchController.text = '';
-                                  });
-                                },
-                              ),
-                              children: [
-                                TileLayer(
-                                  urlTemplate: isDark
-                                      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                                      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                                  subdomains: const ['a', 'b', 'c', 'd'],
-                                  userAgentPackageName: 'com.myride.app',
+                            GoogleMap(
+                              initialCameraPosition: CameraPosition(target: selectedLocation, zoom: 14),
+                              onMapCreated: (controller) => googleMapController = controller,
+                              onTap: (point) {
+                                setModalState(() {
+                                  selectedLocation = point;
+                                  addressText = '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
+                                  selectedName = 'Pinned Location';
+                                  searchController.text = '';
+                                });
+                              },
+                              markers: {
+                                Marker(
+                                  markerId: const MarkerId('selected'),
+                                  position: selectedLocation,
+                                  icon: BitmapDescriptor.defaultMarkerWithHue(
+                                    accentColor == AppColors.success ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed,
+                                  ),
                                 ),
-                                MarkerLayer(
-                                  markers: [
-                                    Marker(
-                                      point: selectedLocation,
-                                      width: 60,
-                                      height: 70,
-                                      child: Column(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.all(10),
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                colors: [accentColor, accentColor.withValues(alpha: 0.8)],
-                                                begin: Alignment.topCenter,
-                                                end: Alignment.bottomCenter,
-                                              ),
-                                              borderRadius: BorderRadius.circular(14),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: accentColor.withValues(alpha: 0.5),
-                                                  blurRadius: 12,
-                                                  spreadRadius: 2,
-                                                  offset: const Offset(0, 4),
-                                                ),
-                                              ],
-                                            ),
-                                            child: Icon(Icons.location_on, color: Colors.white, size: 24),
-                                          ),
-                                          Container(
-                                            width: 3,
-                                            height: 12,
-                                            decoration: BoxDecoration(
-                                              color: accentColor,
-                                              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(2)),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                              },
+                              myLocationEnabled: true,
+                              myLocationButtonEnabled: false,
+                              zoomControlsEnabled: false,
+                              mapToolbarEnabled: false,
+                              style: isDark ? _darkMapStyle : null,
                             ),
                             Positioned(
                               bottom: 20,
@@ -1733,7 +1681,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               child: Column(
                                 children: [
                                   GestureDetector(
-                                    onTap: () => mapController.move(mapController.camera.center, mapController.camera.zoom + 1),
+                                    onTap: () => googleMapController?.animateCamera(CameraUpdate.zoomIn()),
                                     child: Container(
                                       width: 48,
                                       height: 48,
@@ -1747,7 +1695,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                   ),
                                   const SizedBox(height: 10),
                                   GestureDetector(
-                                    onTap: () => mapController.move(mapController.camera.center, mapController.camera.zoom - 1),
+                                    onTap: () => googleMapController?.animateCamera(CameraUpdate.zoomOut()),
                                     child: Container(
                                       width: 48,
                                       height: 48,
@@ -1761,7 +1709,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                   ),
                                   const SizedBox(height: 10),
                                   GestureDetector(
-                                    onTap: () => mapController.move(const LatLng(4.1755, 73.5093), 13),
+                                    onTap: () => googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(const LatLng(4.1755, 73.5093), 13)),
                                     child: Container(
                                       width: 48,
                                       height: 48,
@@ -1902,7 +1850,7 @@ class NearbyScreen extends StatefulWidget {
 }
 
 class _NearbyScreenState extends State<NearbyScreen> with SingleTickerProviderStateMixin {
-  final MapController _mapController = MapController();
+  GoogleMapController? _mapController;
   LatLng _currentLocation = const LatLng(4.1755, 73.5093);
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -1926,7 +1874,7 @@ class _NearbyScreenState extends State<NearbyScreen> with SingleTickerProviderSt
 
   Future<void> _loadCurrentLocation() async {
     final loc = await LocationService.getCurrentLocation();
-    if (mounted) setState(() => _currentLocation = loc);
+    if (mounted) setState(() => _currentLocation = LatLng(loc.latitude, loc.longitude));
   }
 
   Future<void> _loadNearbyDrivers() async {
@@ -1960,88 +1908,26 @@ class _NearbyScreenState extends State<NearbyScreen> with SingleTickerProviderSt
       backgroundColor: context.bgColor,
       body: Stack(
         children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _currentLocation,
-              initialZoom: 15,
-              onTap: (_, __) {},
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: isDark
-                    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                    : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
-                userAgentPackageName: 'com.myride.app',
+          GoogleMap(
+            initialCameraPosition: CameraPosition(target: _currentLocation, zoom: 15),
+            onMapCreated: (controller) => _mapController = controller,
+            markers: {
+              Marker(
+                markerId: const MarkerId('user'),
+                position: _currentLocation,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
               ),
-              MarkerLayer(
-                markers: [
-                  // User marker with pulse animation
-                  Marker(
-                    point: _currentLocation,
-                    width: 80,
-                    height: 80,
-                    child: AnimatedBuilder(
-                      animation: _pulseAnimation,
-                      builder: (context, child) {
-                        return Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            // Outer pulse ring
-                            Container(
-                              width: 24 * _pulseAnimation.value,
-                              height: 24 * _pulseAnimation.value,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppColors.yellow.withValues(alpha: 0.3 / _pulseAnimation.value),
-                              ),
-                            ),
-                            // Inner dot
-                            Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                color: AppColors.yellow,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 3),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.yellow.withValues(alpha: 0.5),
-                                    blurRadius: 12,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                  // Vehicle markers
-                  ..._vehicleLocations.map((loc) => Marker(
-                    point: loc,
-                    width: 40,
-                    height: 40,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.yellow,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Icon(Icons.directions_car, color: Colors.black, size: 24),
-                    ),
-                  )),
-                ],
-              ),
-            ],
+              ..._vehicleLocations.asMap().entries.map((entry) => Marker(
+                markerId: MarkerId('vehicle_${entry.key}'),
+                position: entry.value,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+              )),
+            },
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            style: isDark ? _darkMapStyle : null,
           ),
           _buildHeader(context, isDark),
           _buildCountPill(isDark),
@@ -2347,7 +2233,7 @@ class _FindingScreenState extends State<FindingScreen> with TickerProviderStateM
 
   Future<void> _loadCurrentLocation() async {
     final loc = await LocationService.getCurrentLocation();
-    if (mounted) setState(() => _currentLocation = loc);
+    if (mounted) setState(() => _currentLocation = LatLng(loc.latitude, loc.longitude));
   }
 
   @override
@@ -2388,46 +2274,23 @@ class _FindingScreenState extends State<FindingScreen> with TickerProviderStateM
       backgroundColor: context.bgColor,
       body: Stack(
         children: [
-          FlutterMap(
-            options: MapOptions(
-              initialCenter: _currentLocation,
-              initialZoom: 15,
-              interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.none,
+          GoogleMap(
+            initialCameraPosition: CameraPosition(target: _currentLocation, zoom: 15),
+            markers: {
+              Marker(
+                markerId: const MarkerId('current'),
+                position: _currentLocation,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
               ),
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: isDark
-                    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                    : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
-                userAgentPackageName: 'com.myride.app',
-              ),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: _currentLocation,
-                    width: 24,
-                    height: 24,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.yellow,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 3),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.yellow.withValues(alpha: 0.4),
-                            blurRadius: 12,
-                            spreadRadius: 4,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            },
+            myLocationEnabled: false,
+            zoomControlsEnabled: false,
+            zoomGesturesEnabled: false,
+            scrollGesturesEnabled: false,
+            rotateGesturesEnabled: false,
+            tiltGesturesEnabled: false,
+            mapToolbarEnabled: false,
+            style: isDark ? _darkMapStyle : null,
           ),
           _buildRadar(),
           _buildHeader(isDark),
@@ -2651,6 +2514,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
   LatLng _currentLocation = const LatLng(4.1755, 73.5093);
   final LatLng _driverLocation = const LatLng(4.1950, 73.5320);
   final LatLng _destination = const LatLng(4.1880, 73.5250);
+  static const String _trackingScreenId = 'tracking';
 
   final List<LatLng> _routePoints = [
     const LatLng(4.1950, 73.5320),
@@ -2669,7 +2533,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
   Future<void> _loadCurrentLocation() async {
     final loc = await LocationService.getCurrentLocation();
-    if (mounted) setState(() => _currentLocation = loc);
+    if (mounted) setState(() => _currentLocation = LatLng(loc.latitude, loc.longitude));
   }
 
   @override
@@ -2680,92 +2544,38 @@ class _TrackingScreenState extends State<TrackingScreen> {
       backgroundColor: context.bgColor,
       body: Stack(
         children: [
-          FlutterMap(
-            options: MapOptions(
-              initialCenter: _currentLocation,
-              initialZoom: 15,
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: isDark
-                    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                    : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
-                userAgentPackageName: 'com.myride.app',
+          GoogleMap(
+            initialCameraPosition: CameraPosition(target: _currentLocation, zoom: 15),
+            markers: {
+              Marker(
+                markerId: MarkerId('${_trackingScreenId}_user'),
+                position: _currentLocation,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
               ),
-              PolylineLayer(
-                polylines: [
-                  Polyline(
-                    points: _routePoints,
-                    strokeWidth: 5,
-                    color: AppColors.yellow,
-                  ),
-                ],
+              Marker(
+                markerId: MarkerId('${_trackingScreenId}_driver'),
+                position: _driverLocation,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
               ),
-              MarkerLayer(
-                markers: [
-                  // User location
-                  Marker(
-                    point: _currentLocation,
-                    width: 24,
-                    height: 24,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.yellow,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 3),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.yellow.withValues(alpha: 0.4),
-                            blurRadius: 12,
-                            spreadRadius: 4,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Driver/Vehicle
-                  Marker(
-                    point: _driverLocation,
-                    width: 48,
-                    height: 48,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.yellow,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Icon(Icons.directions_car, color: Colors.black, size: 28),
-                    ),
-                  ),
-                  // Destination
-                  Marker(
-                    point: _destination,
-                    width: 40,
-                    height: 40,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white : Colors.black,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
-                            blurRadius: 8,
-                          ),
-                        ],
-                      ),
-                      child: Icon(Icons.location_on, color: isDark ? Colors.black : Colors.white, size: 24),
-                    ),
-                  ),
-                ],
+              Marker(
+                markerId: MarkerId('${_trackingScreenId}_destination'),
+                position: _destination,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
               ),
-            ],
+            },
+            polylines: {
+              Polyline(
+                polylineId: PolylineId('${_trackingScreenId}_route'),
+                points: _routePoints,
+                width: 5,
+                color: AppColors.yellow,
+              ),
+            },
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            style: isDark ? _darkMapStyle : null,
           ),
           _buildHeader(context, isDark),
           _buildEtaPill(isDark, context),
@@ -4118,7 +3928,7 @@ class _TripProgressScreenState extends State<TripProgressScreen> {
 
   Future<void> _loadCurrentLocation() async {
     final loc = await LocationService.getCurrentLocation();
-    if (mounted) setState(() => _currentLocation = loc);
+    if (mounted) setState(() => _currentLocation = LatLng(loc.latitude, loc.longitude));
   }
 
   final List<LatLng> _routePoints = [
@@ -4136,92 +3946,38 @@ class _TripProgressScreenState extends State<TripProgressScreen> {
       backgroundColor: context.bgColor,
       body: Stack(
         children: [
-          FlutterMap(
-            options: MapOptions(
-              initialCenter: _currentLocation,
-              initialZoom: 15,
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: isDark
-                    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                    : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
-                userAgentPackageName: 'com.myride.app',
+          GoogleMap(
+            initialCameraPosition: CameraPosition(target: _currentLocation, zoom: 15),
+            markers: {
+              Marker(
+                markerId: const MarkerId('progress_user'),
+                position: _currentLocation,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
               ),
-              PolylineLayer(
-                polylines: [
-                  Polyline(
-                    points: _routePoints,
-                    strokeWidth: 5,
-                    color: AppColors.yellow,
-                  ),
-                ],
+              Marker(
+                markerId: const MarkerId('progress_driver'),
+                position: _driverLocation,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
               ),
-              MarkerLayer(
-                markers: [
-                  // User location
-                  Marker(
-                    point: _currentLocation,
-                    width: 24,
-                    height: 24,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.yellow,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 3),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.yellow.withValues(alpha: 0.4),
-                            blurRadius: 12,
-                            spreadRadius: 4,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Driver/Vehicle
-                  Marker(
-                    point: _driverLocation,
-                    width: 48,
-                    height: 48,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.yellow,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Icon(Icons.directions_car, color: Colors.black, size: 28),
-                    ),
-                  ),
-                  // Destination
-                  Marker(
-                    point: _destination,
-                    width: 40,
-                    height: 40,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white : Colors.black,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
-                            blurRadius: 8,
-                          ),
-                        ],
-                      ),
-                      child: Icon(Icons.location_on, color: isDark ? Colors.black : Colors.white, size: 24),
-                    ),
-                  ),
-                ],
+              Marker(
+                markerId: const MarkerId('progress_destination'),
+                position: _destination,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
               ),
-            ],
+            },
+            polylines: {
+              Polyline(
+                polylineId: const PolylineId('progress_route'),
+                points: _routePoints,
+                width: 5,
+                color: AppColors.yellow,
+              ),
+            },
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            style: isDark ? _darkMapStyle : null,
           ),
           _buildStatusPill(isDark, context),
           _buildSosButton(context, isDark),

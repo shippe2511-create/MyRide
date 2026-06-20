@@ -256,8 +256,16 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
 
       if (mounted) {
         setState(() {
-          _driverLat = position.latitude;
-          _driverLng = position.longitude;
+          // Validate GPS coordinates are in Maldives
+          if (_isValidLat(position.latitude) && _isValidLng(position.longitude)) {
+            _driverLat = position.latitude;
+            _driverLng = position.longitude;
+          } else {
+            // Use pickup location as fallback
+            final ride = widget.ride;
+            _driverLat = _isValidLat(ride.pickupLat) ? ride.pickupLat - 0.002 : 4.2050;
+            _driverLng = _isValidLng(ride.pickupLng) ? ride.pickupLng - 0.001 : 73.5380;
+          }
         });
       }
     } catch (e) {
@@ -280,8 +288,12 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
           setState(() {
             _prevDriverLat = _driverLat;
             _prevDriverLng = _driverLng;
-            _driverLat = position.latitude;
-            _driverLng = position.longitude;
+            // Validate GPS coordinates are in Maldives
+            if (_isValidLat(position.latitude) && _isValidLng(position.longitude)) {
+              _driverLat = position.latitude;
+              _driverLng = position.longitude;
+            }
+            // If invalid, keep previous valid location
             if (_etaSeconds > 0) _etaSeconds -= 3;
           });
           _mapController?.animateCamera(CameraUpdate.newLatLng(LatLng(_driverLat, _driverLng)));

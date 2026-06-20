@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
@@ -10,6 +12,8 @@ import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../providers/app_state.dart';
 import 'driver_arriving_screen.dart';
+
+const String _googleApiKey = 'AIzaSyBZ7HVy2dUvTCC5SZkz0MaFCBON2QorFbI';
 
 const String _darkMapStyle = '''
 [
@@ -63,11 +67,37 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
   late LatLng _userLocation;
   List<LatLng> _driverLocations = [];
   int _availableDriverCount = 0;
+  Set<Polyline> _routePolylines = {};
+
+  bool _isValidMaldivesLat(double lat) => lat >= 3.5 && lat <= 7.5;
+  bool _isValidMaldivesLng(double lng) => lng >= 72.0 && lng <= 74.0;
+
+  LatLng _getValidUserLocation() {
+    // Validate pickup location is in Maldives, otherwise use a location near dropoff
+    if (_isValidMaldivesLat(widget.pickupLat) && _isValidMaldivesLng(widget.pickupLng)) {
+      return LatLng(widget.pickupLat, widget.pickupLng);
+    } else if (_isValidMaldivesLat(widget.dropoffLat) && _isValidMaldivesLng(widget.dropoffLng)) {
+      // Place pickup 500m-1km away from dropoff (realistic ride distance)
+      return LatLng(widget.dropoffLat - 0.008, widget.dropoffLng - 0.005);
+    } else {
+      // Default to Malé center
+      return const LatLng(4.1755, 73.5093);
+    }
+  }
+
+  LatLng _getValidDropoffLocation() {
+    if (_isValidMaldivesLat(widget.dropoffLat) && _isValidMaldivesLng(widget.dropoffLng)) {
+      return LatLng(widget.dropoffLat, widget.dropoffLng);
+    } else {
+      // Default to Hulhumalé
+      return const LatLng(4.2116, 73.5300);
+    }
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _userLocation = LatLng(widget.pickupLat, widget.pickupLng);
+    _userLocation = _getValidUserLocation();
   }
 
   final List<String> _statusMessages = [
@@ -82,6 +112,7 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
     super.initState();
     _fetchAvailableDrivers();
     _createRideInDatabase();
+    _fetchRoute();
 
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1500),
@@ -96,18 +127,97 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
     _startDriverMovement();
   }
 
+  Future<void> _fetchRoute() async {
+    try {
+      // Use validated locations
+      final validPickup = _getValidUserLocation();
+      final validDropoff = _getValidDropoffLocation();
+      final origin = '${validPickup.latitude},${validPickup.longitude}';
+      final destination = '${validDropoff.latitude},${validDropoff.longitude}';
+
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/directions/json'
+        '?origin=$origin'
+        '&destination=$destination'
+        '&mode=driving'
+        '&key=$_googleApiKey'
+      );
+
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'OK' && data['routes'].isNotEmpty) {
+          final points = data['routes'][0]['overview_polyline']['points'];
+          final routePoints = _decodePolyline(points);
+
+          setState(() {
+            _routePolylines = {
+              Polyline(
+                polylineId: const PolylineId('route'),
+                points: routePoints,
+                color: const Color(0xFFFFD60A),
+                width: 4,
+              ),
+            };
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching route: $e');
+    }
+  }
+
+  List<LatLng> _decodePolyline(String encoded) {
+    List<LatLng> points = [];
+    int index = 0;
+    int lat = 0;
+    int lng = 0;
+
+    while (index < encoded.length) {
+      int shift = 0;
+      int result = 0;
+      int b;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lng += dlng;
+
+      points.add(LatLng(lat / 1E5, lng / 1E5));
+    }
+    return points;
+  }
+
   Future<void> _fetchAvailableDrivers() async {
     try {
       // Get real driver locations from database
       final locations = await SupabaseService.getOnlineDriverLocations();
+      debugPrint('Fetched ${locations.length} online drivers from DB');
+
+      // Filter to only valid Maldives locations
+      final validLocations = locations.map((loc) {
+        final lat = double.tryParse(loc['lat']?.toString() ?? '') ?? 0;
+        final lng = double.tryParse(loc['lng']?.toString() ?? '') ?? 0;
+        return LatLng(lat, lng);
+      }).where((loc) => _isValidMaldivesLat(loc.latitude) && _isValidMaldivesLng(loc.longitude)).toList();
+
+      debugPrint('Valid Maldives driver locations: ${validLocations.length}');
 
       setState(() {
-        _availableDriverCount = locations.length;
-        _driverLocations = locations.map((loc) {
-          final lat = double.tryParse(loc['lat']?.toString() ?? '') ?? 0;
-          final lng = double.tryParse(loc['lng']?.toString() ?? '') ?? 0;
-          return LatLng(lat, lng);
-        }).where((loc) => loc.latitude != 0 && loc.longitude != 0).toList();
+        _driverLocations = validLocations;
+        _availableDriverCount = _driverLocations.length;
       });
     } catch (e) {
       debugPrint('Error fetching drivers: $e');
@@ -120,11 +230,26 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
       final appState = Provider.of<AppState>(context, listen: false);
       final customerId = appState.profileId;
 
+      // Validate pickup coordinates - use dropoff area if invalid
+      double validPickupLat = widget.pickupLat;
+      double validPickupLng = widget.pickupLng;
+      if (!_isValidMaldivesLat(validPickupLat) || !_isValidMaldivesLng(validPickupLng)) {
+        // Place pickup near dropoff if dropoff is valid
+        if (_isValidMaldivesLat(widget.dropoffLat) && _isValidMaldivesLng(widget.dropoffLng)) {
+          validPickupLat = widget.dropoffLat - 0.008;
+          validPickupLng = widget.dropoffLng - 0.005;
+        } else {
+          // Default to Malé center
+          validPickupLat = 4.1755;
+          validPickupLng = 73.5093;
+        }
+      }
+
       final ride = await SupabaseService.createRide(
         pickupName: widget.pickup,
         dropoffName: widget.dropoff,
-        pickupLat: widget.pickupLat,
-        pickupLng: widget.pickupLng,
+        pickupLat: validPickupLat,
+        pickupLng: validPickupLng,
         dropoffLat: widget.dropoffLat,
         dropoffLng: widget.dropoffLng,
         customerId: customerId,
@@ -207,17 +332,11 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
   }
 
   void _startDriverMovement() {
-    _driverMoveTimer = Timer.periodic(const Duration(milliseconds: 1500), (timer) {
+    // Don't randomly move drivers - show real positions only
+    _driverMoveTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (!mounted) return;
-      setState(() {
-        for (int i = 0; i < _driverLocations.length; i++) {
-          final random = Random();
-          _driverLocations[i] = LatLng(
-            _driverLocations[i].latitude + (random.nextDouble() - 0.5) * 0.001,
-            _driverLocations[i].longitude + (random.nextDouble() - 0.5) * 0.001,
-          );
-        }
-      });
+      // Refresh driver locations from database
+      _fetchAvailableDrivers();
     });
   }
 
@@ -262,7 +381,10 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
 
           if (vehicle != null) {
             vehicleNumber = vehicle['plate_no'] ?? '';
-            vehicleModel = vehicle['display_name'] ?? '';
+            final make = vehicle['make'] ?? '';
+            final model = vehicle['model'] ?? '';
+            vehicleModel = '$make $model'.trim();
+            if (vehicleModel.isEmpty) vehicleModel = 'Vehicle';
           }
 
           debugPrint('Found actual driver: $driverName, profileId: $driverProfileId');
@@ -321,14 +443,22 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
       body: Stack(
         children: [
           // Google Map
-          GoogleMap(
-            initialCameraPosition: CameraPosition(target: _userLocation, zoom: 15),
+          Builder(builder: (context) {
+            final dropoff = _getValidDropoffLocation();
+            return GoogleMap(
+            initialCameraPosition: CameraPosition(target: _userLocation, zoom: 14),
             markers: {
               Marker(
-                markerId: const MarkerId('user'),
+                markerId: const MarkerId('pickup'),
                 position: _userLocation,
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
-                infoWindow: const InfoWindow(title: 'Your location'),
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                infoWindow: InfoWindow(title: 'Pickup', snippet: widget.pickup),
+              ),
+              Marker(
+                markerId: const MarkerId('dropoff'),
+                position: dropoff,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                infoWindow: InfoWindow(title: 'Drop-off', snippet: widget.dropoff),
               ),
               ..._driverLocations.asMap().entries.map((entry) => Marker(
                 markerId: MarkerId('driver_${entry.key}'),
@@ -336,12 +466,29 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
                 icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
               )),
             },
+            polylines: _routePolylines,
+            onMapCreated: (controller) {
+              Future.delayed(const Duration(milliseconds: 500), () {
+                final bounds = LatLngBounds(
+                  southwest: LatLng(
+                    _userLocation.latitude < dropoff.latitude ? _userLocation.latitude : dropoff.latitude,
+                    _userLocation.longitude < dropoff.longitude ? _userLocation.longitude : dropoff.longitude,
+                  ),
+                  northeast: LatLng(
+                    _userLocation.latitude > dropoff.latitude ? _userLocation.latitude : dropoff.latitude,
+                    _userLocation.longitude > dropoff.longitude ? _userLocation.longitude : dropoff.longitude,
+                  ),
+                );
+                controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
+              });
+            },
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             mapToolbarEnabled: false,
             style: context.isDark ? _darkMapStyle : null,
-          ),
+          );
+          }),
 
           // Top bar
           SafeArea(

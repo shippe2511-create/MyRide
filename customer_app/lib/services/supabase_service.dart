@@ -277,9 +277,17 @@ class SupabaseService {
     try {
       final response = await client
           .from('rides')
-          .select('*, driver:drivers(*, profile:profiles(*), vehicle:vehicle_types(*))')
+          .select('''
+            *,
+            driver:drivers!rides_driver_id_fkey(
+              *,
+              profile:profiles!drivers_profile_id_fkey(id, full_name, phone, avatar_url),
+              vehicle:vehicles!drivers_vehicle_id_fkey(plate_no, make, model, color)
+            )
+          ''')
           .eq('id', rideId)
           .maybeSingle();
+      debugPrint('getRideById response: $response');
       return response;
     } catch (e) {
       debugPrint('Error getting ride: $e');

@@ -36,12 +36,17 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final _searchController = TextEditingController();
+  final _pickupController = TextEditingController();
   List<Map<String, dynamic>> _filteredResults = [];
   List<Map<String, dynamic>> _savedPlaces = [];
   bool _loadingSavedPlaces = true;
   bool _isSearching = false;
+  bool _isSearchingPickup = false;
+  bool _editingPickup = false;
   Timer? _debounce;
   LatLng _currentLocation = const LatLng(4.1755, 73.5093);
+  LatLng? _pickupLocation;
+  String _pickupName = 'Current location';
 
   @override
   void initState() {
@@ -49,11 +54,70 @@ class _SearchScreenState extends State<SearchScreen> {
     _loadCurrentLocation();
     _filteredResults = _allResults;
     _searchController.addListener(_onSearchChanged);
+    _pickupController.addListener(_onPickupSearchChanged);
     if (widget.initialDestination != null) {
       _searchController.text = widget.initialDestination!;
     }
     _loadSavedPlaces();
     _loadRecentPlaces();
+  }
+
+  void _onPickupSearchChanged() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      _searchPickupPlaces(_pickupController.text);
+    });
+  }
+
+  Future<void> _searchPickupPlaces(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        _filteredResults = [];
+        _isSearchingPickup = false;
+      });
+      return;
+    }
+
+    setState(() => _isSearchingPickup = true);
+
+    try {
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+        '?input=${Uri.encodeComponent(query)}'
+        '&location=4.1755,73.5093'
+        '&radius=100000'
+        '&strictbounds=true'
+        '&components=country:mv'
+        '&key=$_googleApiKey'
+      );
+
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final status = data['status'] as String?;
+
+        if (status == 'OK') {
+          final predictions = data['predictions'] as List;
+          setState(() {
+            _filteredResults = predictions.map((p) => {
+              'title': p['structured_formatting']?['main_text'] ?? p['description'] ?? '',
+              'subtitle': p['structured_formatting']?['secondary_text'] ?? '',
+              'placeId': p['place_id'],
+              'highlight': false,
+            }).toList();
+            _isSearchingPickup = false;
+          });
+        } else {
+          setState(() {
+            _filteredResults = [];
+            _isSearchingPickup = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Pickup search error: $e');
+      setState(() => _isSearchingPickup = false);
+    }
   }
 
   void _onSearchChanged() {
@@ -352,6 +416,7 @@ class _SearchScreenState extends State<SearchScreen> {
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
+    _pickupController.dispose();
     super.dispose();
   }
 
@@ -386,7 +451,7 @@ class _SearchScreenState extends State<SearchScreen> {
               child: _buildRouteCard(isDark),
             ),
             Expanded(
-              child: _searchController.text.isEmpty
+              child: (_searchController.text.isEmpty && !_editingPickup) || (_editingPickup && _pickupController.text.isEmpty)
                   ? SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
                       child: Column(
@@ -400,7 +465,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         ],
                       ),
                     )
-                  : _isSearching
+                  : (_isSearching || _isSearchingPickup)
                       ? const Center(child: CircularProgressIndicator(color: AppColors.yellow))
                       : _filteredResults.isEmpty
                           ? Center(
@@ -424,20 +489,35 @@ class _SearchScreenState extends State<SearchScreen> {
                                     if (placeId != null) {
                                       final details = await _getPlaceDetails(placeId);
                                       if (details != null && mounted) {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => DriverMatchingScreen(
-                                              pickup: 'Current location',
-                                              dropoff: details['name'],
-                                              rideType: 'Standard',
-                                              pickupLat: _currentLocation.latitude,
-                                              pickupLng: _currentLocation.longitude,
-                                              dropoffLat: details['lat'],
-                                              dropoffLng: details['lng'],
+                                        if (_editingPickup) {
+                                          // Set pickup location
+                                          setState(() {
+                                            _pickupLocation = LatLng(details['lat'], details['lng']);
+                                            _pickupName = details['name'];
+                                            _editingPickup = false;
+                                            _pickupController.clear();
+                                            _filteredResults = [];
+                                          });
+                                        } else {
+                                          // Get fresh GPS location before navigating
+                                          final freshLoc = await LocationService.getCurrentLocation();
+                                          final pickupLat = _pickupLocation?.latitude ?? freshLoc.latitude;
+                                          final pickupLng = _pickupLocation?.longitude ?? freshLoc.longitude;
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => DriverMatchingScreen(
+                                                pickup: _pickupName,
+                                                dropoff: details['name'],
+                                                rideType: 'Standard',
+                                                pickupLat: pickupLat,
+                                                pickupLng: pickupLng,
+                                                dropoffLat: details['lat'],
+                                                dropoffLng: details['lng'],
+                                              ),
                                             ),
-                                          ),
-                                        );
+                                          );
+                                        }
                                       }
                                     } else {
                                       Navigator.push(
@@ -749,7 +829,7 @@ class _SearchScreenState extends State<SearchScreen> {
           Expanded(
             child: Column(
               children: [
-                _buildRouteField('PICKUP', 'Current location', false, isDark),
+                _buildPickupField(isDark),
                 Container(
                   height: 1,
                   color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.07),
@@ -758,6 +838,76 @@ class _SearchScreenState extends State<SearchScreen> {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPickupField(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'PICKUP',
+            style: TextStyle(
+              color: context.faintColor,
+              fontSize: 10,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 2),
+          _editingPickup
+              ? TextField(
+                  controller: _pickupController,
+                  autofocus: true,
+                  style: TextStyle(
+                    color: context.textColor,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Search pickup location',
+                    hintStyle: TextStyle(color: context.faintColor),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                    suffixIcon: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _editingPickup = false;
+                          _pickupController.clear();
+                          _filteredResults = [];
+                        });
+                      },
+                      child: Icon(Icons.close, size: 18, color: context.faintColor),
+                    ),
+                  ),
+                )
+              : GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _editingPickup = true;
+                      _searchController.clear();
+                    });
+                  },
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _pickupName,
+                          style: TextStyle(
+                            color: context.textColor,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Icon(Icons.edit, size: 16, color: context.faintColor),
+                    ],
+                  ),
+                ),
         ],
       ),
     );

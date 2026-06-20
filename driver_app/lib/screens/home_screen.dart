@@ -10,7 +10,6 @@ import '../theme/app_theme.dart';
 import '../widgets/status_toggle.dart';
 import '../widgets/ride_request_popup.dart';
 import '../widgets/break_timer.dart';
-import '../widgets/onboarding_tooltip.dart';
 import 'vehicle_checklist_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
@@ -112,51 +111,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return OnboardingOverlay(
-      steps: const [
-        OnboardingStep(
-          key: 'driver_welcome',
-          title: 'Welcome, Driver!',
-          description: 'This is your hub for managing rides and staying connected with passengers.',
-          icon: Icons.local_taxi_rounded,
-        ),
-        OnboardingStep(
-          key: 'driver_online',
-          title: 'Go Online',
-          description: 'Tap the status toggle to go online and start receiving ride requests.',
-          icon: Icons.wifi_rounded,
-        ),
-        OnboardingStep(
-          key: 'driver_checklist',
-          title: 'Vehicle Checklist',
-          description: 'Complete a quick safety checklist before your first trip each day.',
-          icon: Icons.checklist_rounded,
-        ),
-        OnboardingStep(
-          key: 'driver_rides',
-          title: 'Accept Rides',
-          description: 'Swipe to accept incoming ride requests. Navigate using Google Maps or Waze.',
-          icon: Icons.navigation_rounded,
-        ),
-        OnboardingStep(
-          key: 'driver_breaks',
-          title: 'Take Breaks',
-          description: 'Use the break feature when you need a pause. You won\'t receive requests while on break.',
-          icon: Icons.free_breakfast_rounded,
-        ),
-      ],
-      child: Scaffold(
-        backgroundColor: context.bgColor,
-        body: IndexedStack(
-          index: _selectedTab,
-          children: [
-            _buildHomeContent(),
-            const HistoryScreen(),
-            const ProfileScreen(),
-          ],
-        ),
-        bottomNavigationBar: _buildBottomNav(context),
+    return Scaffold(
+      backgroundColor: context.bgColor,
+      body: IndexedStack(
+        index: _selectedTab,
+        children: [
+          _buildHomeContent(),
+          const HistoryScreen(),
+          const ProfileScreen(),
+        ],
       ),
+      bottomNavigationBar: _buildBottomNav(context),
     );
   }
 

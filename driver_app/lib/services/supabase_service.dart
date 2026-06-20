@@ -509,14 +509,17 @@ class SupabaseService {
   }) async {
     if (driverId.isEmpty) return;
 
-    await client.from('documents').upsert({
-      'driver_id': driverId,
-      'document_type': documentType,
-      'file_url': fileUrl,
-      'expiry_date': expiryDate?.toIso8601String(),
-      'status': 'pending',
-      'uploaded_at': DateTime.now().toIso8601String(),
-    }, onConflict: 'driver_id,document_type');
+    // Use RPC function to bypass RLS (phone-login doesn't set auth.uid())
+    final result = await client.rpc('upsert_driver_document', params: {
+      'p_driver_id': driverId,
+      'p_document_type': documentType,
+      'p_file_url': fileUrl,
+      'p_expiry_date': expiryDate?.toIso8601String(),
+    });
+
+    if (result is Map && result['error'] != null) {
+      throw Exception(result['error']);
+    }
   }
 
   static Future<bool> deleteDocument({

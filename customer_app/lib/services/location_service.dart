@@ -6,6 +6,12 @@ class LocationService {
   static LatLng? _lastKnownLocation;
   static bool _isInitialized = false;
 
+  // Maldives coordinate bounds
+  static bool _isValidMaldivesLat(double lat) => lat >= 3.5 && lat <= 7.5;
+  static bool _isValidMaldivesLng(double lng) => lng >= 72.0 && lng <= 74.0;
+  static bool isValidMaldivesLocation(double lat, double lng) =>
+      _isValidMaldivesLat(lat) && _isValidMaldivesLng(lng);
+
   static Future<bool> initialize() async {
     if (_isInitialized) return true;
 
@@ -53,9 +59,9 @@ class LocationService {
 
       // Try to get last known position first (instant)
       Position? lastPos = await Geolocator.getLastKnownPosition();
-      if (lastPos != null) {
+      if (lastPos != null && isValidMaldivesLocation(lastPos.latitude, lastPos.longitude)) {
         _lastKnownLocation = LatLng(lastPos.latitude, lastPos.longitude);
-        debugPrint('LocationService: Last known: ${lastPos.latitude}, ${lastPos.longitude}');
+        debugPrint('LocationService: Last known (valid): ${lastPos.latitude}, ${lastPos.longitude}');
       }
 
       // Get current position
@@ -64,10 +70,17 @@ class LocationService {
         timeLimit: const Duration(seconds: 20),
       );
 
-      _lastKnownLocation = LatLng(position.latitude, position.longitude);
-      debugPrint('LocationService: Current: ${position.latitude}, ${position.longitude} (accuracy: ${position.accuracy}m)');
+      debugPrint('LocationService: GPS returned: ${position.latitude}, ${position.longitude} (accuracy: ${position.accuracy}m)');
 
-      return _lastKnownLocation!;
+      // Validate coordinates are in Maldives
+      if (isValidMaldivesLocation(position.latitude, position.longitude)) {
+        _lastKnownLocation = LatLng(position.latitude, position.longitude);
+        debugPrint('LocationService: Using GPS location (valid Maldives)');
+        return _lastKnownLocation!;
+      } else {
+        debugPrint('LocationService: GPS location outside Maldives, using default');
+        return _lastKnownLocation ?? defaultLocation;
+      }
     } catch (e) {
       debugPrint('LocationService: Error getting location: $e');
       return _lastKnownLocation ?? defaultLocation;

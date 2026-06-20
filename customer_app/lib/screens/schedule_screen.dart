@@ -141,6 +141,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     if (stops == null) return '';
     if (stops is String) return stops;
     if (stops is List) {
+      // Handle simple string array (from database text[])
+      if (stops.isNotEmpty && stops.first is String) {
+        return (stops as List).cast<String>().join(' → ');
+      }
+      // Handle map array with stop_order (legacy format)
       final sortedStops = List<Map<String, dynamic>>.from(stops);
       sortedStops.sort((a, b) => (a['stop_order'] ?? 0).compareTo(b['stop_order'] ?? 0));
       final stopNames = sortedStops.map((s) => s['stop_name'] ?? '').where((n) => n.isNotEmpty).toList();

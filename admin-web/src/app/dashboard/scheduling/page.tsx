@@ -59,7 +59,7 @@ export default function SchedulingPage() {
     route_name: "",
     route_code: "",
     direction: "outbound",
-    stops: "",
+    stops: [] as string[],
     is_active: true,
   })
   const [editingRoute, setEditingRoute] = useState<TransportRoute | null>(null)
@@ -104,13 +104,12 @@ export default function SchedulingPage() {
 
     setDialogOpen(false)
     setSaving(true)
-    const stopsArray = formData.stops ? formData.stops.split(',').map(s => s.trim()).filter(s => s) : []
     const { data, error } = await supabase.from("transport_routes").insert({
       transport_type: formData.transport_type,
       route_name: formData.route_name,
       route_code: formData.route_code || null,
       direction: formData.direction,
-      stops: stopsArray,
+      stops: formData.stops,
       is_active: formData.is_active,
     }).select().single()
 
@@ -118,7 +117,7 @@ export default function SchedulingPage() {
       toast.error("Failed to create route")
     } else {
       toast.success("Route created")
-      setFormData({ transport_type: activeTab, route_name: "", route_code: "", direction: "outbound", stops: "", is_active: true })
+      setFormData({ transport_type: activeTab, route_name: "", route_code: "", direction: "outbound", stops: [], is_active: true })
       if (data) setRoutes(prev => [...prev, data])
     }
     setSaving(false)
@@ -544,12 +543,60 @@ export default function SchedulingPage() {
             </div>
             <div>
               <label className="text-sm font-medium">Stops</label>
-              <Input
-                value={formData.stops}
-                onChange={e => setFormData({ ...formData, stops: e.target.value })}
-                placeholder="e.g., Water Supply, New Cargo, IT, Corporate Office"
-              />
-              <p className="text-xs text-muted-foreground mt-1">Separate stops with commas</p>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  id="add-stop-input"
+                  placeholder="Type stop name and press Enter"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      const input = e.currentTarget
+                      const val = input.value.trim()
+                      if (val && !formData.stops.includes(val)) {
+                        setFormData({ ...formData, stops: [...formData.stops, val] })
+                        input.value = ''
+                      }
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const input = document.getElementById('add-stop-input') as HTMLInputElement
+                    const val = input?.value.trim()
+                    if (val && !formData.stops.includes(val)) {
+                      setFormData({ ...formData, stops: [...formData.stops, val] })
+                      input.value = ''
+                    }
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              {formData.stops.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {formData.stops.map((stop, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded-md text-sm"
+                    >
+                      {stop}
+                      <button
+                        type="button"
+                        onClick={() => setFormData({
+                          ...formData,
+                          stops: formData.stops.filter((_, idx) => idx !== i)
+                        })}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Checkbox
@@ -609,15 +656,66 @@ export default function SchedulingPage() {
               </div>
               <div>
                 <label className="text-sm font-medium">Stops</label>
-                <Input
-                  value={editingRoute.stops?.join(', ') || ''}
-                  onChange={(e) => setEditingRoute({
-                    ...editingRoute,
-                    stops: e.target.value.split(',').map(s => s.trim()).filter(s => s)
-                  })}
-                  placeholder="e.g., Water Supply, New Cargo, IT"
-                />
-                <p className="text-xs text-muted-foreground mt-1">Separate stops with commas</p>
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    id="edit-stop-input"
+                    placeholder="Type stop name and press Enter"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        const input = e.currentTarget
+                        const val = input.value.trim()
+                        if (val && !editingRoute.stops?.includes(val)) {
+                          setEditingRoute({
+                            ...editingRoute,
+                            stops: [...(editingRoute.stops || []), val]
+                          })
+                          input.value = ''
+                        }
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const input = document.getElementById('edit-stop-input') as HTMLInputElement
+                      const val = input?.value.trim()
+                      if (val && !editingRoute.stops?.includes(val)) {
+                        setEditingRoute({
+                          ...editingRoute,
+                          stops: [...(editingRoute.stops || []), val]
+                        })
+                        input.value = ''
+                      }
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                {editingRoute.stops && editingRoute.stops.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {editingRoute.stops.map((stop, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded-md text-sm"
+                      >
+                        {stop}
+                        <button
+                          type="button"
+                          onClick={() => setEditingRoute({
+                            ...editingRoute,
+                            stops: editingRoute.stops?.filter((_, idx) => idx !== i)
+                          })}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Checkbox

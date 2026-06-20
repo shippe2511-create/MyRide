@@ -532,6 +532,20 @@ https://maps.google.com/?q=${_pickupLocation.latitude},${_pickupLocation.longitu
     Share.share(message, subject: 'My Ride Details');
   }
 
+  void _confirmCancel(String reason) async {
+    HapticFeedback.mediumImpact();
+    // Update ride status to cancelled with reason
+    if (widget.rideId != null) {
+      await SupabaseService.cancelRide(widget.rideId!, reason);
+    }
+    if (mounted) {
+      Navigator.popUntil(context, (route) => route.isFirst);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ride cancelled'), backgroundColor: AppColors.error),
+      );
+    }
+  }
+
   void _showCancelConfirmation() {
     showModalBottomSheet(
       context: context,
@@ -549,13 +563,39 @@ https://maps.google.com/?q=${_pickupLocation.latitude},${_pickupLocation.longitu
             Text('Cancel Ride?', style: TextStyle(color: ctx.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
             Text('Your driver is already on the way', style: TextStyle(color: ctx.mutedColor, fontSize: 15)),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(child: SizedBox(height: 50, child: OutlinedButton(onPressed: () => Navigator.pop(ctx), style: OutlinedButton.styleFrom(foregroundColor: ctx.textColor, side: BorderSide(color: ctx.borderColor), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: Text('Keep Ride', style: TextStyle(color: ctx.textColor, fontWeight: FontWeight.w600))))),
-                const SizedBox(width: 12),
-                Expanded(child: SizedBox(height: 50, child: ElevatedButton(onPressed: () { Navigator.pop(ctx); Navigator.popUntil(context, (route) => route.isFirst); }, style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0), child: Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600))))),
-              ],
+            const SizedBox(height: 16),
+            Text('Why are you cancelling?', style: TextStyle(color: ctx.mutedColor, fontSize: 13)),
+            const SizedBox(height: 12),
+            ...['Changed my plans', 'Driver taking too long', 'Booked by mistake', 'Other reason'].map((reason) =>
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _confirmCancel(reason);
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: ctx.borderColor),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(reason, style: TextStyle(color: ctx.textColor, fontSize: 15)),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: OutlinedButton.styleFrom(foregroundColor: ctx.textColor, side: BorderSide(color: ctx.borderColor), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                child: Text('Keep Ride', style: TextStyle(color: ctx.textColor, fontWeight: FontWeight.w600)),
+              ),
             ),
             SizedBox(height: MediaQuery.of(ctx).padding.bottom + 10),
           ],

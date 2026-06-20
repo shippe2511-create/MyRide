@@ -320,6 +320,38 @@ class SupabaseService {
     });
   }
 
+  static Future<void> rateDriver({
+    required String rideId,
+    required int rating,
+    String? feedback,
+    String? comment,
+  }) async {
+    final id = userId;
+    if (id == null) return;
+
+    // Get driver ID from ride
+    final ride = await client.from('rides').select('driver_id').eq('id', rideId).single();
+    final driverId = ride['driver_id'];
+    if (driverId == null) return;
+
+    // Get driver's user profile ID
+    final driver = await client.from('drivers').select('user_id').eq('id', driverId).single();
+    final driverUserId = driver['user_id'];
+
+    final fullComment = [feedback, comment].where((s) => s != null && s.isNotEmpty).join(' - ');
+
+    await client.from('ratings').insert({
+      'ride_id': rideId,
+      'from_user_id': id,
+      'to_user_id': driverUserId,
+      'rating': rating,
+      'comment': fullComment.isEmpty ? null : fullComment,
+    });
+
+    // Update ride as rated
+    await client.from('rides').update({'is_rated': true}).eq('id', rideId);
+  }
+
   // Saved Places methods
   static Future<List<Map<String, dynamic>>> getSavedPlaces() async {
     final id = userId;

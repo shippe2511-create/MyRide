@@ -1,7 +1,7 @@
 # MyRide Issues List
 
 Investigated: 2026-06-15
-Last Updated: 2026-06-19
+Last Updated: 2026-06-21
 Status: All fixable issues resolved
 Related: [[MyRide — Project Hub]]
 Tags: #project/myride
@@ -128,11 +128,11 @@ Tags: #project/myride
 
 | Category | Fixed | No Issue | External Dependency |
 |----------|-------|----------|---------------------|
-| flutter_app | 7 | 0 | 0 |
+| flutter_app | 10 | 0 | 0 |
 | driver_app | 6 | 1 | 0 |
-| admin-web | 14 | 0 | 0 |
+| admin-web | 17 | 0 | 0 |
 | Cross-App | 0 | 0 | 2 |
-| **Total** | **27** | **1** | **2** |
+| **Total** | **33** | **1** | **2** |
 
 All code-level issues have been resolved. The remaining 2 issues require external Firebase/APNs configuration.
 
@@ -278,4 +278,37 @@ Fixed:
 
 ---
 
-*Updated by Nova on 2026-06-20*
+## UI/UX Improvements (2026-06-21)
+
+### 40. Schedule Screen Countdown - IMPLEMENTED
+- **Feature:** Added "in X min" countdown replacing duration/stops indicator
+- Yellow highlight when ≤10 minutes (urgent)
+
+### 41. Map Location Picker Reverse Geocoding - FIXED
+- **Issue:** Location picker showed coordinates instead of address
+- **Fix:** Added Google Geocoding API to convert lat/lng to readable address
+
+### 42. Map Theme Consistency - FIXED
+- **Issue:** Maps had different dark styles across screens
+- **Fix:** Unified dark map style across all screens (gray tones matching app theme)
+
+### 43. Admin Panel Color Sync - FIXED
+- **Issue:** Admin panel primary color (#FFCC00) didn't match apps (#FFD60A)
+- **Fix:** Synced admin panel to use HSL(50, 100%, 52%) = #FFD60A
+
+### 44. Admin Panel Export CSV - IMPLEMENTED
+- **Feature:** Added Export CSV button to all admin pages:
+  - Rides, Vehicles, Scheduling, Zones, Ratings, Admins, Eligibility, Vehicle Logs
+
+### 45. Admin Panel Hover-to-Show Actions - IMPLEMENTED
+- **Feature:** Consistent UX pattern across all tables:
+  - Edit button + three-dot menu appear on row hover
+  - Smooth opacity transition
+  - Applied to 15+ pages:
+    - Customers, Drivers, Rides, Vehicles, Scheduling, Zones
+    - Admins, Eligibility, Vehicle Logs, Content, Incidents
+    - Checklists, Help, App Config, SOS
+
+---
+
+*Updated by Nova on 2026-06-21*

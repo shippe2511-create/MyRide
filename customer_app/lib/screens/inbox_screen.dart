@@ -31,6 +31,15 @@ class InboxScreen extends StatefulWidget {
 
 class _InboxScreenState extends State<InboxScreen> {
   final List<InboxMessage> _messages = [];
+  bool _isRefreshing = false;
+
+  Future<void> _onRefresh() async {
+    setState(() => _isRefreshing = true);
+    HapticFeedback.lightImpact();
+    // TODO: Load messages from Supabase
+    await Future.delayed(const Duration(milliseconds: 800));
+    setState(() => _isRefreshing = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,13 +51,21 @@ class _InboxScreenState extends State<InboxScreen> {
           children: [
             _buildHeader(context),
             Expanded(
-              child: _messages.isEmpty
-                  ? _buildEmptyState()
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      itemCount: _messages.length,
-                      itemBuilder: (context, index) => _buildMessageCard(_messages[index]),
-                    ),
+              child: RefreshIndicator(
+                onRefresh: _onRefresh,
+                color: AppColors.yellow,
+                child: _messages.isEmpty
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [_buildEmptyState()],
+                      )
+                    : ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: _messages.length,
+                        itemBuilder: (context, index) => _buildMessageCard(_messages[index]),
+                      ),
+              ),
             ),
           ],
         ),

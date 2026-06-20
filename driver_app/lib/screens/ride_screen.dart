@@ -544,6 +544,21 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                     },
                   ),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildNavOption(
+                    icon: Icons.apple,
+                    label: 'Apple Maps',
+                    color: const Color(0xFF333333),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final uri = Uri.parse('https://maps.apple.com/?daddr=$lat,$lng&dirflg=d');
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      }
+                    },
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 16),

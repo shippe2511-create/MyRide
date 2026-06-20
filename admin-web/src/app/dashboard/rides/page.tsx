@@ -21,7 +21,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
-  MapPin, Clock, CheckCircle, XCircle, Search, Loader2, RefreshCw, Car, MoreVertical, Edit, Trash2, TrendingUp, ChevronLeft, ChevronRight, Download, Eye
+  MapPin, Clock, CheckCircle, XCircle, Search, Loader2, RefreshCw, Car, MoreVertical, Edit, Trash2, TrendingUp, ChevronLeft, ChevronRight, Download, Eye, Calendar
 } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -67,6 +67,7 @@ export default function RidesPage() {
   const [selectedRide, setSelectedRide] = useState<Ride | null>(null)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [dateRange, setDateRange] = useState("all")
   const [stats, setStats] = useState({ total: 0, active: 0, completed: 0, cancelled: 0 })
   const [editRide, setEditRide] = useState<Ride | null>(null)
   const [editStatus, setEditStatus] = useState("")
@@ -90,7 +91,7 @@ export default function RidesPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [statusFilter])
+  }, [statusFilter, dateRange])
 
   const loadData = async (showLoading = true) => {
     if (showLoading) setLoading(true)
@@ -107,6 +108,29 @@ export default function RidesPage() {
       } else {
         query = query.eq("status", statusFilter)
       }
+    }
+
+    // Apply date range filter
+    if (dateRange !== "all") {
+      const now = new Date()
+      let startDate: Date
+      switch (dateRange) {
+        case "today":
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+          break
+        case "week":
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          break
+        case "month":
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+          break
+        case "quarter":
+          startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+          break
+        default:
+          startDate = new Date(0)
+      }
+      query = query.gte("created_at", startDate.toISOString())
     }
 
     const [ridesRes, totalRes, activeRes, completedRes, cancelledRes, last7DaysRes] = await Promise.all([
@@ -226,7 +250,7 @@ export default function RidesPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, statusFilter])
+  }, [search, statusFilter, dateRange])
 
   if (loading) {
     return (
@@ -363,6 +387,19 @@ export default function RidesPage() {
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={dateRange} onValueChange={setDateRange}>
+            <SelectTrigger className="w-36">
+              <Calendar className="h-4 w-4 mr-2" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Time</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="week">Last 7 Days</SelectItem>
+              <SelectItem value="month">This Month</SelectItem>
+              <SelectItem value="quarter">Last 90 Days</SelectItem>
             </SelectContent>
           </Select>
         </div>

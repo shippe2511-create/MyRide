@@ -129,10 +129,10 @@ Tags: #project/myride
 | Category | Fixed | No Issue | External Dependency |
 |----------|-------|----------|---------------------|
 | flutter_app | 18 | 0 | 0 |
-| driver_app | 10 | 1 | 0 |
-| admin-web | 20 | 0 | 0 |
+| driver_app | 16 | 1 | 0 |
+| admin-web | 21 | 0 | 0 |
 | Cross-App | 0 | 0 | 2 |
-| **Total** | **48** | **1** | **2** |
+| **Total** | **55** | **1** | **2** |
 
 All code-level issues have been resolved. The remaining 2 issues require external Firebase/APNs configuration.
 
@@ -384,6 +384,32 @@ Fixed:
 ### 62. Dead Code Cleanup
 - **Issue:** `_showBottomSheet` had unused `addButton` parameter with empty handler
 - **Fix:** Removed unused parameter
+
+### Additional Fixes (2026-06-21)
+
+### 63. Customer Rating Hardcoded - FIXED
+- **Issue:** ride_screen.dart showed hardcoded "4.8" for customer rating
+- **Fix:** Added customerRating field to RideRequest model, fetched from Supabase ratings table
+
+### 64. Trips Together Hardcoded - FIXED
+- **Issue:** ride_screen.dart showed hardcoded "12 trips together"
+- **Fix:** Added tripsTogether field to RideRequest, counts completed rides between driver and customer
+
+### 65. Driver Location Updates Random - FIXED
+- **Issue:** driver_state.dart used random offsets for location updates (demo mode)
+- **Fix:** Uses Geolocator.getCurrentPosition() for real GPS coordinates
+
+### 66. Chat Location Sharing Fake - FIXED
+- **Issue:** Driver chat sent "My location" text without actual coordinates
+- **Fix:** Gets real GPS and sends Google Maps link with coordinates
+
+### 67. Monthly Calendar View - FIXED
+- **Issue:** shift_schedule_screen.dart showed "coming soon" snackbar
+- **Fix:** Implemented full month grid with shift highlights and today indicator
+
+### 68. Admin Notification Settings Not Saved - FIXED
+- **Issue:** settings/page.tsx notification toggles not included in saveSettings()
+- **Fix:** Added all notif_* fields to the upsert call
 
 ---
 

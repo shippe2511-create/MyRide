@@ -223,44 +223,41 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
 
   Widget _buildHeader(bool isDark, int reminderCount) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 20, 0),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.arrow_back_ios_new, color: context.textColor, size: 18),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Staff Transport',
+                  style: TextStyle(
+                    color: context.textColor,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
                   ),
-                  child: Icon(Icons.arrow_back_ios_new, color: context.textColor, size: 18),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Staff Transport',
-                    style: TextStyle(
-                      color: context.textColor,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  Text(
-                    _getDateString(),
-                    style: TextStyle(color: context.mutedColor, fontSize: 13),
-                  ),
-                ],
-              ),
-            ],
+                Text(
+                  _getDateString(),
+                  style: TextStyle(color: context.mutedColor, fontSize: 13),
+                ),
+              ],
+            ),
           ),
           Row(
             children: [
@@ -1121,7 +1118,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                     child: SizedBox(
                       height: 54,
                       child: ElevatedButton.icon(
-                        onPressed: () => _setReminder(ctx, tripStr),
+                        onPressed: () => _setReminder(ctx, trip),
                         icon: Icon(Icons.alarm_add, size: 20),
                         label: Text('Remind', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                         style: ElevatedButton.styleFrom(
@@ -1138,7 +1135,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                     child: SizedBox(
                       height: 54,
                       child: ElevatedButton.icon(
-                        onPressed: () => _addToCalendar(ctx, tripStr),
+                        onPressed: () => _addToCalendar(ctx, trip),
                         icon: Icon(Icons.calendar_today, size: 18),
                         label: Text('Calendar', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                         style: ElevatedButton.styleFrom(
@@ -1213,12 +1210,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     );
   }
 
-  void _setReminder(BuildContext ctx, Map<String, String> trip) {
+  void _setReminder(BuildContext ctx, Map<String, dynamic> trip) {
     Navigator.pop(ctx);
     _showReminderTimeDialog(trip);
   }
 
-  void _showReminderTimeDialog(Map<String, String> trip) {
+  void _showReminderTimeDialog(Map<String, dynamic> trip) {
     final isDark = context.isDark;
     int selectedMinutes = 10;
 

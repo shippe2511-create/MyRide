@@ -602,7 +602,7 @@ class SupabaseService {
 
   static Future<List<Map<String, dynamic>>> getRoutes({String? transportType}) async {
     try {
-      var query = client.from('transport_routes').select('*, stops:route_stops(*)').eq('is_active', true);
+      var query = client.from('transport_routes').select().eq('is_active', true);
       if (transportType != null) {
         query = query.eq('transport_type', transportType);
       }

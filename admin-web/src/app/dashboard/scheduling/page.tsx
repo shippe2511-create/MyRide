@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
-  Plus, Bus, Ship, Loader2, Clock, MapPin, RefreshCw, MoreHorizontal, Pencil, Trash2, X, Upload, Image, FileText
+  Plus, Bus, Ship, Loader2, Clock, MapPin, RefreshCw, MoreHorizontal, Pencil, Trash2, X, Upload, Image, FileText, GripVertical
 } from "lucide-react"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -80,6 +80,7 @@ export default function SchedulingPage() {
   const [routeDirection, setRouteDirection] = useState("outbound")
   const [routeStops, setRouteStops] = useState("")
   const [importSaving, setImportSaving] = useState(false)
+  const [draggedStopIndex, setDraggedStopIndex] = useState<number | null>(null)
 
   useEffect(() => {
     loadRoutes()
@@ -580,8 +581,22 @@ export default function SchedulingPage() {
                   {formData.stops.map((stop, i) => (
                     <span
                       key={i}
-                      className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded-md text-sm"
+                      draggable
+                      onDragStart={() => setDraggedStopIndex(i)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => {
+                        if (draggedStopIndex !== null && draggedStopIndex !== i) {
+                          const newStops = [...formData.stops]
+                          const [dragged] = newStops.splice(draggedStopIndex, 1)
+                          newStops.splice(i, 0, dragged)
+                          setFormData({ ...formData, stops: newStops })
+                        }
+                        setDraggedStopIndex(null)
+                      }}
+                      onDragEnd={() => setDraggedStopIndex(null)}
+                      className={`inline-flex items-center gap-1 px-2 py-1 bg-muted rounded-md text-sm cursor-grab active:cursor-grabbing ${draggedStopIndex === i ? 'opacity-50' : ''}`}
                     >
+                      <GripVertical className="h-3 w-3 text-muted-foreground" />
                       {stop}
                       <button
                         type="button"
@@ -699,8 +714,22 @@ export default function SchedulingPage() {
                     {editingRoute.stops.map((stop, i) => (
                       <span
                         key={i}
-                        className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded-md text-sm"
+                        draggable
+                        onDragStart={() => setDraggedStopIndex(i)}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => {
+                          if (draggedStopIndex !== null && draggedStopIndex !== i) {
+                            const newStops = [...(editingRoute.stops || [])]
+                            const [dragged] = newStops.splice(draggedStopIndex, 1)
+                            newStops.splice(i, 0, dragged)
+                            setEditingRoute({ ...editingRoute, stops: newStops })
+                          }
+                          setDraggedStopIndex(null)
+                        }}
+                        onDragEnd={() => setDraggedStopIndex(null)}
+                        className={`inline-flex items-center gap-1 px-2 py-1 bg-muted rounded-md text-sm cursor-grab active:cursor-grabbing ${draggedStopIndex === i ? 'opacity-50' : ''}`}
                       >
+                        <GripVertical className="h-3 w-3 text-muted-foreground" />
                         {stop}
                         <button
                           type="button"

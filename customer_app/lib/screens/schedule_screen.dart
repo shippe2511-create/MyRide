@@ -26,6 +26,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
   List<Map<String, dynamic>> _routes = [];
   List<Map<String, dynamic>> _schedules = [];
   bool _isLoading = true;
+  bool _hidePastTimes = true;
+  Set<String> _favoriteRoutes = {};
 
   late AnimationController _fabController;
   late Animation<double> _fabAnimation;
@@ -154,6 +156,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     return stops.toString();
   }
 
+  String _getStopsPreview(String stopsStr) {
+    final stops = stopsStr.split(' → ');
+    if (stops.length <= 2) return stopsStr;
+    return '${stops.first} → ... → ${stops.last}';
+  }
+
+  int _getStopCount(String stopsStr) {
+    if (stopsStr.isEmpty) return 0;
+    return stopsStr.split(' → ').length;
+  }
+
   Map<String, dynamic>? _getRouteById(String routeId) {
     try {
       return _routes.firstWhere((r) => r['id'] == routeId);
@@ -187,22 +200,29 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     return Scaffold(
       backgroundColor: context.bgColor,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            // Header
-            SliverToBoxAdapter(child: _buildHeader(isDark, reminders.length)),
+        child: RefreshIndicator(
+          onRefresh: () async {
+            HapticFeedback.mediumImpact();
+            await _loadData();
+          },
+          color: AppColors.yellow,
+          backgroundColor: context.surfaceColor,
+          child: CustomScrollView(
+            slivers: [
+              // Header
+              SliverToBoxAdapter(child: _buildHeader(isDark, reminders.length)),
 
-            // Reminders Section (collapsible)
-            if (reminders.isNotEmpty)
-              SliverToBoxAdapter(child: _buildRemindersSection(isDark, reminders)),
+              // Reminders Section (collapsible)
+              if (reminders.isNotEmpty)
+                SliverToBoxAdapter(child: _buildRemindersSection(isDark, reminders)),
 
-            // Transport Mode Tabs - only show when View All
-            if (_showAllTypes)
-              SliverToBoxAdapter(child: _buildModeTabs(isDark)),
+              // Transport Mode Tabs - only show when View All
+              if (_showAllTypes)
+                SliverToBoxAdapter(child: _buildModeTabs(isDark)),
 
-            // Selected Type Header - show when specific type selected
-            if (!_showAllTypes)
-              SliverToBoxAdapter(child: _buildSelectedTypeHeader(isDark)),
+              // Selected Type Header - show when specific type selected
+              if (!_showAllTypes)
+                SliverToBoxAdapter(child: _buildSelectedTypeHeader(isDark)),
 
             // Route Direction Tabs
             SliverToBoxAdapter(child: _buildDirectionTabs(isDark)),
@@ -216,9 +236,94 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
             // Bottom padding
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
+          ),
         ),
       ),
     );
+  }
+
+  Widget _buildFilterControls(bool isDark) {
+    final upcomingCount = _getUpcomingCount();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              setState(() => _hidePastTimes = !_hidePastTimes);
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: _hidePastTimes
+                    ? AppColors.yellow.withValues(alpha: 0.15)
+                    : (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: _hidePastTimes
+                      ? AppColors.yellow.withValues(alpha: 0.3)
+                      : Colors.transparent,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _hidePastTimes ? Icons.visibility_off : Icons.visibility,
+                    size: 14,
+                    color: _hidePastTimes ? AppColors.yellow : context.mutedColor,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    _hidePastTimes ? 'Upcoming only' : 'Show all',
+                    style: TextStyle(
+                      color: _hidePastTimes ? AppColors.yellow : context.mutedColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '$upcomingCount remaining',
+              style: TextStyle(
+                color: AppColors.success,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  int _getUpcomingCount() {
+    final now = TimeOfDay.now();
+    int count = 0;
+    for (final route in _getFilteredRoutes()) {
+      final routeSchedules = _schedules.where((s) => s['route_id'] == route['id']).toList();
+      for (final schedule in routeSchedules) {
+        final time = schedule['departure_time']?.toString().substring(0, 5) ?? '00:00';
+        final parts = time.split(':');
+        final hour = int.tryParse(parts[0]) ?? 0;
+        final minute = int.tryParse(parts[1]) ?? 0;
+        if (hour > now.hour || (hour == now.hour && minute >= now.minute)) {
+          count++;
+        }
+      }
+    }
+    return count;
   }
 
   Widget _buildHeader(bool isDark, int reminderCount) {
@@ -678,6 +783,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
             label = 'To ${route['to_location']?.toString().split(' ').first ?? ''}';
           }
 
+          final isFavorite = _favoriteRoutes.contains(route['id']);
           return Padding(
             padding: EdgeInsets.only(right: index < filteredRoutes.length - 1 ? 8 : 0),
             child: GestureDetector(
@@ -685,23 +791,44 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                 HapticFeedback.selectionClick();
                 setState(() => _selectedRoute = route['id']);
               },
+              onLongPress: () {
+                HapticFeedback.mediumImpact();
+                setState(() {
+                  if (isFavorite) {
+                    _favoriteRoutes.remove(route['id']);
+                  } else {
+                    _favoriteRoutes.add(route['id']);
+                  }
+                });
+              },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
                   color: isActive ? AppColors.yellow : (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(22),
                   border: isActive ? null : Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1)),
                 ),
-                child: Center(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: isActive ? AppColors.bgDark : context.textColor,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isFavorite) ...[
+                      Icon(
+                        Icons.star,
+                        size: 14,
+                        color: isActive ? AppColors.bgDark : AppColors.yellow,
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: isActive ? AppColors.bgDark : context.textColor,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),
@@ -877,7 +1004,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     }
 
     // Skip first schedule as it's shown in Next Departure card
-    final remainingSchedules = schedules.length > 1 ? schedules.sublist(1) : <Map<String, dynamic>>[];
+    var remainingSchedules = schedules.length > 1 ? schedules.sublist(1) : <Map<String, dynamic>>[];
+
+    // Filter past times if enabled
+    if (_hidePastTimes) {
+      final now = TimeOfDay.now();
+      remainingSchedules = remainingSchedules.where((schedule) {
+        final time = schedule['departure_time']?.toString().substring(0, 5) ?? '00:00';
+        final parts = time.split(':');
+        final hour = int.tryParse(parts[0]) ?? 0;
+        final minute = int.tryParse(parts[1]) ?? 0;
+        return hour > now.hour || (hour == now.hour && minute >= now.minute);
+      }).toList();
+    }
 
     if (remainingSchedules.isEmpty) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
@@ -907,14 +1046,18 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     final now = TimeOfDay.now();
     final isPast = hour < now.hour || (hour == now.hour && minute < now.minute);
 
+    final stopsStr = _formatStops(route['stops']);
+    final stopCount = _getStopCount(stopsStr);
+    final duration = route['duration_minutes'] ?? (stopCount > 0 ? (stopCount - 1) * 2 : 0);
+
     final trip = {
       'time': displayTime,
       'hour': hour,
       'minute': minute,
       'route': route['route_name'] ?? '',
-      'duration': '${route['duration_minutes'] ?? 0} min',
+      'duration': '$duration min',
       'type': _selectedType,
-      'stops': _formatStops(route['stops']),
+      'stops': stopsStr,
     };
 
     return TweenAnimationBuilder<double>(
@@ -976,6 +1119,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                         ),
                       ),
                       const SizedBox(height: 4),
+                      if (trip['stops']?.isNotEmpty == true) ...[
+                        Text(
+                          _getStopsPreview(trip['stops']!),
+                          style: TextStyle(
+                            color: isPast ? context.mutedColor.withValues(alpha: 0.6) : AppColors.yellow.withValues(alpha: 0.9),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 3),
+                      ],
                       Row(
                         children: [
                           Icon(Icons.timer_outlined, size: 12, color: context.mutedColor),
@@ -984,6 +1140,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                             trip['duration']!,
                             style: TextStyle(color: context.mutedColor, fontSize: 12),
                           ),
+                          if (trip['stops']?.isNotEmpty == true) ...[
+                            const SizedBox(width: 10),
+                            Icon(Icons.location_on_outlined, size: 12, color: context.mutedColor),
+                            const SizedBox(width: 3),
+                            Text(
+                              '${_getStopCount(trip['stops']!)} stops',
+                              style: TextStyle(color: context.mutedColor, fontSize: 12),
+                            ),
+                          ],
                         ],
                       ),
                     ],
@@ -1061,25 +1226,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                           style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Text(
-                              tripStr['time']!,
-                              style: TextStyle(color: AppColors.yellow, fontSize: 15, fontWeight: FontWeight.w600),
-                            ),
-                            const SizedBox(width: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: context.bgColor,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                tripStr['duration']!,
-                                style: TextStyle(color: context.mutedColor, fontSize: 12),
-                              ),
-                            ),
-                          ],
+                        Text(
+                          tripStr['time']!,
+                          style: TextStyle(color: AppColors.yellow, fontSize: 15, fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
@@ -1103,10 +1252,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                           Icon(Icons.route, color: AppColors.yellow, size: 16),
                           const SizedBox(width: 8),
                           Text('Route Stops', style: TextStyle(color: context.mutedColor, fontSize: 13, fontWeight: FontWeight.w600)),
+                          const SizedBox(width: 8),
+                          Text('(estimated)', style: TextStyle(color: context.mutedColor.withValues(alpha: 0.5), fontSize: 11, fontStyle: FontStyle.italic)),
                         ],
                       ),
                       const SizedBox(height: 12),
-                      _buildStopsVisualization(tripStr['stops']!, isDark),
+                      _buildStopsVisualization(tripStr['stops']!, isDark, trip['hour'] as int, trip['minute'] as int),
                     ],
                   ),
                 ),
@@ -1156,7 +1307,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     );
   }
 
-  Widget _buildStopsVisualization(String stopsStr, bool isDark) {
+  Widget _buildStopsVisualization(String stopsStr, bool isDark, int departureHour, int departureMinute) {
     final stops = stopsStr.contains(' · ')
         ? stopsStr.split(' · ')
         : stopsStr.contains(' → ')
@@ -1169,8 +1320,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
         final stop = entry.value;
         final isFirst = index == 0;
         final isLast = index == stops.length - 1;
+        final minutesFromStart = index * 2;
+
+        // Calculate arrival time
+        final totalMinutes = departureHour * 60 + departureMinute + minutesFromStart;
+        final arrivalHour = (totalMinutes ~/ 60) % 24;
+        final arrivalMinute = totalMinutes % 60;
+        final arrivalTime = '${arrivalHour.toString().padLeft(2, '0')}:${arrivalMinute.toString().padLeft(2, '0')}';
 
         return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Column(
               children: [
@@ -1185,7 +1344,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                 if (!isLast)
                   Container(
                     width: 2,
-                    height: 24,
+                    height: 28,
                     color: context.mutedColor.withValues(alpha: 0.3),
                   ),
               ],
@@ -1193,14 +1352,20 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
             const SizedBox(width: 12),
             Expanded(
               child: Padding(
-                padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
-                child: Text(
-                  stop,
-                  style: TextStyle(
-                    color: (isFirst || isLast) ? context.textColor : context.mutedColor,
-                    fontSize: 14,
-                    fontWeight: (isFirst || isLast) ? FontWeight.w600 : FontWeight.w500,
-                  ),
+                padding: EdgeInsets.only(bottom: isLast ? 0 : 20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        stop,
+                        style: TextStyle(
+                          color: (isFirst || isLast) ? context.textColor : context.mutedColor,
+                          fontSize: 14,
+                          fontWeight: (isFirst || isLast) ? FontWeight.w600 : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

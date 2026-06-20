@@ -582,9 +582,16 @@ export default function SchedulingPage() {
                     <span
                       key={i}
                       draggable
-                      onDragStart={() => setDraggedStopIndex(i)}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={() => {
+                      onDragStart={(e) => {
+                        setDraggedStopIndex(i)
+                        e.dataTransfer.effectAllowed = 'move'
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault()
+                        e.dataTransfer.dropEffect = 'move'
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault()
                         if (draggedStopIndex !== null && draggedStopIndex !== i) {
                           const newStops = [...formData.stops]
                           const [dragged] = newStops.splice(draggedStopIndex, 1)
@@ -594,7 +601,7 @@ export default function SchedulingPage() {
                         setDraggedStopIndex(null)
                       }}
                       onDragEnd={() => setDraggedStopIndex(null)}
-                      className={`inline-flex items-center gap-1 px-2 py-1 bg-muted rounded-md text-sm cursor-grab active:cursor-grabbing ${draggedStopIndex === i ? 'opacity-50' : ''}`}
+                      className={`inline-flex items-center gap-1 px-2 py-1 bg-muted rounded-md text-sm cursor-grab active:cursor-grabbing ${draggedStopIndex === i ? 'opacity-50 ring-2 ring-primary' : ''}`}
                     >
                       <GripVertical className="h-3 w-3 text-muted-foreground" />
                       {stop}
@@ -715,9 +722,16 @@ export default function SchedulingPage() {
                       <span
                         key={i}
                         draggable
-                        onDragStart={() => setDraggedStopIndex(i)}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={() => {
+                        onDragStart={(e) => {
+                          setDraggedStopIndex(i)
+                          e.dataTransfer.effectAllowed = 'move'
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault()
+                          e.dataTransfer.dropEffect = 'move'
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault()
                           if (draggedStopIndex !== null && draggedStopIndex !== i) {
                             const newStops = [...(editingRoute.stops || [])]
                             const [dragged] = newStops.splice(draggedStopIndex, 1)
@@ -727,7 +741,7 @@ export default function SchedulingPage() {
                           setDraggedStopIndex(null)
                         }}
                         onDragEnd={() => setDraggedStopIndex(null)}
-                        className={`inline-flex items-center gap-1 px-2 py-1 bg-muted rounded-md text-sm cursor-grab active:cursor-grabbing ${draggedStopIndex === i ? 'opacity-50' : ''}`}
+                        className={`inline-flex items-center gap-1 px-2 py-1 bg-muted rounded-md text-sm cursor-grab active:cursor-grabbing ${draggedStopIndex === i ? 'opacity-50 ring-2 ring-primary' : ''}`}
                       >
                         <GripVertical className="h-3 w-3 text-muted-foreground" />
                         {stop}

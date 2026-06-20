@@ -513,7 +513,7 @@ export default function SOSPage() {
               }).map(alert => (
                 <TableRow
                   key={alert.id}
-                  className={`hover:bg-muted/50 transition-colors ${alert.status === "active" ? "bg-red-50 dark:bg-red-950/20" : ""}`}
+                  className={`group hover:bg-muted/50 transition-colors ${alert.status === "active" ? "bg-red-50 dark:bg-red-950/20" : ""}`}
                 >
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -555,27 +555,37 @@ export default function SOSPage() {
                     {formatDate(alert.created_at)}
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu modal={false}>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
-                        <DropdownMenuItem onClick={() => setSelectedAlert(alert)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          View / Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-red-500"
-                          onClick={() => confirmDelete(alert.id)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setSelectedAlert(alert)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <DropdownMenu modal={false}>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
+                          <DropdownMenuItem onClick={() => setSelectedAlert(alert)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            View / Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-red-500"
+                            onClick={() => confirmDelete(alert.id)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))

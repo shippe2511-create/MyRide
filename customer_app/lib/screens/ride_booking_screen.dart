@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import 'driver_matching_screen.dart';
+
+const String _darkMapStyle = '''
+[
+  {"elementType": "geometry", "stylers": [{"color": "#212121"}]},
+  {"elementType": "labels.icon", "stylers": [{"visibility": "off"}]},
+  {"elementType": "labels.text.fill", "stylers": [{"color": "#757575"}]},
+  {"featureType": "road", "elementType": "geometry.fill", "stylers": [{"color": "#2c2c2c"}]},
+  {"featureType": "water", "elementType": "geometry", "stylers": [{"color": "#000000"}]}
+]
+''';
 
 class RideBookingScreen extends StatefulWidget {
   final String pickup;
@@ -297,61 +306,41 @@ class _RideBookingScreenState extends State<RideBookingScreen> {
       backgroundColor: context.bgColor,
       body: Stack(
         children: [
-          // Full screen map
+          // Google Map
           Positioned.fill(
             bottom: 0,
-            child: FlutterMap(
-              options: MapOptions(
-                initialCenter: LatLng(centerLat, centerLng),
-                initialZoom: 13.5,
+            child: GoogleMap(
+              initialCameraPosition: CameraPosition(
+                target: LatLng(centerLat, centerLng),
+                zoom: 13.5,
               ),
-              children: [
-                TileLayer(
-                  urlTemplate: context.isDark ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                  subdomains: const ['a', 'b', 'c', 'd'],
+              markers: {
+                Marker(
+                  markerId: const MarkerId('pickup'),
+                  position: pickupLoc,
+                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                  infoWindow: InfoWindow(title: 'Pickup', snippet: widget.pickup),
                 ),
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: [pickupLoc, dropoffLoc],
-                      color: AppColors.yellow,
-                      strokeWidth: 4,
-                    ),
-                  ],
+                Marker(
+                  markerId: const MarkerId('dropoff'),
+                  position: dropoffLoc,
+                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                  infoWindow: InfoWindow(title: 'Drop-off', snippet: widget.dropoff),
                 ),
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: pickupLoc,
-                      width: 48,
-                      height: 48,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.success,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                          boxShadow: [BoxShadow(color: AppColors.success.withValues(alpha: 0.5), blurRadius: 12, spreadRadius: 2)],
-                        ),
-                        child: Icon(Icons.person, color: Colors.white, size: 24),
-                      ),
-                    ),
-                    Marker(
-                      point: dropoffLoc,
-                      width: 48,
-                      height: 48,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.error,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                          boxShadow: [BoxShadow(color: AppColors.error.withValues(alpha: 0.5), blurRadius: 12, spreadRadius: 2)],
-                        ),
-                        child: Icon(Icons.flag, color: Colors.white, size: 22),
-                      ),
-                    ),
-                  ],
+              },
+              polylines: {
+                Polyline(
+                  polylineId: const PolylineId('route'),
+                  points: [pickupLoc, dropoffLoc],
+                  color: AppColors.yellow,
+                  width: 4,
                 ),
-              ],
+              },
+              myLocationEnabled: true,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
+              mapToolbarEnabled: false,
+              style: context.isDark ? _darkMapStyle : null,
             ),
           ),
 

@@ -621,7 +621,7 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
     bool showMap = false;
     LatLng mapLocation = const LatLng(4.1755, 73.5093);
     final searchController = TextEditingController();
-    final mapController = MapController();
+    GoogleMapController? googleMapController;
 
     final List<Map<String, dynamic>> allPlaces = [
       {'name': 'Hulhumale Phase 2', 'address': 'Hulhumale Phase 2, Flat Area', 'lat': 4.2286, 'lng': 73.5400, 'icon': Icons.apartment_rounded},
@@ -784,73 +784,42 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
                               borderRadius: BorderRadius.circular(24),
                               child: Stack(
                                 children: [
-                                  FlutterMap(
-                                    mapController: mapController,
-                                    options: MapOptions(
-                                      initialCenter: mapLocation,
-                                      initialZoom: 14,
-                                      onTap: (tapPosition, point) {
-                                        HapticFeedback.lightImpact();
-                                        String nearestName = 'Custom Location';
-                                        double minDist = double.infinity;
-                                        for (final place in allPlaces) {
-                                          final pLat = place['lat'] as double;
-                                          final pLng = place['lng'] as double;
-                                          final dist = (point.latitude - pLat).abs() + (point.longitude - pLng).abs();
-                                          if (dist < minDist && dist < 0.01) {
-                                            minDist = dist;
-                                            nearestName = 'Near ${place['name']}';
-                                          }
+                                  GoogleMap(
+                                    initialCameraPosition: CameraPosition(target: mapLocation, zoom: 14),
+                                    onMapCreated: (controller) => googleMapController = controller,
+                                    onTap: (point) {
+                                      HapticFeedback.lightImpact();
+                                      String nearestName = 'Custom Location';
+                                      double minDist = double.infinity;
+                                      for (final place in allPlaces) {
+                                        final pLat = place['lat'] as double;
+                                        final pLng = place['lng'] as double;
+                                        final dist = (point.latitude - pLat).abs() + (point.longitude - pLng).abs();
+                                        if (dist < minDist && dist < 0.01) {
+                                          minDist = dist;
+                                          nearestName = 'Near ${place['name']}';
                                         }
-                                        setSheetState(() {
-                                          mapLocation = point;
-                                          selectedName = nearestName;
-                                          selectedDestination = nearestName;
-                                          selectedLat = point.latitude;
-                                          selectedLng = point.longitude;
-                                        });
-                                      },
-                                    ),
-                                    children: [
-                                      TileLayer(
-                                        urlTemplate: context.isDark
-                                            ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                                            : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                                        subdomains: const ['a', 'b', 'c', 'd'],
+                                      }
+                                      setSheetState(() {
+                                        mapLocation = point;
+                                        selectedName = nearestName;
+                                        selectedDestination = nearestName;
+                                        selectedLat = point.latitude;
+                                        selectedLng = point.longitude;
+                                      });
+                                    },
+                                    markers: selectedLat != null ? {
+                                      Marker(
+                                        markerId: const MarkerId('selected'),
+                                        position: LatLng(selectedLat!, selectedLng!),
+                                        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
                                       ),
-                                      MarkerLayer(
-                                        markers: [
-                                          if (selectedLat != null)
-                                            Marker(
-                                              point: LatLng(selectedLat!, selectedLng!),
-                                              width: 50,
-                                              height: 60,
-                                              child: TweenAnimationBuilder<double>(
-                                                tween: Tween(begin: 0.5, end: 1.0),
-                                                duration: const Duration(milliseconds: 300),
-                                                curve: Curves.elasticOut,
-                                                builder: (context, value, child) => Transform.scale(
-                                                  scale: value,
-                                                  child: Column(
-                                                    children: [
-                                                      Container(
-                                                        padding: const EdgeInsets.all(8),
-                                                        decoration: BoxDecoration(
-                                                          gradient: LinearGradient(colors: [AppColors.yellow, AppColors.yellow.withValues(alpha: 0.8)]),
-                                                          shape: BoxShape.circle,
-                                                          boxShadow: [BoxShadow(color: AppColors.yellow.withValues(alpha: 0.5), blurRadius: 12, spreadRadius: 2)],
-                                                        ),
-                                                        child: const Icon(Icons.place_rounded, color: Colors.black, size: 22),
-                                                      ),
-                                                      Container(width: 3, height: 12, decoration: BoxDecoration(color: AppColors.yellow, borderRadius: BorderRadius.circular(2))),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ],
+                                    } : {},
+                                    myLocationEnabled: true,
+                                    myLocationButtonEnabled: false,
+                                    zoomControlsEnabled: false,
+                                    mapToolbarEnabled: false,
+                                    style: context.isDark ? _darkMapStyle : null,
                                   ),
                                   // Tap instruction
                                   Positioned(

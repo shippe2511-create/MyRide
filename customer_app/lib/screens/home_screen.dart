@@ -3,8 +3,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/app_state.dart';
@@ -21,6 +20,19 @@ import 'schedule_screen.dart';
 import 'announcements_screen.dart';
 import 'staff_corner_screen.dart';
 import 'trip_tracking_screen.dart';
+
+const String _darkMapStyle = '''
+[
+  {"elementType": "geometry", "stylers": [{"color": "#212121"}]},
+  {"elementType": "labels.icon", "stylers": [{"visibility": "off"}]},
+  {"elementType": "labels.text.fill", "stylers": [{"color": "#757575"}]},
+  {"elementType": "labels.text.stroke", "stylers": [{"color": "#212121"}]},
+  {"featureType": "road", "elementType": "geometry.fill", "stylers": [{"color": "#2c2c2c"}]},
+  {"featureType": "road.arterial", "elementType": "geometry", "stylers": [{"color": "#373737"}]},
+  {"featureType": "road.highway", "elementType": "geometry", "stylers": [{"color": "#3c3c3c"}]},
+  {"featureType": "water", "elementType": "geometry", "stylers": [{"color": "#000000"}]}
+]
+''';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -1664,7 +1676,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<Map<String, dynamic>?> _showLocationPicker(BuildContext context, String title, Color accentColor) async {
     LatLng selectedLocation = await _getCurrentLocation();
-    final mapController = MapController();
+    GoogleMapController? googleMapController;
     final searchController = TextEditingController();
     String addressText = '';
     String selectedName = '';
@@ -1889,104 +1901,48 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       : // Map View
                         Stack(
                           children: [
-                            FlutterMap(
-                              mapController: mapController,
-                              options: MapOptions(
-                                initialCenter: selectedLocation,
-                                initialZoom: 14,
-                                onTap: (tapPosition, point) {
-                                  // Find nearest known place
-                                  String nearestName = 'Custom Location';
-                                  double minDist = double.infinity;
-                                  for (final place in allPlaces) {
-                                    final pLat = place['lat'] as double;
-                                    final pLng = place['lng'] as double;
-                                    final dist = (point.latitude - pLat).abs() + (point.longitude - pLng).abs();
-                                    if (dist < minDist && dist < 0.01) { // Within ~1km
-                                      minDist = dist;
-                                      nearestName = 'Near ${place['name']}';
-                                    }
+                            GoogleMap(
+                              initialCameraPosition: CameraPosition(target: selectedLocation, zoom: 14),
+                              onMapCreated: (controller) => googleMapController = controller,
+                              onTap: (point) {
+                                String nearestName = 'Custom Location';
+                                double minDist = double.infinity;
+                                for (final place in allPlaces) {
+                                  final pLat = place['lat'] as double;
+                                  final pLng = place['lng'] as double;
+                                  final dist = (point.latitude - pLat).abs() + (point.longitude - pLng).abs();
+                                  if (dist < minDist && dist < 0.01) {
+                                    minDist = dist;
+                                    nearestName = 'Near ${place['name']}';
                                   }
-                                  setModalState(() {
-                                    selectedLocation = point;
-                                    addressText = nearestName;
-                                    selectedName = nearestName;
-                                    searchController.text = '';
-                                  });
-                                },
-                              ),
-                              children: [
-                                TileLayer(
-                                  urlTemplate: context.isDark
-                                    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                                    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                                  subdomains: const ['a', 'b', 'c', 'd'],
-                                  userAgentPackageName: 'com.myride.app',
+                                }
+                                setModalState(() {
+                                  selectedLocation = point;
+                                  addressText = nearestName;
+                                  selectedName = nearestName;
+                                  searchController.text = '';
+                                });
+                              },
+                              markers: {
+                                if (userLocation != null)
+                                  Marker(
+                                    markerId: const MarkerId('user'),
+                                    position: userLocation!,
+                                    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+                                  ),
+                                Marker(
+                                  markerId: const MarkerId('selected'),
+                                  position: selectedLocation,
+                                  icon: BitmapDescriptor.defaultMarkerWithHue(
+                                    accentColor == AppColors.success ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed,
+                                  ),
                                 ),
-                                MarkerLayer(
-                                  markers: [
-                                    // User's current location (blue dot)
-                                    if (userLocation != null)
-                                      Marker(
-                                        point: userLocation!,
-                                        width: 24,
-                                        height: 24,
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(color: Colors.white, width: 3),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.blue.withValues(alpha: 0.4),
-                                                blurRadius: 8,
-                                                spreadRadius: 2,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    // Selected location marker
-                                    Marker(
-                                      point: selectedLocation,
-                                      width: 60,
-                                      height: 70,
-                                      child: Column(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.all(10),
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                colors: [accentColor, accentColor.withValues(alpha: 0.8)],
-                                                begin: Alignment.topCenter,
-                                                end: Alignment.bottomCenter,
-                                              ),
-                                              borderRadius: BorderRadius.circular(14),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: accentColor.withValues(alpha: 0.5),
-                                                  blurRadius: 12,
-                                                  spreadRadius: 2,
-                                                  offset: const Offset(0, 4),
-                                                ),
-                                              ],
-                                            ),
-                                            child: Icon(Icons.location_on, color: Colors.white, size: 24),
-                                          ),
-                                          Container(
-                                            width: 3,
-                                            height: 12,
-                                            decoration: BoxDecoration(
-                                              color: accentColor,
-                                              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(2)),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                              },
+                              myLocationEnabled: true,
+                              myLocationButtonEnabled: false,
+                              zoomControlsEnabled: false,
+                              mapToolbarEnabled: false,
+                              style: context.isDark ? _darkMapStyle : null,
                             ),
                             // Map Controls
                             Positioned(
@@ -1995,7 +1951,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               child: Column(
                                 children: [
                                   GestureDetector(
-                                    onTap: () => mapController.move(mapController.camera.center, mapController.camera.zoom + 1),
+                                    onTap: () => googleMapController?.animateCamera(CameraUpdate.zoomIn()),
                                     child: Container(
                                       width: 48,
                                       height: 48,
@@ -2009,7 +1965,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   ),
                                   const SizedBox(height: 10),
                                   GestureDetector(
-                                    onTap: () => mapController.move(mapController.camera.center, mapController.camera.zoom - 1),
+                                    onTap: () => googleMapController?.animateCamera(CameraUpdate.zoomOut()),
                                     child: Container(
                                       width: 48,
                                       height: 48,
@@ -2029,7 +1985,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                         userLocation = currentPos;
                                         selectedLocation = currentPos;
                                       });
-                                      mapController.move(currentPos, 16);
+                                      googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(currentPos, 16));
                                     },
                                     child: Container(
                                       width: 48,

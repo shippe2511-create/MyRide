@@ -4,14 +4,24 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import 'chat_screen.dart';
+
+const String _darkMapStyle = '''
+[
+  {"elementType": "geometry", "stylers": [{"color": "#212121"}]},
+  {"elementType": "labels.icon", "stylers": [{"visibility": "off"}]},
+  {"elementType": "labels.text.fill", "stylers": [{"color": "#757575"}]},
+  {"elementType": "labels.text.stroke", "stylers": [{"color": "#212121"}]},
+  {"featureType": "road", "elementType": "geometry.fill", "stylers": [{"color": "#2c2c2c"}]},
+  {"featureType": "water", "elementType": "geometry", "stylers": [{"color": "#000000"}]}
+]
+''';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -2669,7 +2679,7 @@ class _AddPlaceScreen extends StatefulWidget {
 class _AddPlaceScreenState extends State<_AddPlaceScreen> {
   final _nameController = TextEditingController();
   final _searchController = TextEditingController();
-  final _mapController = MapController();
+  GoogleMapController? _mapController;
 
   LatLng _selectedLocation = const LatLng(4.1755, 73.5093); // Male, Maldives
   String _selectedAddress = '';
@@ -2728,11 +2738,11 @@ class _AddPlaceScreenState extends State<_AddPlaceScreen> {
       _searchController.text = place['name'];
       _searchResults = [];
     });
-    _mapController.move(_selectedLocation, 16);
+    _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_selectedLocation, 16));
     HapticFeedback.lightImpact();
   }
 
-  void _onMapTap(TapPosition tapPosition, LatLng point) {
+  void _onMapTap(LatLng point) {
     setState(() {
       _selectedLocation = point;
       _selectedAddress = 'Lat: ${point.latitude.toStringAsFixed(4)}, Lng: ${point.longitude.toStringAsFixed(4)}';
@@ -2746,56 +2756,23 @@ class _AddPlaceScreenState extends State<_AddPlaceScreen> {
       backgroundColor: context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5),
       body: Stack(
         children: [
-          // Map
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _selectedLocation,
-              initialZoom: 14,
-              onTap: _onMapTap,
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: context.isDark ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
+          // Google Map
+          GoogleMap(
+            initialCameraPosition: CameraPosition(target: _selectedLocation, zoom: 14),
+            onMapCreated: (controller) => _mapController = controller,
+            onTap: (point) => _onMapTap(point),
+            markers: {
+              Marker(
+                markerId: const MarkerId('selected'),
+                position: _selectedLocation,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
               ),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: _selectedLocation,
-                    width: 50,
-                    height: 50,
-                    child: Column(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.yellow,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.yellow.withValues(alpha: 0.4),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Icon(Icons.place, color: Colors.black, size: 20),
-                        ),
-                        Container(
-                          width: 3,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: AppColors.yellow,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            },
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            style: context.isDark ? _darkMapStyle : null,
           ),
 
           // Top bar with search

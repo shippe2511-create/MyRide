@@ -262,9 +262,11 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
             _driverLng = position.longitude;
           } else {
             // Use pickup location as fallback
-            final ride = widget.ride;
-            _driverLat = _isValidLat(ride.pickupLat) ? ride.pickupLat - 0.002 : 4.2050;
-            _driverLng = _isValidLng(ride.pickupLng) ? ride.pickupLng - 0.001 : 73.5380;
+            final ride = context.read<DriverState>().currentRide;
+            if (ride != null) {
+              _driverLat = _isValidLat(ride.pickupLat) ? ride.pickupLat - 0.002 : 4.2050;
+              _driverLng = _isValidLng(ride.pickupLng) ? ride.pickupLng - 0.001 : 73.5380;
+            }
           }
         });
       }

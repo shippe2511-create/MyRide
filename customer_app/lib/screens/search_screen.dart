@@ -82,6 +82,7 @@ class _SearchScreenState extends State<SearchScreen> {
         '?input=${Uri.encodeComponent(query)}'
         '&location=4.1755,73.5093'
         '&radius=100000'
+        '&strictbounds=true'
         '&components=country:mv'
         '&key=$_googleApiKey'
       );

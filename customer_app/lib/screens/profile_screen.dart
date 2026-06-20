@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
@@ -3072,6 +3073,7 @@ class _AddressPickerScreenState extends State<_AddressPickerScreen> {
   LatLng _selectedLocation = const LatLng(4.1755, 73.5093);
   String _selectedAddress = '';
   bool _isSearching = false;
+  bool _isLoadingLocation = true;
   List<Map<String, dynamic>> _searchResults = [];
   Timer? _debounce;
 
@@ -3083,6 +3085,39 @@ class _AddressPickerScreenState extends State<_AddressPickerScreen> {
     _selectedAddress = widget.initialAddress;
     if (widget.initialAddress.isNotEmpty) {
       _searchController.text = widget.initialAddress;
+    }
+    _getCurrentLocation();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        await Geolocator.requestPermission();
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+
+      // Only use location if in Maldives bounds
+      if (mounted) {
+        if (position.latitude >= -1 && position.latitude <= 8 &&
+            position.longitude >= 72 && position.longitude <= 74) {
+          setState(() {
+            _selectedLocation = LatLng(position.latitude, position.longitude);
+            _isLoadingLocation = false;
+          });
+          _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_selectedLocation, 16));
+        } else {
+          setState(() => _isLoadingLocation = false);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error getting location: $e');
+      if (mounted) {
+        setState(() => _isLoadingLocation = false);
+      }
     }
   }
 

@@ -48,9 +48,7 @@ class _RecurringRidesScreenState extends State<RecurringRidesScreen> {
     if (parts.length < 2) return time;
     final hour = int.tryParse(parts[0]) ?? 0;
     final minute = parts[1];
-    final period = hour >= 12 ? 'PM' : 'AM';
-    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-    return '$displayHour:$minute $period';
+    return '${hour.toString().padLeft(2, '0')}:$minute';
   }
 
   Future<void> _toggleRide(String id, bool currentActive) async {
@@ -491,7 +489,7 @@ class _AddRecurringRideSheetState extends State<AddRecurringRideSheet> {
                     Icon(Icons.schedule, color: AppColors.yellow),
                     const SizedBox(width: 12),
                     Text(
-                      _selectedTime.format(context),
+                      '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}',
                       style: TextStyle(color: context.textColor, fontSize: 16, fontWeight: FontWeight.w600),
                     ),
                     const Spacer(),

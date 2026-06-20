@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
@@ -1708,8 +1709,22 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<Map<String, dynamic>?> _showLocationPicker(BuildContext context, String title, Color accentColor, bool isDark) async {
-    LatLng selectedLocation = const LatLng(4.1755, 73.5093);
+    LatLng selectedLocation = const LatLng(4.1755, 73.5093); // Default: Malé
     GoogleMapController? googleMapController;
+
+    // Get current location (only use if in Maldives)
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      // Check if location is in Maldives bounds (roughly -1 to 8 lat, 72 to 74 lng)
+      if (position.latitude >= -1 && position.latitude <= 8 &&
+          position.longitude >= 72 && position.longitude <= 74) {
+        selectedLocation = LatLng(position.latitude, position.longitude);
+      }
+    } catch (e) {
+      debugPrint('Error getting location: $e');
+    }
     final searchController = TextEditingController();
     String addressText = '';
     String selectedName = '';

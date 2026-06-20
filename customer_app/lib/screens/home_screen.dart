@@ -1204,17 +1204,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final isToday = time.day == now.day && time.month == now.month && time.year == now.year;
     final isTomorrow = time.day == now.day + 1 && time.month == now.month && time.year == now.year;
 
-    final hour = time.hour > 12 ? time.hour - 12 : time.hour;
-    final period = time.hour >= 12 ? 'PM' : 'AM';
+    final hour = time.hour.toString().padLeft(2, '0');
     final minute = time.minute.toString().padLeft(2, '0');
 
     if (isToday) {
-      return 'Today $hour:$minute $period';
+      return 'Today $hour:$minute';
     } else if (isTomorrow) {
-      return 'Tomorrow $hour:$minute $period';
+      return 'Tomorrow $hour:$minute';
     } else {
       final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return '${time.day} ${months[time.month - 1]} $hour:$minute $period';
+      return '${time.day} ${months[time.month - 1]} $hour:$minute';
     }
   }
 
@@ -1534,7 +1533,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   Text('TIME', style: TextStyle(color: context.mutedColor, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
                                   const SizedBox(height: 2),
                                   Text(
-                                    '${selectedTime.hour > 12 ? selectedTime.hour - 12 : (selectedTime.hour == 0 ? 12 : selectedTime.hour)}:${selectedTime.minute.toString().padLeft(2, '0')} ${selectedTime.hour >= 12 ? 'PM' : 'AM'}',
+                                    '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}',
                                     style: TextStyle(color: context.textColor, fontSize: 15, fontWeight: FontWeight.w700),
                                   ),
                                 ],

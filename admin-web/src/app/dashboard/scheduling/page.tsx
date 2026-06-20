@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
-  Plus, Bus, Ship, Loader2, Clock, MapPin, RefreshCw, MoreHorizontal, Pencil, Trash2, X
+  Plus, Bus, Ship, Loader2, Clock, MapPin, RefreshCw, MoreHorizontal, Pencil, Trash2, X, Upload, Image, FileText
 } from "lucide-react"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -30,6 +30,8 @@ import {
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
+import { Label } from "@/components/ui/label"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 interface TransportRoute {
   id: string
@@ -37,6 +39,7 @@ interface TransportRoute {
   route_name: string
   route_code: string | null
   direction: string
+  stops: string[]
   is_active: boolean
   schedules?: { departure_time: string; days_of_week: string[] }[]
 }
@@ -56,6 +59,7 @@ export default function SchedulingPage() {
     route_name: "",
     route_code: "",
     direction: "outbound",
+    stops: "",
     is_active: true,
   })
   const [editingRoute, setEditingRoute] = useState<TransportRoute | null>(null)
@@ -64,6 +68,18 @@ export default function SchedulingPage() {
   const [schedules, setSchedules] = useState<{ id: string; departure_time: string; days_of_week: string[]; is_active: boolean }[]>([])
   const [newTime, setNewTime] = useState("")
   const [newDays, setNewDays] = useState<string[]>(["Mon", "Tue", "Wed", "Thu", "Fri"])
+
+  // Import states
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [importStep, setImportStep] = useState<"upload" | "review">("upload")
+  const [importImage, setImportImage] = useState<string | null>(null)
+  const [extracting, setExtracting] = useState(false)
+  const [extractedTimes, setExtractedTimes] = useState<string[]>([])
+  const [routeName, setRouteName] = useState("")
+  const [routeCode, setRouteCode] = useState("")
+  const [routeDirection, setRouteDirection] = useState("outbound")
+  const [routeStops, setRouteStops] = useState("")
+  const [importSaving, setImportSaving] = useState(false)
 
   useEffect(() => {
     loadRoutes()
@@ -88,11 +104,13 @@ export default function SchedulingPage() {
 
     setDialogOpen(false)
     setSaving(true)
+    const stopsArray = formData.stops ? formData.stops.split(',').map(s => s.trim()).filter(s => s) : []
     const { data, error } = await supabase.from("transport_routes").insert({
       transport_type: formData.transport_type,
       route_name: formData.route_name,
       route_code: formData.route_code || null,
       direction: formData.direction,
+      stops: stopsArray,
       is_active: formData.is_active,
     }).select().single()
 
@@ -100,7 +118,7 @@ export default function SchedulingPage() {
       toast.error("Failed to create route")
     } else {
       toast.success("Route created")
-      setFormData({ transport_type: activeTab, route_name: "", route_code: "", direction: "outbound", is_active: true })
+      setFormData({ transport_type: activeTab, route_name: "", route_code: "", direction: "outbound", stops: "", is_active: true })
       if (data) setRoutes(prev => [...prev, data])
     }
     setSaving(false)
@@ -116,6 +134,7 @@ export default function SchedulingPage() {
       route_name: routeToUpdate.route_name,
       route_code: routeToUpdate.route_code,
       direction: routeToUpdate.direction,
+      stops: routeToUpdate.stops || [],
       is_active: routeToUpdate.is_active,
     }).eq("id", routeToUpdate.id)
 
@@ -195,6 +214,143 @@ export default function SchedulingPage() {
     }
   }
 
+  // Handle image upload
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImportImage(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  // Extract times from image using Tesseract OCR
+  const extractTimesFromImage = async () => {
+    if (!importImage) return
+
+    setExtracting(true)
+    try {
+      const Tesseract = (await import('tesseract.js')).default
+
+      const result = await Tesseract.recognize(importImage, 'eng', {
+        logger: () => {}
+      })
+
+      const text = result.data.text
+
+      // Extract all times in HH:MM format
+      const timePattern = /\b([0-2]?[0-9]):([0-5][0-9])\b/g
+      const matches = text.match(timePattern) || []
+
+      // Normalize and dedupe
+      const normalized = matches.map(t => {
+        const [h, m] = t.split(':')
+        return `${h.padStart(2, '0')}:${m}`
+      })
+      const uniqueTimes = [...new Set(normalized)].sort()
+
+      if (uniqueTimes.length === 0) {
+        toast.error("No times found in image. Try a clearer image.")
+      } else {
+        setExtractedTimes(uniqueTimes)
+        setImportStep("review")
+        toast.success(`Found ${uniqueTimes.length} times - please review`)
+      }
+    } catch (error) {
+      console.error("OCR Error:", error)
+      toast.error("Failed to read image")
+    }
+    setExtracting(false)
+  }
+
+  // Remove a time from extracted list
+  const removeExtractedTime2 = (time: string) => {
+    setExtractedTimes(prev => prev.filter(t => t !== time))
+  }
+
+  // Add a time manually
+  const addTimeManually = (time: string) => {
+    if (time && !extractedTimes.includes(time)) {
+      setExtractedTimes(prev => [...prev, time].sort())
+    }
+  }
+
+  // Save the route with extracted times
+  const saveExtractedRoute = async () => {
+    if (!routeName) {
+      toast.error("Please enter route name")
+      return
+    }
+    if (extractedTimes.length === 0) {
+      toast.error("No times to save")
+      return
+    }
+
+    setImportSaving(true)
+    try {
+      // Create route
+      const { data: newRoute, error: routeError } = await supabase
+        .from("transport_routes")
+        .insert({
+          transport_type: activeTab,
+          route_name: routeName,
+          route_code: routeCode || null,
+          direction: routeDirection,
+          stops: routeStops ? routeStops.split(',').map(s => s.trim()).filter(s => s) : [],
+          is_active: true,
+        })
+        .select()
+        .single()
+
+      if (routeError) {
+        console.error("Route error:", routeError)
+        toast.error(`Route error: ${routeError.message}`)
+        setImportSaving(false)
+        return
+      }
+
+      // Add all times (format as HH:MM:SS for postgres time type)
+      const scheduleInserts = extractedTimes.map(time => ({
+        route_id: newRoute.id,
+        departure_time: `${time}:00`,
+        days_of_week: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        is_active: true,
+      }))
+
+      const { error: scheduleError } = await supabase
+        .from("route_schedules")
+        .insert(scheduleInserts)
+
+      if (scheduleError) {
+        console.error("Schedule error:", scheduleError)
+        toast.error(`Schedule error: ${scheduleError.message}`)
+        setImportSaving(false)
+        return
+      }
+
+      toast.success(`Created route with ${extractedTimes.length} times`)
+      resetImportDialog()
+      loadRoutes()
+    } catch (error: unknown) {
+      console.error("Save error:", error)
+      toast.error(`Failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+    setImportSaving(false)
+  }
+
+  const resetImportDialog = () => {
+    setImportDialogOpen(false)
+    setImportStep("upload")
+    setImportImage(null)
+    setExtractedTimes([])
+    setRouteName("")
+    setRouteCode("")
+    setRouteDirection("outbound")
+    setRouteStops("")
+  }
+
   const filteredRoutes = routes.filter(r => r.transport_type === activeTab)
 
   const stats = {
@@ -228,6 +384,10 @@ export default function SchedulingPage() {
           <Button variant="outline" size="sm" onClick={() => loadRoutes()}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setImportDialogOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            Import from Image
           </Button>
           <Button size="sm" onClick={() => { setFormData({ ...formData, transport_type: activeTab }); setDialogOpen(true) }}>
             <Plus className="h-4 w-4 mr-2" />
@@ -382,6 +542,15 @@ export default function SchedulingPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <label className="text-sm font-medium">Stops</label>
+              <Input
+                value={formData.stops}
+                onChange={e => setFormData({ ...formData, stops: e.target.value })}
+                placeholder="e.g., Water Supply, New Cargo, IT, Corporate Office"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Separate stops with commas</p>
+            </div>
             <div className="flex items-center gap-2">
               <Checkbox
                 checked={formData.is_active}
@@ -435,9 +604,20 @@ export default function SchedulingPage() {
                   <SelectContent>
                     <SelectItem value="outbound">Outbound</SelectItem>
                     <SelectItem value="inbound">Inbound</SelectItem>
-                    <SelectItem value="round">Round Trip</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Stops</label>
+                <Input
+                  value={editingRoute.stops?.join(', ') || ''}
+                  onChange={(e) => setEditingRoute({
+                    ...editingRoute,
+                    stops: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                  })}
+                  placeholder="e.g., Water Supply, New Cargo, IT"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Separate stops with commas</p>
               </div>
               <div className="flex items-center gap-2">
                 <Checkbox
@@ -557,6 +737,196 @@ export default function SchedulingPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setTimesRoute(null)}>Close</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import from Image Dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={(open) => { if (!open) resetImportDialog() }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Image className="h-5 w-5" />
+              {importStep === "upload" ? "Import Schedule from Image" : "Review Extracted Times"}
+            </DialogTitle>
+          </DialogHeader>
+
+          {importStep === "upload" ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Upload a schedule image. Times will be extracted automatically for you to review.
+              </p>
+
+              {!importImage ? (
+                <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                  <Upload className="h-10 w-10 text-muted-foreground mb-3" />
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-semibold">Click to upload</span> schedule image
+                  </p>
+                  <p className="text-xs text-muted-foreground">PNG, JPG</p>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                  />
+                </label>
+              ) : (
+                <div className="space-y-3">
+                  <div className="relative border rounded-lg overflow-hidden">
+                    <img
+                      src={importImage}
+                      alt="Schedule"
+                      className="w-full max-h-64 object-contain bg-muted"
+                    />
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 right-2 h-8 w-8"
+                      onClick={() => setImportImage(null)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <DialogFooter>
+                <Button variant="outline" onClick={resetImportDialog}>Cancel</Button>
+                <Button onClick={extractTimesFromImage} disabled={!importImage || extracting}>
+                  {extracting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Extracting...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Extract Times
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Route Info */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-xs">Route Name *</Label>
+                  <Input
+                    value={routeName}
+                    onChange={(e) => setRouteName(e.target.value)}
+                    placeholder="e.g., R1 - Route One"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Route Code</Label>
+                  <Input
+                    value={routeCode}
+                    onChange={(e) => setRouteCode(e.target.value)}
+                    placeholder="e.g., R1"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Direction</Label>
+                  <Select value={routeDirection} onValueChange={setRouteDirection}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="outbound">Outbound</SelectItem>
+                      <SelectItem value="inbound">Inbound</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Stops */}
+              <div>
+                <Label className="text-xs">Stops (comma-separated)</Label>
+                <Input
+                  value={routeStops}
+                  onChange={(e) => setRouteStops(e.target.value)}
+                  placeholder="e.g., Water Supply, New Cargo, IT, Corporate Office, Domestic"
+                  className="mt-1"
+                />
+              </div>
+
+              {/* Extracted Times */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-sm font-medium">
+                    Extracted Times ({extractedTimes.length})
+                  </Label>
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      type="time"
+                      id="add-time-manual"
+                      className="w-28 h-8 text-sm"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const input = document.getElementById("add-time-manual") as HTMLInputElement
+                        if (input?.value) {
+                          addTimeManually(input.value)
+                          input.value = ""
+                        }
+                      }}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Click on a time to remove it. Add missing times with the picker above.
+                </p>
+                <ScrollArea className="h-[200px] border rounded-lg p-3">
+                  <div className="flex flex-wrap gap-1.5">
+                    {extractedTimes.map((time) => (
+                      <Badge
+                        key={time}
+                        variant="secondary"
+                        className="cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                        onClick={() => removeExtractedTime2(time)}
+                      >
+                        {time}
+                        <X className="h-3 w-3 ml-1" />
+                      </Badge>
+                    ))}
+                    {extractedTimes.length === 0 && (
+                      <p className="text-sm text-muted-foreground">No times. Add manually using the picker above.</p>
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setImportStep("upload")}>
+                  Back
+                </Button>
+                <Button
+                  onClick={saveExtractedRoute}
+                  disabled={!routeName || extractedTimes.length === 0 || importSaving}
+                >
+                  {importSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Route ({extractedTimes.length} times)
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

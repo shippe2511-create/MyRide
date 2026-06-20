@@ -730,8 +730,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     final parts = time.split(':');
     final hour = int.tryParse(parts[0]) ?? 0;
     final minute = int.tryParse(parts[1]) ?? 0;
-    final period = hour >= 12 ? 'PM' : 'AM';
-    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+    final displayHour = hour.toString().padLeft(2, '0');
+    final displayMinute = minute.toString().padLeft(2, '0');
 
     // Calculate minutes until departure
     final nowMinutes = now.hour * 60 + now.minute;
@@ -794,7 +794,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '$displayHour:${minute.toString().padLeft(2, '0')} $period',
+                  '$displayHour:$displayMinute',
                   style: TextStyle(
                     color: context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5),
                     fontSize: 28,
@@ -900,16 +900,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     final timeParts = time.split(':');
     final hour = int.tryParse(timeParts[0]) ?? 0;
     final minute = int.tryParse(timeParts[1]) ?? 0;
-    final period = hour >= 12 ? 'PM' : 'AM';
-    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-    final displayTime = '$displayHour:${minute.toString().padLeft(2, '0')}';
+    final displayTime = '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
 
     final now = TimeOfDay.now();
     final isPast = hour < now.hour || (hour == now.hour && minute < now.minute);
 
     final trip = {
       'time': displayTime,
-      'period': period,
+      'hour': hour,
+      'minute': minute,
       'route': route['route_name'] ?? '',
       'duration': '${route['duration_minutes'] ?? 0} min',
       'type': _selectedType,
@@ -950,26 +949,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                     color: isPast ? context.bgColor.withValues(alpha: 0.5) : context.bgColor,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        displayTime,
-                        style: TextStyle(
-                          color: isPast ? context.mutedColor : context.textColor,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
+                  child: Center(
+                    child: Text(
+                      displayTime,
+                      style: TextStyle(
+                        color: isPast ? context.mutedColor : context.textColor,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
                       ),
-                      Text(
-                        period,
-                        style: TextStyle(
-                          color: context.mutedColor,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -1074,7 +1062,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                         Row(
                           children: [
                             Text(
-                              '${tripStr['time']} ${tripStr['period']}',
+                              tripStr['time']!,
                               style: TextStyle(color: AppColors.yellow, fontSize: 15, fontWeight: FontWeight.w600),
                             ),
                             const SizedBox(width: 12),
@@ -1096,29 +1084,31 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(16),
+              if (tripStr['stops']?.isNotEmpty == true) ...[
+                const SizedBox(height: 20),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.route, color: AppColors.yellow, size: 16),
+                          const SizedBox(width: 8),
+                          Text('Route Stops', style: TextStyle(color: context.mutedColor, fontSize: 13, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildStopsVisualization(tripStr['stops']!, isDark),
+                    ],
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.route, color: AppColors.yellow, size: 16),
-                        const SizedBox(width: 8),
-                        Text('Route Stops', style: TextStyle(color: context.mutedColor, fontSize: 13, fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildStopsVisualization(tripStr['stops']!, isDark),
-                  ],
-                ),
-              ),
+              ],
               const SizedBox(height: 20),
               Row(
                 children: [
@@ -1258,7 +1248,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
               ),
               const SizedBox(height: 8),
               Text(
-                'Get notified before ${trip['time']} ${trip['period']} departure',
+                'Get notified before ${trip['time']} departure',
                 style: TextStyle(color: context.mutedColor, fontSize: 14),
               ),
               const SizedBox(height: 24),
@@ -1322,13 +1312,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     );
   }
 
-  void _confirmReminder(Map<String, String> trip, int minutesBefore) {
-    final timeParts = trip['time']!.split(':');
-    var hour = int.parse(timeParts[0]);
-    final minute = timeParts.length > 1 ? int.parse(timeParts[1]) : 0;
-
-    if (trip['period'] == 'PM' && hour != 12) hour += 12;
-    if (trip['period'] == 'AM' && hour == 12) hour = 0;
+  void _confirmReminder(Map<String, dynamic> trip, int minutesBefore) {
+    final hour = trip['hour'] as int? ?? 0;
+    final minute = trip['minute'] as int? ?? 0;
 
     final now = DateTime.now();
     var scheduledTime = DateTime(now.year, now.month, now.day, hour, minute);
@@ -1341,7 +1327,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     appState.addReminder({
       'route': trip['route'],
       'time': trip['time'],
-      'period': trip['period'],
       'stops': trip['stops'],
       'datetime': scheduledTime,
       'reminderMinutes': minutesBefore,
@@ -1350,7 +1335,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     NotificationService().scheduleRideReminder(
       id: scheduledTime.millisecondsSinceEpoch ~/ 1000,
       route: trip['route']!,
-      time: '${trip['time']} ${trip['period']}',
+      time: trip['time']!,
       scheduledTime: scheduledTime,
       minutesBefore: minutesBefore,
     );
@@ -1373,16 +1358,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     );
   }
 
-  void _addToCalendar(BuildContext ctx, Map<String, String> trip) {
+  void _addToCalendar(BuildContext ctx, Map<String, dynamic> trip) {
     HapticFeedback.mediumImpact();
     Navigator.pop(ctx);
 
-    final timeParts = trip['time']!.split(':');
-    var hour = int.parse(timeParts[0]);
-    final minute = timeParts.length > 1 ? int.parse(timeParts[1]) : 0;
-
-    if (trip['period'] == 'PM' && hour != 12) hour += 12;
-    if (trip['period'] == 'AM' && hour == 12) hour = 0;
+    final hour = trip['hour'] as int? ?? 0;
+    final minute = trip['minute'] as int? ?? 0;
 
     final now = DateTime.now();
     var startTime = DateTime(now.year, now.month, now.day, hour, minute);

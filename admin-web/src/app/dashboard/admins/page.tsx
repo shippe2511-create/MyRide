@@ -23,7 +23,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Plus, Shield, Loader2, RefreshCw, Pencil, Trash2, MoreHorizontal, KeyRound, Eye, EyeOff, Info, Settings2 } from "lucide-react"
+import { Plus, Shield, Loader2, RefreshCw, Pencil, Trash2, MoreHorizontal, KeyRound, Eye, EyeOff, Info, Settings2, Download } from "lucide-react"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -302,6 +302,28 @@ export default function AdminsPage() {
     return new Date(date).toLocaleDateString("en-US", { timeZone: "Indian/Maldives", month: "short", day: "numeric", year: "numeric" })
   }
 
+  const exportCSV = () => {
+    const headers = ["Name", "Email", "Phone", "Role", "Status", "Created At"]
+    const rows = admins.map(a => [
+      a.full_name,
+      a.email || "",
+      a.phone || "",
+      a.role,
+      a.status,
+      formatDate(a.created_at)
+    ])
+
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `admins_${new Date().toISOString().split("T")[0]}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    toast.success("Admins exported")
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -328,6 +350,10 @@ export default function AdminsPage() {
           <p className="text-sm text-muted-foreground">Manage admin users and access</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={exportCSV}>
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
           <Button variant="outline" size="sm" onClick={loadAdmins}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh

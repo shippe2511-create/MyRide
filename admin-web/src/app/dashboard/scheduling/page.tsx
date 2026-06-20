@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
-  Plus, Bus, Ship, Loader2, Clock, MapPin, RefreshCw, MoreHorizontal, Pencil, Trash2, X, Upload, Image, FileText, GripVertical
+  Plus, Bus, Ship, Loader2, Clock, MapPin, RefreshCw, MoreHorizontal, Pencil, Trash2, X, Upload, Image, FileText, GripVertical, Download
 } from "lucide-react"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -358,6 +358,28 @@ export default function SchedulingPage() {
     active: filteredRoutes.filter(r => r.is_active).length,
   }
 
+  const exportCSV = () => {
+    const headers = ["Route Name", "Code", "Direction", "Stops", "Status", "Type"]
+    const rows = filteredRoutes.map(r => [
+      r.route_name,
+      r.route_code || "",
+      r.direction,
+      r.stops.join(" > "),
+      r.is_active ? "Active" : "Inactive",
+      r.transport_type
+    ])
+
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `schedules_${activeTab}_${new Date().toISOString().split("T")[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success("Schedules exported")
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -381,6 +403,10 @@ export default function SchedulingPage() {
           <p className="text-sm text-muted-foreground">Manage transport routes and schedules</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={exportCSV}>
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
           <Button variant="outline" size="sm" onClick={() => loadRoutes()}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh

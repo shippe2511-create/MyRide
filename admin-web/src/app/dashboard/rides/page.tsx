@@ -21,7 +21,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
-  MapPin, Clock, CheckCircle, XCircle, Search, Loader2, RefreshCw, Car, MoreVertical, Edit, Trash2, TrendingUp, ChevronLeft, ChevronRight
+  MapPin, Clock, CheckCircle, XCircle, Search, Loader2, RefreshCw, Car, MoreVertical, Edit, Trash2, TrendingUp, ChevronLeft, ChevronRight, Download
 } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -197,6 +197,30 @@ export default function RidesPage() {
     )
   })
 
+  const exportToCSV = () => {
+    const headers = ["ID", "Customer", "Pickup", "Dropoff", "Status", "Date", "Duration (min)", "Distance (km)"]
+    const rows = filteredRides.map(ride => [
+      ride.id,
+      ride.customer?.full_name || "N/A",
+      ride.pickup_name,
+      ride.dropoff_name,
+      ride.status,
+      new Date(ride.created_at).toLocaleString(),
+      ride.duration_minutes || "",
+      ride.distance_km || ""
+    ])
+
+    const csvContent = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n")
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `rides_export_${new Date().toISOString().split("T")[0]}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    toast.success("Rides exported successfully")
+  }
+
   const totalPages = Math.ceil(filteredRides.length / pageSize)
   const paginatedRides = filteredRides.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
@@ -228,10 +252,16 @@ export default function RidesPage() {
           <h1 className="text-2xl font-bold">Rides</h1>
           <p className="text-sm text-muted-foreground">Monitor and manage all rides</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => loadData(true)}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={exportToCSV}>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => loadData(true)}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3 grid-cols-2 md:grid-cols-4">

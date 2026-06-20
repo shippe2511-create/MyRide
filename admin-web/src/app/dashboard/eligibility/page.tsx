@@ -18,7 +18,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
-import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Zap, Calendar, Clock } from "lucide-react"
+import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Zap, Calendar, Clock, Download } from "lucide-react"
 import { formatDate } from "@/lib/utils"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
@@ -170,6 +170,29 @@ export default function EligibilityPage() {
     }
   }
 
+  const exportCSV = () => {
+    const headers = ["Name", "Max/Day", "Max/Week", "Start Time", "End Time", "Status", "Created At"]
+    const rows = campaigns.map(c => [
+      c.name,
+      c.max_rides_per_day || "Unlimited",
+      c.max_rides_per_week || "Unlimited",
+      c.allowed_start_time || "Any",
+      c.allowed_end_time || "Any",
+      c.is_active ? "Active" : "Inactive",
+      formatDate(c.created_at)
+    ])
+
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `eligibility_campaigns_${new Date().toISOString().split("T")[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success("Campaigns exported")
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -197,10 +220,16 @@ export default function EligibilityPage() {
             Manage ride limits, time restrictions, and eligibility rules
           </p>
         </div>
-        <Button onClick={openAddDialog}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Campaign
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportCSV}>
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+          <Button onClick={openAddDialog}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Campaign
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3 grid-cols-3">

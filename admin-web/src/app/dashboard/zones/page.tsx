@@ -18,7 +18,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
-import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Map } from "lucide-react"
+import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Map, Download } from "lucide-react"
 import { formatDate } from "@/lib/utils"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
@@ -203,6 +203,27 @@ export default function ZonesPage() {
     setSaving(false)
   }
 
+  const exportCSV = () => {
+    const headers = ["Name", "Type", "Priority", "Status", "Created At"]
+    const rows = zones.map(z => [
+      z.name,
+      z.zone_type,
+      z.priority,
+      z.is_active ? "Active" : "Inactive",
+      new Date(z.created_at).toLocaleDateString()
+    ])
+
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `zones_${new Date().toISOString().split("T")[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success("Zones exported")
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -230,10 +251,16 @@ export default function ZonesPage() {
             Define pickup/dropoff areas and coverage boundaries
           </p>
         </div>
-        <Button onClick={() => openZoneDialog()}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Zone
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportCSV}>
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+          <Button onClick={() => openZoneDialog()}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Zone
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3 grid-cols-3">

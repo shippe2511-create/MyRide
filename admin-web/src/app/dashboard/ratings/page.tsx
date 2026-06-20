@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
-import { Star, Search, TrendingUp, TrendingDown, AlertTriangle, Loader2, Car, Phone, MapPin, Calendar, CheckCircle2, XCircle, Clock, Award, Zap, Target, Activity, Trophy, Medal, Crown } from "lucide-react"
+import { Star, Search, TrendingUp, TrendingDown, AlertTriangle, Loader2, Car, Phone, MapPin, Calendar, CheckCircle2, XCircle, Clock, Award, Zap, Target, Activity, Trophy, Medal, Crown, Download } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { formatDate } from "@/lib/utils"
@@ -457,6 +457,29 @@ export default function RatingsPage() {
     return matchesSearch
   })
 
+  const exportCSV = () => {
+    const headers = ["Driver", "Rating", "Total Ratings", "5 Star", "4 Star", "3 Star", "2 Star", "1 Star"]
+    const rows = filteredDrivers.map(d => [
+      d.full_name,
+      d.avg_rating.toFixed(1),
+      d.total_ratings,
+      d.rating_breakdown[5] || 0,
+      d.rating_breakdown[4] || 0,
+      d.rating_breakdown[3] || 0,
+      d.rating_breakdown[2] || 0,
+      d.rating_breakdown[1] || 0
+    ])
+
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `driver_ratings_${new Date().toISOString().split("T")[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -474,14 +497,20 @@ export default function RatingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Star className="h-6 w-6 text-yellow-500" />
-          Driver Ratings
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Monitor driver performance and customer feedback
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Star className="h-6 w-6 text-yellow-500" />
+            Driver Ratings
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Monitor driver performance and customer feedback
+          </p>
+        </div>
+        <Button variant="outline" onClick={exportCSV}>
+          <Download className="mr-2 h-4 w-4" />
+          Export
+        </Button>
       </div>
 
       <div className="grid gap-3 grid-cols-2 md:grid-cols-4">

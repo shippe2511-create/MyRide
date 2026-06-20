@@ -18,7 +18,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ComboboxInput } from "@/components/ui/combobox-input"
-import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Car, Bus, Truck, Bike, Ship, GripVertical } from "lucide-react"
+import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Car, Bus, Truck, Bike, Ship, GripVertical, Download } from "lucide-react"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -235,6 +235,28 @@ export default function VehiclesPage() {
 
   const activeCount = vehicles.filter(v => v.is_active).length
 
+  const exportCSV = () => {
+    const headers = ["Name", "Display Name", "Plate No", "Capacity", "Status", "Created At"]
+    const rows = vehicles.map(v => [
+      v.name,
+      v.display_name,
+      v.plate_no || "",
+      v.capacity,
+      v.is_active ? "Active" : "Inactive",
+      new Date(v.created_at).toLocaleDateString()
+    ])
+
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `vehicles_${new Date().toISOString().split("T")[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success("Vehicles exported")
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -267,6 +289,10 @@ export default function VehiclesPage() {
             <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
             Synced to Apps
           </Badge>
+          <Button variant="outline" onClick={exportCSV}>
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
           <Button onClick={openAddDialog}>
             <Plus className="mr-2 h-4 w-4" />
             Add Vehicle Type

@@ -251,4 +251,31 @@ Fixed:
 
 ---
 
-*Updated by Nova on 2026-06-19*
+### 36. Real-time Driver Location Tracking - FIXED (2026-06-20)
+- **Issue:** Customer app used fake driver simulation instead of real location updates
+- **Fix:** 
+  - Subscribe to `driver_locations` table via Supabase Realtime
+  - Removed `_startDriverSimulation()` fake movement code
+  - Added `_subscribeToDriverLocation()` with proper channel subscription
+  - Fetch initial driver location on screen load
+
+### 37. Driver Name Not Showing in Customer App - FIXED (2026-06-20)
+- **Issue:** Driver name showed as "Driver" instead of actual name
+- **Fix:**
+  - Added `driverId` to the flow: matching → arriving → tracking screens
+  - Fetch driver name from ride data with fallback
+  - Added `_driverName` state variable to track throughout trip
+
+### 38. iOS 26.5 App Crash (comes and goes) - FIXED (2026-06-20)
+- **Issue:** Both Flutter apps crashed on iOS 26.5 (white screen, app comes and goes)
+- **Cause:** Flutter stable 3.44.2 incompatible with iOS 26.5
+- **Fix:** Upgraded to Flutter beta 3.45.0
+- **Note:** Must use Flutter beta channel until stable gets iOS 26.5 support
+
+### 39. App Icons Reverted to Flutter Default - FIXED (2026-06-20)
+- **Issue:** Both apps showed Flutter logo instead of MyRide icons
+- **Fix:** Regenerated icons using `dart run flutter_launcher_icons`
+
+---
+
+*Updated by Nova on 2026-06-20*

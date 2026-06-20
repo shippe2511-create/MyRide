@@ -274,6 +274,7 @@ class AppState extends ChangeNotifier {
       SupabaseService.setProfileId(_profileId);
       loadEmergencyContactsFromProfile();
       loadTripHistory();
+      loadSavedAddresses();
       // Fetch latest avatar URL from DB
       _loadAvatarFromDb();
       // Subscribe to profile updates from admin
@@ -366,8 +367,8 @@ class AppState extends ChangeNotifier {
   }
 
   // Saved addresses
-  String _homeAddress = '21 Marina Walk, Block C';
-  String _workAddress = 'One Central Tower, 14F';
+  String _homeAddress = '';
+  String _workAddress = '';
 
   String get homeAddress => _homeAddress;
   String get workAddress => _workAddress;
@@ -380,6 +381,25 @@ class AppState extends ChangeNotifier {
   void updateWorkAddress(String address) {
     _workAddress = address;
     notifyListeners();
+  }
+
+  Future<void> loadSavedAddresses() async {
+    if (_profileId == null) return;
+    try {
+      final places = await SupabaseService.getSavedPlaces();
+      for (final place in places) {
+        final name = (place['name'] as String?)?.toLowerCase() ?? '';
+        final address = place['address'] as String? ?? '';
+        if (name == 'home' && address.isNotEmpty) {
+          _homeAddress = address;
+        } else if (name == 'work' && address.isNotEmpty) {
+          _workAddress = address;
+        }
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading saved addresses: $e');
+    }
   }
 
   // Trip history (loaded from database)

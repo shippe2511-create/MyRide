@@ -104,6 +104,13 @@ Never scaffold or regenerate code that already exists. When unsure, inspect the 
 - **UI/UX polish** — Added shimmer loading, break timer, onboarding tooltips, Lottie animations
 - **Code cleanup** — Removed ~170 lines of dead code from driver_app
 
+### 2026-06-20
+- **Flutter beta 3.45.0** — Upgraded from stable 3.44.2 for iOS 26.5 compatibility
+- **Real-time driver tracking** — Customer app now subscribes to `driver_locations` via Supabase Realtime
+- **Driver name fix** — Pass `driverId` through ride flow, fetch name from ride data
+- **App icons regenerated** — Used `flutter_launcher_icons` to restore MyRide branding
+- **Cleaned 5GB cache** — Removed Xcode DerivedData, Gradle caches
+
 ---
 
-*Updated by Nova on 2026-06-19*
+*Updated by Nova on 2026-06-20*

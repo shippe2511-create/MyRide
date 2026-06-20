@@ -543,11 +543,12 @@ class SupabaseService {
 
       final driverIds = (drivers as List).map((d) => d['id'] as String).toList();
 
-      // Get their locations
+      // Get their locations (also check is_online in driver_locations for extra safety)
       final response = await client
           .from('driver_locations')
-          .select('lat, lng, heading, speed, driver_id')
-          .inFilter('driver_id', driverIds);
+          .select('latitude, longitude, heading, speed, driver_id')
+          .inFilter('driver_id', driverIds)
+          .eq('is_online', true);
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {

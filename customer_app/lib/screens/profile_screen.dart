@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:http/http.dart' as http;
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
@@ -819,6 +822,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildSavedPlaceEditable(String name, String address, IconData icon, VoidCallback onTap) {
+    final hasAddress = address.isNotEmpty && address != name;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -833,7 +837,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(name, style: TextStyle(color: context.textColor, fontSize: 15, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 2),
-                Text(address, style: TextStyle(color: context.mutedColor, fontSize: 13)),
+                Text(
+                  hasAddress ? address : 'Add address',
+                  style: TextStyle(
+                    color: hasAddress ? context.mutedColor : AppColors.yellow,
+                    fontSize: 13,
+                    fontWeight: hasAddress ? FontWeight.normal : FontWeight.w500,
+                  ),
+                ),
               ]),
             ),
             Icon(Icons.edit, color: context.mutedColor, size: 18),
@@ -844,67 +855,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _editPlace(BuildContext context, String name, String currentAddress, AppState appState) {
-    final controller = TextEditingController(text: currentAddress);
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(color: context.surfaceColor, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(width: 40, height: 4, decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2))),
-              const SizedBox(height: 24),
-              Text('Edit $name Address', style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 20),
-              Container(
-                decoration: BoxDecoration(color: context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5), borderRadius: BorderRadius.circular(14), border: Border.all(color: context.borderColor)),
-                child: TextField(
-                  controller: controller,
-                  style: TextStyle(color: context.textColor),
-                  decoration: InputDecoration(hintText: 'Enter address', hintStyle: TextStyle(color: context.faintColor), border: InputBorder.none, contentPadding: EdgeInsets.all(16)),
-                ),
-              ),
-              const SizedBox(height: 20),
-              StatefulBuilder(
-                builder: (context, setSaveState) {
-                  bool isSaving = false;
-                  return SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: isSaving ? null : () async {
-                        setSaveState(() => isSaving = true);
-                        final success = await SupabaseService.upsertSavedPlace(
-                          name: name,
-                          address: controller.text,
-                          icon: name == 'Home' ? 'home' : 'work',
-                          color: name == 'Home' ? 'blue' : 'green',
-                        );
-                        if (success) {
-                          if (name == 'Home') appState.updateHomeAddress(controller.text);
-                          if (name == 'Work') appState.updateWorkAddress(controller.text);
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name address updated'), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))));
-                        } else {
-                          setSaveState(() => isSaving = false);
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save $name address'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))));
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.yellow, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                      child: isSaving
-                          ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                          : Text('Save', style: TextStyle(fontWeight: FontWeight.w600)),
-                    ),
-                  );
-                },
-              ),
-              SizedBox(height: MediaQuery.of(context).padding.bottom),
-            ],
-          ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _AddressPickerScreen(
+          title: 'Set $name Address',
+          initialAddress: currentAddress.isNotEmpty && currentAddress != name ? currentAddress : '',
+          onSave: (address, lat, lng) async {
+            final success = await SupabaseService.upsertSavedPlace(
+              name: name,
+              address: address,
+              icon: name == 'Home' ? 'home' : 'work',
+              color: name == 'Home' ? 'yellow' : 'yellow',
+              latitude: lat,
+              longitude: lng,
+            );
+            if (success) {
+              if (name == 'Home') appState.updateHomeAddress(address);
+              if (name == 'Work') appState.updateWorkAddress(address);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('$name address saved'),
+                  backgroundColor: AppColors.success,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ));
+              }
+            }
+          },
         ),
       ),
     );
@@ -3066,6 +3044,311 @@ class _AddPlaceScreenState extends State<_AddPlaceScreen> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AddressPickerScreen extends StatefulWidget {
+  final String title;
+  final String initialAddress;
+  final Function(String address, double lat, double lng) onSave;
+
+  const _AddressPickerScreen({
+    required this.title,
+    required this.initialAddress,
+    required this.onSave,
+  });
+
+  @override
+  State<_AddressPickerScreen> createState() => _AddressPickerScreenState();
+}
+
+class _AddressPickerScreenState extends State<_AddressPickerScreen> {
+  final _searchController = TextEditingController();
+  GoogleMapController? _mapController;
+
+  LatLng _selectedLocation = const LatLng(4.1755, 73.5093);
+  String _selectedAddress = '';
+  bool _isSearching = false;
+  List<Map<String, dynamic>> _searchResults = [];
+  Timer? _debounce;
+
+  static const String _googleApiKey = 'AIzaSyBZ7HVy2dUvTCC5SZkz0MaFCBON2QorFbI';
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedAddress = widget.initialAddress;
+    if (widget.initialAddress.isNotEmpty) {
+      _searchController.text = widget.initialAddress;
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      _searchPlaces(query);
+    });
+  }
+
+  Future<void> _searchPlaces(String query) async {
+    if (query.isEmpty || query.length < 2) {
+      setState(() {
+        _searchResults = [];
+        _isSearching = false;
+      });
+      return;
+    }
+
+    setState(() => _isSearching = true);
+
+    try {
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+        '?input=${Uri.encodeComponent(query)}'
+        '&key=$_googleApiKey'
+        '&components=country:mv'
+        '&location=4.1755,73.5093'
+        '&radius=50000'
+        '&strictbounds=true'
+      );
+
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'OK') {
+          final predictions = data['predictions'] as List;
+          setState(() {
+            _searchResults = predictions.map((p) => {
+              'place_id': p['place_id'],
+              'name': p['structured_formatting']?['main_text'] ?? p['description'],
+              'address': p['structured_formatting']?['secondary_text'] ?? '',
+              'full_address': p['description'],
+            }).toList();
+            _isSearching = false;
+          });
+        } else {
+          setState(() {
+            _searchResults = [];
+            _isSearching = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error searching places: $e');
+      setState(() {
+        _searchResults = [];
+        _isSearching = false;
+      });
+    }
+  }
+
+  Future<void> _selectPlace(Map<String, dynamic> place) async {
+    final placeId = place['place_id'] as String;
+
+    try {
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/details/json'
+        '?place_id=$placeId'
+        '&fields=geometry,formatted_address'
+        '&key=$_googleApiKey'
+      );
+
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'OK') {
+          final result = data['result'];
+          final location = result['geometry']['location'];
+          final lat = location['lat'] as double;
+          final lng = location['lng'] as double;
+          final address = result['formatted_address'] ?? place['full_address'];
+
+          setState(() {
+            _selectedLocation = LatLng(lat, lng);
+            _selectedAddress = address;
+            _searchController.text = place['name'] as String;
+            _searchResults = [];
+          });
+
+          _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_selectedLocation, 16));
+          HapticFeedback.lightImpact();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error getting place details: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5),
+      body: Stack(
+        children: [
+          GoogleMap(
+            initialCameraPosition: CameraPosition(target: _selectedLocation, zoom: 14),
+            onMapCreated: (controller) => _mapController = controller,
+            markers: {
+              Marker(
+                markerId: const MarkerId('selected'),
+                position: _selectedLocation,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+              ),
+            },
+            onTap: (point) {
+              setState(() {
+                _selectedLocation = point;
+                _selectedAddress = '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
+              });
+              HapticFeedback.lightImpact();
+            },
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+          ),
+
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: context.surfaceColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8)],
+                          ),
+                          child: Icon(Icons.arrow_back, color: context.textColor),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: context.surfaceColor,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8)],
+                          ),
+                          child: TextField(
+                            controller: _searchController,
+                            onChanged: _onSearchChanged,
+                            style: TextStyle(color: context.textColor),
+                            decoration: InputDecoration(
+                              hintText: 'Search address...',
+                              hintStyle: TextStyle(color: context.faintColor),
+                              prefixIcon: Icon(Icons.search, color: context.mutedColor),
+                              suffixIcon: _searchController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: Icon(Icons.clear, color: context.mutedColor, size: 18),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        setState(() => _searchResults = []);
+                                      },
+                                    )
+                                  : null,
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                if (_searchResults.isNotEmpty)
+                  Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: context.surfaceColor,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8)],
+                      ),
+                      child: ListView.separated(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: _searchResults.length,
+                        separatorBuilder: (_, __) => Divider(height: 1, color: context.borderColor),
+                        itemBuilder: (context, index) {
+                          final place = _searchResults[index];
+                          return ListTile(
+                            leading: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: AppColors.yellow.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(Icons.location_on, color: AppColors.yellow, size: 20),
+                            ),
+                            title: Text(place['name'], style: TextStyle(color: context.textColor, fontWeight: FontWeight.w500)),
+                            subtitle: Text(place['address'], style: TextStyle(color: context.mutedColor, fontSize: 12)),
+                            onTap: () => _selectPlace(place),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          if (_selectedAddress.isNotEmpty)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: MediaQuery.of(context).padding.bottom + 16,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: context.surfaceColor,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 12)],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Selected Address', style: TextStyle(color: context.mutedColor, fontSize: 12)),
+                    const SizedBox(height: 4),
+                    Text(_selectedAddress, style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          widget.onSave(_selectedAddress, _selectedLocation.latitude, _selectedLocation.longitude);
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.yellow,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: Text('Save Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

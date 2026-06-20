@@ -582,7 +582,7 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
               </TableRow>
             ) : (
               drivers.map((driver) => (
-                <TableRow key={driver.id}>
+                <TableRow key={driver.id} className="group hover:bg-muted/50 transition-colors">
                   <TableCell>
                     <Checkbox
                       checked={selectedIds.has(driver.id)}
@@ -625,12 +625,21 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
                   </TableCell>
                   <TableCell>{formatDate(driver.created_at)}</TableCell>
                   <TableCell>
-                    <DropdownMenu modal={false}>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => openEditDialog(driver)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <DropdownMenu modal={false}>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
@@ -676,6 +685,7 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))

@@ -1178,26 +1178,31 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(Icons.timer_outlined, size: 12, color: context.mutedColor),
-                          const SizedBox(width: 4),
-                          Text(
-                            trip['duration']!,
-                            style: TextStyle(color: context.mutedColor, fontSize: 12),
-                          ),
-                          if (trip['stops']?.isNotEmpty == true) ...[
-                            const SizedBox(width: 10),
-                            Icon(Icons.location_on_outlined, size: 12, color: context.mutedColor),
-                            const SizedBox(width: 3),
-                            Text(
-                              '${_getStopCount(trip['stops']!)} stops',
-                              style: TextStyle(color: context.mutedColor, fontSize: 12),
+                      if (!isPast) ...[
+                        const SizedBox(height: 4),
+                        Builder(builder: (_) {
+                          final now = TimeOfDay.now();
+                          final tripHour = trip['hour'] as int;
+                          final tripMinute = trip['minute'] as int;
+                          final nowMinutes = now.hour * 60 + now.minute;
+                          final tripMinutes = tripHour * 60 + tripMinute;
+                          final diff = tripMinutes - nowMinutes;
+
+                          if (diff <= 0) return const SizedBox.shrink();
+
+                          final isUrgent = diff <= 10;
+                          final text = diff < 60 ? 'in $diff min' : 'in ${diff ~/ 60}h ${diff % 60}m';
+
+                          return Text(
+                            text,
+                            style: TextStyle(
+                              color: isUrgent ? AppColors.yellow : context.mutedColor,
+                              fontSize: 12,
+                              fontWeight: isUrgent ? FontWeight.w600 : FontWeight.w500,
                             ),
-                          ],
-                        ],
-                      ),
+                          );
+                        }),
+                      ],
                     ],
                   ),
                 ),

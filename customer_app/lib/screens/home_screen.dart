@@ -1199,6 +1199,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildQuickActionChip({required IconData icon, required String label, required VoidCallback onTap, bool isActive = false}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.yellow.withValues(alpha: 0.2) : context.isDark ? Colors.white.withValues(alpha: 0.06) : Colors.grey.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: isActive ? Border.all(color: AppColors.yellow.withValues(alpha: 0.5)) : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: isActive ? AppColors.yellow : context.mutedColor),
+            const SizedBox(width: 6),
+            Text(label, style: TextStyle(color: isActive ? AppColors.yellow : context.textColor, fontSize: 13, fontWeight: FontWeight.w500)),
+          ],
+        ),
+      ),
+    );
+  }
+
   String _formatScheduledTime(DateTime time) {
     final now = DateTime.now();
     final isToday = time.day == now.day && time.month == now.month && time.year == now.year;
@@ -1269,37 +1291,81 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(14),
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(colors: [AppColors.yellow, AppColors.yellow.withValues(alpha: 0.7)]),
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [BoxShadow(color: AppColors.yellow.withValues(alpha: 0.4), blurRadius: 16, offset: const Offset(0, 6))],
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      child: const Icon(Icons.schedule_rounded, color: Colors.black, size: 28),
+                      child: const Icon(Icons.schedule_rounded, color: Colors.black, size: 22),
                     ),
-                    const SizedBox(width: 18),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Schedule Ride', style: TextStyle(color: context.textColor, fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
-                          const SizedBox(height: 4),
-                          Text('Book your ride in advance', style: TextStyle(color: context.mutedColor, fontSize: 15)),
+                          Text('Schedule Ride', style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w800)),
+                          Text('Book your ride in advance', style: TextStyle(color: context.mutedColor, fontSize: 13)),
                         ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 16),
+
+                // Quick Actions Row
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildQuickActionChip(
+                        icon: Icons.my_location,
+                        label: 'Current Location',
+                        onTap: () async {
+                          final position = await LocationService.getCurrentLocation();
+                          if (position != null) {
+                            setModalState(() {
+                              pickupAddress = 'Current Location';
+                              pickupLat = position.latitude;
+                              pickupLng = position.longitude;
+                            });
+                            _lastPickupAddress = pickupAddress;
+                            _lastPickupLat = pickupLat;
+                            _lastPickupLng = pickupLng;
+                          }
+                        },
+                        isActive: pickupAddress == 'Current Location',
+                      ),
+                      const SizedBox(width: 8),
+                      _buildQuickActionChip(
+                        icon: Icons.swap_horiz,
+                        label: 'Swap',
+                        onTap: () {
+                          HapticFeedback.mediumImpact();
+                          setModalState(() {
+                            final tempAddr = pickupAddress;
+                            final tempLat = pickupLat;
+                            final tempLng = pickupLng;
+                            pickupAddress = dropoffAddress;
+                            pickupLat = dropoffLat;
+                            pickupLng = dropoffLng;
+                            dropoffAddress = tempAddr;
+                            dropoffLat = tempLat;
+                            dropoffLng = tempLng;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
 
                 // Route Card
                 Container(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: context.isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: context.isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
-                    boxShadow: context.isDark ? null : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, 4))],
                   ),
                   child: Column(
                     children: [
@@ -1322,47 +1388,46 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         child: Row(
                           children: [
                             Container(
-                              width: 48,
-                              height: 48,
+                              width: 40,
+                              height: 40,
                               decoration: BoxDecoration(
                                 gradient: pickupAddress.isNotEmpty
                                     ? LinearGradient(colors: [AppColors.success, AppColors.success.withValues(alpha: 0.7)])
                                     : null,
                                 color: pickupAddress.isEmpty ? (context.isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.withValues(alpha: 0.1)) : null,
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Icon(Icons.trip_origin_rounded, color: pickupAddress.isNotEmpty ? Colors.white : context.mutedColor, size: 22),
+                              child: Icon(Icons.trip_origin_rounded, color: pickupAddress.isNotEmpty ? Colors.white : context.mutedColor, size: 18),
                             ),
-                            const SizedBox(width: 16),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('PICKUP', style: TextStyle(color: context.mutedColor, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1)),
-                                  const SizedBox(height: 4),
+                                  Text('PICKUP', style: TextStyle(color: context.mutedColor, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+                                  const SizedBox(height: 2),
                                   Text(
                                     pickupAddress.isEmpty ? 'Select pickup location' : pickupAddress,
-                                    style: TextStyle(color: pickupAddress.isEmpty ? context.mutedColor : context.textColor, fontSize: 16, fontWeight: FontWeight.w600),
+                                    style: TextStyle(color: pickupAddress.isEmpty ? context.mutedColor : context.textColor, fontSize: 14, fontWeight: FontWeight.w600),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
                             ),
-                            Icon(pickupAddress.isNotEmpty ? Icons.check_circle_rounded : Icons.arrow_forward_ios_rounded,
-                                color: pickupAddress.isNotEmpty ? AppColors.success : context.mutedColor, size: 20),
+                            Icon(Icons.arrow_forward_ios_rounded, color: context.mutedColor, size: 16),
                           ],
                         ),
                       ),
 
-                      // Connector
+                      // Connector with Swap Button
                       Padding(
-                        padding: const EdgeInsets.only(left: 23),
+                        padding: const EdgeInsets.only(left: 19),
                         child: Row(
                           children: [
                             Container(
                               width: 2,
-                              height: 30,
+                              height: 20,
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   begin: Alignment.topCenter,
@@ -1372,6 +1437,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 borderRadius: BorderRadius.circular(1),
                               ),
                             ),
+                            const Spacer(),
+                            if (pickupAddress.isNotEmpty || dropoffAddress.isNotEmpty)
+                              GestureDetector(
+                                onTap: () {
+                                  HapticFeedback.mediumImpact();
+                                  setModalState(() {
+                                    final tempAddr = pickupAddress;
+                                    final tempLat = pickupLat;
+                                    final tempLng = pickupLng;
+                                    pickupAddress = dropoffAddress;
+                                    pickupLat = dropoffLat;
+                                    pickupLng = dropoffLng;
+                                    dropoffAddress = tempAddr;
+                                    dropoffLat = tempLat;
+                                    dropoffLng = tempLng;
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.yellow.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(Icons.swap_vert_rounded, color: AppColors.yellow, size: 16),
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -1395,35 +1486,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         child: Row(
                           children: [
                             Container(
-                              width: 48,
-                              height: 48,
+                              width: 40,
+                              height: 40,
                               decoration: BoxDecoration(
                                 gradient: dropoffAddress.isNotEmpty
                                     ? LinearGradient(colors: [AppColors.error, AppColors.error.withValues(alpha: 0.7)])
                                     : null,
                                 color: dropoffAddress.isEmpty ? (context.isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.withValues(alpha: 0.1)) : null,
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Icon(Icons.location_on_rounded, color: dropoffAddress.isNotEmpty ? Colors.white : context.mutedColor, size: 22),
+                              child: Icon(Icons.location_on_rounded, color: dropoffAddress.isNotEmpty ? Colors.white : context.mutedColor, size: 18),
                             ),
-                            const SizedBox(width: 16),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('DROPOFF', style: TextStyle(color: context.mutedColor, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1)),
-                                  const SizedBox(height: 4),
+                                  Text('DROPOFF', style: TextStyle(color: context.mutedColor, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+                                  const SizedBox(height: 2),
                                   Text(
                                     dropoffAddress.isEmpty ? 'Select dropoff location' : dropoffAddress,
-                                    style: TextStyle(color: dropoffAddress.isEmpty ? context.mutedColor : context.textColor, fontSize: 16, fontWeight: FontWeight.w600),
+                                    style: TextStyle(color: dropoffAddress.isEmpty ? context.mutedColor : context.textColor, fontSize: 14, fontWeight: FontWeight.w600),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
                             ),
-                            Icon(dropoffAddress.isNotEmpty ? Icons.check_circle_rounded : Icons.arrow_forward_ios_rounded,
-                                color: dropoffAddress.isNotEmpty ? AppColors.error : context.mutedColor, size: 20),
+                            Icon(Icons.arrow_forward_ios_rounded, color: context.mutedColor, size: 16),
                           ],
                         ),
                       ),
@@ -1431,11 +1521,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
                 // Date & Time Section
-                Text('When?', style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 14),
                 Row(
                   children: [
                     // Date picker
@@ -1457,31 +1545,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           }
                         },
                         child: Container(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: context.isDark
-                                  ? [Colors.white.withValues(alpha: 0.08), Colors.white.withValues(alpha: 0.04)]
-                                  : [Colors.white, const Color(0xFFFAFAFA)],
-                            ),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: context.isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.06)),
+                            color: context.isDark ? Colors.white.withValues(alpha: 0.06) : Colors.grey.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(14),
                           ),
                           child: Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(color: AppColors.yellow.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
-                                child: Icon(Icons.calendar_month_rounded, color: AppColors.yellow, size: 20),
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(color: AppColors.yellow.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
+                                child: Icon(Icons.calendar_month_rounded, color: AppColors.yellow, size: 18),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('DATE', style: TextStyle(color: context.mutedColor, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-                                    const SizedBox(height: 2),
-                                    Text('${selectedDate.day}/${selectedDate.month}/${selectedDate.year}', style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w700)),
+                                    Text('DATE', style: TextStyle(color: context.mutedColor, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+                                    Text('${selectedDate.day}/${selectedDate.month}/${selectedDate.year}', style: TextStyle(color: context.textColor, fontSize: 13, fontWeight: FontWeight.w700)),
                                   ],
                                 ),
                               ),
@@ -1511,33 +1593,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           }
                         },
                         child: Container(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: context.isDark
-                                  ? [Colors.white.withValues(alpha: 0.08), Colors.white.withValues(alpha: 0.04)]
-                                  : [Colors.white, const Color(0xFFFAFAFA)],
-                            ),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: context.isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.06)),
+                            color: context.isDark ? Colors.white.withValues(alpha: 0.06) : Colors.grey.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(14),
                           ),
                           child: Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(color: AppColors.yellow.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
-                                child: Icon(Icons.access_time_rounded, color: AppColors.yellow, size: 20),
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(color: AppColors.yellow.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
+                                child: Icon(Icons.access_time_rounded, color: AppColors.yellow, size: 18),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('TIME', style: TextStyle(color: context.mutedColor, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-                                    const SizedBox(height: 2),
+                                    Text('TIME', style: TextStyle(color: context.mutedColor, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
                                     Text(
                                       '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}',
-                                      style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w700),
+                                      style: TextStyle(color: context.textColor, fontSize: 13, fontWeight: FontWeight.w700),
                                     ),
                                   ],
                                 ),
@@ -1550,7 +1626,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ],
                 ),
 
-                const SizedBox(height: 32),
+                const SizedBox(height: 20),
 
                 // Buttons
                 Row(
@@ -1558,10 +1634,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     if (_scheduledTime != null)
                       Expanded(
                         child: Container(
-                          height: 58,
+                          height: 50,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.error.withValues(alpha: 0.5), width: 2),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.error.withValues(alpha: 0.5), width: 1.5),
                           ),
                           child: TextButton(
                             onPressed: () {
@@ -1592,7 +1668,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     Expanded(
                       flex: _scheduledTime != null ? 1 : 2,
                       child: Container(
-                        height: 58,
+                        height: 50,
                         decoration: BoxDecoration(
                           gradient: (pickupAddress.isNotEmpty && dropoffAddress.isNotEmpty)
                               ? LinearGradient(colors: [AppColors.yellow, AppColors.yellow.withValues(alpha: 0.85)])
@@ -1651,14 +1727,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             disabledBackgroundColor: Colors.transparent, disabledForegroundColor: context.mutedColor,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(pickupAddress.isNotEmpty && dropoffAddress.isNotEmpty ? Icons.check_rounded : Icons.location_off_rounded, size: 22),
-                              const SizedBox(width: 10),
-                              Text(pickupAddress.isEmpty || dropoffAddress.isEmpty ? 'Select locations' : 'Confirm Booking', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, letterSpacing: 0.3)),
-                            ],
-                          ),
+                          child: Text('Confirm', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                         ),
                       ),
                     ),

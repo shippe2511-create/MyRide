@@ -2665,6 +2665,19 @@ class _AddPlaceScreenState extends State<_AddPlaceScreen> {
   bool _isSearching = false;
   List<Map<String, dynamic>> _searchResults = [];
 
+  static const String _darkMapStyle = '''
+[
+  {"elementType": "geometry", "stylers": [{"color": "#212121"}]},
+  {"elementType": "labels.icon", "stylers": [{"visibility": "off"}]},
+  {"elementType": "labels.text.fill", "stylers": [{"color": "#757575"}]},
+  {"elementType": "labels.text.stroke", "stylers": [{"color": "#212121"}]},
+  {"featureType": "road", "elementType": "geometry.fill", "stylers": [{"color": "#2c2c2c"}]},
+  {"featureType": "road.arterial", "elementType": "geometry", "stylers": [{"color": "#373737"}]},
+  {"featureType": "road.highway", "elementType": "geometry", "stylers": [{"color": "#3c3c3c"}]},
+  {"featureType": "water", "elementType": "geometry", "stylers": [{"color": "#000000"}]}
+]
+''';
+
   final List<Map<String, dynamic>> _popularPlaces = [
     {'name': 'Velana International Airport', 'address': 'Hulhulé Island', 'lat': 4.1918, 'lng': 73.5290},
     {'name': 'Male Ferry Terminal', 'address': 'Male City', 'lat': 4.1749, 'lng': 73.5094},
@@ -3079,6 +3092,19 @@ class _AddressPickerScreenState extends State<_AddressPickerScreen> {
 
   static const String _googleApiKey = 'AIzaSyBZ7HVy2dUvTCC5SZkz0MaFCBON2QorFbI';
 
+  static const String _darkMapStyle = '''
+[
+  {"elementType": "geometry", "stylers": [{"color": "#212121"}]},
+  {"elementType": "labels.icon", "stylers": [{"visibility": "off"}]},
+  {"elementType": "labels.text.fill", "stylers": [{"color": "#757575"}]},
+  {"elementType": "labels.text.stroke", "stylers": [{"color": "#212121"}]},
+  {"featureType": "road", "elementType": "geometry.fill", "stylers": [{"color": "#2c2c2c"}]},
+  {"featureType": "road.arterial", "elementType": "geometry", "stylers": [{"color": "#373737"}]},
+  {"featureType": "road.highway", "elementType": "geometry", "stylers": [{"color": "#3c3c3c"}]},
+  {"featureType": "water", "elementType": "geometry", "stylers": [{"color": "#000000"}]}
+]
+''';
+
   @override
   void initState() {
     super.initState();
@@ -3232,7 +3258,13 @@ class _AddressPickerScreenState extends State<_AddressPickerScreen> {
         children: [
           GoogleMap(
             initialCameraPosition: CameraPosition(target: _selectedLocation, zoom: 14),
-            onMapCreated: (controller) => _mapController = controller,
+            onMapCreated: (controller) {
+              _mapController = controller;
+              if (context.isDark) {
+                controller.setMapStyle(_darkMapStyle);
+              }
+            },
+            style: context.isDark ? _darkMapStyle : null,
             markers: {
               Marker(
                 markerId: const MarkerId('selected'),
@@ -3240,12 +3272,37 @@ class _AddressPickerScreenState extends State<_AddressPickerScreen> {
                 icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
               ),
             },
-            onTap: (point) {
+            onTap: (point) async {
               setState(() {
                 _selectedLocation = point;
-                _selectedAddress = '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
+                _selectedAddress = 'Loading...';
               });
               HapticFeedback.lightImpact();
+
+              // Reverse geocode to get address
+              try {
+                final url = Uri.parse(
+                  'https://maps.googleapis.com/maps/api/geocode/json?latlng=${point.latitude},${point.longitude}&key=$_googleApiKey'
+                );
+                final response = await http.get(url);
+                if (response.statusCode == 200) {
+                  final data = json.decode(response.body);
+                  if (data['status'] == 'OK' && data['results'].isNotEmpty) {
+                    final result = data['results'][0];
+                    setState(() {
+                      _selectedAddress = result['formatted_address'] ?? 'Selected Location';
+                    });
+                  } else {
+                    setState(() {
+                      _selectedAddress = 'Pinned Location';
+                    });
+                  }
+                }
+              } catch (e) {
+                setState(() {
+                  _selectedAddress = 'Pinned Location';
+                });
+              }
             },
             myLocationEnabled: true,
             myLocationButtonEnabled: false,

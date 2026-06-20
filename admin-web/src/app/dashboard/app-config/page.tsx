@@ -468,7 +468,7 @@ export default function AppConfigPage() {
                     </TableRow>
                   ) : (
                     pages.map((page) => (
-                      <TableRow key={page.id}>
+                      <TableRow key={page.id} className="group hover:bg-muted/50 transition-colors">
                         <TableCell className="font-medium">{page.title}</TableCell>
                         <TableCell className="text-muted-foreground font-mono text-sm">{page.slug}</TableCell>
                         <TableCell><Badge variant="outline" className="capitalize">{page.page_type}</Badge></TableCell>
@@ -480,7 +480,7 @@ export default function AppConfigPage() {
                           />
                         </TableCell>
                         <TableCell>
-                          <div className="flex gap-1">
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button size="icon" variant="ghost" onClick={() => openPageDialog(page)}>
                               <Pencil className="h-4 w-4" />
                             </Button>

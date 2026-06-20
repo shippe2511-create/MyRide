@@ -369,7 +369,7 @@ export default function IncidentsPage() {
               </TableRow>
             ) : (
               filteredIncidents.map((incident) => (
-                <TableRow key={incident.id} className="hover:bg-muted/50 transition-colors">
+                <TableRow key={incident.id} className="group hover:bg-muted/50 transition-colors">
                   <TableCell>
                     <div>
                       <p className="font-medium">{incident.title}</p>
@@ -384,37 +384,47 @@ export default function IncidentsPage() {
                   <TableCell>{incident.location_name || "-"}</TableCell>
                   <TableCell>{formatDate(incident.created_at)}</TableCell>
                   <TableCell>
-                    <DropdownMenu modal={false}>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => { setSelectedIncident(incident); setDialogType("view") }}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          View Details
-                        </DropdownMenuItem>
-                        {incident.status !== "resolved" && incident.status !== "closed" && (
-                          <>
-                            <DropdownMenuItem onClick={() => updateStatus(incident.id, "investigating")}>
-                              <Clock className="mr-2 h-4 w-4" />
-                              Mark Investigating
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { setSelectedIncident(incident); setDialogType("resolve") }}>
-                              <CheckCircle className="mr-2 h-4 w-4" />
-                              Resolve
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                        {incident.status === "resolved" && (
-                          <DropdownMenuItem onClick={() => updateStatus(incident.id, "closed")}>
-                            <XCircle className="mr-2 h-4 w-4" />
-                            Close
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => { setSelectedIncident(incident); setDialogType("view") }}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <DropdownMenu modal={false}>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => { setSelectedIncident(incident); setDialogType("view") }}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View Details
                           </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                          {incident.status !== "resolved" && incident.status !== "closed" && (
+                            <>
+                              <DropdownMenuItem onClick={() => updateStatus(incident.id, "investigating")}>
+                                <Clock className="mr-2 h-4 w-4" />
+                                Mark Investigating
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { setSelectedIncident(incident); setDialogType("resolve") }}>
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Resolve
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {incident.status === "resolved" && (
+                            <DropdownMenuItem onClick={() => updateStatus(incident.id, "closed")}>
+                              <XCircle className="mr-2 h-4 w-4" />
+                              Close
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))

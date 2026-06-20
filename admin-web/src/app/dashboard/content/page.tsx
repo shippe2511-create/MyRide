@@ -23,7 +23,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { ImagePicker } from "@/components/ui/image-picker"
 import { ComboboxInput } from "@/components/ui/combobox-input"
-import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Bell, Pin, Users, FileText, Megaphone, Calendar } from "lucide-react"
+import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Bell, Pin, Users, FileText, Megaphone, Calendar, Download } from "lucide-react"
 import { SkeletonTable } from "@/components/ui/skeleton-card"
 
 const STAFF_CATEGORIES = [
@@ -365,7 +365,7 @@ export default function ContentPage() {
                     </TableRow>
                   ) : (
                     staffCorner.map((item) => (
-                      <TableRow key={item.id}>
+                      <TableRow key={item.id} className="group hover:bg-muted/50 transition-colors">
                         <TableCell className="w-8">
                           {item.is_pinned && <Pin className="h-4 w-4 text-primary" />}
                         </TableCell>
@@ -400,24 +400,34 @@ export default function ContentPage() {
                         </TableCell>
                         <TableCell>{item.published_at ? formatDate(item.published_at) : "-"}</TableCell>
                         <TableCell>
-                          <DropdownMenu modal={false}>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onSelect={() => openDialog("staff", item)}>
-                                <Edit className="mr-2 h-4 w-4" />Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => togglePin(item)}>
-                                <Pin className="mr-2 h-4 w-4" />
-                                {item.is_pinned ? "Unpin" : "Pin to Top"}
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete("staff", item.id)}>
-                                <Trash2 className="mr-2 h-4 w-4" />Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => openDialog("staff", item)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <DropdownMenu modal={false}>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => openDialog("staff", item)}>
+                                  <Edit className="mr-2 h-4 w-4" />Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => togglePin(item)}>
+                                  <Pin className="mr-2 h-4 w-4" />
+                                  {item.is_pinned ? "Unpin" : "Pin to Top"}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete("staff", item.id)}>
+                                  <Trash2 className="mr-2 h-4 w-4" />Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -460,7 +470,7 @@ export default function ContentPage() {
                     </TableRow>
                   ) : (
                     announcements.map((ann) => (
-                      <TableRow key={ann.id}>
+                      <TableRow key={ann.id} className="group hover:bg-muted/50 transition-colors">
                         <TableCell className="w-8">
                           {ann.is_pinned && <Pin className="h-4 w-4 text-primary" />}
                         </TableCell>
@@ -494,24 +504,34 @@ export default function ContentPage() {
                         </TableCell>
                         <TableCell>{formatDate(ann.created_at)}</TableCell>
                         <TableCell>
-                          <DropdownMenu modal={false}>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onSelect={() => openDialog("announcement", ann)}>
-                                <Edit className="mr-2 h-4 w-4" />Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => toggleAnnouncementPin(ann)}>
-                                <Pin className="mr-2 h-4 w-4" />
-                                {ann.is_pinned ? "Unpin" : "Pin to Top"}
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete("announcement", ann.id)}>
-                                <Trash2 className="mr-2 h-4 w-4" />Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => openDialog("announcement", ann)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <DropdownMenu modal={false}>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => openDialog("announcement", ann)}>
+                                  <Edit className="mr-2 h-4 w-4" />Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => toggleAnnouncementPin(ann)}>
+                                  <Pin className="mr-2 h-4 w-4" />
+                                  {ann.is_pinned ? "Unpin" : "Pin to Top"}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete("announcement", ann.id)}>
+                                  <Trash2 className="mr-2 h-4 w-4" />Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))

@@ -23,7 +23,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Fuel, Loader2, MoreVertical, Edit, Trash2, Plus, Wrench, Sparkles, Car, Filter, TrendingUp, TrendingDown, Calendar, DollarSign, Users } from "lucide-react"
+import { Fuel, Loader2, MoreVertical, Edit, Trash2, Plus, Wrench, Sparkles, Car, Filter, TrendingUp, TrendingDown, Calendar, DollarSign, Users, Download } from "lucide-react"
 import { toast } from "sonner"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import { SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/skeleton-card"
@@ -261,6 +261,28 @@ export default function VehicleLogsPage() {
     return LOG_TYPES.find(t => t.value === type) || LOG_TYPES[0]
   }
 
+  const exportCSV = () => {
+    const headers = ["Type", "Driver", "Amount", "Odometer", "Date", "Notes"]
+    const rows = logs.map(l => [
+      l.log_type,
+      l.driver?.profile?.full_name || "-",
+      l.amount || "",
+      l.odometer || "",
+      formatDate(l.log_date),
+      l.notes || ""
+    ])
+
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `vehicle_logs_${new Date().toISOString().split("T")[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success("Logs exported")
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -290,6 +312,10 @@ export default function VehicleLogsPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Fuel, maintenance, and repair records</p>
         </div>
+        <Button variant="outline" onClick={exportCSV}>
+          <Download className="mr-2 h-4 w-4" />
+          Export
+        </Button>
       </div>
 
       {/* Summary Stats Row */}
@@ -511,7 +537,7 @@ export default function VehicleLogsPage() {
                 const typeInfo = getLogTypeInfo(log.log_type)
                 const Icon = typeInfo.icon
                 return (
-                  <TableRow key={log.id}>
+                  <TableRow key={log.id} className="group hover:bg-muted/50 transition-colors">
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className={`p-1.5 rounded ${typeInfo.color}`}>
@@ -532,26 +558,36 @@ export default function VehicleLogsPage() {
                       {log.notes || "-"}
                     </TableCell>
                     <TableCell>
-                      <DropdownMenu modal={false}>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openDialog(log)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-500"
-                            onClick={() => confirmDelete(log)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openDialog(log)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <DropdownMenu modal={false}>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openDialog(log)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-red-500"
+                              onClick={() => confirmDelete(log)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </TableCell>
                   </TableRow>
                 )

@@ -264,7 +264,7 @@ export default function HelpContentPage() {
                   </TableRow>
                 ) : (
                   contacts.map(item => (
-                    <TableRow key={item.id}>
+                    <TableRow key={item.id} className="group hover:bg-muted/50 transition-colors">
                       <TableCell>{getIcon(item.icon)}</TableCell>
                       <TableCell className="font-medium">{item.title}</TableCell>
                       <TableCell>{item.subtitle}</TableCell>
@@ -273,7 +273,7 @@ export default function HelpContentPage() {
                         <Switch checked={item.is_active} onCheckedChange={() => toggleActive(item)} />
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-1">
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button size="icon" variant="ghost" onClick={() => openEditDialog(item)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -316,14 +316,14 @@ export default function HelpContentPage() {
                   </TableRow>
                 ) : (
                   faqs.map(item => (
-                    <TableRow key={item.id}>
+                    <TableRow key={item.id} className="group hover:bg-muted/50 transition-colors">
                       <TableCell className="font-medium max-w-xs">{item.title}</TableCell>
                       <TableCell className="text-muted-foreground max-w-md truncate">{item.subtitle}</TableCell>
                       <TableCell>
                         <Switch checked={item.is_active} onCheckedChange={() => toggleActive(item)} />
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-1">
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button size="icon" variant="ghost" onClick={() => openEditDialog(item)}>
                             <Pencil className="h-4 w-4" />
                           </Button>

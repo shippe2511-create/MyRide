@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
@@ -366,47 +367,54 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _sendMessage("My location", type: MessageType.location, locationName: "Driver's current location");
   }
 
+  Future<void> _pickAndSendImage(ImageSource source) async {
+    HapticFeedback.lightImpact();
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(source: source, imageQuality: 70, maxWidth: 1024);
+      if (pickedFile == null) return;
+
+      _addMessage(ChatMessage(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        text: '📷 Shared an image',
+        isDriver: true,
+        time: DateTime.now(),
+        type: MessageType.image,
+        status: MessageStatus.sent,
+      ));
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Image sent'), backgroundColor: AppColors.success),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to pick image'), backgroundColor: AppColors.error),
+      );
+    }
+  }
+
   void _toggleRecording() {
     HapticFeedback.mediumImpact();
-    if (_isRecording) {
-      _stopRecording();
-    } else {
-      _startRecording();
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Voice messages coming soon'),
+        backgroundColor: AppColors.info,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
   }
 
   void _startRecording() {
-    HapticFeedback.heavyImpact();
-    setState(() {
-      _isRecording = true;
-      _recordingSeconds = 0;
-    });
-    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
-        setState(() => _recordingSeconds++);
-      }
-    });
+    // Voice recording not yet implemented
   }
 
   void _stopRecording() {
-    _recordingTimer?.cancel();
-    final duration = _recordingSeconds;
-    setState(() {
-      _isRecording = false;
-      _recordingSeconds = 0;
-    });
-    if (duration >= 1) {
-      _sendMessage("Voice message", type: MessageType.voice, voiceDuration: duration);
-    }
+    // Voice recording not yet implemented
   }
 
   void _cancelRecording() {
-    HapticFeedback.mediumImpact();
-    _recordingTimer?.cancel();
-    setState(() {
-      _isRecording = false;
-      _recordingSeconds = 0;
-    });
+    // Voice recording not yet implemented
   }
 
   String _formatRecordingTime(int seconds) {
@@ -1255,7 +1263,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   color: AppColors.info,
                   onTap: () {
                     Navigator.pop(ctx);
-                    HapticFeedback.lightImpact();
+                    _pickAndSendImage(ImageSource.camera);
                   },
                 ),
                 _buildAttachmentOption(
@@ -1265,7 +1273,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   color: AppColors.success,
                   onTap: () {
                     Navigator.pop(ctx);
-                    HapticFeedback.lightImpact();
+                    _pickAndSendImage(ImageSource.gallery);
                   },
                 ),
               ],

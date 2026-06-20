@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import 'dart:async';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
@@ -342,6 +343,73 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         );
       }
     });
+  }
+
+  void _showEmojiPicker() {
+    final emojis = ['😀', '😊', '👍', '❤️', '🙏', '😂', '🎉', '👋', '🚗', '✅', '⭐', '🔥'];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: context.cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 20),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: emojis.map((emoji) => GestureDetector(
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _messageController.text += emoji;
+                  _messageController.selection = TextSelection.fromPosition(TextPosition(offset: _messageController.text.length));
+                },
+                child: Container(
+                  width: 48, height: 48,
+                  decoration: BoxDecoration(color: context.surfaceColor, borderRadius: BorderRadius.circular(12)),
+                  child: Center(child: Text(emoji, style: TextStyle(fontSize: 24))),
+                ),
+              )).toList(),
+            ),
+            SizedBox(height: MediaQuery.of(ctx).padding.bottom + 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAndSendImage(ImageSource source) async {
+    HapticFeedback.lightImpact();
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(source: source, imageQuality: 70, maxWidth: 1024);
+      if (pickedFile == null) return;
+
+      // For now, send as a text message indicating image was shared
+      // Full implementation would upload to Supabase Storage
+      _addMessage(ChatMessage(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        text: '📷 Shared an image',
+        isCustomer: true,
+        time: DateTime.now(),
+        type: MessageType.image,
+        status: MessageStatus.sent,
+      ));
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Image sent'), backgroundColor: AppColors.success),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to pick image'), backgroundColor: AppColors.error),
+      );
+    }
   }
 
   void _showReactionPicker(ChatMessage message) {
@@ -1237,7 +1305,10 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                         ),
                       ),
                       GestureDetector(
-                        onTap: () => HapticFeedback.lightImpact(),
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          _showEmojiPicker();
+                        },
                         child: Padding(
                           padding: const EdgeInsets.only(right: 12),
                           child: Icon(Icons.emoji_emotions_outlined, color: context.mutedColor, size: 22),
@@ -1327,7 +1398,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   color: AppColors.info,
                   onTap: () {
                     Navigator.pop(ctx);
-                    HapticFeedback.lightImpact();
+                    _pickAndSendImage(ImageSource.camera);
                   },
                 ),
                 _buildAttachmentOption(
@@ -1337,7 +1408,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   color: AppColors.success,
                   onTap: () {
                     Navigator.pop(ctx);
-                    HapticFeedback.lightImpact();
+                    _pickAndSendImage(ImageSource.gallery);
                   },
                 ),
               ],

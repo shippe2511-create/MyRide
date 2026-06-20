@@ -894,7 +894,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     required bool isNew,
   }) {
     return GestureDetector(
-      onTap: () => HapticFeedback.lightImpact(),
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _showAnnouncementDetail(context, title: title, subtitle: subtitle, imageUrl: imageUrl, date: date);
+      },
       child: Container(
         width: 280,
         margin: const EdgeInsets.only(right: 12),
@@ -1055,7 +1058,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     required Color categoryColor,
   }) {
     return GestureDetector(
-      onTap: () => HapticFeedback.lightImpact(),
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _showStaffCornerDetail(context, title: title, subtitle: subtitle, imageUrl: imageUrl, category: category, categoryColor: categoryColor);
+      },
       child: Container(
         width: 200,
         margin: const EdgeInsets.only(right: 12),
@@ -1237,6 +1243,155 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       return '${time.day} ${months[time.month - 1]} $hour:$minute';
     }
+  }
+
+  void _showStaffCornerDetail(BuildContext context, {required String title, required String subtitle, required String imageUrl, required String category, required Color categoryColor}) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+        decoration: BoxDecoration(
+          color: context.surfaceColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              height: 180,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: categoryColor.withValues(alpha: 0.2),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                    child: Image.network(imageUrl, width: double.infinity, height: 180, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Center(child: Icon(Icons.people, color: categoryColor, size: 48))),
+                  ),
+                  Positioned(
+                    top: 16, left: 16,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(color: categoryColor, borderRadius: BorderRadius.circular(8)),
+                      child: Text(category, style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  Positioned(
+                    top: 16, right: 16,
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(ctx),
+                      child: Container(
+                        width: 36, height: 36,
+                        decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                        child: Icon(Icons.close, color: Colors.white, size: 20),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 16),
+                  Text(subtitle, style: TextStyle(color: context.textColor, fontSize: 15, height: 1.5)),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.yellow, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                      child: Text('Got it', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  SizedBox(height: MediaQuery.of(ctx).padding.bottom),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAnnouncementDetail(BuildContext context, {required String title, required String subtitle, required String imageUrl, required String date}) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+        decoration: BoxDecoration(
+          color: context.surfaceColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              height: 180,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppColors.yellow.withValues(alpha: 0.2),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                    child: Image.network(imageUrl, width: double.infinity, height: 180, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Center(child: Icon(Icons.campaign, color: AppColors.yellow, size: 48))),
+                  ),
+                  Positioned(
+                    top: 16,
+                    right: 16,
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(ctx),
+                      child: Container(
+                        width: 36, height: 36,
+                        decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                        child: Icon(Icons.close, color: Colors.white, size: 20),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  Text(date, style: TextStyle(color: context.mutedColor, fontSize: 13)),
+                  const SizedBox(height: 16),
+                  Text(subtitle, style: TextStyle(color: context.textColor, fontSize: 15, height: 1.5)),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.yellow, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                      child: Text('Got it', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  SizedBox(height: MediaQuery.of(ctx).padding.bottom),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showSchedulePicker(BuildContext context) {

@@ -2548,7 +2548,7 @@ For questions about cookies, contact support@myride.mv
     );
   }
 
-  void _showBottomSheet(BuildContext context, String title, List<Widget> children, {String? addButton}) {
+  void _showBottomSheet(BuildContext context, String title, List<Widget> children) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -2573,18 +2573,6 @@ For questions about cookies, contact support@myride.mv
                 ),
               ),
             ),
-            if (addButton != null) ...[
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: Icon(Icons.add, size: 18),
-                  label: Text(addButton),
-                  style: OutlinedButton.styleFrom(foregroundColor: AppColors.yellow, side: BorderSide(color: AppColors.yellow), padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                ),
-              ),
-            ],
             SizedBox(height: MediaQuery.of(context).padding.bottom),
           ],
         ),

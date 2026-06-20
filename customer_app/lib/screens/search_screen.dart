@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:http/http.dart' as http;
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_container.dart';
@@ -10,6 +12,8 @@ import '../widgets/primary_button.dart';
 import '../services/supabase_service.dart';
 import '../services/location_service.dart';
 import 'driver_matching_screen.dart';
+
+const String _googleApiKey = 'AIzaSyBZ7HVy2dUvTCC5SZkz0MaFCBON2QorFbI';
 
 const String _darkMapStyle = '''
 [
@@ -35,6 +39,8 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Map<String, dynamic>> _filteredResults = [];
   List<Map<String, dynamic>> _savedPlaces = [];
   bool _loadingSavedPlaces = true;
+  bool _isSearching = false;
+  Timer? _debounce;
   LatLng _currentLocation = const LatLng(4.1755, 73.5093);
 
   @override
@@ -42,12 +48,88 @@ class _SearchScreenState extends State<SearchScreen> {
     super.initState();
     _loadCurrentLocation();
     _filteredResults = _allResults;
-    _searchController.addListener(_filterResults);
+    _searchController.addListener(_onSearchChanged);
     if (widget.initialDestination != null) {
       _searchController.text = widget.initialDestination!;
     }
     _loadSavedPlaces();
     _loadRecentPlaces();
+  }
+
+  void _onSearchChanged() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      _searchPlaces(_searchController.text);
+    });
+  }
+
+  Future<void> _searchPlaces(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        _filteredResults = _allResults;
+        _isSearching = false;
+      });
+      return;
+    }
+
+    setState(() => _isSearching = true);
+
+    try {
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+        '?input=${Uri.encodeComponent(query)}'
+        '&location=4.1755,73.5093'
+        '&radius=50000'
+        '&components=country:mv'
+        '&key=$_googleApiKey'
+      );
+
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final predictions = data['predictions'] as List;
+
+        setState(() {
+          _filteredResults = predictions.map((p) => {
+            'title': p['structured_formatting']['main_text'] ?? p['description'],
+            'subtitle': p['structured_formatting']['secondary_text'] ?? '',
+            'placeId': p['place_id'],
+            'highlight': false,
+          }).toList();
+          _isSearching = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Places search error: $e');
+      _filterResults();
+      setState(() => _isSearching = false);
+    }
+  }
+
+  Future<Map<String, dynamic>?> _getPlaceDetails(String placeId) async {
+    try {
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/details/json'
+        '?place_id=$placeId'
+        '&fields=geometry,formatted_address,name'
+        '&key=$_googleApiKey'
+      );
+
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final result = data['result'];
+        return {
+          'name': result['name'],
+          'address': result['formatted_address'],
+          'lat': result['geometry']['location']['lat'],
+          'lng': result['geometry']['location']['lng'],
+        };
+      }
+    } catch (e) {
+      debugPrint('Place details error: $e');
+    }
+    return null;
   }
 
   Future<void> _loadCurrentLocation() async {
@@ -248,6 +330,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -297,34 +380,59 @@ class _SearchScreenState extends State<SearchScreen> {
                         ],
                       ),
                     )
-                  : _filteredResults.isEmpty
-                      ? Center(
-                          child: Text(
-                            'No locations found',
-                            style: TextStyle(color: context.mutedColor),
-                          ),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                          itemCount: _filteredResults.length,
-                          itemBuilder: (context, index) {
-                            final result = _filteredResults[index];
-                            return _buildResultItem(
-                              result['title'] as String,
-                              result['subtitle'] as String,
-                              result['highlight'] as bool,
-                              isDark,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => NearbyScreen(
-                                    destination: '${result['title']} · ${result['subtitle']}',
-                                  ),
-                                ),
+                  : _isSearching
+                      ? const Center(child: CircularProgressIndicator(color: AppColors.yellow))
+                      : _filteredResults.isEmpty
+                          ? Center(
+                              child: Text(
+                                'No locations found',
+                                style: TextStyle(color: context.mutedColor),
                               ),
-                            );
-                          },
-                        ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                              itemCount: _filteredResults.length,
+                              itemBuilder: (context, index) {
+                                final result = _filteredResults[index];
+                                final placeId = result['placeId'] as String?;
+                                return _buildResultItem(
+                                  result['title'] as String,
+                                  result['subtitle'] as String? ?? '',
+                                  result['highlight'] as bool? ?? false,
+                                  isDark,
+                                  onTap: () async {
+                                    if (placeId != null) {
+                                      final details = await _getPlaceDetails(placeId);
+                                      if (details != null && mounted) {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => DriverMatchingScreen(
+                                              pickup: 'Current location',
+                                              dropoff: details['name'],
+                                              rideType: 'Standard',
+                                              pickupLat: _currentLocation.latitude,
+                                              pickupLng: _currentLocation.longitude,
+                                              dropoffLat: details['lat'],
+                                              dropoffLng: details['lng'],
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    } else {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => NearbyScreen(
+                                            destination: '${result['title']} · ${result['subtitle']}',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                );
+                              },
+                            ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),

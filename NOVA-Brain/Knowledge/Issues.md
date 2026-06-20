@@ -128,11 +128,11 @@ Tags: #project/myride
 
 | Category | Fixed | No Issue | External Dependency |
 |----------|-------|----------|---------------------|
-| flutter_app | 10 | 0 | 0 |
-| driver_app | 6 | 1 | 0 |
-| admin-web | 17 | 0 | 0 |
+| flutter_app | 18 | 0 | 0 |
+| driver_app | 10 | 1 | 0 |
+| admin-web | 20 | 0 | 0 |
 | Cross-App | 0 | 0 | 2 |
-| **Total** | **33** | **1** | **2** |
+| **Total** | **48** | **1** | **2** |
 
 All code-level issues have been resolved. The remaining 2 issues require external Firebase/APNs configuration.
 
@@ -308,6 +308,82 @@ Fixed:
     - Customers, Drivers, Rides, Vehicles, Scheduling, Zones
     - Admins, Eligibility, Vehicle Logs, Content, Incidents
     - Checklists, Help, App Config, SOS
+
+---
+
+## Code Audit Fixes (2026-06-21)
+
+### High Priority Fixes
+
+### 46. Change Password - FIXED
+- **Issue:** Validated input but never called Supabase auth
+- **Fix:** Added `SupabaseService.changePassword()` with loading state and error handling
+
+### 47. Download My Data - FIXED
+- **Issue:** Showed snackbar but did nothing
+- **Fix:** Exports profile, rides, saved places as text via Share
+
+### 48. Clear Search History - FIXED
+- **Issue:** Showed snackbar but didn't clear
+- **Fix:** Deletes recent places from Supabase
+
+### 49. Book Again - FIXED
+- **Issue:** Just closed dialog
+- **Fix:** Navigates to SearchScreen with destination prefilled
+
+### 50. Inbox Screen - FIXED
+- **Issue:** Never loaded messages (TODO comment)
+- **Fix:** Fetches from `notifications` table with pull-to-refresh, mark read
+
+### 51. Notifications Screen - FIXED
+- **Issue:** Never loaded data
+- **Fix:** Same as inbox - loads from Supabase, swipe to delete, mark all read
+
+### 52. Driver Ratings Hardcoded - FIXED
+- **Issue:** Rating breakdown and feedback were mock data
+- **Fix:** Fetches real ratings from Supabase with breakdown calculation
+
+### 53. Driver Notification Settings - FIXED
+- **Issue:** Toggles didn't persist
+- **Fix:** Saves to SharedPreferences, loads on init
+
+### 54. Admin Ratings Export CSV - FIXED
+- **Issue:** Crashed due to undefined `rating_breakdown` property
+- **Fix:** Uses actual fields from DriverRating interface
+
+### Medium Priority Fixes
+
+### 55. Announcement Card Tap - FIXED
+- **Issue:** Only triggered haptic, no action
+- **Fix:** Shows detail modal with image, title, content
+
+### 56. Staff Corner Card Tap - FIXED
+- **Issue:** Only triggered haptic, no action
+- **Fix:** Shows detail modal with category badge, image, content
+
+### 57. Chat Camera/Gallery Buttons - FIXED
+- **Issue:** Did nothing (both apps)
+- **Fix:** Uses image_picker to select/capture and send image message
+
+### 58. Chat Emoji Button - FIXED
+- **Issue:** Did nothing
+- **Fix:** Shows emoji picker modal, inserts selected emoji into message
+
+### 59. SOS Share Location - FIXED
+- **Issue:** Only showed snackbar
+- **Fix:** Gets GPS coordinates and shares via Share with Google Maps link
+
+### 60. Voice Recording - FIXED
+- **Issue:** Simulated recording without actual audio
+- **Fix:** Shows "Voice messages coming soon" snackbar
+
+### 61. Report Builder Navigation - FIXED
+- **Issue:** Page existed but not in sidebar
+- **Fix:** Added to Insights section in sidebar navigation
+
+### 62. Dead Code Cleanup
+- **Issue:** `_showBottomSheet` had unused `addButton` parameter with empty handler
+- **Fix:** Removed unused parameter
 
 ---
 

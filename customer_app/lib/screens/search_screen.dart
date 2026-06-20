@@ -57,8 +57,10 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _onSearchChanged() {
+    debugPrint('Search changed: ${_searchController.text}');
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 400), () {
+      debugPrint('Debounce fired, searching: ${_searchController.text}');
       _searchPlaces(_searchController.text);
     });
   }
@@ -79,25 +81,42 @@ class _SearchScreenState extends State<SearchScreen> {
         'https://maps.googleapis.com/maps/api/place/autocomplete/json'
         '?input=${Uri.encodeComponent(query)}'
         '&location=4.1755,73.5093'
-        '&radius=50000'
+        '&radius=100000'
         '&components=country:mv'
         '&key=$_googleApiKey'
       );
 
+      debugPrint('Places API URL: $url');
       final response = await http.get(url);
+      debugPrint('Places API status: ${response.statusCode}');
+      debugPrint('Places API body: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final predictions = data['predictions'] as List;
+        final status = data['status'] as String?;
+        debugPrint('Places API status field: $status');
 
-        setState(() {
-          _filteredResults = predictions.map((p) => {
-            'title': p['structured_formatting']['main_text'] ?? p['description'],
-            'subtitle': p['structured_formatting']['secondary_text'] ?? '',
-            'placeId': p['place_id'],
-            'highlight': false,
-          }).toList();
-          _isSearching = false;
-        });
+        if (status == 'OK') {
+          final predictions = data['predictions'] as List;
+          debugPrint('Found ${predictions.length} predictions');
+
+          setState(() {
+            _filteredResults = predictions.map((p) => {
+              'title': p['structured_formatting']?['main_text'] ?? p['description'] ?? '',
+              'subtitle': p['structured_formatting']?['secondary_text'] ?? '',
+              'placeId': p['place_id'],
+              'highlight': false,
+            }).toList();
+            _isSearching = false;
+          });
+        } else {
+          debugPrint('Places API error status: $status - ${data['error_message'] ?? ''}');
+          _filterResults();
+          setState(() => _isSearching = false);
+        }
+      } else {
+        _filterResults();
+        setState(() => _isSearching = false);
       }
     } catch (e) {
       debugPrint('Places search error: $e');

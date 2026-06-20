@@ -1,8 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -15,6 +15,19 @@ import '../widgets/status_animation.dart';
 import 'trip_tracking_screen.dart';
 import 'trip_complete_screen.dart';
 import 'chat_screen.dart';
+
+const String _darkMapStyle = '''
+[
+  {"elementType": "geometry", "stylers": [{"color": "#212121"}]},
+  {"elementType": "labels.icon", "stylers": [{"visibility": "off"}]},
+  {"elementType": "labels.text.fill", "stylers": [{"color": "#757575"}]},
+  {"elementType": "labels.text.stroke", "stylers": [{"color": "#212121"}]},
+  {"featureType": "road", "elementType": "geometry.fill", "stylers": [{"color": "#2c2c2c"}]},
+  {"featureType": "road.arterial", "elementType": "geometry", "stylers": [{"color": "#373737"}]},
+  {"featureType": "road.highway", "elementType": "geometry", "stylers": [{"color": "#3c3c3c"}]},
+  {"featureType": "water", "elementType": "geometry", "stylers": [{"color": "#000000"}]}
+]
+''';
 
 class DriverArrivingScreen extends StatefulWidget {
   final String pickup;
@@ -59,6 +72,7 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
   RealtimeChannel? _rideSubscription;
   bool _driverArrived = false;
   bool _tripStarted = false;
+  GoogleMapController? _mapController;
 
   @override
   void initState() {
@@ -224,7 +238,36 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
     _etaTimer.cancel();
     _statusPollingTimer?.cancel();
     _rideSubscription?.unsubscribe();
+    _mapController?.dispose();
     super.dispose();
+  }
+
+  Set<Marker> _buildMarkers() {
+    return {
+      Marker(
+        markerId: const MarkerId('pickup'),
+        position: _pickupLocation,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        infoWindow: InfoWindow(title: 'Pickup', snippet: widget.pickup),
+      ),
+      Marker(
+        markerId: const MarkerId('driver'),
+        position: _driverLocation,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
+        infoWindow: InfoWindow(title: widget.driverName, snippet: widget.vehicleModel),
+      ),
+    };
+  }
+
+  Set<Polyline> _buildPolylines() {
+    return {
+      Polyline(
+        polylineId: const PolylineId('route'),
+        points: [_driverLocation, _pickupLocation],
+        color: AppColors.yellow,
+        width: 4,
+      ),
+    };
   }
 
   @override
@@ -233,35 +276,17 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
       backgroundColor: context.bgColor,
       body: Stack(
         children: [
-          // Map
-          FlutterMap(
-            options: MapOptions(initialCenter: _pickupLocation, initialZoom: 15),
-            children: [
-              TileLayer(urlTemplate: context.isDark ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', subdomains: const ['a', 'b', 'c', 'd']),
-              PolylineLayer(polylines: [Polyline(points: [_driverLocation, _pickupLocation], color: AppColors.yellow, strokeWidth: 4)]),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: _pickupLocation,
-                    width: 44,
-                    height: 44,
-                    child: Container(
-                      decoration: BoxDecoration(color: AppColors.success, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3)),
-                      child: Icon(Icons.person, color: Colors.white, size: 22),
-                    ),
-                  ),
-                  Marker(
-                    point: _driverLocation,
-                    width: 50,
-                    height: 50,
-                    child: Container(
-                      decoration: BoxDecoration(color: AppColors.yellow, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3), boxShadow: [BoxShadow(color: AppColors.yellow.withValues(alpha: 0.5), blurRadius: 12)]),
-                      child: Icon(Icons.local_taxi, color: Colors.black, size: 26),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+          // Google Map
+          GoogleMap(
+            initialCameraPosition: CameraPosition(target: _pickupLocation, zoom: 15),
+            onMapCreated: (controller) => _mapController = controller,
+            markers: _buildMarkers(),
+            polylines: _buildPolylines(),
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            style: context.isDark ? _darkMapStyle : null,
           ),
 
           // Top bar

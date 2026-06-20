@@ -1,24 +1,18 @@
 import Flutter
 import UIKit
+import GoogleMaps
 
 @main
-@objc class AppDelegate: FlutterAppDelegate {
-    lazy var flutterEngine = FlutterEngine(name: "main")
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+  override func application(
+    _ application: UIApplication,
+    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+  ) -> Bool {
+    GMSServices.provideAPIKey("AIzaSyBZ7HVy2dUvTCC5SZkz0MaFCBON2QorFbI")
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
 
-    override func application(
-        _ application: UIApplication,
-        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
-    ) -> Bool {
-        flutterEngine.run()
-        GeneratedPluginRegistrant.register(with: flutterEngine)
-        return super.application(application, didFinishLaunchingWithOptions: launchOptions)
-    }
-
-    override func application(
-        _ application: UIApplication,
-        configurationForConnecting connectingSceneSession: UISceneSession,
-        options: UIScene.ConnectionOptions
-    ) -> UISceneConfiguration {
-        return UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
-    }
+  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+  }
 }

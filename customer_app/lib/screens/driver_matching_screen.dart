@@ -2,8 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
@@ -11,6 +10,19 @@ import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../providers/app_state.dart';
 import 'driver_arriving_screen.dart';
+
+const String _darkMapStyle = '''
+[
+  {"elementType": "geometry", "stylers": [{"color": "#212121"}]},
+  {"elementType": "labels.icon", "stylers": [{"visibility": "off"}]},
+  {"elementType": "labels.text.fill", "stylers": [{"color": "#757575"}]},
+  {"elementType": "labels.text.stroke", "stylers": [{"color": "#212121"}]},
+  {"featureType": "road", "elementType": "geometry.fill", "stylers": [{"color": "#2c2c2c"}]},
+  {"featureType": "road.arterial", "elementType": "geometry", "stylers": [{"color": "#373737"}]},
+  {"featureType": "road.highway", "elementType": "geometry", "stylers": [{"color": "#3c3c3c"}]},
+  {"featureType": "water", "elementType": "geometry", "stylers": [{"color": "#000000"}]}
+]
+''';
 
 class DriverMatchingScreen extends StatefulWidget {
   final String pickup;
@@ -308,84 +320,27 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
       backgroundColor: context.bgColor,
       body: Stack(
         children: [
-          // Live Map
-          FlutterMap(
-            options: MapOptions(
-              initialCenter: _userLocation,
-              initialZoom: 15,
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: context.isDark ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
+          // Google Map
+          GoogleMap(
+            initialCameraPosition: CameraPosition(target: _userLocation, zoom: 15),
+            markers: {
+              Marker(
+                markerId: const MarkerId('user'),
+                position: _userLocation,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
+                infoWindow: const InfoWindow(title: 'Your location'),
               ),
-              // User marker with pulse
-              MarkerLayer(
-                markers: [
-                  // User location with pulse animation
-                  Marker(
-                    point: _userLocation,
-                    width: 100,
-                    height: 100,
-                    child: AnimatedBuilder(
-                      animation: _pulseAnimation,
-                      builder: (context, child) {
-                        return Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            // Pulse ring
-                            Container(
-                              width: 30 * _pulseAnimation.value,
-                              height: 30 * _pulseAnimation.value,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppColors.yellow.withValues(alpha: 0.3 / _pulseAnimation.value),
-                              ),
-                            ),
-                            // User dot
-                            Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                color: AppColors.yellow,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 3),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.yellow.withValues(alpha: 0.5),
-                                    blurRadius: 12,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                  // Driver markers
-                  ..._driverLocations.map((loc) => Marker(
-                    point: loc,
-                    width: 44,
-                    height: 44,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.yellow,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Icon(Icons.local_taxi, color: Colors.black, size: 24),
-                    ),
-                  )),
-                ],
-              ),
-            ],
+              ..._driverLocations.asMap().entries.map((entry) => Marker(
+                markerId: MarkerId('driver_${entry.key}'),
+                position: entry.value,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+              )),
+            },
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            style: context.isDark ? _darkMapStyle : null,
           ),
 
           // Top bar
@@ -463,10 +418,37 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
                   ),
                   const SizedBox(height: 20),
 
-                  // Status text
-                  Text(
-                    _statusText,
-                    style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w600),
+                  // Animated searching indicator
+                  AnimatedBuilder(
+                    animation: _pulseController,
+                    builder: (context, child) {
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Animated dots
+                          ...List.generate(3, (i) {
+                            final delay = i * 0.2;
+                            final value = ((_pulseController.value + delay) % 1.0);
+                            final scale = 0.6 + 0.4 * (value < 0.5 ? value * 2 : (1 - value) * 2);
+                            return Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 3),
+                              width: 8 * scale,
+                              height: 8 * scale,
+                              decoration: BoxDecoration(
+                                color: AppColors.yellow.withValues(alpha: 0.5 + 0.5 * scale),
+                                shape: BoxShape.circle,
+                              ),
+                            );
+                          }),
+                          const SizedBox(width: 12),
+                          // Status text
+                          Text(
+                            _statusText,
+                            style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 16),
 

@@ -1,8 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -14,6 +14,19 @@ import '../widgets/status_animation.dart';
 import 'trip_complete_screen.dart';
 import 'chat_screen.dart';
 
+const String _darkMapStyle = '''
+[
+  {"elementType": "geometry", "stylers": [{"color": "#212121"}]},
+  {"elementType": "labels.icon", "stylers": [{"visibility": "off"}]},
+  {"elementType": "labels.text.fill", "stylers": [{"color": "#757575"}]},
+  {"elementType": "labels.text.stroke", "stylers": [{"color": "#212121"}]},
+  {"featureType": "road", "elementType": "geometry.fill", "stylers": [{"color": "#2c2c2c"}]},
+  {"featureType": "road.arterial", "elementType": "geometry", "stylers": [{"color": "#373737"}]},
+  {"featureType": "road.highway", "elementType": "geometry", "stylers": [{"color": "#3c3c3c"}]},
+  {"featureType": "water", "elementType": "geometry", "stylers": [{"color": "#000000"}]}
+]
+''';
+
 class TripTrackingScreen extends StatefulWidget {
   final Map<String, dynamic> tripData;
 
@@ -24,7 +37,7 @@ class TripTrackingScreen extends StatefulWidget {
 }
 
 class _TripTrackingScreenState extends State<TripTrackingScreen> {
-  late MapController _mapController;
+  GoogleMapController? _mapController;
 
   LatLng _driverLocation = const LatLng(4.2100, 73.5350);
   final LatLng _pickupLocation = const LatLng(4.2286, 73.5400);
@@ -193,72 +206,43 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
       backgroundColor: context.bgColor,
       body: Stack(
         children: [
-          // Full screen map
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _driverLocation,
-              initialZoom: 14,
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: context.isDark ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
+          // Google Map
+          GoogleMap(
+            initialCameraPosition: CameraPosition(target: _driverLocation, zoom: 14),
+            onMapCreated: (controller) => _mapController = controller,
+            markers: {
+              Marker(
+                markerId: const MarkerId('pickup'),
+                position: _pickupLocation,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                infoWindow: const InfoWindow(title: 'Pickup'),
               ),
-              PolylineLayer(
-                polylines: [
-                  Polyline(
-                    points: [_pickupLocation, _driverLocation, _dropoffLocation],
-                    color: AppColors.yellow,
-                    strokeWidth: 4,
-                  ),
-                ],
+              Marker(
+                markerId: const MarkerId('dropoff'),
+                position: _dropoffLocation,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                infoWindow: const InfoWindow(title: 'Drop-off'),
               ),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: _pickupLocation,
-                    width: 44,
-                    height: 44,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.success,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 3),
-                      ),
-                      child: Icon(Icons.person, color: Colors.white, size: 22),
-                    ),
-                  ),
-                  Marker(
-                    point: _dropoffLocation,
-                    width: 44,
-                    height: 44,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.error,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 3),
-                      ),
-                      child: Icon(Icons.flag, color: Colors.white, size: 20),
-                    ),
-                  ),
-                  Marker(
-                    point: _driverLocation,
-                    width: 50,
-                    height: 50,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.yellow,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 3),
-                        boxShadow: [BoxShadow(color: AppColors.yellow.withValues(alpha: 0.5), blurRadius: 12)],
-                      ),
-                      child: Icon(Icons.local_taxi, color: Colors.black, size: 26),
-                    ),
-                  ),
-                ],
+              Marker(
+                markerId: const MarkerId('driver'),
+                position: _driverLocation,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
+                infoWindow: const InfoWindow(title: 'Driver'),
               ),
-            ],
+            },
+            polylines: {
+              Polyline(
+                polylineId: const PolylineId('route'),
+                points: [_pickupLocation, _driverLocation, _dropoffLocation],
+                color: AppColors.yellow,
+                width: 4,
+              ),
+            },
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            style: context.isDark ? _darkMapStyle : null,
           ),
 
           // Top bar - matching driver arriving screen

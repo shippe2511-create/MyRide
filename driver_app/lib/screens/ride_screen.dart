@@ -2,9 +2,8 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/ride_request.dart';
@@ -14,6 +13,26 @@ import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import 'chat_screen.dart';
 
+const String _darkMapStyle = '''
+[
+  {"elementType": "geometry", "stylers": [{"color": "#212121"}]},
+  {"elementType": "labels.icon", "stylers": [{"visibility": "off"}]},
+  {"elementType": "labels.text.fill", "stylers": [{"color": "#757575"}]},
+  {"elementType": "labels.text.stroke", "stylers": [{"color": "#212121"}]},
+  {"featureType": "administrative", "elementType": "geometry", "stylers": [{"color": "#757575"}]},
+  {"featureType": "poi", "elementType": "labels.text.fill", "stylers": [{"color": "#757575"}]},
+  {"featureType": "poi.park", "elementType": "geometry", "stylers": [{"color": "#181818"}]},
+  {"featureType": "road", "elementType": "geometry.fill", "stylers": [{"color": "#2c2c2c"}]},
+  {"featureType": "road", "elementType": "labels.text.fill", "stylers": [{"color": "#8a8a8a"}]},
+  {"featureType": "road.arterial", "elementType": "geometry", "stylers": [{"color": "#373737"}]},
+  {"featureType": "road.highway", "elementType": "geometry", "stylers": [{"color": "#3c3c3c"}]},
+  {"featureType": "road.local", "elementType": "labels.text.fill", "stylers": [{"color": "#616161"}]},
+  {"featureType": "transit", "elementType": "labels.text.fill", "stylers": [{"color": "#757575"}]},
+  {"featureType": "water", "elementType": "geometry", "stylers": [{"color": "#000000"}]},
+  {"featureType": "water", "elementType": "labels.text.fill", "stylers": [{"color": "#3d3d3d"}]}
+]
+''';
+
 class RideScreen extends StatefulWidget {
   const RideScreen({super.key});
 
@@ -22,7 +41,7 @@ class RideScreen extends StatefulWidget {
 }
 
 class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
-  final MapController _mapController = MapController();
+  GoogleMapController? _mapController;
   late AnimationController _pulseController;
   late AnimationController _routeAnimController;
   late Animation<double> _pulseAnimation;
@@ -79,7 +98,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     _timer?.cancel();
     _etaTimer?.cancel();
     _destinationChangeTimer?.cancel();
-    _mapController.dispose();
+    _mapController?.dispose();
     super.dispose();
   }
 
@@ -265,7 +284,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
             _driverLng = position.longitude;
             if (_etaSeconds > 0) _etaSeconds -= 3;
           });
-          _mapController.move(LatLng(_driverLat, _driverLng), _mapController.camera.zoom);
+          _mapController?.animateCamera(CameraUpdate.newLatLng(LatLng(_driverLat, _driverLng)));
           _sendLocationUpdate();
         }
       } catch (e) {
@@ -341,6 +360,57 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     return points;
   }
 
+  Set<Marker> _buildMarkers(RideRequest ride, DriverState state) {
+    return {
+      Marker(
+        markerId: const MarkerId('driver'),
+        position: LatLng(_driverLat, _driverLng),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
+        infoWindow: const InfoWindow(title: 'You'),
+      ),
+      Marker(
+        markerId: const MarkerId('pickup'),
+        position: LatLng(ride.pickupLat, ride.pickupLng),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        infoWindow: InfoWindow(title: 'Pickup', snippet: ride.pickupLocation),
+      ),
+      Marker(
+        markerId: const MarkerId('dropoff'),
+        position: LatLng(ride.dropoffLat, ride.dropoffLng),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        infoWindow: InfoWindow(title: 'Drop-off', snippet: ride.dropoffLocation),
+      ),
+      ...state.queuedRequests.asMap().entries.map((entry) {
+        final idx = entry.key;
+        final req = entry.value;
+        return Marker(
+          markerId: MarkerId('queue_$idx'),
+          position: LatLng(req.pickupLat, req.pickupLng),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+          infoWindow: InfoWindow(title: 'Queue #${idx + 1}', snippet: req.customerName),
+        );
+      }),
+    };
+  }
+
+  Set<Polyline> _buildPolylines() {
+    if (_routePoints.isEmpty) return {};
+    return {
+      Polyline(
+        polylineId: const PolylineId('route_bg'),
+        points: _routePoints,
+        color: Colors.white24,
+        width: 6,
+      ),
+      Polyline(
+        polylineId: const PolylineId('route'),
+        points: _routePoints.take(_currentRouteIndex + 1).toList(),
+        color: AppColors.yellow,
+        width: 5,
+      ),
+    };
+  }
+
   void _startTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -362,15 +432,31 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   }
 
   void _fitBounds(RideRequest ride) {
+    if (_mapController == null) return;
     try {
-      final points = [
-        LatLng(ride.pickupLat, ride.pickupLng),
-        LatLng(ride.dropoffLat, ride.dropoffLng),
-        LatLng(_driverLat, _driverLng),
-      ];
-      final bounds = LatLngBounds.fromPoints(points);
-      _mapController.fitCamera(CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(80)));
-    } catch (e) {}
+      final pickupLat = ride.pickupLat != 0 ? ride.pickupLat : 4.1755;
+      final pickupLng = ride.pickupLng != 0 ? ride.pickupLng : 73.5093;
+      final dropoffLat = ride.dropoffLat != 0 ? ride.dropoffLat : pickupLat + 0.01;
+      final dropoffLng = ride.dropoffLng != 0 ? ride.dropoffLng : pickupLng + 0.01;
+      final driverLat = (_driverLat > 1 && _driverLat < 90) ? _driverLat : pickupLat;
+      final driverLng = (_driverLng > 1 && _driverLng < 180) ? _driverLng : pickupLng;
+
+      final bounds = LatLngBounds(
+        southwest: LatLng(
+          [pickupLat, dropoffLat, driverLat].reduce(math.min),
+          [pickupLng, dropoffLng, driverLng].reduce(math.min),
+        ),
+        northeast: LatLng(
+          [pickupLat, dropoffLat, driverLat].reduce(math.max),
+          [pickupLng, dropoffLng, driverLng].reduce(math.max),
+        ),
+      );
+      _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
+    } catch (e) {
+      _mapController!.animateCamera(CameraUpdate.newLatLngZoom(
+        LatLng(ride.pickupLat, ride.pickupLng), 15,
+      ));
+    }
   }
 
   Future<void> _openNavigation(double lat, double lng) async {
@@ -531,122 +617,25 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
           backgroundColor: context.bgColor,
           body: Stack(
             children: [
-              // Full screen map
+              // Full screen Google Map
               Positioned.fill(
-                child: FlutterMap(
-                  mapController: _mapController,
-                  options: MapOptions(
-                    initialCenter: LatLng(ride.pickupLat, ride.pickupLng),
-                    initialZoom: 14,
-                    onMapReady: () => Future.delayed(
-                      const Duration(milliseconds: 300),
-                      () => _fitBounds(ride),
-                    ),
+                child: GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                    target: LatLng(ride.pickupLat, ride.pickupLng),
+                    zoom: 14,
                   ),
-                  children: [
-                    TileLayer(
-                      urlTemplate: context.isDark
-                          ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'
-                          : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-                      subdomains: const ['a', 'b', 'c', 'd'],
-                    ),
-                    // Animated route line
-                    if (_routePoints.isNotEmpty)
-                      PolylineLayer(
-                        polylines: [
-                          Polyline(
-                            points: _routePoints,
-                            color: Colors.white24,
-                            strokeWidth: 6,
-                          ),
-                          Polyline(
-                            points: _routePoints.take(_currentRouteIndex + 1).toList(),
-                            color: AppColors.yellow,
-                            strokeWidth: 5,
-                          ),
-                        ],
-                      ),
-                    // Markers
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: LatLng(_driverLat, _driverLng),
-                          width: 50,
-                          height: 50,
-                          child: ScaleTransition(
-                            scale: _pulseAnimation,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: AppColors.yellow,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 3),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.yellow.withValues(alpha: 0.5),
-                                    blurRadius: 15,
-                                    spreadRadius: 5,
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(Icons.local_taxi, color: Colors.black, size: 24),
-                            ),
-                          ),
-                        ),
-                        Marker(
-                          point: LatLng(ride.pickupLat, ride.pickupLng),
-                          width: 40,
-                          height: 40,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.success,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            child: const Icon(Icons.person, color: Colors.white, size: 20),
-                          ),
-                        ),
-                        Marker(
-                          point: LatLng(ride.dropoffLat, ride.dropoffLng),
-                          width: 40,
-                          height: 40,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.error,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            child: const Icon(Icons.flag, color: Colors.white, size: 20),
-                          ),
-                        ),
-                        ...state.queuedRequests.asMap().entries.map((entry) {
-                          final idx = entry.key;
-                          final req = entry.value;
-                          return Marker(
-                            point: LatLng(req.pickupLat, req.pickupLng),
-                            width: 30,
-                            height: 30,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.orange,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  '${idx + 1}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }),
-                      ],
-                    ),
-                  ],
+                  onMapCreated: (controller) {
+                    _mapController = controller;
+                    Future.delayed(const Duration(milliseconds: 500), () => _fitBounds(ride));
+                  },
+                  markers: _buildMarkers(ride, state),
+                  polylines: _buildPolylines(),
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: false,
+                  zoomControlsEnabled: false,
+                  mapToolbarEnabled: false,
+                  compassEnabled: false,
+                  style: context.isDark ? _darkMapStyle : null,
                 ),
               ),
 

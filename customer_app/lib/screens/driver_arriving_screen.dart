@@ -40,6 +40,7 @@ class DriverArrivingScreen extends StatefulWidget {
   final String driverPhone;
   final String? driverPhoto;
   final String? driverProfileId;
+  final String? driverId;
   final int eta;
   final String? rideId;
 
@@ -55,6 +56,7 @@ class DriverArrivingScreen extends StatefulWidget {
     required this.driverPhone,
     this.driverPhoto,
     this.driverProfileId,
+    this.driverId,
     required this.eta,
     this.rideId,
   });
@@ -155,6 +157,7 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
               'vehicleNumber': widget.vehicleNumber,
               'driverPhone': widget.driverPhone,
               'driverProfileId': widget.driverProfileId,
+              'driver': {'id': widget.driverId},
               'rideId': widget.rideId,
               'status': 'in_progress',
             },

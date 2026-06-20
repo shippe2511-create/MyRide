@@ -6,6 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
@@ -45,8 +46,9 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
 
   int _etaMinutes = 12;
   late String _dropoff;
-  Timer? _simulationTimer;
+  String _driverName = 'Driver';
   Timer? _statusPollingTimer;
+  RealtimeChannel? _driverLocationChannel;
   bool _tripCompleted = false;
   String _rideStatus = 'accepted'; // accepted, arrived, in_progress, completed
 
@@ -55,8 +57,9 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
     super.initState();
     _dropoff = widget.tripData['dropoff'] ?? 'Velana International Airport';
     _rideStatus = widget.tripData['status'] as String? ?? 'accepted';
-    _startDriverSimulation();
-    _startStatusPolling(); // Poll for driver completing the trip
+    _driverName = widget.tripData['driverName'] as String? ?? 'Driver';
+    _startStatusPolling();
+    _subscribeToDriverLocation();
 
     // Subscribe to chat notifications
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -70,9 +73,97 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
 
   @override
   void dispose() {
-    _simulationTimer?.cancel();
+    _driverLocationChannel?.unsubscribe();
     _statusPollingTimer?.cancel();
     super.dispose();
+  }
+
+  void _subscribeToDriverLocation() async {
+    String? driverId = widget.tripData['driver']?['id'] as String?;
+
+    // Fallback: fetch driver ID from ride if not passed
+    if (driverId == null) {
+      final rideId = widget.tripData['rideId'] as String?;
+      if (rideId != null) {
+        try {
+          final ride = await SupabaseService.getRideById(rideId);
+          if (ride != null) {
+            driverId = ride['driver']?['id'] as String?;
+            // Also update driver name if missing
+            final driverProfile = ride['driver']?['profile'] as Map<String, dynamic>?;
+            if (driverProfile != null && mounted) {
+              setState(() {
+                _driverName = driverProfile['full_name'] as String? ?? _driverName;
+              });
+            }
+          }
+        } catch (e) {
+          debugPrint('Error fetching driver for tracking: $e');
+        }
+      }
+    }
+
+    if (driverId == null) {
+      debugPrint('No driver ID for location tracking');
+      return;
+    }
+
+    debugPrint('Subscribing to driver location: $driverId');
+
+    _driverLocationChannel = Supabase.instance.client
+        .channel('driver_location_$driverId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'driver_locations',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'driver_id',
+            value: driverId,
+          ),
+          callback: (payload) {
+            debugPrint('Driver location update: ${payload.newRecord}');
+            final newRecord = payload.newRecord;
+            if (newRecord != null && mounted) {
+              final lat = newRecord['latitude'] as num?;
+              final lng = newRecord['longitude'] as num?;
+              if (lat != null && lng != null) {
+                setState(() {
+                  _driverLocation = LatLng(lat.toDouble(), lng.toDouble());
+                });
+                _mapController?.animateCamera(
+                  CameraUpdate.newLatLng(_driverLocation),
+                );
+              }
+            }
+          },
+        )
+        .subscribe();
+
+    // Also fetch initial location
+    _fetchDriverLocation(driverId);
+  }
+
+  Future<void> _fetchDriverLocation(String driverId) async {
+    try {
+      final response = await Supabase.instance.client
+          .from('driver_locations')
+          .select('latitude, longitude')
+          .eq('driver_id', driverId)
+          .maybeSingle();
+
+      if (response != null && mounted) {
+        final lat = response['latitude'] as num?;
+        final lng = response['longitude'] as num?;
+        if (lat != null && lng != null) {
+          setState(() {
+            _driverLocation = LatLng(lat.toDouble(), lng.toDouble());
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching driver location: $e');
+    }
   }
 
   void _startStatusPolling() {
@@ -95,11 +186,11 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
 
           if (status == 'completed' && !_tripCompleted) {
             _statusPollingTimer?.cancel();
-            _simulationTimer?.cancel();
+            _driverLocationChannel?.unsubscribe();
             _onTripCompleted(); // This sets _tripCompleted = true
           } else if (status == 'cancelled') {
             _statusPollingTimer?.cancel();
-            _simulationTimer?.cancel();
+            _driverLocationChannel?.unsubscribe();
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Trip was cancelled'), backgroundColor: Colors.red),
             );
@@ -108,23 +199,6 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
         }
       } catch (e) {
         debugPrint('Trip polling error: $e');
-      }
-    });
-  }
-
-  void _startDriverSimulation() {
-    _simulationTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      if (mounted && !_tripCompleted) {
-        setState(() {
-          _driverLocation = LatLng(
-            _driverLocation.latitude - 0.001,
-            _driverLocation.longitude - 0.0005,
-          );
-          if (_etaMinutes > 1) {
-            _etaMinutes--;
-          }
-          // Don't auto-complete - wait for driver to mark as completed via database
-        });
       }
     });
   }
@@ -418,7 +492,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    widget.tripData['driverName'] ?? 'Driver',
+                                    _driverName,
                                     style: TextStyle(color: context.textColor, fontSize: 17, fontWeight: FontWeight.w700),
                                   ),
                                   const SizedBox(height: 4),
@@ -595,7 +669,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
   }
 
   void _shareTripDetails() {
-    final driverName = widget.tripData['driverName'] ?? 'Driver';
+    final driverName = _driverName;
     final vehicleNumber = widget.tripData['vehicleNumber'] ?? 'Unknown';
     final message = '''I'm on a trip with MyRide 🚕
 
@@ -1381,7 +1455,7 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
   }
 
   void _shareLocation() {
-    final driverName = widget.tripData['driverName'] ?? 'Driver';
+    final driverName = _driverName;
     final vehicleNumber = widget.tripData['vehicleNumber'] ?? 'Unknown';
     final message = '''🆘 EMERGENCY - I need help!
 
@@ -1410,7 +1484,7 @@ Please contact me or emergency services (119) if needed.''';
       return;
     }
 
-    final driverName = widget.tripData['driverName'] ?? 'Driver';
+    final driverName = _driverName;
     final vehicleNumber = widget.tripData['vehicleNumber'] ?? 'Unknown';
     final message = '''🆘 EMERGENCY ALERT from MyRide
 

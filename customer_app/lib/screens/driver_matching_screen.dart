@@ -356,6 +356,7 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
     String driverPhone = '';
     String? driverPhoto;
     String? driverProfileId;
+    String? driverId;
 
     try {
       if (_rideId != null) {
@@ -373,6 +374,7 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
           debugPrint('Profile data: $profile');
           final vehicle = driver['vehicle'];
 
+          driverId = driver['id'] as String?;
           driverName = profile?['full_name'] ?? 'Driver';
           driverRating = (driver['rating'] ?? 5.0).toDouble();
           driverPhone = profile?['phone'] ?? '';
@@ -387,7 +389,7 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
             if (vehicleModel.isEmpty) vehicleModel = 'Vehicle';
           }
 
-          debugPrint('Found actual driver: $driverName, profileId: $driverProfileId');
+          debugPrint('Found actual driver: $driverName, driverId: $driverId, profileId: $driverProfileId');
         } else {
           debugPrint('No driver in ride response. Ride driver_id: ${ride?['driver_id']}');
         }
@@ -419,6 +421,7 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
           driverPhone: driverPhone,
           driverPhoto: driverPhoto,
           driverProfileId: driverProfileId,
+          driverId: driverId,
           eta: 4,
           rideId: _rideId,
         ),

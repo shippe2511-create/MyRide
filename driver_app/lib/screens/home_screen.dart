@@ -546,9 +546,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildOnlineView(BuildContext context, DriverState state) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 80),
-      child: Column(
+    return Column(
         children: [
           // Stats card
           _buildStatsCard(context, state),
@@ -686,7 +684,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ],
-      ),
     );
   }
 

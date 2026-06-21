@@ -58,13 +58,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
 
       if (mounted) {
         debugPrint('Loaded ${routes.length} routes, ${schedules.length} schedules');
+        debugPrint('Transport types: ${types.map((t) => t['name']).toList()}');
         // Sort transport types: Internal first, then MTCC, then Ferry
-        final sortOrder = {'internal_bus': 0, 'mtcc_bus': 1, 'ferry': 2};
+        final sortOrder = {'internal_bus': 0, 'Internal': 0, 'mtcc_bus': 1, 'MTCC': 1, 'ferry': 2, 'Ferry': 2};
         types.sort((a, b) {
-          final orderA = sortOrder[a['name']] ?? 99;
-          final orderB = sortOrder[b['name']] ?? 99;
+          final nameA = a['name']?.toString() ?? '';
+          final nameB = b['name']?.toString() ?? '';
+          final orderA = sortOrder[nameA] ?? 99;
+          final orderB = sortOrder[nameB] ?? 99;
           return orderA.compareTo(orderB);
         });
+        debugPrint('Sorted transport types: ${types.map((t) => t['name']).toList()}');
         setState(() {
           _transportTypes = types;
           _routes = routes;

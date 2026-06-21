@@ -428,6 +428,30 @@ Fixed:
   - Fetches initial driver location on screen load
   - Map marker now updates live as driver moves
 
+### 71. Map Shows San Francisco Instead of Maldives - FIXED
+- **Issue:** iOS simulator returns California GPS coords, maps showed wrong location
+- **Fix:**
+  - Added Maldives coordinate validation (lat -0.7 to 7.1, lng 72.6 to 73.8)
+  - Pass pickup/dropoff coords from ride data to all tracking screens
+  - Driver app uses simulated Maldives coords when GPS is outside bounds
+  - Customer map uses ride data coords instead of device GPS
+
+### 72. Ride Requests Not Received After App Restart - FIXED
+- **Issue:** Driver online but not receiving new ride requests
+- **Cause:** `goOnline()` only called when toggle pressed, not on session restore
+- **Fix:** Home screen now calls `goOnline()` if driver was online from previous session
+
+### 73. Customer Map Missing Driver Marker and Route - FIXED
+- **Issue:** Trip tracking screen showed map but no driver marker visible
+- **Fix:**
+  - Check multiple sources for driver ID (driverId, driver_id, driver.id)
+  - Added `_fitMapBounds()` to show all markers in view
+  - Pass coordinates through tripData from home_screen
+
+### 74. Voice Announcements Too Loud/Annoying - FIXED
+- **Issue:** Driver app spoke every action out loud
+- **Fix:** Disabled VoiceService by default (can be enabled in settings if needed)
+
 ---
 
 *Updated by Nova on 2026-06-21*

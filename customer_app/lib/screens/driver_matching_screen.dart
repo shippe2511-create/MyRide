@@ -424,6 +424,10 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
           driverId: driverId,
           eta: 4,
           rideId: _rideId,
+          pickupLat: widget.pickupLat,
+          pickupLng: widget.pickupLng,
+          dropoffLat: widget.dropoffLat,
+          dropoffLng: widget.dropoffLng,
         ),
       ),
     );

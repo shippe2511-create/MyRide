@@ -138,6 +138,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               'pickup': ride['pickup_name'] ?? 'Pickup',
               'dropoff': ride['dropoff_name'] ?? 'Dropoff',
               'status': status,
+              'pickup_lat': ride['pickup_lat'],
+              'pickup_lng': ride['pickup_lng'],
+              'dropoff_lat': ride['dropoff_lat'],
+              'dropoff_lng': ride['dropoff_lng'],
+              'driverId': ride['driver_id'],
             };
           });
 

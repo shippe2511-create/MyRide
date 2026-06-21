@@ -556,6 +556,11 @@ class DriverState extends ChangeNotifier {
     }
   }
 
+  bool _isValidMaldivesCoord(double lat, double lng) {
+    // Maldives bounds: lat -0.7 to 7.1, lng 72.6 to 73.8
+    return lat >= -0.7 && lat <= 7.1 && lng >= 72.6 && lng <= 73.8;
+  }
+
   Future<void> _sendLocationUpdate() async {
     if (_driverId.isEmpty) return;
     try {
@@ -565,8 +570,19 @@ class DriverState extends ChangeNotifier {
         timeLimit: const Duration(seconds: 10),
       );
 
-      _currentLat = position.latitude;
-      _currentLng = position.longitude;
+      double lat = position.latitude;
+      double lng = position.longitude;
+
+      // Validate coordinates are in Maldives - if not, use simulated Maldives location
+      if (!_isValidMaldivesCoord(lat, lng)) {
+        // Simulator returns San Francisco coords - use Male coords instead
+        lat = 4.1755 + (DateTime.now().second * 0.0001);
+        lng = 73.5093 + (DateTime.now().second * 0.0001);
+        debugPrint('Using simulated Maldives location: lat=$lat, lng=$lng');
+      }
+
+      _currentLat = lat;
+      _currentLng = lng;
 
       await SupabaseService.updateLocation(
         _driverId,

@@ -40,9 +40,9 @@ class TripTrackingScreen extends StatefulWidget {
 class _TripTrackingScreenState extends State<TripTrackingScreen> {
   GoogleMapController? _mapController;
 
-  LatLng _driverLocation = const LatLng(4.2100, 73.5350);
-  final LatLng _pickupLocation = const LatLng(4.2286, 73.5400);
-  final LatLng _dropoffLocation = const LatLng(4.1918, 73.5290);
+  late LatLng _driverLocation;
+  late LatLng _pickupLocation;
+  late LatLng _dropoffLocation;
 
   int _etaMinutes = 12;
   late String _dropoff;
@@ -58,6 +58,21 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
     _dropoff = widget.tripData['dropoff'] ?? 'Velana International Airport';
     _rideStatus = widget.tripData['status'] as String? ?? 'accepted';
     _driverName = widget.tripData['driverName'] as String? ?? 'Driver';
+
+    // Initialize coordinates from tripData or use Maldives defaults
+    final pLat = (widget.tripData['pickup_lat'] as num?)?.toDouble() ?? 4.1755;
+    final pLng = (widget.tripData['pickup_lng'] as num?)?.toDouble() ?? 73.5093;
+    final dLat = (widget.tripData['dropoff_lat'] as num?)?.toDouble() ?? 4.1755;
+    final dLng = (widget.tripData['dropoff_lng'] as num?)?.toDouble() ?? 73.5093;
+
+    _pickupLocation = _isValidMaldivesCoord(pLat, pLng)
+        ? LatLng(pLat, pLng)
+        : const LatLng(4.1755, 73.5093);
+    _dropoffLocation = _isValidMaldivesCoord(dLat, dLng)
+        ? LatLng(dLat, dLng)
+        : const LatLng(4.1755, 73.5093);
+    _driverLocation = LatLng(_pickupLocation.latitude + 0.005, _pickupLocation.longitude + 0.003);
+
     _startStatusPolling();
     _subscribeToDriverLocation();
 
@@ -127,7 +142,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
             if (newRecord != null && mounted) {
               final lat = newRecord['lat'] as num?;
               final lng = newRecord['lng'] as num?;
-              if (lat != null && lng != null) {
+              if (lat != null && lng != null && _isValidMaldivesCoord(lat.toDouble(), lng.toDouble())) {
                 setState(() {
                   _driverLocation = LatLng(lat.toDouble(), lng.toDouble());
                 });
@@ -144,6 +159,11 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
     _fetchDriverLocation(driverId);
   }
 
+  bool _isValidMaldivesCoord(double lat, double lng) {
+    // Maldives bounds: lat -0.7 to 7.1, lng 72.6 to 73.8
+    return lat >= -0.7 && lat <= 7.1 && lng >= 72.6 && lng <= 73.8;
+  }
+
   Future<void> _fetchDriverLocation(String driverId) async {
     try {
       final response = await Supabase.instance.client
@@ -155,7 +175,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
       if (response != null && mounted) {
         final lat = response['lat'] as num?;
         final lng = response['lng'] as num?;
-        if (lat != null && lng != null) {
+        if (lat != null && lng != null && _isValidMaldivesCoord(lat.toDouble(), lng.toDouble())) {
           setState(() {
             _driverLocation = LatLng(lat.toDouble(), lng.toDouble());
           });

@@ -43,6 +43,10 @@ class DriverArrivingScreen extends StatefulWidget {
   final String? driverId;
   final int eta;
   final String? rideId;
+  final double? pickupLat;
+  final double? pickupLng;
+  final double? dropoffLat;
+  final double? dropoffLng;
 
   const DriverArrivingScreen({
     super.key,
@@ -59,6 +63,10 @@ class DriverArrivingScreen extends StatefulWidget {
     this.driverId,
     required this.eta,
     this.rideId,
+    this.pickupLat,
+    this.pickupLng,
+    this.dropoffLat,
+    this.dropoffLng,
   });
 
   @override
@@ -69,7 +77,8 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
   late Timer _etaTimer;
   Timer? _statusPollingTimer;
   int _currentEta = 0;
-  final LatLng _pickupLocation = const LatLng(4.2286, 73.5400);
+  late LatLng _pickupLocation;
+  late LatLng _dropoffLocation;
   late LatLng _driverLocation;
   RealtimeChannel? _rideSubscription;
   RealtimeChannel? _driverLocationChannel;
@@ -77,10 +86,27 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
   bool _tripStarted = false;
   GoogleMapController? _mapController;
 
+  bool _isValidMaldivesCoord(double lat, double lng) {
+    return lat >= -0.7 && lat <= 7.1 && lng >= 72.6 && lng <= 73.8;
+  }
+
   @override
   void initState() {
     super.initState();
     _currentEta = widget.eta;
+
+    // Use passed coordinates or default to Male center
+    final pLat = widget.pickupLat ?? 4.1755;
+    final pLng = widget.pickupLng ?? 73.5093;
+    final dLat = widget.dropoffLat ?? 4.1755;
+    final dLng = widget.dropoffLng ?? 73.5093;
+
+    _pickupLocation = _isValidMaldivesCoord(pLat, pLng)
+        ? LatLng(pLat, pLng)
+        : const LatLng(4.1755, 73.5093);
+    _dropoffLocation = _isValidMaldivesCoord(dLat, dLng)
+        ? LatLng(dLat, dLng)
+        : const LatLng(4.1755, 73.5093);
     _driverLocation = LatLng(_pickupLocation.latitude + 0.008, _pickupLocation.longitude + 0.005);
     _startEtaCountdown();
     _subscribeToRideUpdates();
@@ -116,7 +142,7 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
             if (newRecord != null && mounted) {
               final lat = newRecord['lat'] as num?;
               final lng = newRecord['lng'] as num?;
-              if (lat != null && lng != null) {
+              if (lat != null && lng != null && _isValidMaldivesCoord(lat.toDouble(), lng.toDouble())) {
                 setState(() {
                   _driverLocation = LatLng(lat.toDouble(), lng.toDouble());
                 });
@@ -137,7 +163,7 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
       if (response != null && mounted) {
         final lat = response['lat'] as num?;
         final lng = response['lng'] as num?;
-        if (lat != null && lng != null) {
+        if (lat != null && lng != null && _isValidMaldivesCoord(lat.toDouble(), lng.toDouble())) {
           setState(() {
             _driverLocation = LatLng(lat.toDouble(), lng.toDouble());
           });

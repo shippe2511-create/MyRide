@@ -674,7 +674,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // End Shift Button
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
             child: SizedBox(
               width: double.infinity,
               height: 56,
@@ -1793,37 +1793,35 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBottomNav(BuildContext context) {
-    final isDark = context.isDark;
-    final navBgColor = isDark
-        ? Colors.black.withValues(alpha: 0.35)
-        : Colors.white.withValues(alpha: 0.4);
-    final navBorderColor = isDark
-        ? Colors.white.withValues(alpha: 0.15)
-        : Colors.black.withValues(alpha: 0.1);
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(24, 0, 24, bottomPadding + 12),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(35),
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-          child: Container(
-            height: 65,
-            decoration: BoxDecoration(
-              color: navBgColor,
-              borderRadius: BorderRadius.circular(35),
-              border: Border.all(color: navBorderColor, width: 1),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildNavItem(context, Icons.home_rounded, Icons.home_outlined, 0),
-                _buildNavItem(context, Icons.history_rounded, Icons.history_outlined, 1),
-                _buildNavItem(context, Icons.person_rounded, Icons.person_outline_rounded, 2),
-              ],
-            ),
+      child: Container(
+        height: 65,
+        decoration: BoxDecoration(
+          color: const Color(0xFF2A2A2A),
+          borderRadius: BorderRadius.circular(35),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.08),
+            width: 1,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.4),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+              spreadRadius: -2,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildNavItem(context, Icons.home_rounded, Icons.home_outlined, 0),
+            _buildNavItem(context, Icons.history_rounded, Icons.history_outlined, 1),
+            _buildNavItem(context, Icons.person_rounded, Icons.person_outline_rounded, 2),
+          ],
         ),
       ),
     );

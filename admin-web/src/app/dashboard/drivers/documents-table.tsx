@@ -14,12 +14,12 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
-import { FileText, Search, MoreHorizontal, CheckCircle, XCircle, Clock, Eye, AlertTriangle, Loader2, ExternalLink, Trash2 } from "lucide-react"
+import { FileText, Search, MoreHorizontal, CheckCircle, XCircle, Clock, Eye, AlertTriangle, Loader2, ExternalLink, Trash2, Ban, Edit2 } from "lucide-react"
 import { toast } from "sonner"
 
 interface Document {
@@ -401,47 +401,51 @@ export function DocumentsTable() {
                         {formatDate(doc.uploaded_at)}
                       </TableCell>
                       <TableCell>
-                        <DropdownMenu modal={false}>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" disabled={updating === doc.id}>
-                              {updating === doc.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <MoreHorizontal className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => {
+                              if (doc.file_url) {
+                                setPreviewDoc(doc)
+                                setPreviewOpen(true)
+                              }
+                            }}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" disabled={updating === doc.id}>
+                                {updating === doc.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <MoreHorizontal className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
                             {doc.file_url && (
                               <DropdownMenuItem onClick={() => {
                                 setPreviewDoc(doc)
                                 setPreviewOpen(true)
                               }}>
                                 <Eye className="mr-2 h-4 w-4" />
-                                Preview
-                              </DropdownMenuItem>
-                            )}
-                            {doc.file_url && (
-                              <DropdownMenuItem onClick={() => window.open(doc.file_url!, "_blank")}>
-                                <ExternalLink className="mr-2 h-4 w-4" />
-                                Open in New Tab
+                                View Details
                               </DropdownMenuItem>
                             )}
                             {doc.status !== "verified" && (
-                              <DropdownMenuItem
-                                className="text-green-600"
-                                onClick={() => updateStatus(doc.id, "verified")}
-                              >
+                              <DropdownMenuItem onClick={() => updateStatus(doc.id, "verified")}>
                                 <CheckCircle className="mr-2 h-4 w-4" />
                                 Approve
                               </DropdownMenuItem>
                             )}
                             {doc.status !== "rejected" && (
-                              <DropdownMenuItem
-                                className="text-red-600"
-                                onClick={() => updateStatus(doc.id, "rejected")}
-                              >
-                                <XCircle className="mr-2 h-4 w-4" />
+                              <DropdownMenuItem onClick={() => updateStatus(doc.id, "rejected")}>
+                                <Ban className="mr-2 h-4 w-4" />
                                 Reject
                               </DropdownMenuItem>
                             )}
@@ -451,15 +455,17 @@ export function DocumentsTable() {
                                 Mark as Pending
                               </DropdownMenuItem>
                             )}
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              className="text-red-600"
+                              className="text-red-500 focus:text-red-500"
                               onClick={() => deleteDocument(doc.id)}
                             >
-                              <XCircle className="mr-2 h-4 w-4" />
+                              <Trash2 className="mr-2 h-4 w-4" />
                               Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )

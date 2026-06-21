@@ -419,6 +419,15 @@ Fixed:
   - Extract driver name from nested `ride['driver']['profile']['full_name']` in home_screen
   - Removed invalid FK reference to vehicles table that was causing query errors
 
+### 70. Live Driver Location Not Updating on Customer Map - FIXED
+- **Issue:** Map showed static driver marker, not real-time position
+- **Cause:** Wrong column names (`latitude/longitude` instead of `lat/lng`) in driver_locations query
+- **Fix:**
+  - Fixed column names in trip_tracking_screen.dart
+  - Added realtime Postgres subscription to driver_arriving_screen.dart
+  - Fetches initial driver location on screen load
+  - Map marker now updates live as driver moves
+
 ---
 
 *Updated by Nova on 2026-06-21*

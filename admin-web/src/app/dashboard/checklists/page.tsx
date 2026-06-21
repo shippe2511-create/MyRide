@@ -20,14 +20,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { DialogFooter } from "@/components/ui/dialog"
 import {
   ClipboardCheck, AlertTriangle, CheckCircle, XCircle, Car,
-  Loader2, RefreshCw, Download, MoreHorizontal, Pencil, Trash2, Search
+  Loader2, RefreshCw, Download, MoreHorizontal, Pencil, Trash2, Search, Eye, Flag
 } from "lucide-react"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
@@ -151,6 +151,26 @@ export default function ChecklistsPage() {
       loadChecklists(false)
     }
     setDeleteId(null)
+  }
+
+  const toggleIssuesStatus = async (checklist: VehicleChecklist) => {
+    const newStatus = !checklist.has_issues
+    const { error } = await supabase
+      .from("vehicle_checklists")
+      .update({ has_issues: newStatus })
+      .eq("id", checklist.id)
+
+    if (error) {
+      toast.error("Failed to update status")
+    } else {
+      toast.success(newStatus ? "Flagged as having issues" : "Cleared issues")
+      setChecklists(prev => prev.map(c => c.id === checklist.id ? { ...c, has_issues: newStatus } : c))
+      setStats(prev => ({
+        ...prev,
+        withIssues: newStatus ? prev.withIssues + 1 : Math.max(0, prev.withIssues - 1),
+        passed: newStatus ? Math.max(0, prev.passed - 1) : prev.passed + 1,
+      }))
+    }
   }
 
   const toggleItemStatus = (key: string) => {
@@ -341,15 +361,23 @@ export default function ChecklistsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem onSelect={() => setSelectedChecklist(checklist)}>
-                              Details
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
                             </DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => setEditingChecklist(checklist)}>
                               <Pencil className="h-4 w-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => toggleIssuesStatus(checklist)}>
+                              <Flag className="h-4 w-4 mr-2" />
+                              {checklist.has_issues ? "Clear Issues" : "Flag Issues"}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              className="text-red-500"
+                              className="text-destructive"
                               onSelect={() => setDeleteId(checklist.id)}
                             >
                               <Trash2 className="h-4 w-4 mr-2" />

@@ -15,38 +15,45 @@ class FloatingNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = context.isDark;
+    final navBgColor = isDark
+        ? const Color(0xFF1A1A1A).withValues(alpha: 0.85)
+        : Colors.white.withValues(alpha: 0.9);
+    final navBorderColor = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.black.withValues(alpha: 0.08);
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(24, 0, 24, bottomPadding + 12),
+      padding: EdgeInsets.fromLTRB(24, 8, 24, bottomPadding + 12),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(40),
         child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          filter: ui.ImageFilter.blur(sigmaX: 25, sigmaY: 25),
           child: Container(
             height: 64,
             decoration: BoxDecoration(
-              color: const Color(0xFF2A2A2A),
-              borderRadius: BorderRadius.circular(32),
+              color: navBgColor,
+              borderRadius: BorderRadius.circular(40),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.1),
-                width: 0.5,
+                color: navBorderColor,
+                width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.4),
+                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
                   blurRadius: 20,
-                  offset: const Offset(0, 8),
-                  spreadRadius: -2,
+                  offset: const Offset(0, 10),
+                  spreadRadius: -5,
                 ),
               ],
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildNavItem(context, Icons.home_rounded, Icons.home_outlined, 0),
-                _buildNavItem(context, Icons.history_rounded, Icons.history_outlined, 1),
-                _buildNavItem(context, Icons.person_rounded, Icons.person_outline_rounded, 2),
+                _buildNavItem(context, 0, Icons.home_rounded, Icons.home_outlined),
+                _buildNavItem(context, 1, Icons.history_rounded, Icons.history_outlined),
+                _buildNavItem(context, 2, Icons.person_rounded, Icons.person_outline_rounded),
               ],
             ),
           ),
@@ -55,8 +62,13 @@ class FloatingNavBar extends StatelessWidget {
     );
   }
 
-  Widget _buildNavItem(BuildContext context, IconData activeIcon, IconData inactiveIcon, int index) {
+  Widget _buildNavItem(BuildContext context, int index, IconData activeIcon, IconData inactiveIcon) {
     final isActive = selectedIndex == index;
+    final isDark = context.isDark;
+    final activeColor = isDark ? Colors.white : Colors.black;
+    final inactiveColor = isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.4);
+    final activeBgColor = isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.08);
+
     return GestureDetector(
       onTap: () {
         if (selectedIndex != index) {
@@ -70,12 +82,12 @@ class FloatingNavBar extends StatelessWidget {
         curve: Curves.easeOutCubic,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isActive ? Colors.white.withValues(alpha: 0.15) : Colors.transparent,
+          color: isActive ? activeBgColor : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Icon(
           isActive ? activeIcon : inactiveIcon,
-          color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.5),
+          color: isActive ? activeColor : inactiveColor,
           size: 26,
         ),
       ),
@@ -103,25 +115,32 @@ class FloatingAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
+    final isDark = context.isDark;
+    final navBgColor = isDark
+        ? const Color(0xFF1A1A1A).withValues(alpha: 0.85)
+        : Colors.white.withValues(alpha: 0.9);
+    final navBorderColor = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.black.withValues(alpha: 0.08);
 
     return Container(
       padding: EdgeInsets.only(top: topPadding + 8, left: 16, right: 16, bottom: 8),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          filter: ui.ImageFilter.blur(sigmaX: 25, sigmaY: 25),
           child: Container(
             height: 56,
             decoration: BoxDecoration(
-              color: const Color(0xFF2A2A2A),
+              color: navBgColor,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.1),
-                width: 0.5,
+                color: navBorderColor,
+                width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.3),
+                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
                   blurRadius: 15,
                   offset: const Offset(0, 4),
                 ),
@@ -131,7 +150,7 @@ class FloatingAppBar extends StatelessWidget implements PreferredSizeWidget {
               children: [
                 if (showBackButton)
                   IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                    icon: Icon(Icons.arrow_back_ios_new_rounded, color: context.textColor, size: 20),
                     onPressed: () => Navigator.of(context).pop(),
                   )
                 else if (leading != null)
@@ -141,8 +160,8 @@ class FloatingAppBar extends StatelessWidget implements PreferredSizeWidget {
                 Expanded(
                   child: Text(
                     title,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: context.textColor,
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
                     ),
@@ -159,12 +178,10 @@ class FloatingAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-// Helper to get bottom nav height for padding
 double getNavBarHeight(BuildContext context) {
   return 64 + MediaQuery.of(context).padding.bottom + 24;
 }
 
-// Helper to get top app bar height for padding
 double getAppBarHeight(BuildContext context) {
   return kToolbarHeight + MediaQuery.of(context).padding.top + 32;
 }

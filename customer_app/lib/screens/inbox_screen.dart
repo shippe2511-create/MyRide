@@ -100,11 +100,14 @@ class _InboxScreenState extends State<InboxScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top;
     return Scaffold(
       backgroundColor: context.bgColor,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
+      body: Column(
+        children: [
+          SizedBox(height: topPadding),
+          Expanded(
+            child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeader(context),
@@ -128,7 +131,9 @@ class _InboxScreenState extends State<InboxScreen> {
                     ),
             ),
           ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }

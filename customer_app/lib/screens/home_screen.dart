@@ -235,6 +235,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       child: Scaffold(
         backgroundColor: isDark ? AppColors.bgDark : AppColors.bgLight,
         extendBody: true,
+        extendBodyBehindAppBar: true,
         body: PageView(
           controller: _pageController,
           physics: const NeverScrollableScrollPhysics(),
@@ -252,14 +253,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildHomeTab(BuildContext context) {
-    return SafeArea(
-      bottom: false, // Let content extend behind bottom nav
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(context),
+    final topPadding = MediaQuery.of(context).padding.top;
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(height: topPadding),
+          _buildHeader(context),
             const SizedBox(height: 20),
             if (_ongoingTrip != null) _buildOngoingTripBanner(context),
             _buildSearchBar(context),
@@ -272,8 +273,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             SizedBox(height: MediaQuery.of(context).padding.bottom + 100), // Extra space for floating nav
           ],
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildHeader(BuildContext context) {

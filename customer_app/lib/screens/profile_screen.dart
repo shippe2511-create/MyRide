@@ -39,15 +39,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final topPadding = MediaQuery.of(context).padding.top;
     return Scaffold(
       backgroundColor: isDark ? context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5) : AppColors.bgLight,
-      body: SafeArea(
-        bottom: false,
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            children: [
-              _buildHeader(context),
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          children: [
+            SizedBox(height: topPadding),
+            _buildHeader(context),
               const SizedBox(height: 24),
               _buildUserCard(context),
               const SizedBox(height: 24),
@@ -64,7 +64,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
         ),
-      ),
     );
   }
 

@@ -414,10 +414,13 @@ class DriverState extends ChangeNotifier {
     await _checkForActiveRide();
 
     // Only look for new rides if no active ride
+    debugPrint('hasActiveRide=$hasActiveRide, will subscribe=${!hasActiveRide}');
     if (!hasActiveRide) {
       _subscribeToRideRequests();
       _loadPendingRides();
       _startRidePolling();
+    } else {
+      debugPrint('Skipping ride subscription - has active ride');
     }
 
     debugPrint('goOnline complete: hasActiveRide=$hasActiveRide, currentRide=${_currentRide?.id}');
@@ -599,8 +602,10 @@ class DriverState extends ChangeNotifier {
   RealtimeChannel? _rideCancellationSubscription;
 
   void _subscribeToRideRequests() {
+    debugPrint('Subscribing to ride requests...');
     _rideSubscription?.unsubscribe();
     _rideSubscription = SupabaseService.subscribeToNewRides((newRide) {
+      debugPrint('New ride received: ${newRide['id']}');
       if (!_isOnline || _isOnBreak) return;
 
       // Check if this is a scheduled ride that's not due yet

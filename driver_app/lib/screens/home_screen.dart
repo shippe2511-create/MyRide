@@ -37,6 +37,12 @@ class _HomeScreenState extends State<HomeScreen> {
       state.setOnHomeScreen(true);
       state.addListener(_onDriverStateChanged);
       _checkForActiveRide();
+
+      // If driver was online from previous session, re-initialize subscriptions
+      if (state.isOnline) {
+        debugPrint('Driver was online, re-initializing subscriptions...');
+        state.goOnline();
+      }
     });
   }
 

@@ -136,7 +136,8 @@
       "Bash(ipconfig getifaddr *)",
       "Bash(kill 48141)",
       "Bash(pkill -f \"next\")",
-      "Bash(pkill -9 -f dart)"
+      "Bash(pkill -9 -f dart)",
+      "Bash(pkill -f \"flutter.*iPhone 17\")"
     ],
     "additionalDirectories": [
       "/tmp"

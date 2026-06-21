@@ -12,6 +12,7 @@ import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/status_animation.dart';
+import '../widgets/app_notification_banner.dart';
 import 'trip_tracking_screen.dart';
 import 'trip_complete_screen.dart';
 import 'chat_screen.dart';
@@ -304,14 +305,13 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
       debugPrint('Notification error: $e');
     }
 
-    // Show in-app snackbar
+    // Show modern in-app banner
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Driver has arrived at pickup location!'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 3),
-        ),
+      AppNotificationBanner.show(
+        context,
+        title: 'Driver Arrived',
+        message: '${widget.driverName} has arrived at pickup location',
+        type: NotificationType.success,
       );
     }
   }

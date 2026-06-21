@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../main.dart' show showAppNotification;
+import '../widgets/app_notification_banner.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
@@ -153,7 +155,18 @@ class NotificationService {
       );
       debugPrint('NotificationService: Notification shown successfully');
 
-      // Also show in-app toast via callback
+      // Also show modern in-app banner
+      NotificationType bannerType = NotificationType.info;
+      if (title.toLowerCase().contains('error') || title.toLowerCase().contains('cancelled')) {
+        bannerType = NotificationType.error;
+      } else if (title.toLowerCase().contains('success') || title.toLowerCase().contains('completed') || title.toLowerCase().contains('accepted')) {
+        bannerType = NotificationType.success;
+      } else if (title.toLowerCase().contains('arrived') || title.toLowerCase().contains('started')) {
+        bannerType = NotificationType.warning;
+      }
+      showAppNotification(title: title, message: body, type: bannerType);
+
+      // Legacy callback
       final isChat = payload?.startsWith('chat_') ?? false;
       final rideId = isChat ? payload!.replaceFirst('chat_', '') : null;
       onShowInAppMessage?.call(title, body, rideId);

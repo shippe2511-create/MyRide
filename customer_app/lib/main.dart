@@ -23,6 +23,27 @@ import 'services/cache_service.dart';
 import 'services/supabase_service.dart';
 import 'services/location_service.dart';
 import 'widgets/offline_banner.dart';
+import 'widgets/app_notification_banner.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+void showAppNotification({
+  required String title,
+  String? message,
+  NotificationType type = NotificationType.info,
+  VoidCallback? onTap,
+}) {
+  final context = navigatorKey.currentContext;
+  if (context != null) {
+    AppNotificationBanner.show(
+      context,
+      title: title,
+      message: message,
+      type: type,
+      onTap: onTap,
+    );
+  }
+}
 
 // Custom page route with smooth fade + slide transition
 class SmoothPageRoute<T> extends PageRouteBuilder<T> {
@@ -110,6 +131,7 @@ class MyRideApp extends StatelessWidget {
 
         return MaterialApp(
           title: 'MyRide',
+          navigatorKey: navigatorKey,
           debugShowCheckedModeBanner: false,
           theme: appState.isDarkMode ? AppTheme.darkTheme : AppTheme.lightTheme,
           home: const SplashScreen(),

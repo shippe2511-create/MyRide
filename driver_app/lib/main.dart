@@ -24,6 +24,27 @@ import 'services/notification_service.dart';
 import 'services/voice_service.dart';
 import 'services/offline_service.dart';
 import 'widgets/offline_banner.dart';
+import 'widgets/app_notification_banner.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+void showAppNotification({
+  required String title,
+  String? message,
+  NotificationType type = NotificationType.info,
+  VoidCallback? onTap,
+}) {
+  final context = navigatorKey.currentContext;
+  if (context != null) {
+    AppNotificationBanner.show(
+      context,
+      title: title,
+      message: message,
+      type: type,
+      onTap: onTap,
+    );
+  }
+}
 // import 'services/firebase_service.dart'; // Disabled - requires paid Apple Developer Program
 
 class SmoothPageRoute<T> extends PageRouteBuilder<T> {
@@ -101,6 +122,7 @@ class DriverApp extends StatelessWidget {
       builder: (context, state, _) {
         return MaterialApp(
           title: 'MyRide Driver',
+          navigatorKey: navigatorKey,
           debugShowCheckedModeBanner: false,
           theme: state.isDarkMode ? AppTheme.darkTheme : AppTheme.lightTheme,
           home: const SplashScreen(),

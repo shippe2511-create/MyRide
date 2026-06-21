@@ -41,7 +41,7 @@ class DriverState extends ChangeNotifier {
   int _todayTrips = 0;
   int _weekTrips = 0;
   int _totalTrips = 0;
-  double _rating = 5.0;
+  double _rating = 0.0;
   double _todayDistance = 0;
   double _todayEarnings = 0;
   DateTime? _shiftStartTime;
@@ -308,7 +308,7 @@ class DriverState extends ChangeNotifier {
     required String vehicleNumber,
     String vehicleModel = '',
     required String phone,
-    double rating = 5.0,
+    double rating = 0.0,
     String avatarUrl = '',
     String employeeId = '',
     String profileId = '',

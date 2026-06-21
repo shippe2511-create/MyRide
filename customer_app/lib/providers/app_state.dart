@@ -177,7 +177,7 @@ class AppState extends ChangeNotifier {
   String _staffId = '';
   String _userPhone = '';
   String _userEmail = '';
-  double _userRating = 5.0;
+  double _userRating = 0.0;
   int _totalTrips = 0;
   String? _profilePhotoPath;
   String? _profileId; // Supabase profile UUID
@@ -352,7 +352,7 @@ class AppState extends ChangeNotifier {
         final sum = ratings.fold<num>(0, (sum, r) => sum + (r['rating'] as num));
         _userRating = sum / ratings.length;
       } else {
-        _userRating = 5.0; // Default rating if no ratings yet
+        _userRating = 0.0; // No ratings yet
       }
 
       notifyListeners();

@@ -165,7 +165,7 @@ class _GlobalRideRequestOverlay extends StatefulWidget {
 }
 
 class _GlobalRideRequestOverlayState extends State<_GlobalRideRequestOverlay> {
-  final GlobalKey<NavigatorState> _navKey = GlobalKey<NavigatorState>();
+
 
   void _navigateToHome() {
     // Use root navigator to go to home

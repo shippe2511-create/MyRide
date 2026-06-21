@@ -968,13 +968,6 @@ class DriverState extends ChangeNotifier {
     notifyListeners();
   }
 
-  int _requestCounter = 0;
-
-  // DISABLED - No more mock requests, only real Supabase requests
-  void _simulateIncomingRequest() {
-    // Mock requests disabled - real requests come from Supabase via _loadPendingRides()
-  }
-
   Future<Map<String, dynamic>> acceptRide(RideRequest request) async {
     // Ensure we have a driver ID
     if (_driverId.isEmpty) {

@@ -172,9 +172,9 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
             ),
           ),
 
-          // Bottom spacing for bottom bar
-          SliverToBoxAdapter(
-            child: SizedBox(height: MediaQuery.of(context).padding.bottom + 140),
+          // Bottom spacing
+          const SliverToBoxAdapter(
+            child: SizedBox(height: 120),
           ),
         ],
       ),

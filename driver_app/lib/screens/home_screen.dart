@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -120,7 +119,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.bgColor,
-      extendBody: true,
       body: IndexedStack(
         index: _selectedTab,
         children: [
@@ -137,7 +135,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return Consumer<DriverState>(
       builder: (context, state, _) {
         return SafeArea(
-          bottom: false,
           child: Stack(
             children: [
               Column(
@@ -549,37 +546,38 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildOnlineView(BuildContext context, DriverState state) {
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-    return SingleChildScrollView(
-      padding: EdgeInsets.only(bottom: bottomPadding + 120),
-      child: Column(
-        children: [
-          // Stats card
-          _buildStatsCard(context, state),
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                // Stats card
+                _buildStatsCard(context, state),
 
-          // Quick Actions
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: context.cardColor,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: context.borderColor),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Quick Actions',
-                    style: TextStyle(
-                      color: context.mutedColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
+                // Quick Actions
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: context.cardColor,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: context.borderColor),
                     ),
-                  ),
-                  const SizedBox(height: 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Quick Actions',
+                          style: TextStyle(
+                            color: context.mutedColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
@@ -671,27 +669,30 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
+              ],
+            ),
+          ),
+        ),
 
-          // End Shift Button
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 120),
-            child: SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: OutlinedButton.icon(
-                onPressed: () => _showEndShiftDialog(context, state),
-                icon: const Icon(Icons.logout_rounded, size: 22),
-                label: const Text('End Shift', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.error,
-                  side: const BorderSide(color: AppColors.error, width: 1.5),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
+        // End Shift Button - Fixed at bottom
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+          child: SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: OutlinedButton.icon(
+              onPressed: () => _showEndShiftDialog(context, state),
+              icon: const Icon(Icons.logout_rounded, size: 22),
+              label: const Text('End Shift', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.error,
+                side: const BorderSide(color: AppColors.error, width: 1.5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1793,23 +1794,24 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBottomNav(BuildContext context) {
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(24, 0, 24, bottomPadding + 12),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(32),
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+    return Container(
+      color: Colors.transparent,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
           child: Container(
-            height: 64,
+            height: 65,
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(32),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.1),
-                width: 0.5,
-              ),
+              color: context.cardColor,
+              borderRadius: BorderRadius.circular(35),
+              border: Border.all(color: context.borderColor, width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 25,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -1841,17 +1843,18 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 250),
         curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        width: 65,
+        height: 45,
         decoration: BoxDecoration(
-          color: isActive ? Colors.white.withValues(alpha: 0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
+          color: isActive ? context.bgColor : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
         ),
         child: Icon(
           isActive ? activeIcon : inactiveIcon,
-          color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.5),
-          size: 26,
+          color: isActive ? context.textColor : context.mutedColor,
+          size: 24,
         ),
       ),
     );

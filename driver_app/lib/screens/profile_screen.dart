@@ -217,7 +217,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: context.bgColor,
       body: SafeArea(
-        bottom: false,
         child: Consumer<DriverState>(
           builder: (context, state, _) {
             return SingleChildScrollView(
@@ -463,7 +462,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     fontSize: 13,
                   ),
                 ),
-                  const SizedBox(height: 120),
+                  const SizedBox(height: 40),
                 ],
               ),
             );

@@ -30,7 +30,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
   Set<String> _favoriteRoutes = {};
 
   late AnimationController _fabController;
-  late Animation<double> _fabAnimation;
 
   @override
   void initState() {
@@ -39,7 +38,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    _fabAnimation = CurvedAnimation(parent: _fabController, curve: Curves.easeOut);
     _loadData();
   }
 
@@ -141,19 +139,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
       ..sort((a, b) => (a['departure_time'] ?? '').compareTo(b['departure_time'] ?? ''));
   }
 
-  List<Map<String, dynamic>> _getTodaySchedulesForRoute(String routeId) {
-    final today = DateTime.now();
-    final dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    final dayName = dayNames[today.weekday % 7];
-
-    return _schedules.where((s) {
-      if (s['route_id'] != routeId) return false;
-      final days = (s['days_of_week'] as List?)?.cast<String>() ?? [];
-      return days.contains(dayName);
-    }).toList()
-      ..sort((a, b) => (a['departure_time'] ?? '').compareTo(b['departure_time'] ?? ''));
-  }
-
   String _getDisplayName(String type) {
     switch (type.toLowerCase()) {
       case 'internal_bus':
@@ -175,7 +160,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     if (stops is List) {
       // Handle simple string array (from database text[])
       if (stops.isNotEmpty && stops.first is String) {
-        return (stops as List).cast<String>().join(' → ');
+        return stops.cast<String>().join(' → ');
       }
       // Handle map array with stop_order (legacy format)
       final sortedStops = List<Map<String, dynamic>>.from(stops);
@@ -184,12 +169,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
       return stopNames.join(' → ');
     }
     return stops.toString();
-  }
-
-  String _getStopsPreview(String stopsStr) {
-    final stops = stopsStr.split(' → ');
-    if (stops.length <= 2) return stopsStr;
-    return '${stops.first} → ... → ${stops.last}';
   }
 
   int _getStopCount(String stopsStr) {
@@ -268,72 +247,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
           ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildFilterControls(bool isDark) {
-    final upcomingCount = _getUpcomingCount();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              setState(() => _hidePastTimes = !_hidePastTimes);
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: _hidePastTimes
-                    ? AppColors.yellow.withValues(alpha: 0.15)
-                    : (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: _hidePastTimes
-                      ? AppColors.yellow.withValues(alpha: 0.3)
-                      : Colors.transparent,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _hidePastTimes ? Icons.visibility_off : Icons.visibility,
-                    size: 14,
-                    color: _hidePastTimes ? AppColors.yellow : context.mutedColor,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    _hidePastTimes ? 'Upcoming only' : 'Show all',
-                    style: TextStyle(
-                      color: _hidePastTimes ? AppColors.yellow : context.mutedColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.success.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              '$upcomingCount remaining',
-              style: TextStyle(
-                color: AppColors.success,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

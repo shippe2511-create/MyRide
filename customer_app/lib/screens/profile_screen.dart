@@ -538,12 +538,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 24),
               StatefulBuilder(
                 builder: (context, setSaveState) {
-                  bool isSaving = false;
                   return SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: isSaving ? null : () async {
-                        setSaveState(() => isSaving = true);
+                      onPressed: () async {
                         try {
                           await SupabaseService.updateProfile({
                             'full_name': nameController.text,
@@ -561,7 +559,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           );
                         } catch (e) {
-                          setSaveState(() => isSaving = false);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Failed to save: $e'),
@@ -578,9 +575,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
-                      child: isSaving
-                          ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                          : Text('Save Changes', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                      child: Text('Save Changes', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                     ),
                   );
                 },

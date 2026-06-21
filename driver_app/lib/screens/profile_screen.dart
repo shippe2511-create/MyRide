@@ -463,13 +463,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     fontSize: 13,
                   ),
                 ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 120),
                 ],
               ),
             );
           },
         ),
-      ),
     );
   }
 

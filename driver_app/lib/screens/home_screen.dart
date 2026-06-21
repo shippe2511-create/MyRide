@@ -674,7 +674,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // End Shift Button
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 120),
             child: SizedBox(
               width: double.infinity,
               height: 56,
@@ -1796,22 +1796,22 @@ class _HomeScreenState extends State<HomeScreen> {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(24, 0, 24, bottomPadding + 12),
+      padding: EdgeInsets.fromLTRB(24, 0, 24, bottomPadding + 16),
       child: Container(
         height: 65,
         decoration: BoxDecoration(
-          color: const Color(0xFF2A2A2A),
+          color: const Color(0xFF3A3A3A),
           borderRadius: BorderRadius.circular(35),
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.08),
+            color: Colors.white.withValues(alpha: 0.12),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.4),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-              spreadRadius: -2,
+              color: Colors.black.withValues(alpha: 0.5),
+              blurRadius: 25,
+              offset: const Offset(0, 10),
+              spreadRadius: 0,
             ),
           ],
         ),

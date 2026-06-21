@@ -665,12 +665,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // Spacer pushes End Shift to bottom
-          const Spacer(),
-
           // End Shift Button - positioned above nav bar
           Padding(
-            padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(context).padding.bottom + 90),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 90),
             child: SizedBox(
               width: double.infinity,
               height: 56,

@@ -628,39 +628,39 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // Waiting view
           Padding(
-            padding: const EdgeInsets.all(40),
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 100,
-                  height: 100,
+                  width: 80,
+                  height: 80,
                   decoration: BoxDecoration(
                     color: AppColors.success.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Icon(
                     Icons.search,
-                    size: 48,
+                    size: 40,
                     color: AppColors.success,
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
                 Text(
                   'Looking for Rides',
                   style: TextStyle(
                     color: context.textColor,
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Text(
                   'You\'ll be notified when a staff member requests a ride',
                   style: TextStyle(
                     color: context.mutedColor,
-                    fontSize: 15,
-                    height: 1.5,
+                    fontSize: 14,
+                    height: 1.4,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -670,7 +670,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // End Shift Button
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
             child: SizedBox(
               width: double.infinity,
               height: 56,

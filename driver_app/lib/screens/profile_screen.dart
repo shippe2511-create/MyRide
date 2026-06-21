@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
@@ -347,16 +348,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Navigator.pushNamed(context, '/shift-schedule');
                     },
                   ),
-                  _buildSettingTile(
-                    context,
-                    icon: Icons.notifications_outlined,
-                    title: 'Notifications',
-                    trailing: Icon(Icons.chevron_right, color: context.mutedColor),
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      Navigator.pushNamed(context, '/notifications-list');
-                    },
-                  ),
                 ]),
                 const SizedBox(height: 16),
 
@@ -419,6 +410,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   _buildSettingTile(
                     context,
+                    icon: Icons.chat_bubble_outline,
+                    title: 'Contact Support',
+                    trailing: Icon(
+                      Icons.chevron_right,
+                      color: context.mutedColor,
+                    ),
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      _showContactSupport(context);
+                    },
+                  ),
+                  _buildSettingTile(
+                    context,
                     icon: Icons.info_outline,
                     title: 'About',
                     trailing: Icon(
@@ -428,6 +432,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onTap: () {
                       HapticFeedback.lightImpact();
                       Navigator.pushNamed(context, '/about');
+                    },
+                  ),
+                  _buildSettingTile(
+                    context,
+                    icon: Icons.description_outlined,
+                    title: 'Terms & Conditions',
+                    trailing: Icon(
+                      Icons.chevron_right,
+                      color: context.mutedColor,
+                    ),
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      _showTerms(context);
                     },
                   ),
                 ]),
@@ -770,6 +787,181 @@ class _ProfileScreenState extends State<ProfileScreen> {
           color: context.textColor,
           fontSize: 15,
           fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
+  void _showContactSupport(BuildContext context) async {
+    String supportPhone = '+960 333-3333';
+    String supportEmail = 'itadminsupport@macl.aero';
+
+    try {
+      final settings = await SupabaseService.client
+          .from('app_settings')
+          .select('support_phone, support_email')
+          .eq('id', 'default')
+          .maybeSingle();
+      if (settings != null) {
+        supportPhone = settings['support_phone'] ?? supportPhone;
+        supportEmail = settings['support_email'] ?? supportEmail;
+      }
+    } catch (e) {
+      debugPrint('Failed to load support settings: $e');
+    }
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: context.cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.borderColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Contact Support',
+              style: TextStyle(
+                color: context.textColor,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.phone, color: AppColors.success),
+              ),
+              title: Text('Call Support', style: TextStyle(color: context.textColor, fontWeight: FontWeight.w600)),
+              subtitle: Text(supportPhone, style: TextStyle(color: context.mutedColor)),
+              trailing: Icon(Icons.chevron_right, color: context.mutedColor),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final phone = supportPhone.replaceAll(RegExp(r'[^0-9+]'), '');
+                final uri = Uri.parse('tel:$phone');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri);
+                }
+              },
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.info.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.email, color: AppColors.info),
+              ),
+              title: Text('Email Support', style: TextStyle(color: context.textColor, fontWeight: FontWeight.w600)),
+              subtitle: Text(supportEmail, style: TextStyle(color: context.mutedColor)),
+              trailing: Icon(Icons.chevron_right, color: context.mutedColor),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final uri = Uri.parse('mailto:$supportEmail?subject=Driver%20Support%20Request');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri);
+                }
+              },
+            ),
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showTerms(BuildContext context) async {
+    String termsContent = 'Loading...';
+
+    try {
+      final settings = await SupabaseService.client
+          .from('app_settings')
+          .select('terms_conditions')
+          .eq('id', 'default')
+          .maybeSingle();
+      if (settings != null && settings['terms_conditions'] != null) {
+        termsContent = settings['terms_conditions'];
+      } else {
+        termsContent = 'Terms and conditions content will be loaded from the server.';
+      }
+    } catch (e) {
+      termsContent = 'Failed to load terms. Please try again later.';
+    }
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+        decoration: BoxDecoration(
+          color: context.cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.borderColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Terms & Conditions',
+              style: TextStyle(
+                color: context.textColor,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Text(
+                  termsContent,
+                  style: TextStyle(
+                    color: context.mutedColor,
+                    fontSize: 14,
+                    height: 1.6,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
+          ],
         ),
       ),
     );

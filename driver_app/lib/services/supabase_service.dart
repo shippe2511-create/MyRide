@@ -225,15 +225,18 @@ class SupabaseService {
   static Future<void> updateLocation(String driverId, double lat, double lng, {double? heading, double? speed}) async {
     await updateDriverStatus(driverId: driverId, lat: lat, lng: lng);
 
-    // Also update live tracking table
+    // Also update live tracking table directly
     try {
-      await client.rpc('update_driver_location', params: {
-        'p_driver_id': driverId,
-        'p_lat': lat,
-        'p_lng': lng,
-        'p_heading': heading,
-        'p_speed': speed,
-      });
+      await client.from('driver_locations').upsert({
+        'driver_id': driverId,
+        'lat': lat,
+        'lng': lng,
+        'heading': heading,
+        'speed': speed,
+        'is_online': true,
+        'last_updated': DateTime.now().toIso8601String(),
+      }, onConflict: 'driver_id');
+      debugPrint('Driver location updated: lat=$lat, lng=$lng');
     } catch (e) {
       debugPrint('Error updating driver location: $e');
     }

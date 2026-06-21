@@ -455,9 +455,30 @@ class SupabaseService {
   }
 
   static Future<void> clearSearchHistory() async {
+    // Search history is stored locally, not in saved_places
+    // This is a no-op since we use Google Places API directly
+  }
+
+  static Future<void> deleteAccount() async {
     final id = userId;
-    if (id == null) return;
-    await client.from('saved_places').delete().eq('user_id', id).eq('type', 'recent');
+    if (id == null) throw Exception('Not logged in');
+
+    // Delete user data from tables
+    await client.from('saved_places').delete().eq('user_id', id);
+    await client.from('emergency_contacts').delete().eq('user_id', id);
+    await client.from('notifications').delete().eq('user_id', id);
+
+    // Mark profile as deleted (soft delete)
+    await client.from('profiles').update({
+      'full_name': 'Deleted User',
+      'phone': null,
+      'email': null,
+      'avatar_url': null,
+      'is_active': false,
+    }).eq('id', id);
+
+    // Sign out
+    await client.auth.signOut();
   }
 
   // Inbox / Notifications

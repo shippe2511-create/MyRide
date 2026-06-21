@@ -1261,26 +1261,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 24),
             _buildModernPrivacyItem(
-              icon: Icons.lock_outline,
-              title: 'Change Password',
-              subtitle: 'Update your account password',
-              color: AppColors.yellow,
-              onTap: () {
-                Navigator.pop(ctx);
-                _showChangePassword(context);
-              },
-            ),
-            _buildModernPrivacyItem(
-              icon: Icons.security,
-              title: 'Two-Factor Authentication',
-              subtitle: 'Add extra security to your account',
-              color: const Color(0xFF4DA6FF),
-              onTap: () {
-                Navigator.pop(ctx);
-                _showTwoFactorAuth(context);
-              },
-            ),
-            _buildModernPrivacyItem(
               icon: Icons.block,
               title: 'Blocked Users',
               subtitle: 'Manage blocked accounts',
@@ -1654,22 +1634,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 }
               }
             }),
-            _buildActionItem('Clear Search History', Icons.history, () async {
+            _buildActionItem('Manage Permissions', Icons.admin_panel_settings, () async {
               Navigator.pop(ctx);
-              try {
-                await SupabaseService.clearSearchHistory();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Search history cleared'), backgroundColor: AppColors.success));
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to clear history'), backgroundColor: AppColors.error));
-                }
-              }
-            }),
-            _buildActionItem('Manage Permissions', Icons.admin_panel_settings, () {
-              Navigator.pop(ctx);
-              _showPermissions(context);
+              // Opens iOS Settings for this app
+              await launchUrl(Uri.parse('app-settings:'));
             }),
             SizedBox(height: MediaQuery.of(context).padding.bottom),
           ],
@@ -1773,10 +1741,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 fillColor: context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                               ),
-                              onSubmitted: (value) {
+                              onSubmitted: (value) async {
                                 if (value.toUpperCase() == 'DELETE') {
                                   Navigator.pop(dialogCtx);
-                                  Navigator.of(context).pushNamedAndRemoveUntil('/welcome', (route) => false);
+                                  try {
+                                    await SupabaseService.deleteAccount();
+                                    if (context.mounted) {
+                                      Navigator.of(context).pushNamedAndRemoveUntil('/welcome', (route) => false);
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete account: $e'), backgroundColor: AppColors.error));
+                                    }
+                                  }
                                 }
                               },
                             ),

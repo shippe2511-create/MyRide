@@ -125,8 +125,8 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
             debugPrint('Driver location update: ${payload.newRecord}');
             final newRecord = payload.newRecord;
             if (newRecord != null && mounted) {
-              final lat = newRecord['latitude'] as num?;
-              final lng = newRecord['longitude'] as num?;
+              final lat = newRecord['lat'] as num?;
+              final lng = newRecord['lng'] as num?;
               if (lat != null && lng != null) {
                 setState(() {
                   _driverLocation = LatLng(lat.toDouble(), lng.toDouble());
@@ -148,13 +148,13 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
     try {
       final response = await Supabase.instance.client
           .from('driver_locations')
-          .select('latitude, longitude')
+          .select('lat, lng')
           .eq('driver_id', driverId)
           .maybeSingle();
 
       if (response != null && mounted) {
-        final lat = response['latitude'] as num?;
-        final lng = response['longitude'] as num?;
+        final lat = response['lat'] as num?;
+        final lng = response['lng'] as num?;
         if (lat != null && lng != null) {
           setState(() {
             _driverLocation = LatLng(lat.toDouble(), lng.toDouble());

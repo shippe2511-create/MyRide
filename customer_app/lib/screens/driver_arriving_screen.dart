@@ -72,6 +72,7 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
   final LatLng _pickupLocation = const LatLng(4.2286, 73.5400);
   late LatLng _driverLocation;
   RealtimeChannel? _rideSubscription;
+  RealtimeChannel? _driverLocationChannel;
   bool _driverArrived = false;
   bool _tripStarted = false;
   GoogleMapController? _mapController;
@@ -83,6 +84,7 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
     _driverLocation = LatLng(_pickupLocation.latitude + 0.008, _pickupLocation.longitude + 0.005);
     _startEtaCountdown();
     _subscribeToRideUpdates();
+    _subscribeToDriverLocation();
     _startStatusPolling(); // Backup polling
 
     // Subscribe to chat notifications
@@ -92,6 +94,58 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
         NotificationService.subscribeToChatMessages(widget.rideId!, appState.profileId!);
       }
     });
+  }
+
+  void _subscribeToDriverLocation() async {
+    if (widget.driverId == null) return;
+
+    // Subscribe to realtime location updates
+    _driverLocationChannel = Supabase.instance.client
+        .channel('driver_location_arriving_${widget.driverId}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'driver_locations',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'driver_id',
+            value: widget.driverId,
+          ),
+          callback: (payload) {
+            final newRecord = payload.newRecord;
+            if (newRecord != null && mounted) {
+              final lat = newRecord['lat'] as num?;
+              final lng = newRecord['lng'] as num?;
+              if (lat != null && lng != null) {
+                setState(() {
+                  _driverLocation = LatLng(lat.toDouble(), lng.toDouble());
+                });
+              }
+            }
+          },
+        )
+        .subscribe();
+
+    // Fetch initial location
+    try {
+      final response = await Supabase.instance.client
+          .from('driver_locations')
+          .select('lat, lng')
+          .eq('driver_id', widget.driverId!)
+          .maybeSingle();
+
+      if (response != null && mounted) {
+        final lat = response['lat'] as num?;
+        final lng = response['lng'] as num?;
+        if (lat != null && lng != null) {
+          setState(() {
+            _driverLocation = LatLng(lat.toDouble(), lng.toDouble());
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching driver location: $e');
+    }
   }
 
   void _subscribeToRideUpdates() {
@@ -241,6 +295,7 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
     _etaTimer.cancel();
     _statusPollingTimer?.cancel();
     _rideSubscription?.unsubscribe();
+    _driverLocationChannel?.unsubscribe();
     _mapController?.dispose();
     super.dispose();
   }

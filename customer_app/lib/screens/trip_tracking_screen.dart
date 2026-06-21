@@ -93,8 +93,33 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
     super.dispose();
   }
 
+  void _fitMapBounds() {
+    if (_mapController == null) return;
+
+    final bounds = LatLngBounds(
+      southwest: LatLng(
+        [_pickupLocation.latitude, _dropoffLocation.latitude, _driverLocation.latitude].reduce((a, b) => a < b ? a : b),
+        [_pickupLocation.longitude, _dropoffLocation.longitude, _driverLocation.longitude].reduce((a, b) => a < b ? a : b),
+      ),
+      northeast: LatLng(
+        [_pickupLocation.latitude, _dropoffLocation.latitude, _driverLocation.latitude].reduce((a, b) => a > b ? a : b),
+        [_pickupLocation.longitude, _dropoffLocation.longitude, _driverLocation.longitude].reduce((a, b) => a > b ? a : b),
+      ),
+    );
+
+    Future.delayed(const Duration(milliseconds: 300), () {
+      _mapController?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
+    });
+  }
+
   void _subscribeToDriverLocation() async {
-    String? driverId = widget.tripData['driver']?['id'] as String?;
+    // Try multiple sources for driver ID
+    String? driverId = widget.tripData['driverId'] as String?;
+    driverId ??= widget.tripData['driver_id'] as String?;
+    driverId ??= widget.tripData['driver']?['id'] as String?;
+
+    debugPrint('tripData keys: ${widget.tripData.keys}');
+    debugPrint('Looking for driver ID, found: $driverId');
 
     // Fallback: fetch driver ID from ride if not passed
     if (driverId == null) {
@@ -301,8 +326,12 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
         children: [
           // Google Map
           GoogleMap(
-            initialCameraPosition: CameraPosition(target: _driverLocation, zoom: 14),
-            onMapCreated: (controller) => _mapController = controller,
+            initialCameraPosition: CameraPosition(target: _pickupLocation, zoom: 14),
+            onMapCreated: (controller) {
+              _mapController = controller;
+              // Fit bounds to show all markers
+              _fitMapBounds();
+            },
             markers: {
               Marker(
                 markerId: const MarkerId('pickup'),

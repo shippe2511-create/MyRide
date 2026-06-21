@@ -217,6 +217,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: context.bgColor,
       body: SafeArea(
+        bottom: false,
         child: Consumer<DriverState>(
           builder: (context, state, _) {
             return SingleChildScrollView(

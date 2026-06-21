@@ -119,6 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.bgColor,
+      extendBody: true,
       body: IndexedStack(
         index: _selectedTab,
         children: [
@@ -135,6 +136,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Consumer<DriverState>(
       builder: (context, state, _) {
         return SafeArea(
+          bottom: false,
           child: Stack(
             children: [
               Column(
@@ -1794,34 +1796,30 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBottomNav(BuildContext context) {
-    return Container(
-      color: Colors.transparent,
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
-          child: Container(
-            height: 65,
-            decoration: BoxDecoration(
-              color: context.cardColor,
-              borderRadius: BorderRadius.circular(35),
-              border: Border.all(color: context.borderColor, width: 1),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
-                  blurRadius: 25,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24, 8, 24, bottomPadding + 12),
+      child: Container(
+        height: 65,
+        decoration: BoxDecoration(
+          color: context.cardColor,
+          borderRadius: BorderRadius.circular(35),
+          border: Border.all(color: context.borderColor, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 25,
+              offset: const Offset(0, 8),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildNavItem(context, Icons.home_rounded, Icons.home_outlined, 0),
-                _buildNavItem(context, Icons.history_rounded, Icons.history_outlined, 1),
-                _buildNavItem(context, Icons.person_rounded, Icons.person_outline_rounded, 2),
-              ],
-            ),
-          ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildNavItem(context, Icons.home_rounded, Icons.home_outlined, 0),
+            _buildNavItem(context, Icons.history_rounded, Icons.history_outlined, 1),
+            _buildNavItem(context, Icons.person_rounded, Icons.person_outline_rounded, 2),
+          ],
         ),
       ),
     );

@@ -302,16 +302,14 @@ class AppState extends ChangeNotifier {
           callback: (payload) {
             debugPrint('Profile update received: ${payload.newRecord}');
             final newRecord = payload.newRecord;
-            if (newRecord != null) {
-              final avatarUrl = newRecord['avatar_url'] as String?;
-              if (avatarUrl != null && avatarUrl.isNotEmpty && avatarUrl != _avatarUrl) {
-                _avatarUrl = avatarUrl;
-                _saveAvatarUrl();
-              }
-              final status = newRecord['status'] as String?;
-              if (status != null) {
-                debugPrint('Profile status changed to: $status');
-              }
+            final avatarUrl = newRecord['avatar_url'] as String?;
+            if (avatarUrl != null && avatarUrl.isNotEmpty && avatarUrl != _avatarUrl) {
+              _avatarUrl = avatarUrl;
+              _saveAvatarUrl();
+            }
+            final status = newRecord['status'] as String?;
+            if (status != null) {
+              debugPrint('Profile status changed to: $status');
             }
             notifyListeners();
           },

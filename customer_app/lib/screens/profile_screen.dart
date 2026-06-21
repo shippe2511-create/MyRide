@@ -16,17 +16,6 @@ import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import 'chat_screen.dart';
 
-const String _darkMapStyle = '''
-[
-  {"elementType": "geometry", "stylers": [{"color": "#212121"}]},
-  {"elementType": "labels.icon", "stylers": [{"visibility": "off"}]},
-  {"elementType": "labels.text.fill", "stylers": [{"color": "#757575"}]},
-  {"elementType": "labels.text.stroke", "stylers": [{"color": "#212121"}]},
-  {"featureType": "road", "elementType": "geometry.fill", "stylers": [{"color": "#2c2c2c"}]},
-  {"featureType": "water", "elementType": "geometry", "stylers": [{"color": "#000000"}]}
-]
-''';
-
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 

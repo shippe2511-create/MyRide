@@ -636,10 +636,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     );
   }
 
-  String? _currentDocType;
-
   Future<void> _captureDocument(ImageSource source, {String? docType}) async {
-    _currentDocType = docType;
     try {
       final XFile? image = await _picker.pickImage(
         source: source,

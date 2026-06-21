@@ -55,7 +55,6 @@ class DriverMatchingScreen extends StatefulWidget {
 class _DriverMatchingScreenState extends State<DriverMatchingScreen>
     with TickerProviderStateMixin {
   late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
   late Timer _matchTimer;
   late Timer _driverMoveTimer;
   int _driversChecked = 0;
@@ -118,10 +117,6 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat(reverse: true);
-
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 2.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
 
     _startMatching();
     _startDriverMovement();

@@ -1484,16 +1484,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         label: 'Current Location',
                         onTap: () async {
                           final position = await LocationService.getCurrentLocation();
-                          if (position != null) {
-                            setModalState(() {
-                              pickupAddress = 'Current Location';
-                              pickupLat = position.latitude;
-                              pickupLng = position.longitude;
-                            });
-                            _lastPickupAddress = pickupAddress;
-                            _lastPickupLat = pickupLat;
-                            _lastPickupLng = pickupLng;
-                          }
+                          setModalState(() {
+                            pickupAddress = 'Current Location';
+                            pickupLat = position.latitude;
+                            pickupLng = position.longitude;
+                          });
+                          _lastPickupAddress = pickupAddress;
+                          _lastPickupLat = pickupLat;
+                          _lastPickupLng = pickupLng;
                         },
                         isActive: pickupAddress == 'Current Location',
                       ),

@@ -133,7 +133,8 @@ class OfflineService {
 
   static Future<bool> _executeAction(Map<String, dynamic> action) async {
     final type = action['type'] as String;
-    final data = action['data'] as Map<String, dynamic>;
+    // data is available for future use when actions are implemented
+    // final data = action['data'] as Map<String, dynamic>;
 
     switch (type) {
       case 'update_location':

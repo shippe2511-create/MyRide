@@ -36,7 +36,6 @@ class _RideRequestPopupState extends State<RideRequestPopup>
   Timer? _timer;
   int _remainingSeconds = 30;
   bool _isAccepting = false;
-  double _swipeProgress = 0;
 
   @override
   void initState() {

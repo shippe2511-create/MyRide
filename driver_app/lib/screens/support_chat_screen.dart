@@ -32,7 +32,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     final driverState = Provider.of<DriverState>(context, listen: false);
     final driverId = driverState.driverId;
 
-    if (driverId == null) {
+    if (driverId.isEmpty) {
       setState(() => _loading = false);
       return;
     }
@@ -96,7 +96,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
 
     final driverState = Provider.of<DriverState>(context, listen: false);
     final driverId = driverState.driverId;
-    if (driverId == null) return;
+    if (driverId.isEmpty) return;
 
     _controller.clear();
     HapticFeedback.lightImpact();

@@ -91,7 +91,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   bool _isTyping = false;
   bool _customerTyping = false;
   bool _isRecording = false;
-  bool _isLoading = true;
   int _recordingSeconds = 0;
   Timer? _recordingTimer;
   late AnimationController _recordingController;
@@ -126,7 +125,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         _subscribeToMessages();
       } else {
         // No mock messages - show empty chat when no ride
-        setState(() => _isLoading = false);
+        setState(() {});
       }
     });
     _messageController.addListener(_onTextChanged);
@@ -135,7 +134,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   Future<void> _loadMessages() async {
     if (widget.rideId == null) return;
 
-    setState(() => _isLoading = true);
+    setState(() {});
     try {
       final messages = await SupabaseService.getChatMessages(widget.rideId!);
       _messages.clear();
@@ -156,7 +155,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     } catch (e) {
       debugPrint('Error loading messages: $e');
     }
-    setState(() => _isLoading = false);
+    setState(() {});
     _scrollToBottom();
   }
 
@@ -418,14 +417,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
-  }
-
-  void _startRecording() {
-    // Voice recording not yet implemented
-  }
-
-  void _stopRecording() {
-    // Voice recording not yet implemented
   }
 
   void _cancelRecording() {

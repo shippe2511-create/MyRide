@@ -736,11 +736,9 @@ class DriverState extends ChangeNotifier {
           callback: (payload) {
             debugPrint('Driver profile update received: ${payload.newRecord}');
             final newRecord = payload.newRecord;
-            if (newRecord != null) {
-              final status = newRecord['status'] as String?;
-              if (status != null && status != 'approved') {
-                debugPrint('Driver status changed to: $status');
-              }
+            final status = newRecord['status'] as String?;
+            if (status != null && status != 'approved') {
+              debugPrint('Driver status changed to: $status');
             }
             notifyListeners();
           },

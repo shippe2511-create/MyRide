@@ -78,7 +78,6 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
   Timer? _statusPollingTimer;
   int _currentEta = 0;
   late LatLng _pickupLocation;
-  late LatLng _dropoffLocation;
   late LatLng _driverLocation;
   RealtimeChannel? _rideSubscription;
   RealtimeChannel? _driverLocationChannel;
@@ -98,14 +97,9 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
     // Use passed coordinates or default to Male center
     final pLat = widget.pickupLat ?? 4.1755;
     final pLng = widget.pickupLng ?? 73.5093;
-    final dLat = widget.dropoffLat ?? 4.1755;
-    final dLng = widget.dropoffLng ?? 73.5093;
 
     _pickupLocation = _isValidMaldivesCoord(pLat, pLng)
         ? LatLng(pLat, pLng)
-        : const LatLng(4.1755, 73.5093);
-    _dropoffLocation = _isValidMaldivesCoord(dLat, dLng)
-        ? LatLng(dLat, dLng)
         : const LatLng(4.1755, 73.5093);
     _driverLocation = LatLng(_pickupLocation.latitude + 0.008, _pickupLocation.longitude + 0.005);
     _startEtaCountdown();
@@ -139,7 +133,7 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
           ),
           callback: (payload) {
             final newRecord = payload.newRecord;
-            if (newRecord != null && mounted) {
+            if (mounted) {
               final lat = newRecord['lat'] as num?;
               final lng = newRecord['lng'] as num?;
               if (lat != null && lng != null && _isValidMaldivesCoord(lat.toDouble(), lng.toDouble())) {

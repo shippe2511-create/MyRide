@@ -28,7 +28,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     try {
       final driverState = Provider.of<DriverState>(context, listen: false);
       final driverId = driverState.driverId;
-      if (driverId != null) {
+      if (driverId.isNotEmpty) {
         final notifications = await SupabaseService.getDriverNotifications(driverId);
         setState(() {
           _notifications = notifications;
@@ -235,7 +235,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void _markAllAsRead() async {
     final driverState = Provider.of<DriverState>(context, listen: false);
     final driverId = driverState.driverId;
-    if (driverId != null) {
+    if (driverId.isNotEmpty) {
       try {
         await SupabaseService.markAllNotificationsAsRead(driverId);
         setState(() {

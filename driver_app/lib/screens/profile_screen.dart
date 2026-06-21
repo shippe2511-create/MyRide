@@ -718,8 +718,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: context.borderColor),
           ),
-          child: Column(
-            children: children,
+          child: Material(
+            color: Colors.transparent,
+            child: Column(
+              children: children,
+            ),
           ),
         ),
       ],

@@ -342,8 +342,10 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: context.borderColor),
           ),
-          child: ListTile(
-            leading: Container(
+          child: Material(
+            color: Colors.transparent,
+            child: ListTile(
+              leading: Container(
               width: 44,
               height: 44,
               decoration: BoxDecoration(
@@ -379,6 +381,7 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
                 child: const Icon(Icons.phone, color: Colors.white, size: 20),
               ),
             ),
+          ),
           ),
         ))),
       ],

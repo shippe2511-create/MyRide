@@ -411,6 +411,14 @@ Fixed:
 - **Issue:** settings/page.tsx notification toggles not included in saveSettings()
 - **Fix:** Added all notif_* fields to the upsert call
 
+### 69. Driver Name Shows "Driver" Instead of Actual Name - FIXED
+- **Issue:** Trip tracking screen showed generic "Driver" text instead of actual driver name
+- **Cause:** `getMyScheduledRides` and `getRideById` queries didn't include driver profile data
+- **Fix:** 
+  - Updated both queries to include `driver:drivers!rides_driver_id_fkey(*, profile:profiles!...)`
+  - Extract driver name from nested `ride['driver']['profile']['full_name']` in home_screen
+  - Removed invalid FK reference to vehicles table that was causing query errors
+
 ---
 
 *Updated by Nova on 2026-06-21*

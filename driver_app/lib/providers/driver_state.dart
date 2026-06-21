@@ -578,10 +578,21 @@ class DriverState extends ChangeNotifier {
 
       // Validate coordinates are in Maldives - if not, use simulated Maldives location
       if (!_isValidMaldivesCoord(lat, lng)) {
-        // Simulator returns San Francisco coords - use Male coords instead
-        lat = 4.1755 + (DateTime.now().second * 0.0001);
-        lng = 73.5093 + (DateTime.now().second * 0.0001);
-        debugPrint('Using simulated Maldives location: lat=$lat, lng=$lng');
+        // Simulator returns San Francisco coords - simulate near the ride pickup if active
+        if (_currentRide != null) {
+          // Simulate driver moving toward pickup location
+          final pickupLat = _currentRide!.pickupLat;
+          final pickupLng = _currentRide!.pickupLng;
+          final jitter = (DateTime.now().second % 10) * 0.0002;
+          lat = pickupLat - 0.003 + jitter; // Start slightly away from pickup
+          lng = pickupLng - 0.002 + jitter;
+          debugPrint('Simulating driver near pickup: lat=$lat, lng=$lng (pickup: $pickupLat, $pickupLng)');
+        } else {
+          // No active ride - use Male center with jitter
+          lat = 4.1755 + (DateTime.now().second * 0.0001);
+          lng = 73.5093 + (DateTime.now().second * 0.0001);
+          debugPrint('Using simulated Maldives location: lat=$lat, lng=$lng');
+        }
       }
 
       _currentLat = lat;

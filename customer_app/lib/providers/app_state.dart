@@ -177,8 +177,8 @@ class AppState extends ChangeNotifier {
   String _staffId = '';
   String _userPhone = '';
   String _userEmail = '';
-  final double _userRating = 4.92;
-  int _totalTrips = 142;
+  double _userRating = 5.0;
+  int _totalTrips = 0;
   String? _profilePhotoPath;
   String? _profileId; // Supabase profile UUID
   String? _avatarUrl; // Cloud avatar URL
@@ -275,6 +275,7 @@ class AppState extends ChangeNotifier {
       loadEmergencyContactsFromProfile();
       loadTripHistory();
       loadSavedAddresses();
+      loadUserStats();
       // Fetch latest avatar URL from DB
       _loadAvatarFromDb();
       // Subscribe to profile updates from admin
@@ -325,6 +326,38 @@ class AppState extends ChangeNotifier {
       _avatarUrl = url;
       _saveAvatarUrl();
       notifyListeners();
+    }
+  }
+
+  Future<void> loadUserStats() async {
+    if (_profileId == null) return;
+
+    try {
+      // Get total completed trips for this customer
+      final rides = await SupabaseService.client
+          .from('rides')
+          .select('id')
+          .eq('customer_id', _profileId!)
+          .eq('status', 'completed');
+
+      _totalTrips = (rides as List).length;
+
+      // Get average rating from ratings table (ratings given to this customer by drivers)
+      final ratings = await SupabaseService.client
+          .from('ratings')
+          .select('rating')
+          .eq('to_user_id', _profileId!);
+
+      if ((ratings as List).isNotEmpty) {
+        final sum = ratings.fold<num>(0, (sum, r) => sum + (r['rating'] as num));
+        _userRating = sum / ratings.length;
+      } else {
+        _userRating = 5.0; // Default rating if no ratings yet
+      }
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading user stats: $e');
     }
   }
 

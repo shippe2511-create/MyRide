@@ -41,7 +41,7 @@ class DriverState extends ChangeNotifier {
   int _todayTrips = 0;
   int _weekTrips = 0;
   int _totalTrips = 0;
-  double _rating = 4.8;
+  double _rating = 5.0;
   double _todayDistance = 0;
   double _todayEarnings = 0;
   DateTime? _shiftStartTime;

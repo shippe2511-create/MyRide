@@ -1796,32 +1796,30 @@ class _HomeScreenState extends State<HomeScreen> {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(24, 0, 24, bottomPadding + 16),
-      child: Container(
-        height: 65,
-        decoration: BoxDecoration(
-          color: const Color(0xFF3A3A3A),
-          borderRadius: BorderRadius.circular(35),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.12),
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.5),
-              blurRadius: 25,
-              offset: const Offset(0, 10),
-              spreadRadius: 0,
+      padding: EdgeInsets.fromLTRB(24, 0, 24, bottomPadding + 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(32),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+          child: Container(
+            height: 64,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.1),
+                width: 0.5,
+              ),
             ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildNavItem(context, Icons.home_rounded, Icons.home_outlined, 0),
-            _buildNavItem(context, Icons.history_rounded, Icons.history_outlined, 1),
-            _buildNavItem(context, Icons.person_rounded, Icons.person_outline_rounded, 2),
-          ],
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildNavItem(context, Icons.home_rounded, Icons.home_outlined, 0),
+                _buildNavItem(context, Icons.history_rounded, Icons.history_outlined, 1),
+                _buildNavItem(context, Icons.person_rounded, Icons.person_outline_rounded, 2),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -1843,18 +1841,17 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
+        duration: const Duration(milliseconds: 200),
         curve: Curves.easeOutCubic,
-        width: 65,
-        height: 45,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isActive ? context.bgColor : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
+          color: isActive ? Colors.white.withValues(alpha: 0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Icon(
           isActive ? activeIcon : inactiveIcon,
-          color: isActive ? context.textColor : context.mutedColor,
-          size: 24,
+          color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.5),
+          size: 26,
         ),
       ),
     );

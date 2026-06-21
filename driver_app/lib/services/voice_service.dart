@@ -8,7 +8,7 @@ class VoiceService {
 
   final FlutterTts _tts = FlutterTts();
   bool _isInitialized = false;
-  bool _isEnabled = true;
+  bool _isEnabled = false; // Disabled by default
 
   Future<void> initialize() async {
     if (_isInitialized) return;

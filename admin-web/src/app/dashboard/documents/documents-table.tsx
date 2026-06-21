@@ -160,7 +160,6 @@ export function DocumentsTable({ documents: initialDocuments, totalCount, curren
   }
 
   const handleApprove = async (doc: Document) => {
-    setLoading(true)
     const { error } = await supabase
       .from("documents")
       .update({ status: "verified", verified_at: new Date().toISOString() })
@@ -170,13 +169,11 @@ export function DocumentsTable({ documents: initialDocuments, totalCount, curren
       toast.error("Failed to approve document")
     } else {
       toast.success("Document approved")
-      router.refresh()
+      setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, status: "verified", verified_at: new Date().toISOString() } : d))
     }
-    setLoading(false)
   }
 
   const handleReject = async (doc: Document) => {
-    setLoading(true)
     const { error } = await supabase
       .from("documents")
       .update({ status: "rejected" })
@@ -186,13 +183,11 @@ export function DocumentsTable({ documents: initialDocuments, totalCount, curren
       toast.error("Failed to reject document")
     } else {
       toast.success("Document rejected")
-      router.refresh()
+      setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, status: "rejected" } : d))
     }
-    setLoading(false)
   }
 
   const handleDelete = async (doc: Document) => {
-    setLoading(true)
     const { error } = await supabase
       .from("documents")
       .delete()
@@ -203,9 +198,8 @@ export function DocumentsTable({ documents: initialDocuments, totalCount, curren
     } else {
       toast.success("Document deleted")
       setDialogType(null)
-      router.refresh()
+      setDocuments(prev => prev.filter(d => d.id !== doc.id))
     }
-    setLoading(false)
   }
 
   const toggleSelectAll = () => {
@@ -229,17 +223,18 @@ export function DocumentsTable({ documents: initialDocuments, totalCount, curren
   const handleBulkApprove = async () => {
     if (selectedIds.size === 0) return
     setBulkLoading(true)
+    const ids = Array.from(selectedIds)
     const { error } = await supabase
       .from("documents")
       .update({ status: "verified", verified_at: new Date().toISOString() })
-      .in("id", Array.from(selectedIds))
+      .in("id", ids)
 
     if (error) {
       toast.error("Failed to approve documents")
     } else {
       toast.success(`${selectedIds.size} documents approved`)
+      setDocuments(prev => prev.map(d => ids.includes(d.id) ? { ...d, status: "verified", verified_at: new Date().toISOString() } : d))
       setSelectedIds(new Set())
-      router.refresh()
     }
     setBulkLoading(false)
   }
@@ -247,17 +242,18 @@ export function DocumentsTable({ documents: initialDocuments, totalCount, curren
   const handleBulkReject = async () => {
     if (selectedIds.size === 0) return
     setBulkLoading(true)
+    const ids = Array.from(selectedIds)
     const { error } = await supabase
       .from("documents")
       .update({ status: "rejected" })
-      .in("id", Array.from(selectedIds))
+      .in("id", ids)
 
     if (error) {
       toast.error("Failed to reject documents")
     } else {
       toast.success(`${selectedIds.size} documents rejected`)
+      setDocuments(prev => prev.map(d => ids.includes(d.id) ? { ...d, status: "rejected" } : d))
       setSelectedIds(new Set())
-      router.refresh()
     }
     setBulkLoading(false)
   }
@@ -266,17 +262,18 @@ export function DocumentsTable({ documents: initialDocuments, totalCount, curren
     if (selectedIds.size === 0) return
     if (!window.confirm(`Are you sure you want to delete ${selectedIds.size} documents?`)) return
     setBulkLoading(true)
+    const ids = Array.from(selectedIds)
     const { error } = await supabase
       .from("documents")
       .delete()
-      .in("id", Array.from(selectedIds))
+      .in("id", ids)
 
     if (error) {
       toast.error("Failed to delete documents")
     } else {
       toast.success(`${selectedIds.size} documents deleted`)
+      setDocuments(prev => prev.filter(d => !ids.includes(d.id)))
       setSelectedIds(new Set())
-      router.refresh()
     }
     setBulkLoading(false)
   }

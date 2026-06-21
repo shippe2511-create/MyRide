@@ -428,33 +428,23 @@ export function DocumentsTable() {
                           <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            {doc.file_url && (
-                              <DropdownMenuItem onClick={() => {
+                            <DropdownMenuItem onClick={() => {
+                              if (doc.file_url) {
                                 setPreviewDoc(doc)
                                 setPreviewOpen(true)
-                              }}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                View Details
-                              </DropdownMenuItem>
-                            )}
-                            {doc.status !== "verified" && (
-                              <DropdownMenuItem onClick={() => updateStatus(doc.id, "verified")}>
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                                Approve
-                              </DropdownMenuItem>
-                            )}
-                            {doc.status !== "rejected" && (
-                              <DropdownMenuItem onClick={() => updateStatus(doc.id, "rejected")}>
-                                <Ban className="mr-2 h-4 w-4" />
-                                Reject
-                              </DropdownMenuItem>
-                            )}
-                            {doc.status !== "pending" && (
-                              <DropdownMenuItem onClick={() => updateStatus(doc.id, "pending")}>
-                                <Clock className="mr-2 h-4 w-4" />
-                                Mark as Pending
-                              </DropdownMenuItem>
-                            )}
+                              }
+                            }}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => updateStatus(doc.id, "verified")}>
+                              <Edit2 className="mr-2 h-4 w-4" />
+                              {doc.status === "verified" ? "Approved" : "Approve"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => updateStatus(doc.id, "rejected")}>
+                              <Ban className="mr-2 h-4 w-4" />
+                              {doc.status === "rejected" ? "Rejected" : "Reject"}
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-red-500 focus:text-red-500"

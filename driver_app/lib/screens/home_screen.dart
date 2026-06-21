@@ -547,7 +547,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildOnlineView(BuildContext context, DriverState state) {
     return SingleChildScrollView(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 100),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 80),
       child: Column(
         children: [
           // Stats card
@@ -628,39 +628,38 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // Waiting view
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 80,
-                  height: 80,
+                  width: 64,
+                  height: 64,
                   decoration: BoxDecoration(
                     color: AppColors.success.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: const Icon(
                     Icons.search,
-                    size: 40,
+                    size: 32,
                     color: AppColors.success,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 Text(
                   'Looking for Rides',
                   style: TextStyle(
                     color: context.textColor,
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Text(
                   'You\'ll be notified when a staff member requests a ride',
                   style: TextStyle(
                     color: context.mutedColor,
-                    fontSize: 14,
-                    height: 1.4,
+                    fontSize: 13,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -670,7 +669,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // End Shift Button
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
             child: SizedBox(
               width: double.infinity,
               height: 56,

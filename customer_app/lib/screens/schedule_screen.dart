@@ -251,24 +251,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     );
   }
 
-  int _getUpcomingCount() {
-    final now = TimeOfDay.now();
-    int count = 0;
-    for (final route in _getFilteredRoutes()) {
-      final routeSchedules = _schedules.where((s) => s['route_id'] == route['id']).toList();
-      for (final schedule in routeSchedules) {
-        final time = schedule['departure_time']?.toString().substring(0, 5) ?? '00:00';
-        final parts = time.split(':');
-        final hour = int.tryParse(parts[0]) ?? 0;
-        final minute = int.tryParse(parts[1]) ?? 0;
-        if (hour > now.hour || (hour == now.hour && minute >= now.minute)) {
-          count++;
-        }
-      }
-    }
-    return count;
-  }
-
   Widget _buildHeader(bool isDark, int reminderCount) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -596,19 +578,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
   }
 
   Color _getTypeColor(String type) {
-    switch (type) {
-      case 'internal_bus':
-        return AppColors.yellow;
-      case 'mtcc_bus':
-        return const Color(0xFF4DA6FF);
-      case 'ferry':
-        return const Color(0xFF00CED1);
-      default:
-        return AppColors.yellow;
-    }
-  }
-
-  Color _getTypeIconColor(String type) {
     switch (type) {
       case 'internal_bus':
         return AppColors.yellow;
@@ -1295,7 +1264,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
         final stop = entry.value;
         final isFirst = index == 0;
         final isLast = index == stops.length - 1;
-        final minutesFromStart = index * 2;
 
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,

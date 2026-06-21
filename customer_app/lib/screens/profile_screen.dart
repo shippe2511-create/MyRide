@@ -42,6 +42,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: isDark ? context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5) : AppColors.bgLight,
       body: SafeArea(
+        bottom: false,
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           child: Column(
@@ -59,7 +60,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildLogoutButton(context),
               const SizedBox(height: 40),
               _buildVersionInfo(context),
-              const SizedBox(height: 40),
+              SizedBox(height: MediaQuery.of(context).padding.bottom + 100),
             ],
           ),
         ),

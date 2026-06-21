@@ -253,6 +253,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildHomeTab(BuildContext context) {
     return SafeArea(
+      bottom: false, // Let content extend behind bottom nav
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Column(
@@ -268,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             _buildAnnouncementCorner(context),
             const SizedBox(height: 24),
             _buildStaffCorner(context),
-            const SizedBox(height: 100),
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 100), // Extra space for floating nav
           ],
         ),
       ),
@@ -1143,44 +1144,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final navBorderColor = isDark
         ? Colors.white.withValues(alpha: 0.08)
         : Colors.black.withValues(alpha: 0.08);
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    return Container(
-      color: Colors.transparent,
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(40),
-            child: BackdropFilter(
-              filter: ui.ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-              child: Container(
-                height: 64,
-                decoration: BoxDecoration(
-                  color: navBgColor,
-                  borderRadius: BorderRadius.circular(40),
-                  border: Border.all(
-                    color: navBorderColor,
-                    width: 1,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                      spreadRadius: -5,
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildNavItem(0, Icons.home_rounded, Icons.home_outlined),
-                    _buildNavItem(1, Icons.history_rounded, Icons.history_outlined),
-                    _buildNavItem(2, Icons.send_rounded, Icons.send_outlined),
-                    _buildNavItem(3, Icons.person_rounded, Icons.person_outline_rounded),
-                  ],
-                ),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24, 8, 24, bottomPadding + 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(40),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+          child: Container(
+            height: 64,
+            decoration: BoxDecoration(
+              color: navBgColor,
+              borderRadius: BorderRadius.circular(40),
+              border: Border.all(
+                color: navBorderColor,
+                width: 1,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                  spreadRadius: -5,
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildNavItem(0, Icons.home_rounded, Icons.home_outlined),
+                _buildNavItem(1, Icons.history_rounded, Icons.history_outlined),
+                _buildNavItem(2, Icons.send_rounded, Icons.send_outlined),
+                _buildNavItem(3, Icons.person_rounded, Icons.person_outline_rounded),
+              ],
             ),
           ),
         ),

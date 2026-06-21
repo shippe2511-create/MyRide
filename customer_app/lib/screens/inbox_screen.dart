@@ -103,6 +103,7 @@ class _InboxScreenState extends State<InboxScreen> {
     return Scaffold(
       backgroundColor: context.bgColor,
       body: SafeArea(
+        bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

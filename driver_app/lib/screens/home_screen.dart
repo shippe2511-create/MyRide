@@ -548,8 +548,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildOnlineView(BuildContext context, DriverState state) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
     return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 100),
+      padding: EdgeInsets.only(bottom: bottomPadding + 120),
       child: Column(
         children: [
           // Stats card

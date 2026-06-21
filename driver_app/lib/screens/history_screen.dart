@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../models/ride_request.dart';
-import '../widgets/floating_nav_bar.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -116,7 +115,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   }
 
                   return ListView.builder(
-                    padding: EdgeInsets.fromLTRB(16, 16, 16, getNavBarHeight(context) + 16),
+                    padding: const EdgeInsets.all(16),
                     itemCount: filteredTrips.length,
                     itemBuilder: (context, index) {
                       final trip = filteredTrips[index];

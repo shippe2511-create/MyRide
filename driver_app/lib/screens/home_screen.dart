@@ -1795,33 +1795,25 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBottomNav(BuildContext context) {
     final isDark = context.isDark;
     final navBgColor = isDark
-        ? const Color(0xFF1A1A1A).withValues(alpha: 0.85)
-        : Colors.white.withValues(alpha: 0.9);
+        ? Colors.black.withValues(alpha: 0.35)
+        : Colors.white.withValues(alpha: 0.4);
     final navBorderColor = isDark
-        ? Colors.white.withValues(alpha: 0.08)
-        : Colors.black.withValues(alpha: 0.08);
+        ? Colors.white.withValues(alpha: 0.15)
+        : Colors.black.withValues(alpha: 0.1);
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(24, 8, 24, bottomPadding + 12),
+      padding: EdgeInsets.fromLTRB(24, 0, 24, bottomPadding + 12),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(35),
         child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+          filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
           child: Container(
             height: 65,
             decoration: BoxDecoration(
               color: navBgColor,
               borderRadius: BorderRadius.circular(35),
               border: Border.all(color: navBorderColor, width: 1),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                  spreadRadius: -5,
-                ),
-              ],
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,

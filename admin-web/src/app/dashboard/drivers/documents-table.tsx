@@ -401,11 +401,11 @@ export function DocumentsTable() {
                         {formatDate(doc.uploaded_at)}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2">
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="icon"
-                            className="h-8 w-8"
+                            className="h-8 w-8 border-border"
                             onClick={() => {
                               if (doc.file_url) {
                                 setPreviewDoc(doc)
@@ -417,7 +417,7 @@ export function DocumentsTable() {
                           </Button>
                           <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8" disabled={updating === doc.id}>
+                              <Button variant="outline" size="icon" className="h-8 w-8 border-border" disabled={updating === doc.id}>
                                 {updating === doc.id ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (

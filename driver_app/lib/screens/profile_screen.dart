@@ -894,22 +894,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showTerms(BuildContext context) async {
-    String termsContent = 'Loading...';
+    const String termsContent = '''
+MyRide Driver Terms & Conditions
 
-    try {
-      final settings = await SupabaseService.client
-          .from('app_settings')
-          .select('terms_conditions')
-          .eq('id', 'default')
-          .maybeSingle();
-      if (settings != null && settings['terms_conditions'] != null) {
-        termsContent = settings['terms_conditions'];
-      } else {
-        termsContent = 'Terms and conditions content will be loaded from the server.';
-      }
-    } catch (e) {
-      termsContent = 'Failed to load terms. Please try again later.';
-    }
+1. SERVICE AGREEMENT
+By using the MyRide Driver app, you agree to provide safe, professional transportation services to staff members.
+
+2. DRIVER RESPONSIBILITIES
+- Maintain a valid driving license at all times
+- Follow all traffic laws and regulations
+- Keep your vehicle clean and well-maintained
+- Treat all passengers with respect and courtesy
+- Complete assigned rides promptly
+
+3. SAFETY REQUIREMENTS
+- Complete pre-trip vehicle inspections
+- Report any safety concerns immediately
+- Use the SOS feature in emergencies
+- Never use mobile devices while driving
+
+4. DATA & PRIVACY
+- Your location is tracked during active shifts
+- Ride data is stored for record-keeping
+- Personal information is protected per our privacy policy
+
+5. TERMINATION
+MyRide reserves the right to suspend or terminate driver accounts for violations of these terms.
+
+For questions, contact support at itadminsupport@macl.aero
+''';
 
     if (!mounted) return;
 

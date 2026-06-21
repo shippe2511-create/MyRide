@@ -496,11 +496,10 @@ class SupabaseService {
     final id = driverId ?? _driverId;
     if (id == null || id.isEmpty) return [];
 
-    final response = await client
-        .from('documents')
-        .select()
-        .eq('driver_id', id)
-        .order('document_type');
+    // Use RPC to bypass RLS (phone login doesn't set auth.uid())
+    final response = await client.rpc('get_driver_documents', params: {
+      'p_driver_id': id,
+    });
     return List<Map<String, dynamic>>.from(response);
   }
 

@@ -19,7 +19,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
-import { FileText, Search, MoreHorizontal, CheckCircle, XCircle, Clock, Eye, AlertTriangle, Loader2, ExternalLink } from "lucide-react"
+import { FileText, Search, MoreHorizontal, CheckCircle, XCircle, Clock, Eye, AlertTriangle, Loader2, ExternalLink, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 interface Document {
@@ -150,6 +150,24 @@ export function DocumentsTable() {
       toast.error("Failed to update status")
     } else {
       toast.success(`Document ${newStatus}`)
+      loadDocuments()
+    }
+    setUpdating(null)
+  }
+
+  const deleteDocument = async (docId: string) => {
+    if (!confirm("Are you sure you want to delete this document?")) return
+
+    setUpdating(docId)
+    const { error } = await supabase
+      .from("documents")
+      .delete()
+      .eq("id", docId)
+
+    if (error) {
+      toast.error("Failed to delete document")
+    } else {
+      toast.success("Document deleted")
       loadDocuments()
     }
     setUpdating(null)
@@ -433,6 +451,13 @@ export function DocumentsTable() {
                                 Mark as Pending
                               </DropdownMenuItem>
                             )}
+                            <DropdownMenuItem
+                              className="text-red-600"
+                              onClick={() => deleteDocument(doc.id)}
+                            >
+                              <XCircle className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

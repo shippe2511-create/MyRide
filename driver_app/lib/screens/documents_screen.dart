@@ -476,23 +476,19 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                       children: [
                         Icon(statusIcon, color: statusColor, size: 14),
                         const SizedBox(width: 4),
-                        Text(
-                          statusText,
-                          style: TextStyle(
-                            color: statusColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                        Flexible(
+                          child: Text(
+                            expiryDisplay != null
+                              ? '$statusText • Expires $expiryDisplay'
+                              : statusText,
+                            style: TextStyle(
+                              color: statusColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (expiryDisplay != null) ...[
-                          Text(
-                            isExpired ? ' • Expired $expiryDisplay' : ' • Expires $expiryDisplay',
-                            style: TextStyle(
-                              color: isExpired ? AppColors.error : (isExpiringSoon ? AppColors.warning : context.mutedColor),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                   ],

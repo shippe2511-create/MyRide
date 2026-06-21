@@ -31,7 +31,17 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         {children}
-        <Toaster position="top-right" richColors />
+        <Toaster
+          position="top-right"
+          richColors
+          closeButton
+          toastOptions={{
+            style: {
+              borderRadius: '12px',
+            },
+            duration: 4000,
+          }}
+        />
       </body>
     </html>
   );

@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../widgets/status_toggle.dart';
 import '../widgets/ride_request_popup.dart';
 import '../widgets/break_timer.dart';
+import '../widgets/floating_nav_bar.dart';
 import 'vehicle_checklist_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
@@ -119,6 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.bgColor,
+      extendBody: true,
       body: IndexedStack(
         index: _selectedTab,
         children: [
@@ -127,7 +129,10 @@ class _HomeScreenState extends State<HomeScreen> {
           const ProfileScreen(),
         ],
       ),
-      bottomNavigationBar: _buildBottomNav(context),
+      bottomNavigationBar: FloatingNavBar(
+        selectedIndex: _selectedTab,
+        onTap: _onTabChanged,
+      ),
     );
   }
 
@@ -674,9 +679,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
-        // End Shift Button - Fixed at bottom
+        // End Shift Button - Fixed at bottom with nav clearance
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+          padding: EdgeInsets.fromLTRB(20, 10, 20, getNavBarHeight(context) + 16),
           child: SizedBox(
             width: double.infinity,
             height: 56,

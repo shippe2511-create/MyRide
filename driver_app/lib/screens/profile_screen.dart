@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../widgets/floating_nav_bar.dart';
 import 'stats_screen.dart';
 import 'vehicle_logs_screen.dart';
 
@@ -220,7 +221,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Consumer<DriverState>(
           builder: (context, state, _) {
             return SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.fromLTRB(20, 20, 20, getNavBarHeight(context) + 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

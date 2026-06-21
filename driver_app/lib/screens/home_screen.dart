@@ -546,14 +546,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildOnlineView(BuildContext context, DriverState state) {
-    return Column(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                // Stats card
-                _buildStatsCard(context, state),
+    return SingleChildScrollView(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 100),
+      child: Column(
+        children: [
+          // Stats card
+          _buildStatsCard(context, state),
 
                 // Quick Actions
                 Padding(
@@ -669,30 +667,27 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-              ],
-            ),
-          ),
-        ),
 
-        // End Shift Button - Fixed at bottom
-        Padding(
-          padding: EdgeInsets.fromLTRB(20, 10, 20, MediaQuery.of(context).padding.bottom + 16),
-          child: SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: OutlinedButton.icon(
-              onPressed: () => _showEndShiftDialog(context, state),
-              icon: const Icon(Icons.logout_rounded, size: 22),
-              label: const Text('End Shift', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.error,
-                side: const BorderSide(color: AppColors.error, width: 1.5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          // End Shift Button
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+            child: SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: OutlinedButton.icon(
+                onPressed: () => _showEndShiftDialog(context, state),
+                icon: const Icon(Icons.logout_rounded, size: 22),
+                label: const Text('End Shift', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: const BorderSide(color: AppColors.error, width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

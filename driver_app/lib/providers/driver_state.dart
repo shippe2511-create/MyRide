@@ -339,6 +339,9 @@ class DriverState extends ChangeNotifier {
     // Load shifts from database
     await loadShifts();
 
+    // Load actual stats from database
+    await loadDriverStats();
+
     notifyListeners();
   }
 
@@ -364,9 +367,60 @@ class DriverState extends ChangeNotifier {
     }
   }
 
-  // REMOVED - No mock data, all data comes from Supabase
-  void _loadMockData() {
-    // Mock data removed - fetch real data from Supabase instead
+  // Load driver stats from Supabase (trips, rating)
+  Future<void> loadDriverStats() async {
+    if (_driverId.isEmpty) return;
+
+    try {
+      // Get driver's rating from drivers table
+      final driverData = await Supabase.instance.client
+          .from('drivers')
+          .select('rating, total_trips')
+          .eq('id', _driverId)
+          .maybeSingle();
+
+      if (driverData != null) {
+        _rating = (driverData['rating'] as num?)?.toDouble() ?? 5.0;
+        _totalTrips = (driverData['total_trips'] as num?)?.toInt() ?? 0;
+      }
+
+      // Get actual completed trips count
+      final completedRides = await Supabase.instance.client
+          .from('rides')
+          .select('id')
+          .eq('driver_id', _driverId)
+          .eq('status', 'completed');
+
+      _totalTrips = (completedRides as List).length;
+
+      // Get today's trips
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day);
+
+      final todayRides = await Supabase.instance.client
+          .from('rides')
+          .select('id')
+          .eq('driver_id', _driverId)
+          .eq('status', 'completed')
+          .gte('created_at', todayStart.toIso8601String());
+
+      _todayTrips = (todayRides as List).length;
+
+      // Calculate average rating from ratings table
+      final ratings = await Supabase.instance.client
+          .from('ratings')
+          .select('rating')
+          .eq('to_user_id', _profileId);
+
+      if ((ratings as List).isNotEmpty) {
+        final sum = ratings.fold<num>(0, (sum, r) => sum + (r['rating'] as num));
+        _rating = sum / ratings.length;
+      }
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading driver stats: $e');
+    }
   }
 
   // Actions

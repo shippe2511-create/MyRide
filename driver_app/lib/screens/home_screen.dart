@@ -546,34 +546,36 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildOnlineView(BuildContext context, DriverState state) {
-    return Column(
+    return SingleChildScrollView(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 100),
+      child: Column(
         children: [
           // Stats card
           _buildStatsCard(context, state),
 
-                // Quick Actions
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: context.cardColor,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: context.borderColor),
+          // Quick Actions
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: context.cardColor,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: context.borderColor),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Quick Actions',
+                    style: TextStyle(
+                      color: context.mutedColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Quick Actions',
-                          style: TextStyle(
-                            color: context.mutedColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 14),
+                  ),
+                  const SizedBox(height: 14),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
@@ -626,7 +628,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // Waiting view
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -665,9 +667,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // End Shift Button - positioned above nav bar
+          // End Shift Button - with proper spacing above nav bar
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 90),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
             child: SizedBox(
               width: double.infinity,
               height: 56,
@@ -684,6 +686,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ],
+      ),
     );
   }
 

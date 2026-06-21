@@ -11,11 +11,9 @@ class SchedulesScreen extends StatefulWidget {
 
 class _SchedulesScreenState extends State<SchedulesScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  List<Map<String, dynamic>> _transportTypes = [];
   List<Map<String, dynamic>> _routes = [];
   List<Map<String, dynamic>> _schedules = [];
   bool _isLoading = true;
-  String? _selectedTypeFilter;
 
   @override
   void initState() {
@@ -33,7 +31,6 @@ class _SchedulesScreenState extends State<SchedulesScreen> with SingleTickerProv
 
       if (mounted) {
         setState(() {
-          _transportTypes = types;
           _routes = routes;
           _schedules = schedules;
           _isLoading = false;

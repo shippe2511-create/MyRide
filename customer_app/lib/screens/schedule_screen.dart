@@ -635,7 +635,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
             // Use color from database if available
             final colorHex = type['color'] as String? ?? '#FFD60A';
             final typeColor = Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
-            final iconColor = typeColor;
             return Expanded(
               child: GestureDetector(
                 onTap: () {
@@ -1297,12 +1296,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
         final isFirst = index == 0;
         final isLast = index == stops.length - 1;
         final minutesFromStart = index * 2;
-
-        // Calculate arrival time
-        final totalMinutes = departureHour * 60 + departureMinute + minutesFromStart;
-        final arrivalHour = (totalMinutes ~/ 60) % 24;
-        final arrivalMinute = totalMinutes % 60;
-        final arrivalTime = '${arrivalHour.toString().padLeft(2, '0')}:${arrivalMinute.toString().padLeft(2, '0')}';
 
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,

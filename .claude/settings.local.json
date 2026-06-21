@@ -135,7 +135,8 @@
       "Bash(sudo killall usbmuxd)",
       "Bash(ipconfig getifaddr *)",
       "Bash(kill 48141)",
-      "Bash(pkill -f \"next\")"
+      "Bash(pkill -f \"next\")",
+      "Bash(pkill -9 -f dart)"
     ],
     "additionalDirectories": [
       "/tmp"

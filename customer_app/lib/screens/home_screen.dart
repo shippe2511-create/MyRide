@@ -126,10 +126,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
         // Update ongoing trip for banner display
         if (status == 'accepted' || status == 'arrived' || status == 'in_progress') {
+          // Extract driver name from nested driver.profile
+          final driver = ride['driver'] as Map<String, dynamic>?;
+          final driverProfile = driver?['profile'] as Map<String, dynamic>?;
+          final driverName = driverProfile?['full_name'] as String? ?? 'Driver';
+
           setState(() {
             _ongoingTrip = {
               'rideId': rideId,
-              'driverName': 'Driver',
+              'driverName': driverName,
               'pickup': ride['pickup_name'] ?? 'Pickup',
               'dropoff': ride['dropoff_name'] ?? 'Dropoff',
               'status': status,

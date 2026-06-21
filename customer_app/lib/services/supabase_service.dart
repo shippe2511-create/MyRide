@@ -245,7 +245,13 @@ class SupabaseService {
     try {
       final response = await client
           .from('rides')
-          .select('*')
+          .select('''
+            *,
+            driver:drivers!rides_driver_id_fkey(
+              *,
+              profile:profiles!drivers_profile_id_fkey(id, full_name, phone, avatar_url)
+            )
+          ''')
           .eq('customer_id', customerId)
           .inFilter('status', ['pending', 'accepted', 'arrived', 'in_progress'])
           .order('created_at', ascending: false)
@@ -285,8 +291,7 @@ class SupabaseService {
             *,
             driver:drivers!rides_driver_id_fkey(
               *,
-              profile:profiles!drivers_profile_id_fkey(id, full_name, phone, avatar_url),
-              vehicle:vehicles!drivers_vehicle_id_fkey(plate_no, make, model, color)
+              profile:profiles!drivers_profile_id_fkey(id, full_name, phone, avatar_url)
             )
           ''')
           .eq('id', rideId)

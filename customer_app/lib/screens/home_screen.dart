@@ -525,37 +525,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  String _selectedTransportType = 'MTCC';
+
   Widget _buildTransportSchedules(BuildContext context) {
-    final cardBg = context.surfaceColor;
     final scheduleTypes = [
       {
-        'name': 'Internal Bus',
-        'subtitle': 'Staff transport',
+        'name': 'MTCC',
         'icon': Icons.directions_bus_rounded,
-        'color': AppColors.yellow,
-        'iconColor': AppColors.yellow,
-        'textColor': AppColors.yellow,
-        'cardColor': cardBg,
-        'type': 'internal_bus',
-      },
-      {
-        'name': 'MTCC Bus',
-        'subtitle': 'Public transport',
-        'icon': Icons.airport_shuttle_rounded,
-        'color': const Color(0xFF4DA6FF),
-        'iconColor': const Color(0xFF4DA6FF),
-        'textColor': const Color(0xFF4DA6FF),
-        'cardColor': cardBg,
+        'color': const Color(0xFFFF9800),
         'type': 'mtcc_bus',
       },
       {
+        'name': 'Internal',
+        'icon': Icons.airport_shuttle_rounded,
+        'color': const Color(0xFFAFB42B),
+        'type': 'internal_bus',
+      },
+      {
         'name': 'Ferry',
-        'subtitle': 'Staff ferry',
         'icon': Icons.directions_boat_rounded,
-        'color': const Color(0xFF00CED1),
-        'iconColor': const Color(0xFF00CED1),
-        'textColor': const Color(0xFF00CED1),
-        'cardColor': cardBg,
+        'color': const Color(0xFF2196F3),
         'type': 'ferry',
       },
     ];
@@ -569,7 +558,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Transport Schedules',
+                'Staff Transport',
                 style: TextStyle(
                   color: context.textColor,
                   fontSize: 18,
@@ -601,69 +590,107 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ),
         const SizedBox(height: 12),
+        // Transport Type Cards
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: SizedBox(
-            height: 120,
-            child: Row(
-              children: scheduleTypes.map((schedule) {
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      HapticFeedback.mediumImpact();
-                      Navigator.push(context, MaterialPageRoute(
-                        builder: (_) => ScheduleScreen(initialTransportType: schedule['type'] as String),
-                      ));
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      padding: const EdgeInsets.fromLTRB(8, 14, 8, 12),
-                      decoration: BoxDecoration(
-                        color: schedule['cardColor'] as Color,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: (schedule['color'] as Color).withValues(alpha: 0.4), width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: (schedule['color'] as Color).withValues(alpha: 0.15),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 52,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              color: (schedule['color'] as Color).withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Icon(
-                              schedule['icon'] as IconData,
-                              color: schedule['iconColor'] as Color,
-                              size: 30,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            schedule['name'] as String,
-                            style: TextStyle(color: schedule['textColor'] as Color, fontSize: 12, fontWeight: FontWeight.w700),
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+          child: Row(
+            children: scheduleTypes.map((schedule) {
+              final isSelected = _selectedTransportType == schedule['name'];
+              final color = schedule['color'] as Color;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _selectedTransportType = schedule['name'] as String);
+                  },
+                  onDoubleTap: () {
+                    HapticFeedback.mediumImpact();
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => ScheduleScreen(initialTransportType: schedule['type'] as String),
+                    ));
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      color: context.surfaceColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isSelected ? color : color.withValues(alpha: 0.3),
+                        width: isSelected ? 2 : 1.5,
                       ),
                     ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            schedule['icon'] as IconData,
+                            color: color,
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          schedule['name'] as String,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                );
-              }).toList(),
-            ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Route Direction Buttons
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: [
+              _buildRouteButton('To Hulhumale', true),
+              const SizedBox(width: 10),
+              _buildRouteButton('To Hulhule', false),
+            ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildRouteButton(String label, bool isPrimary) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const ScheduleScreen()));
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        decoration: BoxDecoration(
+          color: isPrimary ? AppColors.yellow : context.surfaceColor,
+          borderRadius: BorderRadius.circular(24),
+          border: isPrimary ? null : Border.all(color: context.borderColor),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isPrimary ? Colors.black : context.textColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
     );
   }
 

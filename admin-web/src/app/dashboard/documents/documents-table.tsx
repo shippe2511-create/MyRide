@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import {
@@ -46,11 +46,13 @@ import {
   Edit,
   Ban,
   Trash2,
+  ChevronLeft,
+  ChevronRight,
+  Download,
   CheckCircle,
   XCircle,
   FileText,
   ExternalLink,
-  Loader2,
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { formatDate } from "@/lib/utils"
@@ -75,6 +77,13 @@ interface Document {
   }
 }
 
+interface DocumentsTableProps {
+  documents: Document[]
+  totalCount: number
+  currentPage: number
+  pageSize: number
+}
+
 const DOCUMENT_TYPES = [
   { value: "license", label: "Driver's License" },
   { value: "id_card", label: "ID Card" },
@@ -84,71 +93,74 @@ const DOCUMENT_TYPES = [
   { value: "police_clearance", label: "Police Clearance" },
 ]
 
-export function DocumentsTable() {
+export function DocumentsTable({ documents: initialDocuments, totalCount, currentPage, pageSize }: DocumentsTableProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
 
-  const [documents, setDocuments] = useState<Document[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [typeFilter, setTypeFilter] = useState("all")
+  const [documents, setDocuments] = useState(initialDocuments)
+  const [search, setSearch] = useState(searchParams.get("search") || "")
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "all")
+  const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || "all")
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
   const [dialogType, setDialogType] = useState<"view" | "delete" | null>(null)
-  const [updating, setUpdating] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
 
-  useEffect(() => {
-    loadDocuments()
+  const totalPages = Math.ceil(totalCount / pageSize)
 
+  useEffect(() => {
+    setDocuments(initialDocuments)
+  }, [initialDocuments])
+
+  // Real-time subscription
+  useEffect(() => {
     const channel = supabase
       .channel('documents-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
-        loadDocuments()
+        router.refresh()
       })
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [supabase, router])
 
-  const loadDocuments = async () => {
-    setLoading(true)
-    const { data, error } = await supabase
-      .from("documents")
-      .select(`
-        *,
-        driver:drivers!inner(
-          id,
-          profile:profiles(
-            full_name,
-            avatar_url,
-            phone,
-            employee_id
-          )
-        )
-      `)
-      .order("uploaded_at", { ascending: false })
-
-    if (!error && data) {
-      setDocuments(data)
+  const updateParams = (key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value && value !== "all") {
+      params.set(key, value)
+    } else {
+      params.delete(key)
     }
-    setLoading(false)
+    params.delete("page")
+    router.push(`/dashboard/documents?${params.toString()}`)
   }
 
-  const filteredDocuments = documents.filter(doc => {
-    const matchesSearch = search === "" ||
-      doc.driver?.profile?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-      doc.document_type.toLowerCase().includes(search.toLowerCase())
-    const matchesStatus = statusFilter === "all" || doc.status === statusFilter
-    const matchesType = typeFilter === "all" || doc.document_type === typeFilter
-    return matchesSearch && matchesStatus && matchesType
-  })
+  const handleSearch = () => {
+    updateParams("search", search)
+  }
+
+  const handleStatusChange = (value: string) => {
+    setStatusFilter(value)
+    updateParams("status", value)
+  }
+
+  const handleTypeChange = (value: string) => {
+    setTypeFilter(value)
+    updateParams("type", value)
+  }
+
+  const goToPage = (page: number) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("page", page.toString())
+    router.push(`/dashboard/documents?${params.toString()}`)
+  }
 
   const handleApprove = async (doc: Document) => {
-    setUpdating(true)
+    setLoading(true)
     const { error } = await supabase
       .from("documents")
       .update({ status: "verified", verified_at: new Date().toISOString() })
@@ -158,13 +170,13 @@ export function DocumentsTable() {
       toast.error("Failed to approve document")
     } else {
       toast.success("Document approved")
-      loadDocuments()
+      router.refresh()
     }
-    setUpdating(false)
+    setLoading(false)
   }
 
   const handleReject = async (doc: Document) => {
-    setUpdating(true)
+    setLoading(true)
     const { error } = await supabase
       .from("documents")
       .update({ status: "rejected" })
@@ -174,13 +186,13 @@ export function DocumentsTable() {
       toast.error("Failed to reject document")
     } else {
       toast.success("Document rejected")
-      loadDocuments()
+      router.refresh()
     }
-    setUpdating(false)
+    setLoading(false)
   }
 
   const handleDelete = async (doc: Document) => {
-    setUpdating(true)
+    setLoading(true)
     const { error } = await supabase
       .from("documents")
       .delete()
@@ -191,16 +203,16 @@ export function DocumentsTable() {
     } else {
       toast.success("Document deleted")
       setDialogType(null)
-      loadDocuments()
+      router.refresh()
     }
-    setUpdating(false)
+    setLoading(false)
   }
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === filteredDocuments.length) {
+    if (selectedIds.size === documents.length) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(filteredDocuments.map(d => d.id)))
+      setSelectedIds(new Set(documents.map(d => d.id)))
     }
   }
 
@@ -227,7 +239,7 @@ export function DocumentsTable() {
     } else {
       toast.success(`${selectedIds.size} documents approved`)
       setSelectedIds(new Set())
-      loadDocuments()
+      router.refresh()
     }
     setBulkLoading(false)
   }
@@ -245,7 +257,7 @@ export function DocumentsTable() {
     } else {
       toast.success(`${selectedIds.size} documents rejected`)
       setSelectedIds(new Set())
-      loadDocuments()
+      router.refresh()
     }
     setBulkLoading(false)
   }
@@ -264,9 +276,28 @@ export function DocumentsTable() {
     } else {
       toast.success(`${selectedIds.size} documents deleted`)
       setSelectedIds(new Set())
-      loadDocuments()
+      router.refresh()
     }
     setBulkLoading(false)
+  }
+
+  const exportCSV = () => {
+    const headers = ["Driver", "Document Type", "Status", "Expiry Date", "Uploaded At"]
+    const rows = documents.map(d => [
+      d.driver?.profile?.full_name || "Unknown",
+      getDocTypeLabel(d.document_type),
+      d.status,
+      d.expiry_date || "",
+      formatDate(d.uploaded_at)
+    ])
+
+    const csv = [headers, ...rows].map(row => row.join(",")).join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "documents.csv"
+    a.click()
   }
 
   const getInitials = (name: string) => {
@@ -336,14 +367,6 @@ export function DocumentsTable() {
     return new Date(expiryDate) < new Date()
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -354,10 +377,11 @@ export function DocumentsTable() {
               placeholder="Search documents..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               className="w-64 pl-9"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={handleStatusChange}>
             <SelectTrigger className="w-32">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -368,7 +392,7 @@ export function DocumentsTable() {
               <SelectItem value="rejected">Rejected</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <Select value={typeFilter} onValueChange={handleTypeChange}>
             <SelectTrigger className="w-44">
               <SelectValue placeholder="Type" />
             </SelectTrigger>
@@ -379,6 +403,12 @@ export function DocumentsTable() {
               ))}
             </SelectContent>
           </Select>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportCSV}>
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
         </div>
       </div>
 
@@ -411,7 +441,7 @@ export function DocumentsTable() {
             <TableRow>
               <TableHead className="w-12">
                 <Checkbox
-                  checked={selectedIds.size === filteredDocuments.length && filteredDocuments.length > 0}
+                  checked={selectedIds.size === documents.length && documents.length > 0}
                   onCheckedChange={toggleSelectAll}
                 />
               </TableHead>
@@ -424,14 +454,14 @@ export function DocumentsTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredDocuments.length === 0 ? (
+            {documents.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   No documents found
                 </TableCell>
               </TableRow>
             ) : (
-              filteredDocuments.map((doc) => (
+              documents.map((doc) => (
                 <TableRow key={doc.id} className="group hover:bg-muted/50 transition-colors">
                   <TableCell>
                     <Checkbox
@@ -470,7 +500,7 @@ export function DocumentsTable() {
                           variant="outline"
                           className="h-7 text-green-500 border-green-500 hover:bg-green-500 hover:text-white"
                           onClick={() => handleApprove(doc)}
-                          disabled={updating}
+                          disabled={loading}
                         >
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Approve
@@ -560,6 +590,57 @@ export function DocumentsTable() {
         </Table>
       </div>
 
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount} documents
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => goToPage(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let page: number
+                if (totalPages <= 5) {
+                  page = i + 1
+                } else if (currentPage <= 3) {
+                  page = i + 1
+                } else if (currentPage >= totalPages - 2) {
+                  page = totalPages - 4 + i
+                } else {
+                  page = currentPage - 2 + i
+                }
+                return (
+                  <Button
+                    key={page}
+                    variant={page === currentPage ? "default" : "outline"}
+                    size="sm"
+                    className="w-8"
+                    onClick={() => goToPage(page)}
+                  >
+                    {page}
+                  </Button>
+                )
+              })}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => goToPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* View Details Dialog */}
       <Dialog open={dialogType === "view"} onOpenChange={(open) => !open && setDialogType(null)}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-auto">
@@ -634,7 +715,7 @@ export function DocumentsTable() {
                   if (selectedDocument) handleApprove(selectedDocument)
                   setDialogType(null)
                 }}
-                disabled={updating}
+                disabled={loading}
               >
                 <CheckCircle className="mr-2 h-4 w-4" />
                 Approve
@@ -647,7 +728,7 @@ export function DocumentsTable() {
                   if (selectedDocument) handleReject(selectedDocument)
                   setDialogType(null)
                 }}
-                disabled={updating}
+                disabled={loading}
               >
                 <XCircle className="mr-2 h-4 w-4" />
                 Reject
@@ -673,9 +754,9 @@ export function DocumentsTable() {
             <Button
               variant="destructive"
               onClick={() => selectedDocument && handleDelete(selectedDocument)}
-              disabled={updating}
+              disabled={loading}
             >
-              {updating ? "Deleting..." : "Delete"}
+              {loading ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

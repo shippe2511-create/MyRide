@@ -678,7 +678,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // End Shift Button - Fixed at bottom
         Padding(
-          padding: EdgeInsets.fromLTRB(20, 10, 20, MediaQuery.of(context).padding.bottom + 100),
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 100),
           child: SizedBox(
             width: double.infinity,
             height: 56,

@@ -670,7 +670,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // End Shift Button
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
             child: SizedBox(
               width: double.infinity,
               height: 56,

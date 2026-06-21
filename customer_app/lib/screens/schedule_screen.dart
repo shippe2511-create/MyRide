@@ -155,10 +155,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
   }
 
   String _getDisplayName(String type) {
-    switch (type) {
+    switch (type.toLowerCase()) {
       case 'internal_bus':
+      case 'internal':
         return 'Internal Bus';
       case 'mtcc_bus':
+      case 'mtcc':
         return 'MTCC Bus';
       case 'ferry':
         return 'Ferry';

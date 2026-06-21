@@ -138,7 +138,8 @@
       "Bash(pkill -f \"next\")",
       "Bash(pkill -9 -f dart)",
       "Bash(pkill -f \"flutter.*iPhone 17\")",
-      "Bash(pkill -f \"flutter.*iPhone 16\")"
+      "Bash(pkill -f \"flutter.*iPhone 16\")",
+      "Bash(pkill -f \"flutter.*iPhone\")"
     ],
     "additionalDirectories": [
       "/tmp"

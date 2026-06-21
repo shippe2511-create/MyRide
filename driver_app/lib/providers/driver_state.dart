@@ -221,6 +221,8 @@ class DriverState extends ChangeNotifier {
         SupabaseService.setDriverId(_driverId);
         // Load shifts for this week
         loadShifts();
+        // Load actual stats from database
+        loadDriverStats();
       }
 
       // Fetch employee_id from database if not set but logged in

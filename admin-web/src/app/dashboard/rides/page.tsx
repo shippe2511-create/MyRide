@@ -146,11 +146,14 @@ export default function RidesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 20
 
-  const { data, isLoading: loading, refetch } = useQuery({
+  const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ["rides-page", statusFilter, dateRange],
     queryFn: () => fetchRidesData(statusFilter, dateRange),
     staleTime: 30 * 1000,
+    placeholderData: (previousData) => previousData,
   })
+
+  const loading = isLoading && !data
 
   const rides = data?.rides || []
   const stats = data?.stats || { total: 0, active: 0, completed: 0, cancelled: 0 }

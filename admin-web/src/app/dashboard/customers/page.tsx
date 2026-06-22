@@ -56,6 +56,7 @@ function useCustomersData(search?: string, status?: string, page: number = 1) {
       }
     },
     staleTime: 30 * 1000,
+    placeholderData: (previousData) => previousData,
   })
 }
 
@@ -66,7 +67,7 @@ export default function CustomersPage() {
   const status = searchParams.get("status") || undefined
   const page = parseInt(searchParams.get("page") || "1")
 
-  const { data, isLoading } = useCustomersData(search, status, page)
+  const { data, isLoading, isFetching } = useCustomersData(search, status, page)
 
   // Realtime subscription for profile updates
   useEffect(() => {
@@ -82,7 +83,8 @@ export default function CustomersPage() {
     }
   }, [queryClient])
 
-  if (isLoading || !data) {
+  // Only show skeleton on initial load, not on page changes
+  if (isLoading && !data) {
     return (
       <div className="space-y-6">
         <div>
@@ -96,6 +98,8 @@ export default function CustomersPage() {
       </div>
     )
   }
+
+  if (!data) return null
 
   const { customers, totalCount, pageSize, stats } = data
 

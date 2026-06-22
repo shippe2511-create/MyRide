@@ -10,17 +10,36 @@ import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Users, UserCheck, Clock, FileText, Calendar } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
+import { useSearchParams } from "next/navigation"
 
 const supabase = createClient()
 
-function useDriversData() {
+function useDriversData(search?: string, status?: string, page: number = 1) {
   return useQuery({
-    queryKey: ["drivers-page"],
+    queryKey: ["drivers-page", search, status, page],
     queryFn: async () => {
-      const pageSize = 20
+      const pageSize = 15
+      const start = (page - 1) * pageSize
+      const end = start + pageSize - 1
+
+      let query = supabase
+        .from("profiles")
+        .select("*", { count: "exact" })
+        .eq("role", "driver")
+        .order("created_at", { ascending: false })
+
+      if (search) {
+        query = query.or(`full_name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`)
+      }
+
+      if (status) {
+        query = query.eq("status", status)
+      }
+
+      query = query.range(start, end)
 
       const [driversRes, driverRecordsRes, totalRes, activeRes, pendingRes] = await Promise.all([
-        supabase.from("profiles").select("*", { count: "exact" }).eq("role", "driver").order("created_at", { ascending: false }).range(0, pageSize - 1),
+        query,
         supabase.from("drivers").select("id, profile_id, vehicle_id, vehicle:vehicle_types(id, display_name, plate_no)"),
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver"),
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver").eq("status", "approved"),
@@ -43,6 +62,7 @@ function useDriversData() {
       return {
         drivers: driversWithVehicles,
         totalCount: driversRes.count || 0,
+        pageSize,
         stats: {
           total: totalRes.count || 0,
           active: activeRes.count || 0,
@@ -51,12 +71,18 @@ function useDriversData() {
       }
     },
     staleTime: 30 * 1000,
+    placeholderData: (previousData) => previousData,
   })
 }
 
 export default function DriversPage() {
   const queryClient = useQueryClient()
-  const { data, isLoading } = useDriversData()
+  const searchParams = useSearchParams()
+  const search = searchParams.get("search") || undefined
+  const status = searchParams.get("status") || undefined
+  const page = parseInt(searchParams.get("page") || "1")
+
+  const { data, isLoading } = useDriversData(search, status, page)
 
   // Realtime subscription for profile updates
   useEffect(() => {
@@ -75,7 +101,8 @@ export default function DriversPage() {
     }
   }, [queryClient])
 
-  if (isLoading || !data) {
+  // Only show skeleton on initial load
+  if (isLoading && !data) {
     return (
       <div className="space-y-6">
         <div>
@@ -90,7 +117,9 @@ export default function DriversPage() {
     )
   }
 
-  const { drivers, totalCount, stats } = data
+  if (!data) return null
+
+  const { drivers, totalCount, pageSize, stats } = data
 
   return (
     <div className="space-y-6">
@@ -158,8 +187,8 @@ export default function DriversPage() {
           <DriversTable
             drivers={drivers}
             totalCount={totalCount}
-            currentPage={1}
-            pageSize={20}
+            currentPage={page}
+            pageSize={pageSize}
           />
         </TabsContent>
 

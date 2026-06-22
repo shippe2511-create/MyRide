@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -18,7 +19,7 @@ import {
 import { DashboardCharts } from "./charts"
 import { ActivityFeed } from "@/components/activity-feed"
 import Link from "next/link"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 
 function useDashboardData() {
@@ -92,8 +93,31 @@ function useDashboardData() {
   })
 }
 
+const supabase = createClient()
+
 export function DashboardClient() {
+  const queryClient = useQueryClient()
   const { data: stats, isLoading } = useDashboardData()
+
+  // Realtime subscriptions for dashboard updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('dashboard_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rides' }, () => {
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => {
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [queryClient])
 
   if (isLoading || !stats) {
     return (

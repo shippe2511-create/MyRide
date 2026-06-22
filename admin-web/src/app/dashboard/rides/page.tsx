@@ -237,6 +237,20 @@ export default function RidesPage() {
     setCurrentPage(1)
   }, [search, statusFilter, dateRange])
 
+  // Realtime subscription for rides updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('rides_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rides' }, () => {
+        queryClient.invalidateQueries({ queryKey: ["rides-page"] })
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [queryClient])
+
   if (loading) {
     return (
       <div className="space-y-6">

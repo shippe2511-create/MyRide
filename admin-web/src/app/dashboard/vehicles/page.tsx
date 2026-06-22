@@ -116,6 +116,20 @@ export default function VehiclesPage() {
     staleTime: 30 * 1000,
   })
 
+  // Realtime subscription for vehicle updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('vehicles_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_types' }, () => {
+        queryClient.invalidateQueries({ queryKey: ["vehicles-page"] })
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [queryClient])
+
   const loadVehicles = () => refetch()
 
   const openAddDialog = () => {

@@ -300,13 +300,17 @@ export function DashboardCharts() {
             </PieChart>
           </ResponsiveContainer>
           <div className="flex justify-center gap-4 mt-2">
-            {statusData.map((entry) => (
-              <div key={entry.name} className="flex items-center gap-1.5 text-xs">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
-                <span className="text-muted-foreground">{entry.name}</span>
-                <span className="font-medium">{entry.value}</span>
-              </div>
-            ))}
+            {statusData.map((entry) => {
+              const total = statusData.reduce((sum, d) => sum + d.value, 0)
+              const percent = total > 0 ? Math.round((entry.value / total) * 100) : 0
+              return (
+                <div key={entry.name} className="flex items-center gap-1.5 text-xs">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+                  <span className="text-muted-foreground">{entry.name}</span>
+                  <span className="font-medium">{percent}%</span>
+                </div>
+              )
+            })}
           </div>
         </CardContent>
       </Card>

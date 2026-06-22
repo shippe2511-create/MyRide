@@ -709,37 +709,12 @@ https://maps.google.com/?q=${_pickupLocation.latitude},${_pickupLocation.longitu
             const SizedBox(height: 4),
             Text('Get help immediately', style: TextStyle(color: context.mutedColor, fontSize: 13)),
             const SizedBox(height: 20),
-            // Main SOS activation button
-            GestureDetector(
-              onTap: () async {
+            // Main SOS activation button - press and hold
+            _SOSHoldButton(
+              onActivate: () async {
                 Navigator.pop(ctx);
                 await _activateSOS();
               },
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [AppColors.error, AppColors.error.withValues(alpha: 0.8)],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.error.withValues(alpha: 0.4),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.warning_amber, color: Colors.white, size: 24),
-                    const SizedBox(width: 10),
-                    Text('ACTIVATE SOS ALERT', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
-                  ],
-                ),
-              ),
             ),
             const SizedBox(height: 16),
             Text('Or choose an option:', style: TextStyle(color: context.mutedColor, fontSize: 12)),
@@ -973,6 +948,116 @@ Map: https://maps.google.com/?q=${_pickupLocation.latitude},${_pickupLocation.lo
         backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+}
+
+class _SOSHoldButton extends StatefulWidget {
+  final VoidCallback onActivate;
+
+  const _SOSHoldButton({required this.onActivate});
+
+  @override
+  State<_SOSHoldButton> createState() => _SOSHoldButtonState();
+}
+
+class _SOSHoldButtonState extends State<_SOSHoldButton> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  bool _isHolding = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        HapticFeedback.heavyImpact();
+        widget.onActivate();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onTapDown(TapDownDetails details) {
+    setState(() => _isHolding = true);
+    HapticFeedback.mediumImpact();
+    _controller.forward();
+  }
+
+  void _onTapUp(TapUpDetails details) {
+    setState(() => _isHolding = false);
+    _controller.reset();
+  }
+
+  void _onTapCancel() {
+    setState(() => _isHolding = false);
+    _controller.reset();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.error, AppColors.error.withValues(alpha: 0.8)],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.error.withValues(alpha: _isHolding ? 0.6 : 0.4),
+                  blurRadius: _isHolding ? 20 : 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: LinearProgressIndicator(
+                      value: _controller.value,
+                      backgroundColor: Colors.transparent,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withValues(alpha: 0.3)),
+                    ),
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.warning_amber, color: Colors.white, size: 24),
+                    const SizedBox(width: 10),
+                    Column(
+                      children: [
+                        Text('HOLD TO ACTIVATE SOS', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                        if (_isHolding)
+                          Text('${(2 - _controller.value * 2).toStringAsFixed(1)}s', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

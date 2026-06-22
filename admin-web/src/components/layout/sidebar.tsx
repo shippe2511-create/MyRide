@@ -163,7 +163,7 @@ export function Sidebar() {
 
   return (
     <div className="flex h-full w-56 flex-col bg-card">
-      <div className="flex h-14 items-center border-b px-4">
+      <div className="flex h-14 items-center px-4">
         <Link href="/dashboard" className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
             <Car className="h-5 w-5 text-primary-foreground" />
@@ -236,7 +236,7 @@ export function Sidebar() {
           })}
         </div>
       </nav>
-      <div className="border-t p-3">
+      <div className="p-3">
         <button
           onClick={handleLogout}
           className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground"

@@ -1451,6 +1451,16 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
             const SizedBox(height: 4),
             Text('Get help immediately', style: TextStyle(color: context.mutedColor, fontSize: 13)),
             const SizedBox(height: 20),
+            // Main SOS activation button - press and hold
+            _SOSHoldButton(
+              onActivate: () async {
+                Navigator.pop(ctx);
+                await _activateSOS();
+              },
+            ),
+            const SizedBox(height: 16),
+            Text('Or choose an option:', style: TextStyle(color: context.mutedColor, fontSize: 12)),
+            const SizedBox(height: 12),
             _buildSOSOption(ctx, Icons.phone, 'Call Emergency (119)', AppColors.error, () async {
               Navigator.pop(ctx);
               await _callEmergency();
@@ -1474,6 +1484,26 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
         ),
       ),
     );
+  }
+
+  Future<void> _activateSOS() async {
+    HapticFeedback.heavyImpact();
+
+    // Send SOS alert to admin
+    await SupabaseService.triggerSOSAlert(
+      latitude: _driverLocation.latitude,
+      longitude: _driverLocation.longitude,
+      rideId: widget.tripData['rideId'] as String?,
+    );
+
+    // Show notification
+    NotificationService.showNotification(
+      title: '🚨 SOS ACTIVATED',
+      body: 'Emergency services have been notified. Help is on the way.',
+    );
+
+    // Show confirmation
+    _showSOSConfirmed('SOS alert sent to control room');
   }
 
   Future<void> _callEmergency() async {
@@ -1662,6 +1692,118 @@ Location: https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocati
         backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+}
+
+class _SOSHoldButton extends StatefulWidget {
+  final VoidCallback onActivate;
+
+  const _SOSHoldButton({required this.onActivate});
+
+  @override
+  State<_SOSHoldButton> createState() => _SOSHoldButtonState();
+}
+
+class _SOSHoldButtonState extends State<_SOSHoldButton> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  bool _isHolding = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        HapticFeedback.heavyImpact();
+        widget.onActivate();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onTapDown(TapDownDetails details) {
+    setState(() => _isHolding = true);
+    HapticFeedback.mediumImpact();
+    _controller.forward();
+  }
+
+  void _onTapUp(TapUpDetails details) {
+    setState(() => _isHolding = false);
+    _controller.reset();
+  }
+
+  void _onTapCancel() {
+    setState(() => _isHolding = false);
+    _controller.reset();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.error, AppColors.error.withValues(alpha: 0.8)],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.error.withValues(alpha: _isHolding ? 0.6 : 0.4),
+                  blurRadius: _isHolding ? 20 : 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                // Progress indicator
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: LinearProgressIndicator(
+                      value: _controller.value,
+                      backgroundColor: Colors.transparent,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withValues(alpha: 0.3)),
+                    ),
+                  ),
+                ),
+                // Button content
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.warning_amber, color: Colors.white, size: 24),
+                    const SizedBox(width: 10),
+                    Column(
+                      children: [
+                        Text('HOLD TO ACTIVATE SOS', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                        if (_isHolding)
+                          Text('${(2 - _controller.value * 2).toStringAsFixed(1)}s', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

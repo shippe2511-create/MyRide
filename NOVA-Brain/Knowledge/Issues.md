@@ -292,6 +292,120 @@ Fixed:
 - **Issue:** Maps had different dark styles across screens
 - **Fix:** Unified dark map style across all screens (gray tones matching app theme)
 
+---
+
+## Customer App Audit (2026-06-22)
+
+Full audit of every interactive element in customer_app (flutter_app).
+
+### Bottom Navigation
+| Tab | Status | Notes |
+|-----|--------|-------|
+| Home | WORKING | Map, booking flow, ongoing trip banner all functional |
+| Activity | WORKING | Loads real ride history from Supabase |
+| Inbox | WORKING | Loads notifications from Supabase, mark-all-read works |
+| Profile | MOSTLY WORKING | See detailed issues below |
+
+### Home Screen
+| Element | Status | Notes |
+|---------|--------|-------|
+| Where to? search | WORKING | Opens search screen with Google Places |
+| Schedule types (Bus/MTCC/Ferry) | WORKING | Opens schedule screen with type filter |
+| Ongoing trip banner | WORKING | Shows active ride, opens tracking screen |
+| Book Later button | WORKING | Opens scheduled ride creation flow |
+| Announcements carousel | WORKING | Loads from Supabase, taps open detail |
+| Staff Corner posts | WORKING | Loads from Supabase with real-time updates |
+
+### Booking/Ride Flow
+| Element | Status | Notes |
+|---------|--------|-------|
+| Pickup/Dropoff search | WORKING | Google Places Autocomplete, Maldives filter |
+| Vehicle type selection | WORKING | Loads from transport_types table |
+| Confirm booking | WORKING | Creates ride in Supabase |
+| Driver matching screen | WORKING | Shows real-time driver search |
+| Driver arriving screen | WORKING | Shows ETA, driver info, cancel option |
+| Trip tracking | WORKING | Real-time driver location from Supabase |
+| Chat with driver | WORKING | Real messages saved to chat_messages table |
+| SOS button (during trip) | WORKING | Triggers SOS alert saved to sos_alerts |
+| Trip complete rating | WORKING | Saves to ratings table |
+
+### Profile - Quick Actions
+| Element | Status | Notes |
+|---------|--------|-------|
+| Saved Places | WORKING | Home/Work save to Supabase via upsertSavedPlace |
+| Emergency Contacts | WORKING | Saves to profiles.emergency_contacts JSONB |
+| Invite Friends | WORKING | Hardcoded referral code, but Share works |
+
+### Profile - Settings
+| Element | Status | Issue |
+|---------|--------|-------|
+| Personal Information | WORKING | Display only (read from profile) |
+| Recurring Rides | WORKING | Full CRUD with Supabase |
+| **Notifications toggles** | **BROKEN** | Local state only, resets on app restart. Not persisted to DB or SharedPreferences |
+| Privacy & Safety | PARTIAL | See sub-items below |
+| Language | WORKING | Only English available (expected) |
+| Dark Mode toggle | WORKING | Persisted to SharedPreferences |
+
+### Profile - Privacy & Safety
+| Element | Status | Issue |
+|---------|--------|-------|
+| **Blocked Users** | **BROKEN** | Local state only, resets on app restart. No Supabase persistence |
+| **Two-Factor Auth toggle** | **BROKEN** | Local state only, shows success but doesn't actually enable 2FA. No Supabase auth integration |
+| Data Privacy > Export Data | WORKING | Generates JSON export |
+| Data Privacy > Clear History | WORKING | Calls clearSearchHistory() |
+| Permissions settings | WORKING | Opens system settings |
+| Delete Account | WORKING | Deletes account from Supabase |
+
+### Profile - Support
+| Element | Status | Issue |
+|---------|--------|-------|
+| Help Center | WORKING | Opens FAQs from app_settings |
+| **Report Issue** | **BROKEN** | Shows "Issue reported" success message but doesn't save anywhere. No database table, no email, nothing |
+| Contact Support | WORKING | Loads phone/email from app_settings, opens dialer/email |
+| About MyRide | WORKING | Static info display |
+| Terms & Conditions | WORKING | Loads from legal_pages table |
+
+### SOS Screen (standalone)
+| Element | Status | Notes |
+|---------|--------|-------|
+| SOS button (long press) | WORKING | Triggers SupabaseService.triggerSOSAlert() |
+| Call Police/Ambulance | WORKING | Opens phone dialer |
+| Share Location | PARTIAL | Shows snackbar but doesn't actually share via SMS/message |
+| Emergency contacts list | WORKING | Loads from app_settings.emergency_contacts |
+
+### Schedule/Transport Screen
+| Element | Status | Notes |
+|---------|--------|-------|
+| Transport type tabs | WORKING | Filters routes by type |
+| Route cards | WORKING | Loads from transport_routes table |
+| Schedule expansion | WORKING | Shows departure times from route_schedules |
+| Refresh | WORKING | Pull-to-refresh reloads data |
+
+---
+
+## Summary of BROKEN Items (Customer App)
+
+### Priority 1 - Fake Functionality (says it works but doesn't)
+1. **Report Issue (profile_screen.dart:2120)** - Shows success but saves nothing
+2. **Two-Factor Auth (profile_screen.dart:1447)** - Toggle shows success but doesn't enable real 2FA
+
+### Priority 2 - Not Persisted (resets on app restart)  
+3. **Notification Settings (profile_screen.dart:1169)** - 4 toggles (Push, Ride Updates, Promotions, Email) reset to defaults
+4. **Blocked Users (profile_screen.dart:1518)** - List resets to empty on restart
+
+### Priority 3 - Incomplete  
+5. **Share Location in SOS (sos_screen.dart:218)** - Only shows snackbar, doesn't actually share via SMS
+
+---
+
+## Fix Approach
+
+**#1 Report Issue:** Create `support_tickets` table, wire submit button to insert
+**#2 Two-Factor Auth:** Either remove the feature or integrate with Supabase Auth MFA
+**#3 Notification Settings:** Save toggles to SharedPreferences on change, load on app start
+**#4 Blocked Users:** Save to profiles.blocked_users JSONB column
+**#5 Share Location:** Use share_plus to send actual SMS with location link
+
 ### 43. Admin Panel Color Sync - FIXED
 - **Issue:** Admin panel primary color (#FFCC00) didn't match apps (#FFD60A)
 - **Fix:** Synced admin panel to use HSL(50, 100%, 52%) = #FFD60A

@@ -1603,4 +1603,26 @@ class SupabaseService {
       return false;
     }
   }
+
+  static Future<bool> submitSupportTicket({
+    required String category,
+    required String description,
+  }) async {
+    try {
+      final uid = userId;
+      if (uid == null) {
+        debugPrint('No user ID for support ticket');
+        return false;
+      }
+      await client.from('support_tickets').insert({
+        'user_id': uid,
+        'category': category,
+        'description': description,
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error submitting support ticket: $e');
+      return false;
+    }
+  }
 }

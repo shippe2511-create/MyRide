@@ -2172,20 +2172,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      if (descriptionController.text.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please describe your issue'), backgroundColor: AppColors.error));
-                        return;
-                      }
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Issue reported. We\'ll get back to you soon.'), backgroundColor: AppColors.success));
-                    },
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.yellow, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                    child: Text('Submit Report', style: TextStyle(fontWeight: FontWeight.w600)),
-                  ),
+                StatefulBuilder(
+                  builder: (context, setButtonState) {
+                    bool isSubmitting = false;
+                    return SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: isSubmitting ? null : () async {
+                          if (descriptionController.text.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please describe your issue'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12)))));
+                            return;
+                          }
+                          setButtonState(() => isSubmitting = true);
+                          final success = await SupabaseService.submitSupportTicket(
+                            category: selectedCategory,
+                            description: descriptionController.text.trim(),
+                          );
+                          if (context.mounted) {
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text(success ? 'Issue reported. We\'ll get back to you soon.' : 'Failed to submit. Please try again.'),
+                              backgroundColor: success ? AppColors.success : AppColors.error,
+                              behavior: SnackBarBehavior.floating,
+                              shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                            ));
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.yellow, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                        child: isSubmitting
+                            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                            : const Text('Submit Report', style: TextStyle(fontWeight: FontWeight.w600)),
+                      ),
+                    );
+                  },
                 ),
                 SizedBox(height: MediaQuery.of(context).padding.bottom),
               ],

@@ -89,6 +89,8 @@ const CATEGORIES = [
   { value: "Other", label: "Other", color: "bg-gray-500" },
 ]
 
+const PAGE_SIZE = 15
+
 export default function SupportTicketsPage() {
   const supabase = createClient()
   const [tickets, setTickets] = useState<SupportTicket[]>([])
@@ -99,6 +101,8 @@ export default function SupportTicketsPage() {
   const [dialogType, setDialogType] = useState<"view" | "resolve" | null>(null)
   const [adminNotes, setAdminNotes] = useState("")
   const [saving, setSaving] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
 
   const [stats, setStats] = useState({
     total: 0,
@@ -107,23 +111,10 @@ export default function SupportTicketsPage() {
     resolved: 0,
   })
 
-  useEffect(() => {
-    loadTickets()
-
-    const channel = supabase
-      .channel('support_tickets_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'support_tickets' }, () => {
-        loadTickets()
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [statusFilter])
-
-  const loadTickets = async () => {
-    setLoading(true)
+  const loadTickets = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
+    const start = (currentPage - 1) * PAGE_SIZE
+    const end = start + PAGE_SIZE - 1
 
     let query = supabase
       .from("support_tickets")
@@ -131,15 +122,20 @@ export default function SupportTicketsPage() {
         *,
         user:profiles!support_tickets_user_id_fkey(full_name, phone, email, employee_id),
         driver:drivers(profile:profiles(full_name, phone), vehicle_number)
-      `)
+      `, { count: "exact" })
       .order("created_at", { ascending: false })
+      .range(start, end)
+
+    let countQuery = supabase.from("support_tickets").select("*", { count: "exact", head: true })
 
     if (statusFilter !== "all") {
       query = query.eq("status", statusFilter)
+      countQuery = countQuery.eq("status", statusFilter)
     }
 
-    const [ticketsRes, totalRes, openRes, inProgressRes, resolvedRes] = await Promise.all([
+    const [ticketsRes, filteredCountRes, totalRes, openRes, inProgressRes, resolvedRes] = await Promise.all([
       query,
+      countQuery,
       supabase.from("support_tickets").select("*", { count: "exact", head: true }),
       supabase.from("support_tickets").select("*", { count: "exact", head: true }).eq("status", "open"),
       supabase.from("support_tickets").select("*", { count: "exact", head: true }).eq("status", "in_progress"),
@@ -147,6 +143,7 @@ export default function SupportTicketsPage() {
     ])
 
     setTickets(ticketsRes.data || [])
+    setTotalCount(filteredCountRes.count || 0)
     setStats({
       total: totalRes.count || 0,
       open: openRes.count || 0,
@@ -155,6 +152,27 @@ export default function SupportTicketsPage() {
     })
     setLoading(false)
   }
+
+  useEffect(() => {
+    loadTickets(true)
+
+    const channel = supabase
+      .channel('support_tickets_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'support_tickets' }, () => {
+        loadTickets(false)
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!loading) {
+      loadTickets(false)
+    }
+  }, [statusFilter, currentPage])
 
   const filteredTickets = tickets.filter(t =>
     t.description.toLowerCase().includes(search.toLowerCase()) ||
@@ -360,7 +378,7 @@ export default function SupportTicketsPage() {
               className="pl-9"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1) }}>
             <SelectTrigger className="w-36">
               <SelectValue />
             </SelectTrigger>
@@ -494,6 +512,36 @@ export default function SupportTicketsPage() {
             )}
           </TableBody>
         </Table>
+
+        {/* Pagination */}
+        {totalCount > PAGE_SIZE && (
+          <div className="flex items-center justify-between pt-4 border-t mt-4">
+            <p className="text-sm text-muted-foreground">
+              Showing {((currentPage - 1) * PAGE_SIZE) + 1}-{Math.min(currentPage * PAGE_SIZE, totalCount)} of {totalCount}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {Math.ceil(totalCount / PAGE_SIZE)}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(Math.ceil(totalCount / PAGE_SIZE), p + 1))}
+                disabled={currentPage >= Math.ceil(totalCount / PAGE_SIZE)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* View/Edit Dialog */}

@@ -53,6 +53,8 @@ const LOG_TYPES = [
   { value: "inspection", label: "Inspection", icon: Car, color: "bg-purple-500" },
 ]
 
+const PAGE_SIZE = 15
+
 export default function VehicleLogsPage() {
   const supabase = createClient()
   const [logs, setLogs] = useState<VehicleLog[]>([])
@@ -62,6 +64,8 @@ export default function VehicleLogsPage() {
   const [selectedLog, setSelectedLog] = useState<VehicleLog | null>(null)
   const [saving, setSaving] = useState(false)
   const [filterType, setFilterType] = useState("all")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
 
   const [formData, setFormData] = useState({
     log_type: "fuel",
@@ -143,23 +147,11 @@ export default function VehicleLogsPage() {
 
   const monthlyData = getMonthlyData()
 
-  useEffect(() => {
-    loadLogs()
+  const loadLogs = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
+    const start = (currentPage - 1) * PAGE_SIZE
+    const end = start + PAGE_SIZE - 1
 
-    const channel = supabase
-      .channel('vehicle_logs_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_logs' }, () => {
-        loadLogs()
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [filterType])
-
-  const loadLogs = async () => {
-    setLoading(true)
     let query = supabase
       .from("vehicle_logs")
       .select(`
@@ -167,17 +159,43 @@ export default function VehicleLogsPage() {
         driver:drivers!vehicle_logs_driver_id_fkey(
           profile:profiles(full_name)
         )
-      `)
+      `, { count: "exact" })
       .order("log_date", { ascending: false })
+      .range(start, end)
+
+    let countQuery = supabase.from("vehicle_logs").select("*", { count: "exact", head: true })
 
     if (filterType !== "all") {
       query = query.eq("log_type", filterType)
+      countQuery = countQuery.eq("log_type", filterType)
     }
 
-    const { data } = await query
+    const [{ data }, { count }] = await Promise.all([query, countQuery])
     setLogs(data || [])
+    setTotalCount(count || 0)
     setLoading(false)
   }
+
+  useEffect(() => {
+    loadLogs(true)
+
+    const channel = supabase
+      .channel('vehicle_logs_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_logs' }, () => {
+        loadLogs(false)
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!loading) {
+      loadLogs(false)
+    }
+  }, [filterType, currentPage])
 
   const openDialog = (log?: VehicleLog) => {
     if (log) {
@@ -510,7 +528,7 @@ export default function VehicleLogsPage() {
       <Card className="p-4">
         <div className="flex items-center gap-4 mb-4">
           <Filter className="h-4 w-4 text-muted-foreground" />
-          <Select value={filterType} onValueChange={setFilterType}>
+          <Select value={filterType} onValueChange={(v) => { setFilterType(v); setCurrentPage(1) }}>
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>
@@ -521,7 +539,7 @@ export default function VehicleLogsPage() {
               ))}
             </SelectContent>
           </Select>
-          <span className="text-sm text-muted-foreground">{logs.length} records</span>
+          <span className="text-sm text-muted-foreground">{totalCount} records</span>
         </div>
 
         <Table>
@@ -606,6 +624,36 @@ export default function VehicleLogsPage() {
             )}
           </TableBody>
         </Table>
+
+        {/* Pagination */}
+        {totalCount > PAGE_SIZE && (
+          <div className="flex items-center justify-between pt-4 border-t mt-4">
+            <p className="text-sm text-muted-foreground">
+              Showing {((currentPage - 1) * PAGE_SIZE) + 1}-{Math.min(currentPage * PAGE_SIZE, totalCount)} of {totalCount}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {Math.ceil(totalCount / PAGE_SIZE)}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(Math.ceil(totalCount / PAGE_SIZE), p + 1))}
+                disabled={currentPage >= Math.ceil(totalCount / PAGE_SIZE)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

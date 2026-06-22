@@ -203,8 +203,8 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
 
       // Filter to only valid Maldives locations
       final validLocations = locations.map((loc) {
-        final lat = double.tryParse(loc['latitude']?.toString() ?? '') ?? 0;
-        final lng = double.tryParse(loc['longitude']?.toString() ?? '') ?? 0;
+        final lat = double.tryParse(loc['lat']?.toString() ?? '') ?? 0;
+        final lng = double.tryParse(loc['lng']?.toString() ?? '') ?? 0;
         return LatLng(lat, lng);
       }).where((loc) => _isValidMaldivesLat(loc.latitude) && _isValidMaldivesLng(loc.longitude)).toList();
 

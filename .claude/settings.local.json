@@ -144,7 +144,9 @@
       "Bash(node -e ' *)",
       "WebFetch(domain:localhost)",
       "Bash(disown)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(git tag *)",
+      "mcp__claude_ai_Supabase__get_logs"
     ],
     "additionalDirectories": [
       "/tmp"

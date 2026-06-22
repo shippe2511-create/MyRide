@@ -673,7 +673,7 @@ class SupabaseService {
       // Get their locations (also check is_online in driver_locations for extra safety)
       final response = await client
           .from('driver_locations')
-          .select('latitude, longitude, heading, speed, driver_id')
+          .select('lat, lng, heading, speed, driver_id')
           .inFilter('driver_id', driverIds)
           .eq('is_online', true);
 

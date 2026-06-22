@@ -132,22 +132,7 @@ export function Header() {
     .toUpperCase() || "AD"
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-card px-6">
-      <div className="flex items-center gap-4">
-        <button
-          onClick={() => {
-            const event = new KeyboardEvent("keydown", { key: "k", metaKey: true })
-            document.dispatchEvent(event)
-          }}
-          className="flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors w-64"
-        >
-          <Search className="h-4 w-4" />
-          <span className="flex-1 text-left">Search...</span>
-          <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium sm:flex">
-            <span className="text-xs">⌘</span>K
-          </kbd>
-        </button>
-      </div>
+    <header className="flex h-16 items-center justify-end border-b bg-card px-6">
       <div className="flex items-center gap-2">
         <ThemeToggle />
 

@@ -378,10 +378,7 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
 
           if (vehicle != null) {
             vehicleNumber = vehicle['plate_no'] ?? '';
-            final make = vehicle['make'] ?? '';
-            final model = vehicle['model'] ?? '';
-            vehicleModel = '$make $model'.trim();
-            if (vehicleModel.isEmpty) vehicleModel = 'Vehicle';
+            vehicleModel = vehicle['display_name'] ?? 'Vehicle';
           }
 
           debugPrint('Found actual driver: $driverName, driverId: $driverId, profileId: $driverProfileId');

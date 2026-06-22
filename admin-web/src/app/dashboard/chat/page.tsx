@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -191,7 +192,20 @@ export default function ChatPage() {
 
     const channel = supabase
       .channel('chat-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
+        loadConversations()
+        if (selectedRide) loadMessages(selectedRide)
+        // Show notification for new messages
+        if (payload.new) {
+          const msg = payload.new as ChatMessage
+          const senderType = msg.sender_type === 'customer' ? 'Customer' : 'Driver'
+          toast.info(`New message from ${senderType}`, {
+            description: msg.message.length > 50 ? msg.message.substring(0, 50) + '...' : msg.message,
+            duration: 5000,
+          })
+        }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_messages' }, () => {
         loadConversations()
         if (selectedRide) loadMessages(selectedRide)
       })

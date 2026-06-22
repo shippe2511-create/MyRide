@@ -61,7 +61,7 @@ interface Vehicle {
   name: string
   display_name: string
   plate_no: string | null
-  icon: string
+  is_active: boolean
 }
 import { formatDate } from "@/lib/utils"
 import { logActivity } from "@/lib/activity-logger"
@@ -149,7 +149,8 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
   const loadVehicles = async () => {
     const { data, error } = await supabase
       .from("vehicle_types")
-      .select("id, name, display_name, plate_no, icon")
+      .select("id, name, display_name, plate_no, is_active")
+      .eq("is_active", true)
       .order("display_name")
     if (error) {
       console.error("Error loading vehicles:", error)

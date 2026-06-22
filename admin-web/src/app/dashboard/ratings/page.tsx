@@ -21,6 +21,7 @@ import { Star, Search, TrendingUp, TrendingDown, AlertTriangle, Loader2, Car, Ph
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { formatDate } from "@/lib/utils"
+import { PermissionGate } from "@/components/permission-gate"
 
 // Circular Progress Component
 const CircularProgress = ({ value, size = 120, strokeWidth = 10, color = "yellow" }: { value: number, size?: number, strokeWidth?: number, color?: string }) => {
@@ -495,6 +496,7 @@ export default function RatingsPage() {
   }
 
   return (
+    <PermissionGate permission="ratings:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -933,5 +935,6 @@ export default function RatingsPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </PermissionGate>
   )
 }

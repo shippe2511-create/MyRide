@@ -31,6 +31,7 @@ import {
   Save,
   Trash2,
 } from "lucide-react"
+import { PermissionGate } from "@/components/permission-gate"
 
 interface Column {
   id: string
@@ -243,6 +244,7 @@ export default function ReportBuilderPage() {
   }
 
   return (
+    <PermissionGate permission="reports:view">
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Report Builder</h1>
@@ -421,5 +423,6 @@ export default function ReportBuilderPage() {
         </div>
       </div>
     </div>
+    </PermissionGate>
   )
 }

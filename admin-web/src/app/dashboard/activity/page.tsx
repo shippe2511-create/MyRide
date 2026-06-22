@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select"
 import { Search, RefreshCw, User, Car, MapPin, AlertTriangle, Settings } from 'lucide-react'
 import { format } from 'date-fns'
+import { PermissionGate } from "@/components/permission-gate"
 
 const PAGE_SIZE = 20
 
@@ -117,6 +118,7 @@ export default function ActivityPage() {
   const totalPages = Math.ceil(totalCount / PAGE_SIZE)
 
   return (
+    <PermissionGate permission="reports:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -255,5 +257,6 @@ export default function ActivityPage() {
         </CardContent>
       </Card>
     </div>
+    </PermissionGate>
   )
 }

@@ -23,6 +23,7 @@ import {
   AlertTriangle, Phone, MapPin, Clock, CheckCircle, XCircle, Loader2, RefreshCw, Shield, MoreVertical, Edit, Trash2, Plus, GripVertical, Flame, Heart, Building, Save, Search
 } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
+import { PermissionGate } from "@/components/permission-gate"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -453,6 +454,7 @@ export default function SOSPage() {
   }
 
   return (
+    <PermissionGate permission="sos:view">
     <div className="space-y-6 p-1">
       <div className="flex items-center justify-between">
         <div>
@@ -811,5 +813,6 @@ export default function SOSPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </PermissionGate>
   )
 }

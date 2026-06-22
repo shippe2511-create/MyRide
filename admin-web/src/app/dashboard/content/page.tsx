@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { PermissionGate } from "@/components/permission-gate"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -320,6 +321,7 @@ export default function ContentPage() {
   }
 
   return (
+    <PermissionGate permission="content:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -812,5 +814,6 @@ export default function ContentPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </PermissionGate>
   )
 }

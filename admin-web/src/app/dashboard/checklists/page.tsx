@@ -32,6 +32,7 @@ import {
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
+import { PermissionGate } from "@/components/permission-gate"
 
 interface IssueDetail {
   note: string
@@ -240,6 +241,7 @@ export default function ChecklistsPage() {
   }
 
   return (
+    <PermissionGate permission="pretrip:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -670,5 +672,6 @@ export default function ChecklistsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </PermissionGate>
   )
 }

@@ -16,6 +16,7 @@ import {
   MessageSquare, Search, User, Car, Clock, MapPin, Loader2, RefreshCw, ChevronRight
 } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
+import { PermissionGate } from "@/components/permission-gate"
 
 interface ChatMessage {
   id: string
@@ -278,6 +279,7 @@ export default function ChatPage() {
   }
 
   return (
+    <PermissionGate permission="chat:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -507,5 +509,6 @@ export default function ChatPage() {
         </Card>
       </div>
     </div>
+    </PermissionGate>
   )
 }

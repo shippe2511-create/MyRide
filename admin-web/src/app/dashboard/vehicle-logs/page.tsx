@@ -28,6 +28,7 @@ import { toast } from "sonner"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import { SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
+import { PermissionGate } from "@/components/permission-gate"
 
 interface VehicleLog {
   id: string
@@ -332,6 +333,7 @@ export default function VehicleLogsPage() {
   }
 
   return (
+    <PermissionGate permission="vehicles:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -739,5 +741,6 @@ export default function VehicleLogsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </PermissionGate>
   )
 }

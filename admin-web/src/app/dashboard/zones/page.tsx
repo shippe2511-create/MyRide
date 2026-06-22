@@ -23,6 +23,7 @@ import { formatDate } from "@/lib/utils"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
+import { PermissionGate } from "@/components/permission-gate"
 import { ZoneMap } from "@/components/zone-map"
 
 interface Zone {
@@ -286,6 +287,7 @@ export default function ZonesPage() {
   }
 
   return (
+    <PermissionGate permission="zones:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -647,5 +649,6 @@ export default function ZonesPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </PermissionGate>
   )
 }

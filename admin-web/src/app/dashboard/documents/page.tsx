@@ -30,6 +30,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
+import { PermissionGate } from "@/components/permission-gate"
 
 interface Document {
   id: string
@@ -309,6 +310,7 @@ export default function DocumentsPage() {
   }
 
   return (
+    <PermissionGate permission="drivers:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -718,5 +720,6 @@ export default function DocumentsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </PermissionGate>
   )
 }

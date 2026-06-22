@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Users, UserCheck, Clock, FileText, Calendar } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { useSearchParams } from "next/navigation"
+import { PermissionGate } from "@/components/permission-gate"
 
 const supabase = createClient()
 
@@ -122,84 +123,86 @@ export default function DriversPage() {
   const { drivers, totalCount, pageSize, stats } = data
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Drivers</h1>
-        <p className="text-sm text-muted-foreground">Manage driver accounts and documents</p>
+    <PermissionGate permission="drivers:view">
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">Drivers</h1>
+          <p className="text-sm text-muted-foreground">Manage driver accounts and documents</p>
+        </div>
+
+        <div className="grid gap-3 grid-cols-3">
+          <Card className="p-4 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-slate-500/20 shrink-0">
+                <Users className="h-4 w-4 text-slate-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl font-bold tracking-tight">{stats.total}</p>
+                <p className="text-xs text-muted-foreground truncate">Total Drivers</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-green-500/20 shrink-0">
+                <UserCheck className="h-4 w-4 text-green-500" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl font-bold tracking-tight text-green-500">{stats.active}</p>
+                <p className="text-xs text-muted-foreground truncate">Active</p>
+              </div>
+              <span className="text-xs font-medium text-green-500 ml-auto shrink-0">
+                {stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0}%
+              </span>
+            </div>
+          </Card>
+          <Card className={`p-4 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20 ${stats.pending > 0 ? 'ring-2 ring-yellow-500/50' : ''}`}>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-yellow-500/20 shrink-0">
+                <Clock className="h-4 w-4 text-yellow-500" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl font-bold tracking-tight text-yellow-500">{stats.pending}</p>
+                <p className="text-xs text-muted-foreground truncate">Pending</p>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <Tabs defaultValue="drivers">
+          <TabsList>
+            <TabsTrigger value="drivers" className="gap-2">
+              <Users className="h-4 w-4" />
+              Drivers
+            </TabsTrigger>
+            <TabsTrigger value="documents" className="gap-2">
+              <FileText className="h-4 w-4" />
+              Documents
+            </TabsTrigger>
+            <TabsTrigger value="shifts" className="gap-2">
+              <Calendar className="h-4 w-4" />
+              Shifts
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="drivers" className="mt-4">
+            <DriversTable
+              drivers={drivers}
+              totalCount={totalCount}
+              currentPage={page}
+              pageSize={pageSize}
+            />
+          </TabsContent>
+
+          <TabsContent value="documents" className="mt-4">
+            <DocumentsTable />
+          </TabsContent>
+
+          <TabsContent value="shifts" className="mt-4">
+            <ShiftsTable />
+          </TabsContent>
+        </Tabs>
       </div>
-
-      <div className="grid gap-3 grid-cols-3">
-        <Card className="p-4 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-slate-500/20 shrink-0">
-              <Users className="h-4 w-4 text-slate-400" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xl font-bold tracking-tight">{stats.total}</p>
-              <p className="text-xs text-muted-foreground truncate">Total Drivers</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-500/20 shrink-0">
-              <UserCheck className="h-4 w-4 text-green-500" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xl font-bold tracking-tight text-green-500">{stats.active}</p>
-              <p className="text-xs text-muted-foreground truncate">Active</p>
-            </div>
-            <span className="text-xs font-medium text-green-500 ml-auto shrink-0">
-              {stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0}%
-            </span>
-          </div>
-        </Card>
-        <Card className={`p-4 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20 ${stats.pending > 0 ? 'ring-2 ring-yellow-500/50' : ''}`}>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-yellow-500/20 shrink-0">
-              <Clock className="h-4 w-4 text-yellow-500" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xl font-bold tracking-tight text-yellow-500">{stats.pending}</p>
-              <p className="text-xs text-muted-foreground truncate">Pending</p>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <Tabs defaultValue="drivers">
-        <TabsList>
-          <TabsTrigger value="drivers" className="gap-2">
-            <Users className="h-4 w-4" />
-            Drivers
-          </TabsTrigger>
-          <TabsTrigger value="documents" className="gap-2">
-            <FileText className="h-4 w-4" />
-            Documents
-          </TabsTrigger>
-          <TabsTrigger value="shifts" className="gap-2">
-            <Calendar className="h-4 w-4" />
-            Shifts
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="drivers" className="mt-4">
-          <DriversTable
-            drivers={drivers}
-            totalCount={totalCount}
-            currentPage={page}
-            pageSize={pageSize}
-          />
-        </TabsContent>
-
-        <TabsContent value="documents" className="mt-4">
-          <DocumentsTable />
-        </TabsContent>
-
-        <TabsContent value="shifts" className="mt-4">
-          <ShiftsTable />
-        </TabsContent>
-      </Tabs>
-    </div>
+    </PermissionGate>
   )
 }

@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
+import { PermissionGate } from "@/components/permission-gate"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -406,6 +407,7 @@ export default function SchedulingPage() {
   }
 
   return (
+    <PermissionGate permission="schedules:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -1117,5 +1119,6 @@ export default function SchedulingPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </PermissionGate>
   )
 }

@@ -52,6 +52,7 @@ import { Card } from "@/components/ui/card"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { FilterPills } from "@/components/ui/filter-pills"
+import { PermissionGate } from "@/components/permission-gate"
 
 interface Incident {
   id: string
@@ -241,6 +242,7 @@ export default function IncidentsPage() {
   }
 
   return (
+    <PermissionGate permission="sos:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -584,5 +586,6 @@ export default function IncidentsPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </PermissionGate>
   )
 }

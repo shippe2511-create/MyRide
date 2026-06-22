@@ -41,6 +41,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Switch } from "@/components/ui/switch"
+import { PermissionGate } from "@/components/permission-gate"
 import {
   Plus,
   Pencil,
@@ -232,6 +233,7 @@ export default function HelpContentPage() {
   }
 
   return (
+    <PermissionGate permission="settings:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -469,5 +471,6 @@ export default function HelpContentPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </PermissionGate>
   )
 }

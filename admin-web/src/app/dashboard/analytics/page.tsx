@@ -18,6 +18,7 @@ import {
   Calendar, Activity, Target, Award, Zap
 } from "lucide-react"
 import { SkeletonCard, SkeletonChart } from "@/components/ui/skeleton-card"
+import { PermissionGate } from "@/components/permission-gate"
 
 interface Ride {
   id: string

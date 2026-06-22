@@ -32,6 +32,7 @@ import { ROLE_DESCRIPTIONS, type Role, type Permission, getPermissionsForRole } 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Switch } from "@/components/ui/switch"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { PermissionGate } from "@/components/permission-gate"
 
 interface AdminUser {
   id: string
@@ -351,6 +352,7 @@ export default function AdminsPage() {
   }
 
   return (
+    <PermissionGate permission="admins:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -697,5 +699,6 @@ export default function AdminsPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </PermissionGate>
   )
 }

@@ -53,6 +53,7 @@ import {
   AlertCircle,
 } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
+import { PermissionGate } from "@/components/permission-gate"
 
 interface SupportTicket {
   id: string
@@ -305,6 +306,7 @@ export default function SupportTicketsPage() {
   }
 
   return (
+    <PermissionGate permission="sos:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -665,5 +667,6 @@ export default function SupportTicketsPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </PermissionGate>
   )
 }

@@ -49,6 +49,23 @@ are documented there. Keep those notes updated as the project evolves.
 - Inspect tables before coding. Schema is documented in the vault's Supabase Schema note.
 - All tables have RLS enabled with proper policies (fixed 2026-06-19).
 
+## Session rules — run automatically
+
+### STARTUP RULE (do this FIRST every session)
+At the start of every session, before anything else:
+1. Read the vault at `~/NOVA/Brain/NOVA-Brain/` — specifically `Knowledge/Issues.md`,
+   `Project State.md`, and `Decisions Log.md`
+2. Verify RLS/auth status against the **live Supabase database** (don't trust memory)
+3. State the current **#1 priority** before suggesting any work
+
+### END-OF-SESSION RULE (do this when wrapping up)
+Before the user ends a session:
+1. Update the vault files (`Knowledge/Issues.md`, `Project State.md`, `Decisions Log.md`)
+   with what was done, what's still open, and the next priority
+2. If the user seems to be wrapping up without doing this, remind them
+
+---
+
 ## Working rules — ALWAYS follow (added by Athif)
 - **No dead buttons or fields, ever.** Every button, field, toggle, and feature you
   create or touch must be fully wired and functional before you call it done:

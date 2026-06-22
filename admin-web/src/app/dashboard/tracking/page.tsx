@@ -12,6 +12,7 @@ import {
   Radio, Car, Users, MapPin, Phone, RefreshCw, Loader2, Navigation
 } from "lucide-react"
 import { SkeletonCard } from "@/components/ui/skeleton-card"
+import { PermissionGate } from "@/components/permission-gate"
 
 const LiveDriverMap = dynamic(
   () => import("@/components/live-driver-map").then(mod => mod.LiveDriverMap),
@@ -88,6 +89,7 @@ export default function TrackingPage() {
   }
 
   return (
+    <PermissionGate permission="tracking:view">
     <div className="space-y-4 h-[calc(100vh-100px)]">
       <div className="flex items-center justify-between">
         <div>
@@ -218,5 +220,6 @@ export default function TrackingPage() {
         </Card>
       </div>
     </div>
+    </PermissionGate>
   )
 }

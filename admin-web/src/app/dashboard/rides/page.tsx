@@ -28,6 +28,7 @@ import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { FilterPills } from "@/components/ui/filter-pills"
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
+import { PermissionGate, ManageGate } from "@/components/permission-gate"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu"
@@ -272,6 +273,7 @@ export default function RidesPage() {
   }
 
   return (
+    <PermissionGate permission="rides:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -683,5 +685,6 @@ export default function RidesPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </PermissionGate>
   )
 }

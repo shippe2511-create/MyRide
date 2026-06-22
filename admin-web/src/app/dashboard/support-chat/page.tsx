@@ -20,6 +20,7 @@ import {
   Loader2,
 } from "lucide-react"
 import { SkeletonCard } from "@/components/ui/skeleton-card"
+import { PermissionGate } from "@/components/permission-gate"
 
 interface SupportChat {
   id: string
@@ -268,6 +269,7 @@ export default function SupportChatPage() {
   }
 
   return (
+    <PermissionGate permission="chat:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -484,5 +486,6 @@ export default function SupportChatPage() {
         </Card>
       </div>
     </div>
+    </PermissionGate>
   )
 }

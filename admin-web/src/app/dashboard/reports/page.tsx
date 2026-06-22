@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { PermissionGate } from "@/components/permission-gate"
 import { Button } from "@/components/ui/button"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -603,6 +604,7 @@ export default function ReportsPage() {
   }
 
   return (
+    <PermissionGate permission="reports:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -720,5 +722,6 @@ export default function ReportsPage() {
         ))}
       </div>
     </div>
+    </PermissionGate>
   )
 }

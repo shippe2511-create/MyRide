@@ -28,6 +28,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { logActivity } from "@/lib/activity-logger"
+import { PermissionGate } from "@/components/permission-gate"
 
 interface AppSettings {
   id: string
@@ -319,6 +320,7 @@ export default function AppConfigPage() {
   }
 
   return (
+    <PermissionGate permission="settings:view">
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -856,5 +858,6 @@ export default function AppConfigPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </PermissionGate>
   )
 }

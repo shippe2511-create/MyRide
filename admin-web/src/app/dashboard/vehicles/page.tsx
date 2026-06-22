@@ -23,6 +23,7 @@ import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Car, Bus, Truck, Bike, Shi
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
+import { PermissionGate } from "@/components/permission-gate"
 
 interface VehicleType {
   id: string
@@ -274,6 +275,7 @@ export default function VehiclesPage() {
   }
 
   return (
+    <PermissionGate permission="vehicles:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -542,5 +544,6 @@ export default function VehiclesPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </PermissionGate>
   )
 }

@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch"
 import { Settings, Globe, Bell, Shield, Database, Save, Loader2, KeyRound, Phone, Plus, Trash2, GripVertical, Eye, EyeOff } from "lucide-react"
 import { toast } from "sonner"
 import { logActivity } from "@/lib/activity-logger"
+import { PermissionGate } from "@/components/permission-gate"
 
 interface AppSettings {
   id: string
@@ -245,6 +246,7 @@ export default function SettingsPage() {
   }
 
   return (
+    <PermissionGate permission="settings:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -628,5 +630,6 @@ export default function SettingsPage() {
         </TabsContent>
       </Tabs>
     </div>
+    </PermissionGate>
   )
 }

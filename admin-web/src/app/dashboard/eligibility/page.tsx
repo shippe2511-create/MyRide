@@ -23,6 +23,7 @@ import { formatDate } from "@/lib/utils"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
+import { PermissionGate } from "@/components/permission-gate"
 
 interface Campaign {
   id: string
@@ -220,6 +221,7 @@ export default function EligibilityPage() {
   }
 
   return (
+    <PermissionGate permission="eligibility:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -481,5 +483,6 @@ export default function EligibilityPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </PermissionGate>
   )
 }

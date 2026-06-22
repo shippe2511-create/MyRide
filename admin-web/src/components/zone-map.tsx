@@ -50,13 +50,20 @@ function ZoneMapInner({
   const [mapReady, setMapReady] = useState(false)
 
   useEffect(() => {
-    if (typeof window === "undefined" || !mapContainerRef.current || mapRef.current) return
+    if (typeof window === "undefined" || !mapContainerRef.current) return
+
+    // Prevent double initialization
+    if (mapRef.current) return
 
     const initMap = async () => {
       const L = (await import("leaflet")).default
       await import("leaflet-draw")
       await import("leaflet/dist/leaflet.css")
       await import("leaflet-draw/dist/leaflet.draw.css")
+
+      // Check if container already has a map
+      const container = mapContainerRef.current
+      if (!container || (container as any)._leaflet_id) return
 
       // Fix marker icons
       delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -67,7 +74,7 @@ function ZoneMapInner({
       })
 
       // Maldives centered map
-      const map = L.map(mapContainerRef.current!, {
+      const map = L.map(container, {
         center: [4.1755, 73.5093],
         zoom: 13,
         zoomControl: true,

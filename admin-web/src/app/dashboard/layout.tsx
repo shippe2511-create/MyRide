@@ -10,16 +10,16 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen w-screen overflow-hidden">
       <SOSAlertListener />
       <GlobalSearch />
       <KeyboardShortcuts />
       <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden pl-6 pr-6">
-        <div className="flex items-center justify-end py-3">
+      <div className="flex flex-1 flex-col overflow-hidden pl-6 pr-6 max-w-[calc(100vw-14rem)]">
+        <div className="flex items-center justify-end py-3 shrink-0">
           <Header />
         </div>
-        <main className="flex-1 overflow-auto pb-6">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden pb-6">
           {children}
         </main>
       </div>

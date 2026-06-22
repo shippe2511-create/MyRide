@@ -23,6 +23,7 @@ class AppState extends ChangeNotifier {
       _loadUserRegistration(),
       _loadTheme(),
       _loadProfileId(),
+      _loadNotificationSettings(),
     ]);
     _isInitialized = true;
     notifyListeners();
@@ -51,12 +52,51 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Notifications
+  // Notifications - persisted to SharedPreferences
   bool _notificationsEnabled = true;
-  bool get notificationsEnabled => _notificationsEnabled;
+  bool _rideUpdatesEnabled = true;
+  bool _promotionsEnabled = false;
+  bool _emailNotificationsEnabled = true;
 
-  void toggleNotifications(bool value) {
+  bool get notificationsEnabled => _notificationsEnabled;
+  bool get rideUpdatesEnabled => _rideUpdatesEnabled;
+  bool get promotionsEnabled => _promotionsEnabled;
+  bool get emailNotificationsEnabled => _emailNotificationsEnabled;
+
+  Future<void> _loadNotificationSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
+    _rideUpdatesEnabled = prefs.getBool('rideUpdatesEnabled') ?? true;
+    _promotionsEnabled = prefs.getBool('promotionsEnabled') ?? false;
+    _emailNotificationsEnabled = prefs.getBool('emailNotificationsEnabled') ?? true;
+    notifyListeners();
+  }
+
+  Future<void> toggleNotifications(bool value) async {
     _notificationsEnabled = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notificationsEnabled', value);
+    notifyListeners();
+  }
+
+  Future<void> toggleRideUpdates(bool value) async {
+    _rideUpdatesEnabled = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('rideUpdatesEnabled', value);
+    notifyListeners();
+  }
+
+  Future<void> togglePromotions(bool value) async {
+    _promotionsEnabled = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('promotionsEnabled', value);
+    notifyListeners();
+  }
+
+  Future<void> toggleEmailNotifications(bool value) async {
+    _emailNotificationsEnabled = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('emailNotificationsEnabled', value);
     notifyListeners();
   }
 
@@ -75,30 +115,6 @@ class AppState extends ChangeNotifier {
 
   void toggleFaceId(bool value) {
     _faceIdEnabled = value;
-    notifyListeners();
-  }
-
-  // Additional notification settings
-  bool _rideUpdatesEnabled = true;
-  bool _promotionsEnabled = false;
-  bool _emailNotificationsEnabled = true;
-
-  bool get rideUpdatesEnabled => _rideUpdatesEnabled;
-  bool get promotionsEnabled => _promotionsEnabled;
-  bool get emailNotificationsEnabled => _emailNotificationsEnabled;
-
-  void toggleRideUpdates(bool value) {
-    _rideUpdatesEnabled = value;
-    notifyListeners();
-  }
-
-  void togglePromotions(bool value) {
-    _promotionsEnabled = value;
-    notifyListeners();
-  }
-
-  void toggleEmailNotifications(bool value) {
-    _emailNotificationsEnabled = value;
     notifyListeners();
   }
 

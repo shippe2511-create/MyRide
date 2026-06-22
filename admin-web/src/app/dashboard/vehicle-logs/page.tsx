@@ -145,6 +145,17 @@ export default function VehicleLogsPage() {
 
   useEffect(() => {
     loadLogs()
+
+    const channel = supabase
+      .channel('vehicle_logs_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_logs' }, () => {
+        loadLogs()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [filterType])
 
   const loadLogs = async () => {

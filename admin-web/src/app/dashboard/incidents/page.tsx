@@ -90,6 +90,17 @@ export default function IncidentsPage() {
 
   useEffect(() => {
     loadIncidents()
+
+    const channel = supabase
+      .channel('incidents_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, () => {
+        loadIncidents()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [statusFilter, severityFilter])
 
   const loadIncidents = async () => {

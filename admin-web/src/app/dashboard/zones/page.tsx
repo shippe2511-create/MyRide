@@ -55,6 +55,16 @@ export default function ZonesPage() {
 
   useEffect(() => {
     loadData()
+
+    const channel = supabase
+      .channel('zones_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'service_zones' }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, () => loadData())
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const loadData = async () => {

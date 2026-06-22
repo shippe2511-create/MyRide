@@ -84,6 +84,16 @@ export default function SchedulingPage() {
 
   useEffect(() => {
     loadRoutes()
+
+    const channel = supabase
+      .channel('scheduling_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transport_routes' }, () => loadRoutes(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'route_schedules' }, () => loadRoutes(false))
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const loadRoutes = async (showLoading = true) => {

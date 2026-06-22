@@ -70,10 +70,10 @@ export default function ChecklistsPage() {
   useEffect(() => {
     loadChecklists(true)
 
-    // Real-time subscription - only reload on INSERT (new checklists from drivers)
+    // Real-time subscription for all changes
     const channel = supabase
       .channel('checklists_realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vehicle_checklists' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_checklists' }, () => {
         loadChecklists(false)
       })
       .subscribe()

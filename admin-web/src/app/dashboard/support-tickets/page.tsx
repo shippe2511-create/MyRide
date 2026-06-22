@@ -103,7 +103,7 @@ export default function SupportTicketsPage() {
 
     const channel = supabase
       .channel('support_tickets_realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_tickets' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'support_tickets' }, () => {
         loadTickets()
       })
       .subscribe()

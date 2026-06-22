@@ -113,6 +113,17 @@ export default function AdminsPage() {
 
   useEffect(() => {
     loadAdmins()
+
+    const channel = supabase
+      .channel('admins_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        loadAdmins()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const loadAdmins = async () => {

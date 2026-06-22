@@ -55,6 +55,17 @@ export default function EligibilityPage() {
 
   useEffect(() => {
     loadCampaigns()
+
+    const channel = supabase
+      .channel('eligibility_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ride_campaigns' }, () => {
+        loadCampaigns()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const loadCampaigns = async () => {

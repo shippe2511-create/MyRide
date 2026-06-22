@@ -82,6 +82,16 @@ export default function ContentPage() {
 
   useEffect(() => {
     loadData()
+
+    const channel = supabase
+      .channel('content_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_corner' }, () => loadData())
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const loadData = async () => {

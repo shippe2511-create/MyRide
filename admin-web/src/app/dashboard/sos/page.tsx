@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -156,9 +156,20 @@ export default function SOSPage() {
     { value: "phone", label: "Phone (General)", icon: Phone },
   ]
 
-  const playAlarmSound = () => {
+  const audioContextRef = useRef<AudioContext | null>(null)
+
+  const playAlarmSound = useCallback(() => {
     try {
-      const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+      // Resume audio context if suspended (browser autoplay policy)
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+      }
+      const audioContext = audioContextRef.current
+
+      if (audioContext.state === 'suspended') {
+        audioContext.resume()
+      }
+
       const oscillator = audioContext.createOscillator()
       const gainNode = audioContext.createGain()
 
@@ -183,7 +194,7 @@ export default function SOSPage() {
     } catch (e) {
       console.error('Audio error:', e)
     }
-  }
+  }, [])
 
   useEffect(() => {
     loadAlerts()

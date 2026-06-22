@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:share_plus/share_plus.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../services/notification_service.dart';
 
 class SOSScreen extends StatefulWidget {
   const SOSScreen({super.key});
@@ -98,6 +99,12 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
   Future<void> _activateSOS() async {
     HapticFeedback.heavyImpact();
     setState(() => _sosActivated = true);
+
+    // Play SOS alert sound via notification
+    NotificationService.showNotification(
+      title: '🚨 SOS ACTIVATED',
+      body: 'Emergency services have been notified. Help is on the way.',
+    );
 
     double? lat;
     double? lng;

@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:share_plus/share_plus.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../services/notification_service.dart';
 import '../providers/driver_state.dart';
 
 class SOSScreen extends StatefulWidget {
@@ -108,6 +109,9 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
   Future<void> _activateSOS(BuildContext context) async {
     HapticFeedback.heavyImpact();
     setState(() => _sosActivated = true);
+
+    // Play SOS alert sound via notification
+    NotificationService().showSOSNotification();
 
     final driverState = Provider.of<DriverState>(context, listen: false);
     final driverId = driverState.driverId;

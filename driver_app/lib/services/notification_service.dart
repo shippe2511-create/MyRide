@@ -33,6 +33,13 @@ class NotificationService {
     );
   }
 
+  void showSOSNotification() {
+    showNotification(
+      title: '🚨 SOS ACTIVATED',
+      body: 'Emergency services have been notified. Help is on the way.',
+    );
+  }
+
   void showBreakReminderNow({required String breakType, int? minutes}) {
     showNotification(
       title: 'Break Reminder',

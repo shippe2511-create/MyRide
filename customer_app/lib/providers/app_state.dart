@@ -118,20 +118,36 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Blocked Users
+  // Blocked Users - persisted to Supabase profiles.blocked_users
   final List<String> _blockedUsers = [];
-  List<String> get blockedUsers => _blockedUsers;
+  List<String> get blockedUsers => List.unmodifiable(_blockedUsers);
 
-  void blockUser(String userName) {
-    if (!_blockedUsers.contains(userName)) {
-      _blockedUsers.add(userName);
+  void setBlockedUsers(List<String> users) {
+    _blockedUsers.clear();
+    _blockedUsers.addAll(users);
+    notifyListeners();
+  }
+
+  Future<void> blockUser(String driverIdOrUserName) async {
+    if (!_blockedUsers.contains(driverIdOrUserName)) {
+      _blockedUsers.add(driverIdOrUserName);
       notifyListeners();
+      await _saveBlockedUsers();
     }
   }
 
-  void unblockUser(String userName) {
-    _blockedUsers.remove(userName);
+  Future<void> unblockUser(String driverIdOrUserName) async {
+    _blockedUsers.remove(driverIdOrUserName);
     notifyListeners();
+    await _saveBlockedUsers();
+  }
+
+  Future<void> _saveBlockedUsers() async {
+    try {
+      await SupabaseService.updateProfile({'blocked_users': _blockedUsers});
+    } catch (e) {
+      debugPrint('Error saving blocked users: $e');
+    }
   }
 
   // Emergency contacts
@@ -166,6 +182,23 @@ class AppState extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Error loading emergency contacts: $e');
+    }
+  }
+
+  Future<void> loadBlockedUsersFromProfile() async {
+    if (_profileId == null) return;
+    try {
+      final profile = await SupabaseService.getProfile();
+      if (profile != null && profile['blocked_users'] != null) {
+        _blockedUsers.clear();
+        final blocked = profile['blocked_users'] as List<dynamic>;
+        for (final b in blocked) {
+          _blockedUsers.add(b.toString());
+        }
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error loading blocked users: $e');
     }
   }
 
@@ -247,6 +280,7 @@ class AppState extends ChangeNotifier {
     _saveProfileId();
     if (id != null) {
       loadEmergencyContactsFromProfile();
+      loadBlockedUsersFromProfile();
       loadTripHistory();
     }
     notifyListeners();
@@ -280,6 +314,7 @@ class AppState extends ChangeNotifier {
     if (_profileId != null) {
       SupabaseService.setProfileId(_profileId);
       loadEmergencyContactsFromProfile();
+      loadBlockedUsersFromProfile();
       loadTripHistory();
       loadSavedAddresses();
       loadUserStats();

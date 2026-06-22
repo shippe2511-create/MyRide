@@ -15,9 +15,11 @@ export default function DashboardLayout({
       <GlobalSearch />
       <KeyboardShortcuts />
       <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-auto bg-muted/30 p-6">
+      <div className="flex flex-1 flex-col overflow-hidden pl-6 pr-6">
+        <div className="flex items-center justify-end py-3">
+          <Header />
+        </div>
+        <main className="flex-1 overflow-auto pb-6">
           {children}
         </main>
       </div>

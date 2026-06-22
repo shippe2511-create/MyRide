@@ -197,7 +197,10 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-9 w-9 rounded-full">
               <Avatar className="h-9 w-9">
-                <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.full_name || "Admin"} />
+                <AvatarImage
+                  src={profile?.avatar_url ? `${profile.avatar_url}?t=${Math.floor(Date.now() / 60000)}` : undefined}
+                  alt={profile?.full_name || "Admin"}
+                />
                 <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
             </Button>

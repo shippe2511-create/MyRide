@@ -371,8 +371,38 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildProfileAvatar(AppState appState) {
-    // Try local file first
-    if (appState.profilePhotoPath != null) {
+    // Priority: avatarUrl (cloud) > profilePhotoPath (local) > icon
+    if (appState.avatarUrl != null && appState.avatarUrl!.isNotEmpty) {
+      // Add cache-busting parameter to force reload
+      final avatarUrlWithCache = appState.avatarUrl!.contains('?')
+          ? '${appState.avatarUrl!}&t=${DateTime.now().millisecondsSinceEpoch ~/ 60000}'
+          : '${appState.avatarUrl!}?t=${DateTime.now().millisecondsSinceEpoch ~/ 60000}';
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.network(
+          avatarUrlWithCache,
+          width: 52,
+          height: 52,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) {
+            // Fall back to local file or icon
+            if (appState.profilePhotoPath != null) {
+              final file = File(appState.profilePhotoPath!);
+              if (file.existsSync()) {
+                return Image.file(
+                  file,
+                  width: 52,
+                  height: 52,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Icon(Icons.person, color: Colors.black, size: 28),
+                );
+              }
+            }
+            return Icon(Icons.person, color: Colors.black, size: 28);
+          },
+        ),
+      );
+    } else if (appState.profilePhotoPath != null) {
       final file = File(appState.profilePhotoPath!);
       if (file.existsSync()) {
         return ClipRRect(
@@ -386,20 +416,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         );
       }
-    }
-
-    // Fallback to cloud URL
-    if (appState.avatarUrl != null) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Image.network(
-          appState.avatarUrl!,
-          width: 52,
-          height: 52,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Icon(Icons.person, color: Colors.black, size: 28),
-        ),
-      );
     }
 
     // Default icon

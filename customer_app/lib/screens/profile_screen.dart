@@ -736,8 +736,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildProfileAvatar(AppState appState, double size, double iconSize) {
     // Priority: avatarUrl (cloud) > profilePhotoPath (local) > icon
     if (appState.avatarUrl != null && appState.avatarUrl!.isNotEmpty) {
+      // Add cache-busting parameter to force reload
+      final avatarUrlWithCache = appState.avatarUrl!.contains('?')
+          ? '${appState.avatarUrl!}&t=${DateTime.now().millisecondsSinceEpoch ~/ 60000}'
+          : '${appState.avatarUrl!}?t=${DateTime.now().millisecondsSinceEpoch ~/ 60000}';
       return Image.network(
-        appState.avatarUrl!,
+        avatarUrlWithCache,
         width: size,
         height: size,
         fit: BoxFit.cover,

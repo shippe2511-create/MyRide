@@ -20,6 +20,7 @@ import {
   LogOut,
   AlertTriangle,
   MessageSquare,
+  TicketCheck,
   ClipboardCheck,
   Star,
   Radio,
@@ -94,6 +95,7 @@ const navigationSections: NavSection[] = [
     items: [
       { name: "SOS Alerts", href: "/dashboard/sos", icon: AlertTriangle, permission: "sos:view" },
       { name: "Incidents", href: "/dashboard/incidents", icon: AlertTriangle, permission: "sos:view" },
+      { name: "Support Tickets", href: "/dashboard/support-tickets", icon: TicketCheck, permission: "sos:view" },
     ]
   },
   {

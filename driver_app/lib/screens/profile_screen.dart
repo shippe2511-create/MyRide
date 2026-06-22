@@ -577,8 +577,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildProfileImage(DriverState state) {
     // Priority: avatarUrl > local file > initials
     if (state.avatarUrl.isNotEmpty) {
+      // Add cache-busting parameter to force reload
+      final avatarUrlWithCache = state.avatarUrl.contains('?')
+          ? '${state.avatarUrl}&t=${DateTime.now().millisecondsSinceEpoch ~/ 60000}'
+          : '${state.avatarUrl}?t=${DateTime.now().millisecondsSinceEpoch ~/ 60000}';
       return Image.network(
-        state.avatarUrl,
+        avatarUrlWithCache,
         width: 110,
         height: 110,
         fit: BoxFit.cover,

@@ -141,7 +141,9 @@
       "Bash(pkill -f \"flutter.*iPhone 16\")",
       "Bash(pkill -f \"flutter.*iPhone\")",
       "Bash(dart format *)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "WebFetch(domain:localhost)",
+      "Bash(disown)"
     ],
     "additionalDirectories": [
       "/tmp"

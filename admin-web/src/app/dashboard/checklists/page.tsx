@@ -70,10 +70,10 @@ export default function ChecklistsPage() {
   useEffect(() => {
     loadChecklists(true)
 
-    // Real-time subscription
+    // Real-time subscription - only reload on INSERT (new checklists from drivers)
     const channel = supabase
       .channel('checklists_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_checklists' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vehicle_checklists' }, () => {
         loadChecklists(false)
       })
       .subscribe()
@@ -135,20 +135,40 @@ export default function ChecklistsPage() {
       toast.error("Failed to update")
     } else {
       toast.success("Updated successfully")
+      // Update local state instead of reloading
+      const oldChecklist = checklists.find(c => c.id === editingChecklist.id)
+      setChecklists(prev => prev.map(c => c.id === editingChecklist.id ? editingChecklist : c))
+      // Update stats if has_issues changed
+      if (oldChecklist && oldChecklist.has_issues !== editingChecklist.has_issues) {
+        setStats(prev => ({
+          ...prev,
+          withIssues: editingChecklist.has_issues ? prev.withIssues + 1 : Math.max(0, prev.withIssues - 1),
+          passed: editingChecklist.has_issues ? Math.max(0, prev.passed - 1) : prev.passed + 1,
+        }))
+      }
       setEditingChecklist(null)
-      loadChecklists(false)
     }
     setSaving(false)
   }
 
   const confirmDelete = async () => {
     if (!deleteId) return
+    const checklist = checklists.find(c => c.id === deleteId)
     const { error } = await supabase.from("vehicle_checklists").delete().eq("id", deleteId)
     if (error) {
       toast.error("Failed to delete")
     } else {
       toast.success("Deleted successfully")
-      loadChecklists(false)
+      // Update local state instead of reloading
+      setChecklists(prev => prev.filter(c => c.id !== deleteId))
+      if (checklist) {
+        setStats(prev => ({
+          ...prev,
+          total: Math.max(0, prev.total - 1),
+          withIssues: checklist.has_issues ? Math.max(0, prev.withIssues - 1) : prev.withIssues,
+          passed: !checklist.has_issues ? Math.max(0, prev.passed - 1) : prev.passed,
+        }))
+      }
     }
     setDeleteId(null)
   }

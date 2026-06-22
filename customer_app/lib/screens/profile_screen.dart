@@ -15,6 +15,7 @@ import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import 'chat_screen.dart';
+import 'support_chat_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -2125,19 +2126,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }, subtitle: supportEmail),
       _buildActionItem('Live Chat', Icons.chat, () {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Live chat coming soon. Use Report Issue or call/email support.'),
-            backgroundColor: AppColors.info,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-            action: SnackBarAction(
-              label: 'Report Issue',
-              textColor: Colors.white,
-              onPressed: () => _showReportIssue(context),
-            ),
-          ),
-        );
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportChatScreen()));
       }),
     ]);
   }

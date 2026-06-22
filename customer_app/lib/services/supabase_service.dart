@@ -1656,4 +1656,112 @@ class SupabaseService {
       return [];
     }
   }
+
+  // Support Chat Methods
+  static Future<String?> getOrCreateSupportChat() async {
+    try {
+      final uid = userId;
+      if (uid == null) return null;
+
+      // Check for existing open chat
+      final existing = await client
+          .from('support_chats')
+          .select('id')
+          .eq('customer_id', uid)
+          .inFilter('status', ['open', 'active'])
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (existing != null) {
+        return existing['id'] as String;
+      }
+
+      // Create new chat
+      final response = await client
+          .from('support_chats')
+          .insert({'customer_id': uid, 'status': 'open'})
+          .select('id')
+          .single();
+
+      return response['id'] as String;
+    } catch (e) {
+      debugPrint('Error getting/creating support chat: $e');
+      return null;
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getSupportChatMessages(String chatId) async {
+    try {
+      final response = await client
+          .from('support_chat_messages')
+          .select('*')
+          .eq('chat_id', chatId)
+          .order('created_at', ascending: true);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error getting support chat messages: $e');
+      return [];
+    }
+  }
+
+  static Future<bool> sendSupportChatMessage({
+    required String chatId,
+    required String message,
+    String? senderId,
+  }) async {
+    try {
+      final uid = senderId ?? userId;
+      if (uid == null) return false;
+
+      await client.from('support_chat_messages').insert({
+        'chat_id': chatId,
+        'sender_id': uid,
+        'sender_type': 'customer',
+        'message': message,
+      });
+
+      // Update chat status to active
+      await client.from('support_chats').update({
+        'status': 'active',
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', chatId);
+
+      return true;
+    } catch (e) {
+      debugPrint('Error sending support chat message: $e');
+      return false;
+    }
+  }
+
+  static RealtimeChannel subscribeToSupportChat(String chatId, Function(Map<String, dynamic>) onMessage) {
+    return client
+        .channel('support_chat_$chatId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'support_chat_messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'chat_id',
+            value: chatId,
+          ),
+          callback: (payload) {
+            onMessage(payload.newRecord);
+          },
+        )
+        .subscribe();
+  }
+
+  static Future<void> markSupportMessagesAsRead(String chatId) async {
+    try {
+      await client
+          .from('support_chat_messages')
+          .update({'is_read': true})
+          .eq('chat_id', chatId)
+          .eq('sender_type', 'admin');
+    } catch (e) {
+      debugPrint('Error marking support messages as read: $e');
+    }
+  }
 }

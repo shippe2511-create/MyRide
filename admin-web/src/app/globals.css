@@ -85,6 +85,17 @@
     height: 100%;
     width: 100%;
   }
+
+  /* Hide scrollbars globally but keep functionality */
+  *::-webkit-scrollbar {
+    width: 0px;
+    height: 0px;
+    background: transparent;
+  }
+  * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 
 /* Ensure dialogs appear above maps */

@@ -143,7 +143,8 @@
       "Bash(dart format *)",
       "Bash(node -e ' *)",
       "WebFetch(domain:localhost)",
-      "Bash(disown)"
+      "Bash(disown)",
+      "Bash(npx eslint *)"
     ],
     "additionalDirectories": [
       "/tmp"

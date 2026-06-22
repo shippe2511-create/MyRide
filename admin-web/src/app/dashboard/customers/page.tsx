@@ -72,13 +72,10 @@ export default function CustomersPage() {
   useEffect(() => {
     const channel = supabase
       .channel('customers_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
-        console.log('Realtime update received:', payload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
         queryClient.invalidateQueries({ queryKey: ["customers-page"] })
       })
-      .subscribe((status) => {
-        console.log('Realtime subscription status:', status)
-      })
+      .subscribe()
 
     return () => {
       supabase.removeChannel(channel)

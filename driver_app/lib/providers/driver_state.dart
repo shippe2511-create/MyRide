@@ -70,7 +70,6 @@ class DriverState extends ChangeNotifier {
   bool get hasAvailableSeats => availableSeats > 0;
 
   DriverState() {
-    // _loadMockData(); // DISABLED - using real Supabase data only
     _initPreferences();
   }
 
@@ -917,7 +916,7 @@ class DriverState extends ChangeNotifier {
     await prefs.remove('breakStartTime');
 
     if (_isOnline) {
-      // _simulateIncomingRequest(); // DISABLED - using real Supabase data
+
     }
     notifyListeners();
   }
@@ -1046,7 +1045,7 @@ class DriverState extends ChangeNotifier {
     // Simulate a new incoming request after cancellation
     if (_isOnline) {
       Future.delayed(const Duration(seconds: 3), () {
-        // _simulateIncomingRequest(); // DISABLED - using real Supabase data
+
       });
     }
   }
@@ -1140,7 +1139,7 @@ class DriverState extends ChangeNotifier {
       } else {
         _currentRide = null;
         if (_isOnline) {
-          // _simulateIncomingRequest(); // DISABLED - using real Supabase data
+
         }
       }
 
@@ -1153,7 +1152,7 @@ class DriverState extends ChangeNotifier {
     notifyListeners();
 
     if (_isOnline) {
-      // _simulateIncomingRequest(); // DISABLED - using real Supabase data
+
     }
   }
 
@@ -1176,7 +1175,7 @@ class DriverState extends ChangeNotifier {
     notifyListeners();
 
     if (_isOnline) {
-      // _simulateIncomingRequest(); // DISABLED - using real Supabase data
+
     }
   }
 
@@ -1187,7 +1186,7 @@ class DriverState extends ChangeNotifier {
 
     // Simulate next request if seats still available
     if (_currentRide != null && hasAvailableSeats && _incomingRequests.isEmpty) {
-      // _simulateIncomingRequest(); // DISABLED - using real Supabase data
+
     }
   }
 

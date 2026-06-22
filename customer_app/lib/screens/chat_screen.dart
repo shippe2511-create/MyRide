@@ -1287,23 +1287,29 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   child: Row(
                     children: [
                       Expanded(
-                        child: TextField(
-                          controller: _messageController,
-                          focusNode: _focusNode,
-                          style: TextStyle(color: context.textColor, fontSize: 15),
-                          keyboardType: TextInputType.text,
-                          textInputAction: TextInputAction.send,
-                          textCapitalization: TextCapitalization.sentences,
-                          decoration: InputDecoration(
-                            hintText: 'Type a message...',
-                            hintStyle: TextStyle(color: context.mutedColor, fontSize: 15),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
+                        child: GestureDetector(
+                          onTap: () => _focusNode.requestFocus(),
+                          child: TextField(
+                            controller: _messageController,
+                            focusNode: _focusNode,
+                            style: TextStyle(color: context.textColor, fontSize: 15),
+                            keyboardType: TextInputType.text,
+                            textInputAction: TextInputAction.send,
+                            textCapitalization: TextCapitalization.sentences,
+                            autofocus: false,
+                            enableInteractiveSelection: true,
+                            decoration: InputDecoration(
+                              hintText: 'Type a message...',
+                              hintStyle: TextStyle(color: context.mutedColor, fontSize: 15),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
                             ),
+                            onSubmitted: _sendMessage,
+                            onTap: () => _focusNode.requestFocus(),
                           ),
-                          onSubmitted: _sendMessage,
                         ),
                       ),
                       GestureDetector(

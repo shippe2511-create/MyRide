@@ -2125,11 +2125,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }, subtitle: supportEmail),
       _buildActionItem('Live Chat', Icons.chat, () {
         Navigator.pop(context);
-        Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(
-          driverName: 'MyRide Support',
-          driverPhone: supportPhone,
-          vehicleNumber: 'Support',
-        )));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Live chat coming soon. Use Report Issue or call/email support.'),
+            backgroundColor: AppColors.info,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+            action: SnackBarAction(
+              label: 'Report Issue',
+              textColor: Colors.white,
+              onPressed: () => _showReportIssue(context),
+            ),
+          ),
+        );
       }),
     ]);
   }

@@ -83,11 +83,13 @@ interface CustomersTableProps {
   pageSize: number
 }
 
-export function CustomersTable({ customers, totalCount, currentPage, pageSize }: CustomersTableProps) {
+export function CustomersTable({ customers: initialCustomers, totalCount: initialTotalCount, currentPage, pageSize }: CustomersTableProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
 
+  const [customers, setCustomers] = useState<Customer[]>(initialCustomers)
+  const [totalCount, setTotalCount] = useState(initialTotalCount)
   const [search, setSearch] = useState(searchParams.get("search") || "")
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "all")
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
@@ -106,21 +108,38 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
 
+  // Sync with server data when props change
+  useEffect(() => {
+    setCustomers(initialCustomers)
+    setTotalCount(initialTotalCount)
+  }, [initialCustomers, initialTotalCount])
+
   const totalPages = Math.ceil(totalCount / pageSize)
 
   // Real-time subscription for live updates
   useEffect(() => {
     const channel = supabase
       .channel('customers-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-        router.refresh()
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
+        if (payload.eventType === 'UPDATE' && payload.new) {
+          setCustomers(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } as Customer : c))
+        } else if (payload.eventType === 'DELETE' && payload.old) {
+          setCustomers(prev => prev.filter(c => c.id !== payload.old.id))
+          setTotalCount(prev => Math.max(0, prev - 1))
+        } else if (payload.eventType === 'INSERT' && payload.new) {
+          const newCustomer = payload.new as Customer
+          if (['customer', 'super-admin', 'admin', 'operator', 'support', 'viewer'].includes(newCustomer.role)) {
+            setCustomers(prev => [newCustomer, ...prev].slice(0, pageSize))
+            setTotalCount(prev => prev + 1)
+          }
+        }
       })
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [supabase, router])
+  }, [supabase, pageSize])
 
   const updateParams = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -161,7 +180,7 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
     } else {
       toast.success(`Customer ${newStatus === "suspended" ? "suspended" : "activated"}`)
       logActivity({ action: 'update', entityType: 'customer', entityId: customer.id, details: { status: newStatus, name: customer.full_name } })
-      router.refresh()
+      setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, status: newStatus } : c))
     }
     setLoading(false)
   }
@@ -178,7 +197,7 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
     } else {
       toast.success("Customer approved")
       logActivity({ action: 'update', entityType: 'customer', entityId: customer.id, details: { status: 'approved', name: customer.full_name } })
-      router.refresh()
+      setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, status: "approved" } : c))
     }
     setLoading(false)
   }
@@ -195,7 +214,7 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
     } else {
       toast.success("Customer rejected")
       logActivity({ action: 'update', entityType: 'customer', entityId: customer.id, details: { status: 'rejected', name: customer.full_name } })
-      router.refresh()
+      setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, status: "rejected" } : c))
     }
     setLoading(false)
   }
@@ -217,7 +236,8 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
     } else {
       toast.success("Customer deleted")
       logActivity({ action: 'delete', entityType: 'customer', entityId: customerToDelete.id, details: { name: customerToDelete.full_name } })
-      router.refresh()
+      setCustomers(prev => prev.filter(c => c.id !== customerToDelete.id))
+      setTotalCount(prev => Math.max(0, prev - 1))
     }
     setLoading(false)
   }
@@ -279,11 +299,11 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
       } else {
         toast.success("Customer updated")
         logActivity({ action: 'update', entityType: 'customer', entityId: selectedCustomer.id, details: { name: formData.full_name } })
+        setCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? { ...c, ...formData } as Customer : c))
         setDialogType(null)
-        router.refresh()
       }
     } else if (dialogType === "add") {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("profiles")
         .insert({
           full_name: formData.full_name,
@@ -295,14 +315,19 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
           status: formData.status,
           role: "customer"
         })
+        .select()
+        .single()
 
       if (error) {
         toast.error("Failed to add customer: " + error.message)
       } else {
         toast.success("Customer added")
         logActivity({ action: 'create', entityType: 'customer', details: { name: formData.full_name } })
+        if (data) {
+          setCustomers(prev => [data as Customer, ...prev].slice(0, pageSize))
+          setTotalCount(prev => prev + 1)
+        }
         setDialogType(null)
-        router.refresh()
       }
     }
     setLoading(false)
@@ -338,8 +363,8 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
       toast.error("Failed to approve customers")
     } else {
       toast.success(`${selectedIds.size} customers approved`)
+      setCustomers(prev => prev.map(c => selectedIds.has(c.id) ? { ...c, status: "approved" } : c))
       setSelectedIds(new Set())
-      router.refresh()
     }
     setBulkLoading(false)
   }
@@ -356,8 +381,8 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
       toast.error("Failed to suspend customers")
     } else {
       toast.success(`${selectedIds.size} customers suspended`)
+      setCustomers(prev => prev.map(c => selectedIds.has(c.id) ? { ...c, status: "suspended" } : c))
       setSelectedIds(new Set())
-      router.refresh()
     }
     setBulkLoading(false)
   }
@@ -365,6 +390,7 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return
     if (!window.confirm(`Are you sure you want to delete ${selectedIds.size} customers?`)) return
+    const idsToDelete = new Set(selectedIds)
     setBulkLoading(true)
     const { error } = await supabase
       .from("profiles")
@@ -375,8 +401,9 @@ export function CustomersTable({ customers, totalCount, currentPage, pageSize }:
       toast.error("Failed to delete customers")
     } else {
       toast.success(`${selectedIds.size} customers deleted`)
+      setCustomers(prev => prev.filter(c => !idsToDelete.has(c.id)))
+      setTotalCount(prev => Math.max(0, prev - idsToDelete.size))
       setSelectedIds(new Set())
-      router.refresh()
     }
     setBulkLoading(false)
   }

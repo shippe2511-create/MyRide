@@ -91,17 +91,44 @@ interface DriversTableProps {
   pageSize: number
 }
 
-export function DriversTable({ drivers, totalCount, currentPage, pageSize }: DriversTableProps) {
+export function DriversTable({ drivers: initialDrivers, totalCount: initialTotalCount, currentPage, pageSize }: DriversTableProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
 
+  const [drivers, setDrivers] = useState<Driver[]>(initialDrivers)
+  const [totalCount, setTotalCount] = useState(initialTotalCount)
   const [search, setSearch] = useState(searchParams.get("search") || "")
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "all")
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null)
   const [dialogType, setDialogType] = useState<"view" | "edit" | "delete" | "add" | null>(null)
   const [loading, setLoading] = useState(false)
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
+
+  // Sync with server data when props change
+  useEffect(() => {
+    setDrivers(initialDrivers)
+    setTotalCount(initialTotalCount)
+  }, [initialDrivers, initialTotalCount])
+
+  // Real-time subscription for live updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('drivers-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, (payload) => {
+        if (payload.eventType === 'UPDATE' && payload.new) {
+          setDrivers(prev => prev.map(d => d.id === payload.new.id ? { ...d, ...payload.new } as Driver : d))
+        } else if (payload.eventType === 'DELETE' && payload.old) {
+          setDrivers(prev => prev.filter(d => d.id !== payload.old.id))
+          setTotalCount(prev => Math.max(0, prev - 1))
+        }
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [supabase])
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
@@ -168,7 +195,7 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
     } else {
       toast.success("Driver approved")
       logActivity({ action: 'update', entityType: 'driver', entityId: driver.id, details: { status: 'approved', name: driver.full_name } })
-      router.refresh()
+      setDrivers(prev => prev.map(d => d.id === driver.id ? { ...d, status: "approved" } : d))
     }
     setLoading(false)
   }
@@ -186,7 +213,7 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
     } else {
       toast.success("Driver rejected")
       logActivity({ action: 'update', entityType: 'driver', entityId: driver.id, details: { status: 'rejected', name: driver.full_name } })
-      router.refresh()
+      setDrivers(prev => prev.map(d => d.id === driver.id ? { ...d, status: "rejected" } : d))
     }
     setLoading(false)
   }
@@ -205,7 +232,7 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
     } else {
       toast.success(`Driver ${newStatus === "suspended" ? "suspended" : "activated"}`)
       logActivity({ action: 'update', entityType: 'driver', entityId: driver.id, details: { status: newStatus, name: driver.full_name } })
-      router.refresh()
+      setDrivers(prev => prev.map(d => d.id === driver.id ? { ...d, status: newStatus } : d))
     }
     setLoading(false)
   }
@@ -236,7 +263,8 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
       } else {
         toast.success("Driver deleted")
         logActivity({ action: 'delete', entityType: 'driver', entityId: driverToDelete.id, details: { name: driverToDelete.full_name } })
-        router.refresh()
+        setDrivers(prev => prev.filter(d => d.id !== driverToDelete.id))
+        setTotalCount(prev => Math.max(0, prev - 1))
       }
     } catch (e) {
       console.error("Delete exception:", e)
@@ -340,8 +368,8 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
             logActivity({ action: 'update', entityType: 'driver', entityId: selectedDriver.id, details: { name: formData.full_name } })
           }
         }
+        setDrivers(prev => prev.map(d => d.id === selectedDriver.id ? { ...d, ...formData, full_name: formData.full_name, status: formData.status } as Driver : d))
         setDialogType(null)
-        router.refresh()
       }
     } else if (dialogType === "add") {
       const { data: newProfile, error } = await supabase
@@ -379,8 +407,11 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
         }
         toast.success("Driver added")
         logActivity({ action: 'create', entityType: 'driver', entityId: newProfile?.id, details: { name: formData.full_name } })
+        if (newProfile) {
+          setDrivers(prev => [newProfile as Driver, ...prev].slice(0, pageSize))
+          setTotalCount(prev => prev + 1)
+        }
         setDialogType(null)
-        router.refresh()
       }
     }
     setLoading(false)
@@ -416,8 +447,8 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
       toast.error("Failed to approve drivers")
     } else {
       toast.success(`${selectedIds.size} drivers approved`)
+      setDrivers(prev => prev.map(d => selectedIds.has(d.id) ? { ...d, status: "approved" } : d))
       setSelectedIds(new Set())
-      router.refresh()
     }
     setBulkLoading(false)
   }
@@ -434,8 +465,8 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
       toast.error("Failed to suspend drivers")
     } else {
       toast.success(`${selectedIds.size} drivers suspended`)
+      setDrivers(prev => prev.map(d => selectedIds.has(d.id) ? { ...d, status: "suspended" } : d))
       setSelectedIds(new Set())
-      router.refresh()
     }
     setBulkLoading(false)
   }
@@ -443,6 +474,7 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return
     if (!window.confirm(`Are you sure you want to delete ${selectedIds.size} drivers?`)) return
+    const idsToDelete = new Set(selectedIds)
     setBulkLoading(true)
     const { error } = await supabase
       .from("profiles")
@@ -453,8 +485,9 @@ export function DriversTable({ drivers, totalCount, currentPage, pageSize }: Dri
       toast.error("Failed to delete drivers")
     } else {
       toast.success(`${selectedIds.size} drivers deleted`)
+      setDrivers(prev => prev.filter(d => !idsToDelete.has(d.id)))
+      setTotalCount(prev => Math.max(0, prev - idsToDelete.size))
       setSelectedIds(new Set())
-      router.refresh()
     }
     setBulkLoading(false)
   }

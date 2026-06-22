@@ -328,6 +328,8 @@ export default function SOSPage() {
   }
 
   const updateStatus = async (alertId: string, newStatus: string) => {
+    const oldAlert = alerts.find(a => a.id === alertId)
+    const oldStatus = oldAlert?.status
     setSelectedAlert(null)
     setSaving(true)
     const updates: Record<string, unknown> = { status: newStatus }
@@ -342,6 +344,19 @@ export default function SOSPage() {
     } else {
       toast.success("Alert updated")
       setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, status: newStatus } : a))
+      // Update stats locally
+      if (oldStatus && oldStatus !== newStatus) {
+        setStats(prev => {
+          const newStats = { ...prev }
+          if (oldStatus === "active") newStats.active = Math.max(0, newStats.active - 1)
+          if (oldStatus === "responding") newStats.responding = Math.max(0, newStats.responding - 1)
+          if (oldStatus === "resolved" || oldStatus === "false_alarm") newStats.resolved = Math.max(0, newStats.resolved - 1)
+          if (newStatus === "active") newStats.active++
+          if (newStatus === "responding") newStats.responding++
+          if (newStatus === "resolved" || newStatus === "false_alarm") newStats.resolved++
+          return newStats
+        })
+      }
     }
     setSaving(false)
   }
@@ -366,6 +381,7 @@ export default function SOSPage() {
   const deleteAlert = async () => {
     if (!alertToDelete) return
     const idToDelete = alertToDelete
+    const alertToRemove = alerts.find(a => a.id === idToDelete)
     setDeleteDialogOpen(false)
     setAlertToDelete(null)
 
@@ -375,6 +391,16 @@ export default function SOSPage() {
     } else {
       toast.success("Alert deleted")
       setAlerts(prev => prev.filter(a => a.id !== idToDelete))
+      // Update stats locally
+      if (alertToRemove) {
+        setStats(prev => {
+          const newStats = { ...prev }
+          if (alertToRemove.status === "active") newStats.active = Math.max(0, newStats.active - 1)
+          if (alertToRemove.status === "responding") newStats.responding = Math.max(0, newStats.responding - 1)
+          if (alertToRemove.status === "resolved" || alertToRemove.status === "false_alarm") newStats.resolved = Math.max(0, newStats.resolved - 1)
+          return newStats
+        })
+      }
     }
   }
 

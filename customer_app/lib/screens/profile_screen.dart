@@ -1944,10 +1944,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showReportIssue(BuildContext context) {
+  void _showReportIssue(BuildContext context) async {
     final descriptionController = TextEditingController();
     String selectedCategory = 'Driver Issue';
+    String? selectedDriverId;
+    List<Map<String, dynamic>> recentDrivers = [];
     final categories = ['Driver Issue', 'App Bug', 'Lost Item', 'Safety Concern', 'Other'];
+
+    // Load recent drivers
+    recentDrivers = await SupabaseService.getRecentDrivers();
+
+    if (!mounted) return;
 
     showModalBottomSheet(
       context: context,
@@ -1973,7 +1980,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   spacing: 8,
                   runSpacing: 8,
                   children: categories.map((cat) => GestureDetector(
-                    onTap: () => setSheetState(() => selectedCategory = cat),
+                    onTap: () => setSheetState(() {
+                      selectedCategory = cat;
+                      if (cat != 'Driver Issue') selectedDriverId = null;
+                    }),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
@@ -1985,6 +1995,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   )).toList(),
                 ),
+                if (selectedCategory == 'Driver Issue' && recentDrivers.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text('Select Driver (Optional)', style: TextStyle(color: context.mutedColor, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: context.borderColor),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String?>(
+                        value: selectedDriverId,
+                        isExpanded: true,
+                        dropdownColor: context.surfaceColor,
+                        hint: Text('Select a recent driver', style: TextStyle(color: context.faintColor, fontSize: 14)),
+                        items: [
+                          DropdownMenuItem<String?>(value: null, child: Text('None', style: TextStyle(color: context.textColor))),
+                          ...recentDrivers.map((driver) {
+                            final name = driver['profile']?['full_name'] ?? 'Unknown';
+                            final vehicle = driver['vehicle_number'] ?? '';
+                            return DropdownMenuItem<String?>(
+                              value: driver['id'] as String,
+                              child: Text('$name ${vehicle.isNotEmpty ? "($vehicle)" : ""}', style: TextStyle(color: context.textColor, fontSize: 14)),
+                            );
+                          }),
+                        ],
+                        onChanged: (value) => setSheetState(() => selectedDriverId = value),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 Text('Description', style: TextStyle(color: context.mutedColor, fontSize: 13)),
                 const SizedBox(height: 8),
@@ -2014,6 +2057,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           final success = await SupabaseService.submitSupportTicket(
                             category: selectedCategory,
                             description: descriptionController.text.trim(),
+                            driverId: selectedDriverId,
                           );
                           if (context.mounted) {
                             Navigator.pop(ctx);

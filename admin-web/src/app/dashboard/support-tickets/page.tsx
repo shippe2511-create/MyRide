@@ -57,6 +57,8 @@ import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 interface SupportTicket {
   id: string
   user_id: string
+  driver_id: string | null
+  ride_id: string | null
   category: string
   description: string
   status: string
@@ -70,6 +72,13 @@ interface SupportTicket {
     email: string | null
     employee_id: string | null
   }
+  driver?: {
+    profile?: {
+      full_name: string
+      phone: string | null
+    }
+    vehicle_number: string | null
+  } | null
 }
 
 const CATEGORIES = [
@@ -120,7 +129,8 @@ export default function SupportTicketsPage() {
       .from("support_tickets")
       .select(`
         *,
-        user:profiles!support_tickets_user_id_fkey(full_name, phone, email, employee_id)
+        user:profiles!support_tickets_user_id_fkey(full_name, phone, email, employee_id),
+        driver:drivers(profile:profiles(full_name, phone), vehicle_number)
       `)
       .order("created_at", { ascending: false })
 
@@ -368,6 +378,7 @@ export default function SupportTicketsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>User</TableHead>
+              <TableHead>Driver</TableHead>
               <TableHead>Category</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Status</TableHead>
@@ -378,7 +389,7 @@ export default function SupportTicketsPage() {
           <TableBody>
             {filteredTickets.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   {search ? "No matching tickets" : "No tickets found"}
                 </TableCell>
               </TableRow>
@@ -402,6 +413,18 @@ export default function SupportTicketsPage() {
                         )}
                       </div>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    {ticket.driver ? (
+                      <div>
+                        <p className="font-medium text-sm">{ticket.driver.profile?.full_name || "Unknown"}</p>
+                        {ticket.driver.vehicle_number && (
+                          <p className="text-xs text-muted-foreground">{ticket.driver.vehicle_number}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
                   </TableCell>
                   <TableCell>{categoryBadge(ticket.category)}</TableCell>
                   <TableCell>
@@ -499,6 +522,23 @@ export default function SupportTicketsPage() {
                   {selectedTicket.user?.email || "-"}
                 </div>
               </div>
+
+              {selectedTicket.driver && (
+                <div className="grid grid-cols-2 gap-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg text-sm border border-blue-200 dark:border-blue-800">
+                  <div>
+                    <span className="text-muted-foreground">Driver:</span>{" "}
+                    {selectedTicket.driver.profile?.full_name || "Unknown"}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Vehicle:</span>{" "}
+                    {selectedTicket.driver.vehicle_number || "-"}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Driver Phone:</span>{" "}
+                    {selectedTicket.driver.profile?.phone || "-"}
+                  </div>
+                </div>
+              )}
 
               <div className="p-3 border rounded-lg">
                 <div className="flex items-center justify-between mb-2">

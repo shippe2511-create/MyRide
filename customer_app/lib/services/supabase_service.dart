@@ -1607,6 +1607,8 @@ class SupabaseService {
   static Future<bool> submitSupportTicket({
     required String category,
     required String description,
+    String? driverId,
+    String? rideId,
   }) async {
     try {
       final uid = userId;
@@ -1618,11 +1620,40 @@ class SupabaseService {
         'user_id': uid,
         'category': category,
         'description': description,
+        if (driverId != null) 'driver_id': driverId,
+        if (rideId != null) 'ride_id': rideId,
       });
       return true;
     } catch (e) {
       debugPrint('Error submitting support ticket: $e');
       return false;
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getRecentDrivers() async {
+    try {
+      final uid = userId;
+      if (uid == null) return [];
+      final response = await client
+          .from('rides')
+          .select('driver_id, driver:drivers!rides_driver_id_fkey(id, profile:profiles(full_name), vehicle_number)')
+          .eq('customer_id', uid)
+          .not('driver_id', 'is', null)
+          .order('created_at', ascending: false)
+          .limit(5);
+      final seen = <String>{};
+      final drivers = <Map<String, dynamic>>[];
+      for (final ride in response) {
+        final driverId = ride['driver_id'] as String?;
+        if (driverId != null && !seen.contains(driverId) && ride['driver'] != null) {
+          seen.add(driverId);
+          drivers.add(ride['driver'] as Map<String, dynamic>);
+        }
+      }
+      return drivers;
+    } catch (e) {
+      debugPrint('Error getting recent drivers: $e');
+      return [];
     }
   }
 }

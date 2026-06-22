@@ -1,7 +1,7 @@
 # MyRide Issues List
 
 Investigated: 2026-06-15
-Last Updated: 2026-06-21
+Last Updated: 2026-06-22
 Status: All fixable issues resolved
 Related: [[MyRide — Project Hub]]
 Tags: #project/myride
@@ -545,16 +545,14 @@ Full audit of admin-web dashboard pages.
 | Help | WORKING | Help content management |
 | Incidents | WORKING | Incident reporting |
 
-### Missing Features
-| Feature | Issue | Priority |
-|---------|-------|----------|
-| **Support Tickets** | Table exists but no admin page to view/manage tickets | HIGH |
-
----
-
-## Fix Approach
-
-**Support Tickets Admin Page:** Create /dashboard/support-tickets page styled like Incidents - list tickets, view details, update status, add admin notes
+### 43.5. Support Tickets Admin Page - IMPLEMENTED (2026-06-22)
+- **Feature:** Created /dashboard/support-tickets page with:
+  - Stats cards (total, open, in-progress, resolved)
+  - Filterable table by status and category
+  - Details dialog with customer info, issue description
+  - Status actions: Assign, In Progress, Resolve, Close
+  - Admin notes field
+  - Real-time updates
 
 ### 43. Admin Panel Color Sync - FIXED
 - **Issue:** Admin panel primary color (#FFCC00) didn't match apps (#FFD60A)
@@ -718,4 +716,4 @@ Full audit of admin-web dashboard pages.
 
 ---
 
-*Updated by Nova on 2026-06-21*
+*Updated by Nova on 2026-06-22*

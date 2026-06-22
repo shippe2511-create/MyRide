@@ -279,17 +279,16 @@ export function DashboardCharts() {
           <CardTitle>Ride Status Distribution</CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie
                 data={statusData}
                 cx="50%"
                 cy="50%"
-                innerRadius={60}
-                outerRadius={100}
+                innerRadius={50}
+                outerRadius={80}
                 paddingAngle={5}
                 dataKey="value"
-                label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
               >
                 {statusData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
@@ -300,6 +299,15 @@ export function DashboardCharts() {
               />
             </PieChart>
           </ResponsiveContainer>
+          <div className="flex justify-center gap-4 mt-2">
+            {statusData.map((entry) => (
+              <div key={entry.name} className="flex items-center gap-1.5 text-xs">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+                <span className="text-muted-foreground">{entry.name}</span>
+                <span className="font-medium">{entry.value}</span>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 

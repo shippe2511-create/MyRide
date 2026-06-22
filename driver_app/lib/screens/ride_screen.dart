@@ -59,6 +59,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   int _currentRouteIndex = 0;
   bool _isQueueExpanded = false;
   bool _isPanelExpanded = true;
+  bool _isNavigatingAway = false;
 
   @override
   void initState() {
@@ -635,13 +636,18 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
         final ride = state.currentRide;
 
         if (ride == null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else if (mounted) {
-              Navigator.pushReplacementNamed(context, '/home');
-            }
-          });
+          if (!_isNavigatingAway) {
+            _isNavigatingAway = true;
+            _pulseController.stop();
+            _routeAnimController.stop();
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && Navigator.canPop(context)) {
+                Navigator.pop(context);
+              } else if (mounted) {
+                Navigator.pushReplacementNamed(context, '/home');
+              }
+            });
+          }
           return const Scaffold(backgroundColor: Colors.black);
         }
 

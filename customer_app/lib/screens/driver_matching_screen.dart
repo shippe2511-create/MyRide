@@ -568,31 +568,9 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
                   AnimatedBuilder(
                     animation: _pulseController,
                     builder: (context, child) {
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // Animated dots
-                          ...List.generate(3, (i) {
-                            final delay = i * 0.2;
-                            final value = ((_pulseController.value + delay) % 1.0);
-                            final scale = 0.6 + 0.4 * (value < 0.5 ? value * 2 : (1 - value) * 2);
-                            return Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 3),
-                              width: 8 * scale,
-                              height: 8 * scale,
-                              decoration: BoxDecoration(
-                                color: AppColors.yellow.withValues(alpha: 0.5 + 0.5 * scale),
-                                shape: BoxShape.circle,
-                              ),
-                            );
-                          }),
-                          const SizedBox(width: 12),
-                          // Status text
-                          Text(
-                            _statusText,
-                            style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w600),
-                          ),
-                        ],
+                      return Text(
+                        _statusText,
+                        style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w600),
                       );
                     },
                   ),

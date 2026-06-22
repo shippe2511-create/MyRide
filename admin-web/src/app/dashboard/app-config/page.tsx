@@ -111,6 +111,18 @@ export default function AppConfigPage() {
 
   useEffect(() => {
     loadAll()
+
+    // Realtime subscriptions
+    const channel = supabase
+      .channel('app_config_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => loadAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pages' }, () => loadAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'help_content' }, () => loadAll())
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const loadAll = async () => {

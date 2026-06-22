@@ -78,6 +78,21 @@ export default function SettingsPage() {
   useEffect(() => {
     loadSettings()
     loadEmergencyContacts()
+
+    // Realtime subscription
+    const channel = supabase
+      .channel('settings_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => {
+        loadSettings()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'emergency_contacts' }, () => {
+        loadEmergencyContacts()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const loadSettings = async () => {

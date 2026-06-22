@@ -91,6 +91,18 @@ export default function HelpContentPage() {
 
   useEffect(() => {
     loadContent()
+
+    // Realtime subscription
+    const channel = supabase
+      .channel('help_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'help_content' }, () => {
+        loadContent()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [appType])
 
   const loadContent = async () => {

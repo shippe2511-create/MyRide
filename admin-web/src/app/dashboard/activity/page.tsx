@@ -67,6 +67,19 @@ export default function ActivityPage() {
 
   useEffect(() => {
     loadActivities()
+
+    // Realtime subscription for activity updates
+    const supabase = createClient()
+    const channel = supabase
+      .channel('activity_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_logs' }, () => {
+        loadActivities()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const filteredActivities = activities.filter(activity => {

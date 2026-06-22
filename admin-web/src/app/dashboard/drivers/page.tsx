@@ -1,77 +1,62 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { DriversTable } from "./drivers-table"
 import { DocumentsTable } from "./documents-table"
 import { ShiftsTable } from "./shifts-table"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, UserCheck, Clock, FileText, Loader2, Calendar } from "lucide-react"
+import { Users, UserCheck, Clock, FileText, Calendar } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 
-export default function DriversPage() {
-  const supabase = createClient()
-  const [loading, setLoading] = useState(true)
-  const [drivers, setDrivers] = useState<any[]>([])
-  const [totalCount, setTotalCount] = useState(0)
-  const [currentPage] = useState(1)
-  const pageSize = 20
+const supabase = createClient()
 
-  const [stats, setStats] = useState({
-    total: 0,
-    active: 0,
-    pending: 0,
-  })
+function useDriversData() {
+  return useQuery({
+    queryKey: ["drivers-page"],
+    queryFn: async () => {
+      const pageSize = 20
 
-  useEffect(() => {
-    loadData()
+      const [driversRes, driverRecordsRes, totalRes, activeRes, pendingRes] = await Promise.all([
+        supabase.from("profiles").select("*", { count: "exact" }).eq("role", "driver").order("created_at", { ascending: false }).range(0, pageSize - 1),
+        supabase.from("drivers").select("id, profile_id, vehicle_id, vehicle:vehicle_types(id, display_name, plate_no)"),
+        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver"),
+        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver").eq("status", "approved"),
+        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver").eq("status", "pending"),
+      ])
 
-    const channel = supabase
-      .channel('drivers_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => loadData(false))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => loadData(false))
-      .subscribe()
+      const driverRecords = driverRecordsRes.data || []
+      const driversWithVehicles = (driversRes.data || []).map(profile => {
+        const driverRecord = driverRecords.find(d => d.profile_id === profile.id)
+        return {
+          ...profile,
+          driver_record: driverRecord ? {
+            id: driverRecord.id,
+            vehicle_id: driverRecord.vehicle_id,
+            vehicle: driverRecord.vehicle
+          } : null
+        }
+      })
 
-    return () => { supabase.removeChannel(channel) }
-  }, [])
-
-  const loadData = async (showLoading = true) => {
-    if (showLoading) setLoading(true)
-
-    const [driversRes, driverRecordsRes, totalRes, activeRes, pendingRes] = await Promise.all([
-      supabase.from("profiles").select("*", { count: "exact" }).eq("role", "driver").order("created_at", { ascending: false }).range(0, pageSize - 1),
-      supabase.from("drivers").select("id, profile_id, vehicle_id, vehicle:vehicle_types(id, display_name, plate_no)"),
-      supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver"),
-      supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver").eq("status", "approved"),
-      supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver").eq("status", "pending"),
-    ])
-
-    const driverRecords = driverRecordsRes.data || []
-    const driversWithVehicles = (driversRes.data || []).map(profile => {
-      const driverRecord = driverRecords.find(d => d.profile_id === profile.id)
       return {
-        ...profile,
-        driver_record: driverRecord ? {
-          id: driverRecord.id,
-          vehicle_id: driverRecord.vehicle_id,
-          vehicle: driverRecord.vehicle
-        } : null
+        drivers: driversWithVehicles,
+        totalCount: driversRes.count || 0,
+        stats: {
+          total: totalRes.count || 0,
+          active: activeRes.count || 0,
+          pending: pendingRes.count || 0,
+        }
       }
-    })
+    },
+    staleTime: 30 * 1000,
+  })
+}
 
-    setDrivers(driversWithVehicles)
-    setTotalCount(driversRes.count || 0)
-    setStats({
-      total: totalRes.count || 0,
-      active: activeRes.count || 0,
-      pending: pendingRes.count || 0,
-    })
+export default function DriversPage() {
+  const { data, isLoading } = useDriversData()
 
-    if (showLoading) setLoading(false)
-  }
-
-  if (loading) {
+  if (isLoading || !data) {
     return (
       <div className="space-y-6">
         <div>
@@ -85,6 +70,8 @@ export default function DriversPage() {
       </div>
     )
   }
+
+  const { drivers, totalCount, stats } = data
 
   return (
     <div className="space-y-6">
@@ -152,8 +139,8 @@ export default function DriversPage() {
           <DriversTable
             drivers={drivers}
             totalCount={totalCount}
-            currentPage={currentPage}
-            pageSize={pageSize}
+            currentPage={1}
+            pageSize={20}
           />
         </TabsContent>
 

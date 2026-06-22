@@ -1,51 +1,87 @@
-import { createClient } from "@/lib/supabase/server"
+"use client"
+
+import { useQuery } from "@tanstack/react-query"
+import { createClient } from "@/lib/supabase/client"
 import { CustomersTable } from "./customers-table"
 import { Card } from "@/components/ui/card"
 import { Users, UserCheck, Clock, UserX } from "lucide-react"
+import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
+import { useSearchParams } from "next/navigation"
 
-export default async function CustomersPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ search?: string; status?: string; page?: string }>
-}) {
-  const params = await searchParams
-  const supabase = await createClient()
+const supabase = createClient()
 
-  let query = supabase
-    .from("profiles")
-    .select("*", { count: "exact" })
-    .in("role", ["customer", "super-admin", "admin", "operator", "support", "viewer"])
-    .order("created_at", { ascending: false })
+function useCustomersData(search?: string, status?: string, page: number = 1) {
+  return useQuery({
+    queryKey: ["customers-page", search, status, page],
+    queryFn: async () => {
+      const pageSize = 10
+      const start = (page - 1) * pageSize
+      const end = start + pageSize - 1
 
-  if (params.search) {
-    query = query.or(`full_name.ilike.%${params.search}%,phone.ilike.%${params.search}%,email.ilike.%${params.search}%`)
+      let query = supabase
+        .from("profiles")
+        .select("*", { count: "exact" })
+        .in("role", ["customer", "super-admin", "admin", "operator", "support", "viewer"])
+        .order("created_at", { ascending: false })
+
+      if (search) {
+        query = query.or(`full_name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`)
+      }
+
+      if (status) {
+        query = query.eq("status", status)
+      }
+
+      query = query.range(start, end)
+
+      const [{ data: customers, count }, totalRes, approvedRes, pendingRes, suspendedRes] = await Promise.all([
+        query,
+        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer"),
+        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer").eq("status", "approved"),
+        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer").eq("status", "pending"),
+        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer").eq("status", "suspended"),
+      ])
+
+      return {
+        customers: customers || [],
+        totalCount: count || 0,
+        pageSize,
+        stats: {
+          total: totalRes.count || 0,
+          approved: approvedRes.count || 0,
+          pending: pendingRes.count || 0,
+          suspended: suspendedRes.count || 0,
+        }
+      }
+    },
+    staleTime: 30 * 1000,
+  })
+}
+
+export default function CustomersPage() {
+  const searchParams = useSearchParams()
+  const search = searchParams.get("search") || undefined
+  const status = searchParams.get("status") || undefined
+  const page = parseInt(searchParams.get("page") || "1")
+
+  const { data, isLoading } = useCustomersData(search, status, page)
+
+  if (isLoading || !data) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <div className="w-32 h-8 bg-muted rounded animate-pulse" />
+          <div className="w-64 h-4 bg-muted rounded animate-pulse mt-2" />
+        </div>
+        <div className="grid gap-4 grid-cols-4">
+          {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
+        </div>
+        <SkeletonTable rows={5} />
+      </div>
+    )
   }
 
-  if (params.status) {
-    query = query.eq("status", params.status)
-  }
-
-  const page = parseInt(params.page || "1")
-  const pageSize = 10
-  const start = (page - 1) * pageSize
-  const end = start + pageSize - 1
-
-  query = query.range(start, end)
-
-  const [{ data: customers, count }, totalRes, approvedRes, pendingRes, suspendedRes] = await Promise.all([
-    query,
-    supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer"),
-    supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer").eq("status", "approved"),
-    supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer").eq("status", "pending"),
-    supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer").eq("status", "suspended"),
-  ])
-
-  const stats = {
-    total: totalRes.count || 0,
-    approved: approvedRes.count || 0,
-    pending: pendingRes.count || 0,
-    suspended: suspendedRes.count || 0,
-  }
+  const { customers, totalCount, pageSize, stats } = data
 
   return (
     <div className="space-y-6">
@@ -110,8 +146,8 @@ export default async function CustomersPage({
       </div>
 
       <CustomersTable
-        customers={customers || []}
-        totalCount={count || 0}
+        customers={customers}
+        totalCount={totalCount}
         currentPage={page}
         pageSize={pageSize}
       />

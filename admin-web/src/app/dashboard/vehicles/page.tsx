@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -80,10 +81,10 @@ const getIconComponent = (iconName: string | null) => {
   return CATEGORY_ICONS[iconName] || Car
 }
 
+const supabase = createClient()
+
 export default function VehiclesPage() {
-  const supabase = createClient()
-  const [vehicles, setVehicles] = useState<VehicleType[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType | null>(null)
@@ -99,37 +100,23 @@ export default function VehiclesPage() {
     features: ""
   })
 
-  useEffect(() => {
-    loadVehicles()
+  const { data: vehicles = [], isLoading: loading, refetch } = useQuery({
+    queryKey: ["vehicles-page"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vehicle_types")
+        .select("*")
+        .order("sort_order", { ascending: true })
 
-    // Real-time subscription
-    const channel = supabase
-      .channel('vehicles_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_types' }, () => {
-        loadVehicles()
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [])
-
-  const loadVehicles = async () => {
-    const { data, error } = await supabase
-      .from("vehicle_types")
-      .select("*")
-      .order("sort_order", { ascending: true })
-
-    if (error) {
-      // Table might not exist, create it
-      if (error.code === "42P01") {
+      if (error && error.code === "42P01") {
         toast.error("Vehicle types table not found. Please create it in Supabase.")
       }
-    }
-    setVehicles(data || [])
-    setLoading(false)
-  }
+      return data || []
+    },
+    staleTime: 30 * 1000,
+  })
+
+  const loadVehicles = () => refetch()
 
   const openAddDialog = () => {
     setSelectedVehicle(null)

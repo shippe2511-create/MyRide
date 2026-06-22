@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
+import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -37,52 +38,37 @@ interface DriverLocation {
   }
 }
 
+const supabase = createClient()
+
 export default function TrackingPage() {
-  const supabase = createClient()
-  const [driverLocations, setDriverLocations] = useState<DriverLocation[]>([])
-  const [loading, setLoading] = useState(true)
   const [selectedDriver, setSelectedDriver] = useState<DriverLocation | null>(null)
 
-  const [stats, setStats] = useState({ online: 0, total: 0 })
+  const { data: driverLocations = [], isLoading: loading, refetch } = useQuery({
+    queryKey: ["tracking-page"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("driver_locations")
+        .select(`
+          *,
+          driver:drivers!driver_locations_driver_id_fkey(
+            id,
+            profile_id,
+            profile:profiles!drivers_profile_id_fkey(full_name, phone, avatar_url)
+          )
+        `)
+        .order("last_updated", { ascending: false })
+      return data || []
+    },
+    staleTime: 5 * 1000,
+    refetchInterval: 5000,
+  })
 
-  useEffect(() => {
-    loadDriverLocations()
-    const interval = setInterval(loadDriverLocations, 5000)
-
-    const channel = supabase
-      .channel('driver_locations_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_locations' }, () => {
-        loadDriverLocations()
-      })
-      .subscribe()
-
-    return () => {
-      clearInterval(interval)
-      supabase.removeChannel(channel)
-    }
-  }, [])
-
-  const loadDriverLocations = async () => {
-    const { data } = await supabase
-      .from("driver_locations")
-      .select(`
-        *,
-        driver:drivers!driver_locations_driver_id_fkey(
-          id,
-          profile_id,
-          profile:profiles!drivers_profile_id_fkey(full_name, phone, avatar_url)
-        )
-      `)
-      .order("last_updated", { ascending: false })
-
-    const locations = data || []
-    setDriverLocations(locations)
-    setStats({
-      online: locations.filter(d => d.is_online).length,
-      total: locations.length,
-    })
-    setLoading(false)
+  const stats = {
+    online: driverLocations.filter(d => d.is_online).length,
+    total: driverLocations.length,
   }
+
+  const loadDriverLocations = () => refetch()
 
   const onlineDrivers = driverLocations.filter(d => d.is_online)
 

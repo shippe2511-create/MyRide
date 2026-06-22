@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -60,112 +61,102 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "bg-red-500",
 }
 
-export default function RidesPage() {
-  const supabase = createClient()
-  const [loading, setLoading] = useState(true)
-  const [rides, setRides] = useState<Ride[]>([])
-  const [selectedRide, setSelectedRide] = useState<Ride | null>(null)
-  const [search, setSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [dateRange, setDateRange] = useState("all")
-  const [stats, setStats] = useState({ total: 0, active: 0, completed: 0, cancelled: 0 })
-  const [editRide, setEditRide] = useState<Ride | null>(null)
-  const [editStatus, setEditStatus] = useState("")
-  const [saving, setSaving] = useState(false)
-  const [deleteRideId, setDeleteRideId] = useState<string | null>(null)
-  const [chartData, setChartData] = useState<{ date: string; rides: number }[]>([])
-  const [currentPage, setCurrentPage] = useState(1)
-  const pageSize = 20
+const supabase = createClient()
 
-  useEffect(() => {
-    loadData(true)
+async function fetchRidesData(statusFilter: string, dateRange: string) {
+  let query = supabase
+    .from("rides")
+    .select(`*, customer:profiles!rides_customer_id_fkey(full_name, phone), driver:drivers!rides_driver_id_fkey(profile:profiles(full_name))`)
+    .order("created_at", { ascending: false })
+    .limit(100)
 
-    // Real-time subscription for rides - refresh silently without loading spinner
-    const channel = supabase
-      .channel('rides_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rides' }, () => {
-        loadData(false)
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
+  if (statusFilter !== "all") {
+    if (statusFilter === "active") {
+      query = query.in("status", ["pending", "accepted", "arrived", "in_progress"])
+    } else {
+      query = query.eq("status", statusFilter)
     }
-  }, [statusFilter, dateRange])
+  }
 
-  const loadData = async (showLoading = true) => {
-    if (showLoading) setLoading(true)
-
-    let query = supabase
-      .from("rides")
-      .select(`*, customer:profiles!rides_customer_id_fkey(full_name, phone), driver:drivers!rides_driver_id_fkey(profile:profiles(full_name))`)
-      .order("created_at", { ascending: false })
-      .limit(100)
-
-    if (statusFilter !== "all") {
-      if (statusFilter === "active") {
-        query = query.in("status", ["pending", "accepted", "arrived", "in_progress"])
-      } else {
-        query = query.eq("status", statusFilter)
-      }
+  if (dateRange !== "all") {
+    const now = new Date()
+    let startDate: Date
+    switch (dateRange) {
+      case "today":
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        break
+      case "week":
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        break
+      case "month":
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+        break
+      case "quarter":
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+        break
+      default:
+        startDate = new Date(0)
     }
+    query = query.gte("created_at", startDate.toISOString())
+  }
 
-    // Apply date range filter
-    if (dateRange !== "all") {
-      const now = new Date()
-      let startDate: Date
-      switch (dateRange) {
-        case "today":
-          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-          break
-        case "week":
-          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-          break
-        case "month":
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1)
-          break
-        case "quarter":
-          startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
-          break
-        default:
-          startDate = new Date(0)
-      }
-      query = query.gte("created_at", startDate.toISOString())
-    }
+  const [ridesRes, totalRes, activeRes, completedRes, cancelledRes, last7DaysRes] = await Promise.all([
+    query,
+    supabase.from("rides").select("*", { count: "exact", head: true }),
+    supabase.from("rides").select("*", { count: "exact", head: true }).in("status", ["pending", "accepted", "arrived", "in_progress"]),
+    supabase.from("rides").select("*", { count: "exact", head: true }).eq("status", "completed"),
+    supabase.from("rides").select("*", { count: "exact", head: true }).eq("status", "cancelled"),
+    supabase.from("rides").select("created_at").gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
+  ])
 
-    const [ridesRes, totalRes, activeRes, completedRes, cancelledRes, last7DaysRes] = await Promise.all([
-      query,
-      supabase.from("rides").select("*", { count: "exact", head: true }),
-      supabase.from("rides").select("*", { count: "exact", head: true }).in("status", ["pending", "accepted", "arrived", "in_progress"]),
-      supabase.from("rides").select("*", { count: "exact", head: true }).eq("status", "completed"),
-      supabase.from("rides").select("*", { count: "exact", head: true }).eq("status", "cancelled"),
-      supabase.from("rides").select("created_at").gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
-    ])
+  const last7Days = last7DaysRes.data || []
+  const dateCount: Record<string, number> = {}
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
+    const key = d.toLocaleDateString("en-US", { weekday: "short" })
+    dateCount[key] = 0
+  }
+  last7Days.forEach(r => {
+    const key = new Date(r.created_at).toLocaleDateString("en-US", { weekday: "short" })
+    if (dateCount[key] !== undefined) dateCount[key]++
+  })
 
-    setRides(ridesRes.data || [])
-    setStats({
+  return {
+    rides: ridesRes.data || [],
+    stats: {
       total: totalRes.count || 0,
       active: activeRes.count || 0,
       completed: completedRes.count || 0,
       cancelled: cancelledRes.count || 0,
-    })
-
-    // Build chart data for last 7 days
-    const last7Days = last7DaysRes.data || []
-    const dateCount: Record<string, number> = {}
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
-      const key = d.toLocaleDateString("en-US", { weekday: "short" })
-      dateCount[key] = 0
-    }
-    last7Days.forEach(r => {
-      const key = new Date(r.created_at).toLocaleDateString("en-US", { weekday: "short" })
-      if (dateCount[key] !== undefined) dateCount[key]++
-    })
-    setChartData(Object.entries(dateCount).map(([date, rides]) => ({ date, rides })))
-
-    setLoading(false)
+    },
+    chartData: Object.entries(dateCount).map(([date, rides]) => ({ date, rides }))
   }
+}
+
+export default function RidesPage() {
+  const queryClient = useQueryClient()
+  const [selectedRide, setSelectedRide] = useState<Ride | null>(null)
+  const [search, setSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [dateRange, setDateRange] = useState("all")
+  const [editRide, setEditRide] = useState<Ride | null>(null)
+  const [editStatus, setEditStatus] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [deleteRideId, setDeleteRideId] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 20
+
+  const { data, isLoading: loading, refetch } = useQuery({
+    queryKey: ["rides-page", statusFilter, dateRange],
+    queryFn: () => fetchRidesData(statusFilter, dateRange),
+    staleTime: 30 * 1000,
+  })
+
+  const rides = data?.rides || []
+  const stats = data?.stats || { total: 0, active: 0, completed: 0, cancelled: 0 }
+  const chartData = data?.chartData || []
+
+  const loadData = () => refetch()
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleString("en-US", {
@@ -200,13 +191,7 @@ export default function RidesPage() {
       toast.error("Failed to delete ride")
     } else {
       toast.success("Ride deleted")
-      // Update state directly without full reload
-      setRides(prev => prev.filter(r => r.id !== deleteRideId))
-      setStats(prev => ({
-        ...prev,
-        total: prev.total - 1,
-        completed: rides.find(r => r.id === deleteRideId)?.status === 'completed' ? prev.completed - 1 : prev.completed
-      }))
+      refetch()
     }
     setDeleteRideId(null)
   }
@@ -281,7 +266,7 @@ export default function RidesPage() {
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
-          <Button variant="outline" size="sm" onClick={() => loadData(true)}>
+          <Button variant="outline" size="sm" onClick={() => loadData()}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>

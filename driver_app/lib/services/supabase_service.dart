@@ -412,31 +412,42 @@ class SupabaseService {
   }
 
   static Future<void> updateRideStatus(String rideId, String status, {String? cancelReason}) async {
-    final data = <String, dynamic>{'status': status};
-
-    if (status == 'arrived') {
-      data['arrived_at'] = DateTime.now().toIso8601String();
-    } else if (status == 'in_progress') {
-      data['started_at'] = DateTime.now().toIso8601String();
-    } else if (status == 'completed') {
-      data['completed_at'] = DateTime.now().toIso8601String();
-    } else if (status == 'cancelled') {
-      data['cancelled_at'] = DateTime.now().toIso8601String();
-      if (cancelReason != null) {
-        data['cancel_reason'] = cancelReason;
-      }
+    final driverId = _driverId;
+    if (driverId == null || driverId.isEmpty) {
+      throw Exception('Driver not logged in');
     }
 
-    await client.from('rides').update(data).eq('id', rideId);
+    final result = await client.rpc('update_ride_status', params: {
+      'p_ride_id': rideId,
+      'p_caller_id': driverId,
+      'p_caller_type': 'driver',
+      'p_new_status': status,
+      'p_cancel_reason': cancelReason,
+    });
+
+    if (result != null && result['success'] == false) {
+      throw Exception(result['error'] ?? 'Failed to update ride status');
+    }
   }
 
   static Future<void> completeRide(String rideId, {double? distanceKm, int? durationMinutes}) async {
-    await client.from('rides').update({
-      'status': 'completed',
-      'completed_at': DateTime.now().toIso8601String(),
-      'distance_km': distanceKm,
-      'duration_minutes': durationMinutes,
-    }).eq('id', rideId);
+    final driverId = _driverId;
+    if (driverId == null || driverId.isEmpty) {
+      throw Exception('Driver not logged in');
+    }
+
+    final result = await client.rpc('update_ride_status', params: {
+      'p_ride_id': rideId,
+      'p_caller_id': driverId,
+      'p_caller_type': 'driver',
+      'p_new_status': 'completed',
+      'p_distance_km': distanceKm,
+      'p_duration_minutes': durationMinutes,
+    });
+
+    if (result != null && result['success'] == false) {
+      throw Exception(result['error'] ?? 'Failed to complete ride');
+    }
   }
 
   static Future<List<Map<String, dynamic>>> getCompletedRides() async {

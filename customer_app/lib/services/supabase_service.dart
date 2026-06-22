@@ -306,11 +306,20 @@ class SupabaseService {
   }
 
   static Future<void> cancelRide(String rideId, {String? reason}) async {
-    await client.from('rides').update({
-      'status': 'cancelled',
-      'cancelled_at': DateTime.now().toIso8601String(),
-      'cancel_reason': reason,
-    }).eq('id', rideId);
+    final id = userId;
+    if (id == null) throw Exception('User not logged in');
+
+    final result = await client.rpc('update_ride_status', params: {
+      'p_ride_id': rideId,
+      'p_caller_id': id,
+      'p_caller_type': 'customer',
+      'p_new_status': 'cancelled',
+      'p_cancel_reason': reason,
+    });
+
+    if (result != null && result['success'] == false) {
+      throw Exception(result['error'] ?? 'Failed to cancel ride');
+    }
   }
 
   static Future<void> rateRide({

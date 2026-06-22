@@ -371,10 +371,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildProfileAvatar(DriverState state, double size) {
     // Priority: avatarUrl (cloud) > profileImagePath (local) > initials
     if (state.avatarUrl.isNotEmpty) {
-      // Add cache-busting parameter to force reload
+      // Use avatar cache key for immediate refresh on change
       final avatarUrlWithCache = state.avatarUrl.contains('?')
-          ? '${state.avatarUrl}&t=${DateTime.now().millisecondsSinceEpoch ~/ 60000}'
-          : '${state.avatarUrl}?t=${DateTime.now().millisecondsSinceEpoch ~/ 60000}';
+          ? '${state.avatarUrl}&t=${state.avatarCacheKey}'
+          : '${state.avatarUrl}?t=${state.avatarCacheKey}';
       return Image.network(
         avatarUrlWithCache,
         width: size,

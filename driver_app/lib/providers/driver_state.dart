@@ -32,6 +32,7 @@ class DriverState extends ChangeNotifier {
   String _phoneNumber = '';
   String _profileImagePath = '';
   String _avatarUrl = '';
+  int _avatarCacheKey = 0; // Cache buster for avatar
 
   RideRequest? _currentRide;
   final List<RideRequest> _incomingRequests = [];
@@ -98,6 +99,7 @@ class DriverState extends ChangeNotifier {
   String get phoneNumber => _phoneNumber;
   String get profileImagePath => _profileImagePath;
   String get avatarUrl => _avatarUrl;
+  int get avatarCacheKey => _avatarCacheKey;
   RideRequest? get currentRide => _currentRide;
   List<RideRequest> get incomingRequests => _incomingRequests;
   List<RideRequest> get queuedRequests => _queuedRequests;
@@ -286,6 +288,7 @@ class DriverState extends ChangeNotifier {
 
   Future<void> updateAvatarUrl(String url) async {
     _avatarUrl = url;
+    _avatarCacheKey = DateTime.now().millisecondsSinceEpoch; // Force cache refresh
     final prefs = await SharedPreferences.getInstance();
     prefs.setString('avatarUrl', url);
     notifyListeners();

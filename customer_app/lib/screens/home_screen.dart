@@ -373,10 +373,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildProfileAvatar(AppState appState) {
     // Priority: avatarUrl (cloud) > profilePhotoPath (local) > icon
     if (appState.avatarUrl != null && appState.avatarUrl!.isNotEmpty) {
-      // Add cache-busting parameter to force reload
+      // Use avatar cache key for immediate refresh on change
       final avatarUrlWithCache = appState.avatarUrl!.contains('?')
-          ? '${appState.avatarUrl!}&t=${DateTime.now().millisecondsSinceEpoch ~/ 60000}'
-          : '${appState.avatarUrl!}?t=${DateTime.now().millisecondsSinceEpoch ~/ 60000}';
+          ? '${appState.avatarUrl!}&t=${appState.avatarCacheKey}'
+          : '${appState.avatarUrl!}?t=${appState.avatarCacheKey}';
       return ClipRRect(
         borderRadius: BorderRadius.circular(14),
         child: Image.network(

@@ -222,6 +222,7 @@ class AppState extends ChangeNotifier {
   String? _profilePhotoPath;
   String? _profileId; // Supabase profile UUID
   String? _avatarUrl; // Cloud avatar URL
+  int _avatarCacheKey = 0; // Cache buster for avatar
 
   String get userName => _userName;
   String get userInitials => _userInitials;
@@ -233,9 +234,11 @@ class AppState extends ChangeNotifier {
   String? get profilePhotoPath => _profilePhotoPath;
   String? get profileId => _profileId;
   String? get avatarUrl => _avatarUrl;
+  int get avatarCacheKey => _avatarCacheKey;
 
   void updateAvatarUrl(String? url) async {
     _avatarUrl = url;
+    _avatarCacheKey = DateTime.now().millisecondsSinceEpoch; // Force cache refresh
     final prefs = await SharedPreferences.getInstance();
     if (url != null) {
       await prefs.setString('avatar_url', url);

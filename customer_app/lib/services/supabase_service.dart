@@ -344,9 +344,9 @@ class SupabaseService {
     final driverId = ride['driver_id'];
     if (driverId == null) return;
 
-    // Get driver's user profile ID
-    final driver = await client.from('drivers').select('user_id').eq('id', driverId).single();
-    final driverUserId = driver['user_id'];
+    // Get driver's profile ID
+    final driver = await client.from('drivers').select('profile_id').eq('id', driverId).single();
+    final driverUserId = driver['profile_id'];
 
     final fullComment = [feedback, comment].where((s) => s != null && s.isNotEmpty).join(' - ');
 

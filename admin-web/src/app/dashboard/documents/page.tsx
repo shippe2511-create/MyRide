@@ -51,6 +51,8 @@ interface Document {
   }
 }
 
+const PAGE_SIZE = 15
+
 const DOCUMENT_TYPES: Record<string, string> = {
   license: "Driver's License",
   id_card: "ID Card",
@@ -70,6 +72,8 @@ export default function DocumentsPage() {
   const [editingDocument, setEditingDocument] = useState<Document | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
 
   const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 })
 
@@ -86,10 +90,18 @@ export default function DocumentsPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [filter])
+  }, [])
+
+  useEffect(() => {
+    if (!loading) {
+      loadDocuments(false)
+    }
+  }, [filter, currentPage])
 
   const loadDocuments = async (showLoading = true) => {
     if (showLoading) setLoading(true)
+    const start = (currentPage - 1) * PAGE_SIZE
+    const end = start + PAGE_SIZE - 1
 
     let query = supabase
       .from("documents")
@@ -104,16 +116,28 @@ export default function DocumentsPage() {
             employee_id
           )
         )
-      `)
+      `, { count: "exact" })
       .order("uploaded_at", { ascending: false })
-      .limit(50)
+      .range(start, end)
 
-    if (filter === "pending") query = query.eq("status", "pending")
-    if (filter === "approved") query = query.eq("status", "verified")
-    if (filter === "rejected") query = query.eq("status", "rejected")
+    let countQuery = supabase.from("documents").select("*", { count: "exact", head: true })
 
-    const [docsRes, totalRes, pendingRes, approvedRes, rejectedRes] = await Promise.all([
+    if (filter === "pending") {
+      query = query.eq("status", "pending")
+      countQuery = countQuery.eq("status", "pending")
+    }
+    if (filter === "approved") {
+      query = query.eq("status", "verified")
+      countQuery = countQuery.eq("status", "verified")
+    }
+    if (filter === "rejected") {
+      query = query.eq("status", "rejected")
+      countQuery = countQuery.eq("status", "rejected")
+    }
+
+    const [docsRes, filteredCountRes, totalRes, pendingRes, approvedRes, rejectedRes] = await Promise.all([
       query,
+      countQuery,
       supabase.from("documents").select("*", { count: "exact", head: true }),
       supabase.from("documents").select("*", { count: "exact", head: true }).eq("status", "pending"),
       supabase.from("documents").select("*", { count: "exact", head: true }).eq("status", "verified"),
@@ -121,6 +145,7 @@ export default function DocumentsPage() {
     ])
 
     setDocuments(docsRes.data || [])
+    setTotalCount(filteredCountRes.count || 0)
     setStats({
       total: totalRes.count || 0,
       pending: pendingRes.count || 0,
@@ -349,7 +374,7 @@ export default function DocumentsPage() {
               className="pl-9"
             />
           </div>
-          <Select value={filter} onValueChange={setFilter}>
+          <Select value={filter} onValueChange={(v) => { setFilter(v); setCurrentPage(1) }}>
             <SelectTrigger className="w-36">
               <SelectValue />
             </SelectTrigger>
@@ -485,6 +510,36 @@ export default function DocumentsPage() {
             )}
           </TableBody>
         </Table>
+
+        {/* Pagination */}
+        {totalCount > PAGE_SIZE && (
+          <div className="flex items-center justify-between pt-4 border-t mt-4">
+            <p className="text-sm text-muted-foreground">
+              Showing {((currentPage - 1) * PAGE_SIZE) + 1}-{Math.min(currentPage * PAGE_SIZE, totalCount)} of {totalCount}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {Math.ceil(totalCount / PAGE_SIZE)}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(Math.ceil(totalCount / PAGE_SIZE), p + 1))}
+                disabled={currentPage >= Math.ceil(totalCount / PAGE_SIZE)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* View Details Dialog */}

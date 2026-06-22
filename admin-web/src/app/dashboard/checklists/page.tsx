@@ -71,6 +71,7 @@ export default function ChecklistsPage() {
 
   const [stats, setStats] = useState({ total: 0, withIssues: 0, passed: 0 })
 
+  // Initial load only
   useEffect(() => {
     loadChecklists(true)
 
@@ -84,6 +85,13 @@ export default function ChecklistsPage() {
 
     return () => {
       supabase.removeChannel(channel)
+    }
+  }, [])
+
+  // Page/filter changes - no loading skeleton
+  useEffect(() => {
+    if (!loading) {
+      loadChecklists(false)
     }
   }, [filter, currentPage])
 

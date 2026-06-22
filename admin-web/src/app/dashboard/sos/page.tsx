@@ -51,6 +51,8 @@ interface SOSAlert {
   user?: { full_name: string; phone: string | null; role: string | null }
 }
 
+const PAGE_SIZE = 15
+
 const STATUS_COLORS: Record<string, string> = {
   active: "bg-red-500",
   responding: "bg-yellow-500",
@@ -135,6 +137,8 @@ export default function SOSPage() {
   const [alertToDelete, setAlertToDelete] = useState<string | null>(null)
 
   const [stats, setStats] = useState({ active: 0, responding: 0, resolved: 0 })
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
 
   interface EmergencyContact {
     id: string
@@ -196,8 +200,44 @@ export default function SOSPage() {
     }
   }, [])
 
+  const loadAlerts = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true)
+    const start = (currentPage - 1) * PAGE_SIZE
+    const end = start + PAGE_SIZE - 1
+
+    let query = supabase
+      .from("sos_alerts")
+      .select("*, user:profiles!sos_alerts_user_id_fkey(full_name, phone, role)", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(start, end)
+
+    let countQuery = supabase.from("sos_alerts").select("*", { count: "exact", head: true })
+
+    if (statusFilter !== "all") {
+      query = query.eq("status", statusFilter)
+      countQuery = countQuery.eq("status", statusFilter)
+    }
+
+    const [alertsRes, filteredCountRes, activeRes, respondingRes, resolvedRes] = await Promise.all([
+      query,
+      countQuery,
+      supabase.from("sos_alerts").select("*", { count: "exact", head: true }).eq("status", "active"),
+      supabase.from("sos_alerts").select("*", { count: "exact", head: true }).eq("status", "responding"),
+      supabase.from("sos_alerts").select("*", { count: "exact", head: true }).eq("status", "resolved"),
+    ])
+
+    setAlerts(alertsRes.data || [])
+    setTotalCount(filteredCountRes.count || 0)
+    setStats({
+      active: activeRes.count || 0,
+      responding: respondingRes.count || 0,
+      resolved: resolvedRes.count || 0,
+    })
+    setLoading(false)
+  }, [currentPage, statusFilter, supabase])
+
   useEffect(() => {
-    loadAlerts()
+    loadAlerts(true)
     loadEmergencyContacts()
 
     // Real-time subscription for SOS alerts
@@ -208,11 +248,9 @@ export default function SOSPage() {
           playAlarmSound()
           toast.error("🚨 NEW SOS ALERT!", { duration: 10000 })
         }
-        // Add new alert to local state
-        loadAlerts()
+        loadAlerts(false)
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sos_alerts' }, (payload) => {
-        // Update alert in local state
         if (payload.new) {
           setAlerts(prev => prev.map(a => a.id === payload.new.id ? { ...a, ...payload.new } : a))
         }
@@ -222,36 +260,13 @@ export default function SOSPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [statusFilter])
+  }, [])
 
-  const loadAlerts = async () => {
-    setLoading(true)
-
-    let query = supabase
-      .from("sos_alerts")
-      .select("*, user:profiles!sos_alerts_user_id_fkey(full_name, phone, role)")
-      .order("created_at", { ascending: false })
-      .limit(50)
-
-    if (statusFilter !== "all") {
-      query = query.eq("status", statusFilter)
+  useEffect(() => {
+    if (!loading) {
+      loadAlerts(false)
     }
-
-    const [alertsRes, activeRes, respondingRes, resolvedRes] = await Promise.all([
-      query,
-      supabase.from("sos_alerts").select("*", { count: "exact", head: true }).eq("status", "active"),
-      supabase.from("sos_alerts").select("*", { count: "exact", head: true }).eq("status", "responding"),
-      supabase.from("sos_alerts").select("*", { count: "exact", head: true }).eq("status", "resolved"),
-    ])
-
-    setAlerts(alertsRes.data || [])
-    setStats({
-      active: activeRes.count || 0,
-      responding: respondingRes.count || 0,
-      resolved: resolvedRes.count || 0,
-    })
-    setLoading(false)
-  }
+  }, [currentPage, statusFilter])
 
   const loadEmergencyContacts = async () => {
     const { data } = await supabase
@@ -451,7 +466,7 @@ export default function SOSPage() {
           <Button variant="outline" size="sm" onClick={playAlarmSound}>
             🔊 Test Sound
           </Button>
-          <Button variant="outline" size="sm" onClick={loadAlerts}>
+          <Button variant="outline" size="sm" onClick={() => loadAlerts(false)}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -505,7 +520,7 @@ export default function SOSPage() {
               className="pl-9"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1) }}>
             <SelectTrigger className="w-36">
               <SelectValue />
             </SelectTrigger>
@@ -633,6 +648,36 @@ export default function SOSPage() {
             )}
           </TableBody>
         </Table>
+
+        {/* Pagination */}
+        {totalCount > PAGE_SIZE && (
+          <div className="flex items-center justify-between pt-4 border-t mt-4">
+            <p className="text-sm text-muted-foreground">
+              Showing {((currentPage - 1) * PAGE_SIZE) + 1}-{Math.min(currentPage * PAGE_SIZE, totalCount)} of {totalCount}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {Math.ceil(totalCount / PAGE_SIZE)}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(Math.ceil(totalCount / PAGE_SIZE), p + 1))}
+                disabled={currentPage >= Math.ceil(totalCount / PAGE_SIZE)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Emergency Contacts Section */}

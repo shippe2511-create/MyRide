@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/select"
 import { Search, RefreshCw, User, Car, MapPin, AlertTriangle, Settings } from 'lucide-react'
 import { format } from 'date-fns'
+
+const PAGE_SIZE = 20
 
 interface ActivityLog {
   id: string
@@ -47,33 +49,48 @@ export default function ActivityPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [entityFilter, setEntityFilter] = useState<string>('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
 
-  const loadActivities = async () => {
-    setLoading(true)
+  const loadActivities = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true)
     const supabase = createClient()
+    const start = (currentPage - 1) * PAGE_SIZE
+    const end = start + PAGE_SIZE - 1
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('activity_logs')
-      .select('*')
+      .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
-      .limit(100)
+      .range(start, end)
+
+    let countQuery = supabase
+      .from('activity_logs')
+      .select('*', { count: 'exact', head: true })
+
+    if (entityFilter !== 'all') {
+      query = query.eq('entity_type', entityFilter)
+      countQuery = countQuery.eq('entity_type', entityFilter)
+    }
+
+    const [{ data, error }, { count }] = await Promise.all([query, countQuery])
 
     if (!error && data) {
       setActivities(data)
+      setTotalCount(count || 0)
     }
 
     setLoading(false)
-  }
+  }, [currentPage, entityFilter])
 
   useEffect(() => {
-    loadActivities()
+    loadActivities(true)
 
-    // Realtime subscription for activity updates
     const supabase = createClient()
     const channel = supabase
       .channel('activity_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_logs' }, () => {
-        loadActivities()
+        loadActivities(false)
       })
       .subscribe()
 
@@ -82,16 +99,22 @@ export default function ActivityPage() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!loading) {
+      loadActivities(false)
+    }
+  }, [currentPage, entityFilter])
+
   const filteredActivities = activities.filter(activity => {
-    const matchesSearch = search === '' ||
+    if (search === '') return true
+    return (
       activity.action.toLowerCase().includes(search.toLowerCase()) ||
       activity.entity_type.toLowerCase().includes(search.toLowerCase()) ||
       activity.admin_name.toLowerCase().includes(search.toLowerCase())
-
-    const matchesEntity = entityFilter === 'all' || activity.entity_type === entityFilter
-
-    return matchesSearch && matchesEntity
+    )
   })
+
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE)
 
   return (
     <div className="space-y-6">
@@ -103,7 +126,7 @@ export default function ActivityPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Track all admin actions and changes</p>
         </div>
-        <Button onClick={loadActivities} variant="outline" disabled={loading}>
+        <Button onClick={() => loadActivities(false)} variant="outline" disabled={loading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
@@ -121,7 +144,7 @@ export default function ActivityPage() {
                 className="pl-10"
               />
             </div>
-            <Select value={entityFilter} onValueChange={setEntityFilter}>
+            <Select value={entityFilter} onValueChange={(v) => { setEntityFilter(v); setCurrentPage(1) }}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filter by type" />
               </SelectTrigger>
@@ -197,6 +220,36 @@ export default function ActivityPage() {
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalCount > PAGE_SIZE && (
+            <div className="flex items-center justify-between pt-4 border-t mt-4">
+              <p className="text-sm text-muted-foreground">
+                Showing {((currentPage - 1) * PAGE_SIZE) + 1}-{Math.min(currentPage * PAGE_SIZE, totalCount)} of {totalCount}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

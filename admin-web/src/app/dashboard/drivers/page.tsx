@@ -62,10 +62,17 @@ export default function DriversPage() {
   useEffect(() => {
     const channel = supabase
       .channel('drivers_realtime')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
+        console.log('Drivers realtime update:', payload)
         queryClient.invalidateQueries({ queryKey: ["drivers-page"] })
       })
-      .subscribe()
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, (payload) => {
+        console.log('Drivers table update:', payload)
+        queryClient.invalidateQueries({ queryKey: ["drivers-page"] })
+      })
+      .subscribe((status) => {
+        console.log('Drivers realtime status:', status)
+      })
 
     return () => {
       supabase.removeChannel(channel)

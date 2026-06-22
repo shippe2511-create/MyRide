@@ -221,7 +221,7 @@ function ZoneMapInner({
     <div className="relative">
       <div
         ref={mapContainerRef}
-        className="h-[400px] rounded-lg overflow-hidden"
+        className="h-[400px] rounded-lg overflow-hidden relative z-0"
         style={{ background: "#1a1a2e" }}
       />
       <div className="absolute top-4 left-4 z-[1000] flex gap-2">

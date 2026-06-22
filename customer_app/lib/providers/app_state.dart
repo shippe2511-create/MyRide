@@ -102,15 +102,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Two-Factor Authentication
-  bool _twoFactorEnabled = false;
-  bool get twoFactorEnabled => _twoFactorEnabled;
-
-  void toggleTwoFactor(bool value) {
-    _twoFactorEnabled = value;
-    notifyListeners();
-  }
-
   // Blocked Users
   final List<String> _blockedUsers = [];
   List<String> get blockedUsers => _blockedUsers;

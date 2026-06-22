@@ -578,7 +578,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar className="h-9 w-9 border-2 border-background shadow-sm">
-                        <AvatarImage src={customer.avatar_url || undefined} />
+                        <AvatarImage src={customer.avatar_url ? `${customer.avatar_url}?t=${Date.now()}` : undefined} />
                         <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
                           {getInitials(customer.full_name)}
                         </AvatarFallback>
@@ -770,7 +770,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 <Avatar className="h-16 w-16">
-                  <AvatarImage src={selectedCustomer.avatar_url || undefined} />
+                  <AvatarImage src={selectedCustomer.avatar_url ? `${selectedCustomer.avatar_url}?t=${Date.now()}` : undefined} />
                   <AvatarFallback className="text-lg">{getInitials(selectedCustomer.full_name)}</AvatarFallback>
                 </Avatar>
                 <div>

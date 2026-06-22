@@ -626,7 +626,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar>
-                        <AvatarImage src={driver.avatar_url || undefined} />
+                        <AvatarImage src={driver.avatar_url ? `${driver.avatar_url}?t=${Date.now()}` : undefined} />
                         <AvatarFallback>{getInitials(driver.full_name)}</AvatarFallback>
                       </Avatar>
                       <span className="font-medium">{driver.full_name}</span>
@@ -775,7 +775,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 <Avatar className="h-16 w-16">
-                  <AvatarImage src={selectedDriver.avatar_url || undefined} />
+                  <AvatarImage src={selectedDriver.avatar_url ? `${selectedDriver.avatar_url}?t=${Date.now()}` : undefined} />
                   <AvatarFallback className="text-lg">{getInitials(selectedDriver.full_name)}</AvatarFallback>
                 </Avatar>
                 <div>

@@ -1,6 +1,7 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useEffect } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { CustomersTable } from "./customers-table"
 import { Card } from "@/components/ui/card"
@@ -59,12 +60,27 @@ function useCustomersData(search?: string, status?: string, page: number = 1) {
 }
 
 export default function CustomersPage() {
+  const queryClient = useQueryClient()
   const searchParams = useSearchParams()
   const search = searchParams.get("search") || undefined
   const status = searchParams.get("status") || undefined
   const page = parseInt(searchParams.get("page") || "1")
 
   const { data, isLoading } = useCustomersData(search, status, page)
+
+  // Realtime subscription for profile updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('customers_realtime')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, () => {
+        queryClient.invalidateQueries({ queryKey: ["customers-page"] })
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [queryClient])
 
   if (isLoading || !data) {
     return (

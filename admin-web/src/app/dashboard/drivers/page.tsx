@@ -1,6 +1,7 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useEffect } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { DriversTable } from "./drivers-table"
 import { DocumentsTable } from "./documents-table"
@@ -54,7 +55,22 @@ function useDriversData() {
 }
 
 export default function DriversPage() {
+  const queryClient = useQueryClient()
   const { data, isLoading } = useDriversData()
+
+  // Realtime subscription for profile updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('drivers_realtime')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, () => {
+        queryClient.invalidateQueries({ queryKey: ["drivers-page"] })
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [queryClient])
 
   if (isLoading || !data) {
     return (

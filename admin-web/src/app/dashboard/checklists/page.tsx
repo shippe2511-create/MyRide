@@ -54,6 +54,8 @@ const ITEM_LABELS: Record<string, string> = {
   ac: "A/C", safety: "Safety Kit", documents: "Documents", seatbelts: "Seatbelts", cleanliness: "Cleanliness",
 }
 
+const PAGE_SIZE = 15
+
 export default function ChecklistsPage() {
   const supabase = createClient()
   const [checklists, setChecklists] = useState<VehicleChecklist[]>([])
@@ -64,6 +66,8 @@ export default function ChecklistsPage() {
   const [editingChecklist, setEditingChecklist] = useState<VehicleChecklist | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
 
   const [stats, setStats] = useState({ total: 0, withIssues: 0, passed: 0 })
 
@@ -81,23 +85,35 @@ export default function ChecklistsPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [filter])
+  }, [filter, currentPage])
 
   const loadChecklists = async (showLoading = true) => {
     if (showLoading) setLoading(true)
-    let query = supabase.from("vehicle_checklists").select("*").order("checked_at", { ascending: false }).limit(50)
+    const start = (currentPage - 1) * PAGE_SIZE
+    const end = start + PAGE_SIZE - 1
 
-    if (filter === "issues") query = query.eq("has_issues", true)
-    if (filter === "passed") query = query.eq("has_issues", false)
+    let query = supabase.from("vehicle_checklists").select("*", { count: "exact" }).order("checked_at", { ascending: false }).range(start, end)
+    let countQuery = supabase.from("vehicle_checklists").select("*", { count: "exact", head: true })
 
-    const [checklistsRes, totalRes, issuesRes, passedRes] = await Promise.all([
+    if (filter === "issues") {
+      query = query.eq("has_issues", true)
+      countQuery = countQuery.eq("has_issues", true)
+    }
+    if (filter === "passed") {
+      query = query.eq("has_issues", false)
+      countQuery = countQuery.eq("has_issues", false)
+    }
+
+    const [checklistsRes, filteredCountRes, totalRes, issuesRes, passedRes] = await Promise.all([
       query,
+      countQuery,
       supabase.from("vehicle_checklists").select("*", { count: "exact", head: true }),
       supabase.from("vehicle_checklists").select("*", { count: "exact", head: true }).eq("has_issues", true),
       supabase.from("vehicle_checklists").select("*", { count: "exact", head: true }).eq("has_issues", false),
     ])
 
     setChecklists(checklistsRes.data || [])
+    setTotalCount(filteredCountRes.count || 0)
     setStats({ total: totalRes.count || 0, withIssues: issuesRes.count || 0, passed: passedRes.count || 0 })
     setLoading(false)
   }
@@ -281,7 +297,7 @@ export default function ChecklistsPage() {
               className="pl-9"
             />
           </div>
-          <Select value={filter} onValueChange={setFilter}>
+          <Select value={filter} onValueChange={(v) => { setFilter(v); setCurrentPage(1) }}>
             <SelectTrigger className="w-36">
               <SelectValue />
             </SelectTrigger>
@@ -413,6 +429,36 @@ export default function ChecklistsPage() {
             )}
           </TableBody>
         </Table>
+
+        {/* Pagination */}
+        {totalCount > PAGE_SIZE && (
+          <div className="flex items-center justify-between pt-4 border-t mt-4">
+            <p className="text-sm text-muted-foreground">
+              Showing {((currentPage - 1) * PAGE_SIZE) + 1}-{Math.min(currentPage * PAGE_SIZE, totalCount)} of {totalCount}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {Math.ceil(totalCount / PAGE_SIZE)}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(Math.ceil(totalCount / PAGE_SIZE), p + 1))}
+                disabled={currentPage >= Math.ceil(totalCount / PAGE_SIZE)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       <Dialog open={!!selectedChecklist} onOpenChange={() => setSelectedChecklist(null)}>

@@ -292,7 +292,7 @@ class SupabaseService {
             driver:drivers!rides_driver_id_fkey(
               *,
               profile:profiles!drivers_profile_id_fkey(id, full_name, phone, avatar_url),
-              vehicle:vehicle_types(display_name, plate_no, name)
+              vehicle:vehicle_types!drivers_vehicle_id_fkey(display_name, plate_no, name)
             )
           ''')
           .eq('id', rideId)

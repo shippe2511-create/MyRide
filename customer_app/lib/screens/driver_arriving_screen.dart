@@ -709,6 +709,41 @@ https://maps.google.com/?q=${_pickupLocation.latitude},${_pickupLocation.longitu
             const SizedBox(height: 4),
             Text('Get help immediately', style: TextStyle(color: context.mutedColor, fontSize: 13)),
             const SizedBox(height: 20),
+            // Main SOS activation button
+            GestureDetector(
+              onTap: () async {
+                Navigator.pop(ctx);
+                await _activateSOS();
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [AppColors.error, AppColors.error.withValues(alpha: 0.8)],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.error.withValues(alpha: 0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.warning_amber, color: Colors.white, size: 24),
+                    const SizedBox(width: 10),
+                    Text('ACTIVATE SOS ALERT', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('Or choose an option:', style: TextStyle(color: context.mutedColor, fontSize: 12)),
+            const SizedBox(height: 12),
             _buildSOSOption(ctx, Icons.phone, 'Call Emergency (119)', AppColors.error, () async {
               Navigator.pop(ctx);
               await _callEmergency();
@@ -732,6 +767,30 @@ https://maps.google.com/?q=${_pickupLocation.latitude},${_pickupLocation.longitu
         ),
       ),
     );
+  }
+
+  Future<void> _activateSOS() async {
+    HapticFeedback.heavyImpact();
+
+    // Get current location
+    double? lat = _pickupLocation.latitude;
+    double? lng = _pickupLocation.longitude;
+
+    // Send SOS alert to admin
+    await SupabaseService.triggerSOSAlert(
+      latitude: lat,
+      longitude: lng,
+      rideId: widget.rideId,
+    );
+
+    // Show notification
+    NotificationService.showNotification(
+      title: '🚨 SOS ACTIVATED',
+      body: 'Emergency services have been notified. Help is on the way.',
+    );
+
+    // Show confirmation
+    _showSOSConfirmed('SOS alert sent to control room');
   }
 
   Future<void> _callEmergency() async {

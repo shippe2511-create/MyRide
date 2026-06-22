@@ -23,6 +23,7 @@ import { formatDate } from "@/lib/utils"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
+import { ZoneMap } from "@/components/zone-map"
 
 interface Zone {
   id: string
@@ -31,6 +32,7 @@ interface Zone {
   priority: number
   is_active: boolean
   created_at: string
+  boundary_coords?: number[][]
 }
 
 interface Location {
@@ -52,6 +54,9 @@ export default function ZonesPage() {
   const [selectedItem, setSelectedItem] = useState<any>(null)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState<any>({})
+  const [selectedZone, setSelectedZone] = useState<Zone | null>(null)
+  const [drawingMode, setDrawingMode] = useState(false)
+  const [pendingCoords, setPendingCoords] = useState<number[][] | null>(null)
 
   useEffect(() => {
     loadData()
@@ -69,12 +74,37 @@ export default function ZonesPage() {
 
   const loadData = async () => {
     const [zonesRes, locationsRes] = await Promise.all([
-      supabase.from("service_zones").select("*").order("priority", { ascending: false }),
+      supabase.from("service_zones").select("id, name, zone_type, priority, is_active, created_at, boundary_coords").order("priority", { ascending: false }),
       supabase.from("locations").select("*").order("name", { ascending: true }),
     ])
     setZones(zonesRes.data || [])
     setLocations(locationsRes.data || [])
     setLoading(false)
+  }
+
+  const handleZoneCreate = (coordinates: number[][]) => {
+    setPendingCoords(coordinates)
+    setFormData({
+      name: "",
+      zone_type: "pickup",
+      priority: 0,
+      is_active: true
+    })
+    setDialogType("zone")
+  }
+
+  const handleZoneUpdate = async (zoneId: string, coordinates: number[][]) => {
+    const { error } = await supabase
+      .from("service_zones")
+      .update({ boundary_coords: coordinates })
+      .eq("id", zoneId)
+
+    if (error) {
+      toast.error("Failed to update zone boundary")
+    } else {
+      toast.success("Zone boundary updated")
+      setZones(prev => prev.map(z => z.id === zoneId ? { ...z, boundary_coords: coordinates } : z))
+    }
   }
 
   const openZoneDialog = (zone?: Zone) => {
@@ -108,11 +138,16 @@ export default function ZonesPage() {
     }
     setSaving(true)
 
-    const payload = {
+    const payload: any = {
       name: formData.name,
       zone_type: formData.zone_type,
       priority: parseInt(formData.priority) || 0,
       is_active: formData.is_active
+    }
+
+    // Include coordinates if drawing a new zone
+    if (pendingCoords) {
+      payload.boundary_coords = pendingCoords
     }
 
     if (selectedItem) {
@@ -132,6 +167,7 @@ export default function ZonesPage() {
     }
     setSaving(false)
     setDialogType(null)
+    setPendingCoords(null)
   }
 
   const handleSaveLocation = async () => {
@@ -315,13 +351,19 @@ export default function ZonesPage() {
             <CardTitle>Map View</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[400px] rounded-lg bg-muted flex items-center justify-center">
-              <div className="text-center text-muted-foreground">
-                <Map className="h-12 w-12 mx-auto mb-2" />
-                <p>Interactive map with service zones</p>
-                <p className="text-sm">Add Leaflet/Google Maps for visual zone editing</p>
-              </div>
-            </div>
+            <ZoneMap
+              zones={zones.map(z => ({
+                ...z,
+                coordinates: z.boundary_coords
+              }))}
+              locations={locations}
+              selectedZone={selectedZone ? { ...selectedZone, coordinates: selectedZone.boundary_coords } : null}
+              onZoneSelect={(z) => setSelectedZone(z ? zones.find(zone => zone.id === z.id) || null : null)}
+              onZoneCreate={handleZoneCreate}
+              onZoneUpdate={handleZoneUpdate}
+              drawingMode={drawingMode}
+              setDrawingMode={setDrawingMode}
+            />
           </CardContent>
         </Card>
 

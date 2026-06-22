@@ -203,12 +203,19 @@ export default function SOSPage() {
     // Real-time subscription for SOS alerts
     const channel = supabase
       .channel('sos_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sos_alerts' }, (payload) => {
-        if (payload.eventType === 'INSERT' && payload.new && payload.new.status === 'active') {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sos_alerts' }, (payload) => {
+        if (payload.new && payload.new.status === 'active') {
           playAlarmSound()
           toast.error("🚨 NEW SOS ALERT!", { duration: 10000 })
         }
+        // Add new alert to local state
         loadAlerts()
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sos_alerts' }, (payload) => {
+        // Update alert in local state
+        if (payload.new) {
+          setAlerts(prev => prev.map(a => a.id === payload.new.id ? { ...a, ...payload.new } : a))
+        }
       })
       .subscribe()
 

@@ -432,15 +432,19 @@ class SupabaseService {
   static Future<bool> deleteSavedPlace(String placeId) async {
     try {
       final id = userId;
-      if (id == null) return false;
+      if (id == null) {
+        debugPrint('Cannot delete saved place: not logged in');
+        return false;
+      }
 
-      await client
+      final response = await client
           .from('saved_places')
           .delete()
           .eq('id', placeId)
-          .eq('user_id', id);
+          .eq('user_id', id)
+          .select();
 
-      debugPrint('Deleted saved place: $placeId');
+      debugPrint('Delete saved place response: $response');
       return true;
     } catch (e) {
       debugPrint('Error deleting saved place: $e');

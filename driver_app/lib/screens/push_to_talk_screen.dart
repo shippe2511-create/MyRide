@@ -611,19 +611,8 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
   }
 
   Widget _buildRecordingArea() {
-    return Container(
+    return Padding(
       padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).padding.bottom + 20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF1A1A1A),
-            const Color(0xFF0A0A0A),
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.1))),
-      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

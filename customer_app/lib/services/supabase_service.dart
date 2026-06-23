@@ -429,8 +429,23 @@ class SupabaseService {
     }
   }
 
-  static Future<void> deleteSavedPlace(String placeId) async {
-    await client.from('saved_places').delete().eq('id', placeId);
+  static Future<bool> deleteSavedPlace(String placeId) async {
+    try {
+      final id = userId;
+      if (id == null) return false;
+
+      await client
+          .from('saved_places')
+          .delete()
+          .eq('id', placeId)
+          .eq('user_id', id);
+
+      debugPrint('Deleted saved place: $placeId');
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting saved place: $e');
+      return false;
+    }
   }
 
   static Future<String> exportUserData() async {

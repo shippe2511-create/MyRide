@@ -146,7 +146,11 @@
       "Bash(disown)",
       "Bash(npx eslint *)",
       "Bash(git tag *)",
-      "mcp__claude_ai_Supabase__get_logs"
+      "mcp__claude_ai_Supabase__get_logs",
+      "Read(//Users/athifabdulla/Documents/**)",
+      "Read(//Users/athifabdulla/**)",
+      "Bash(grep -n \"^import {$\" /Users/athifabdulla/Downloads/MyRide/admin-web/src/app/dashboard/report-builder/page.tsx)",
+      "Bash(node *)"
     ],
     "additionalDirectories": [
       "/tmp"

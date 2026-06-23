@@ -111,14 +111,14 @@ export default function AppConfigPage() {
   const [deleteId, setDeleteId] = useState<{ type: string; id: string } | null>(null)
 
   useEffect(() => {
-    loadAll()
+    loadAll(true)
 
-    // Realtime subscriptions
+    // Realtime subscriptions - silent refresh without loading state
     const channel = supabase
       .channel('app_config_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => loadAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pages' }, () => loadAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'help_content' }, () => loadAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => loadAll(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pages' }, () => loadAll(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'help_content' }, () => loadAll(false))
       .subscribe()
 
     return () => {
@@ -126,8 +126,8 @@ export default function AppConfigPage() {
     }
   }, [])
 
-  const loadAll = async () => {
-    setLoading(true)
+  const loadAll = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
     const [settingsRes, pagesRes, helpRes] = await Promise.all([
       supabase.from("app_settings").select("*").eq("id", "default").single(),
       supabase.from("pages").select("*").order("display_order"),
@@ -137,7 +137,7 @@ export default function AppConfigPage() {
     if (settingsRes.data) setSettings({ ...defaultSettings, ...settingsRes.data })
     setPages(pagesRes.data || [])
     setHelpContent(helpRes.data || [])
-    setLoading(false)
+    if (showLoading) setLoading(false)
   }
 
   const saveSettings = async () => {

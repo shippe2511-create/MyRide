@@ -130,8 +130,7 @@ export default function SupportTicketsPage() {
       .from("support_tickets")
       .select(`
         *,
-        user:profiles!support_tickets_user_id_fkey(full_name, phone, email, employee_id),
-        driver:drivers(profile:profiles(full_name, phone), vehicle_number)
+        user:profiles!support_tickets_user_id_fkey(full_name, phone, email, employee_id)
       `, { count: "exact" })
       .order("created_at", { ascending: false })
       .range(start, end)

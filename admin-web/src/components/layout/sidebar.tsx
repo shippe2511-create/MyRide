@@ -35,6 +35,8 @@ import {
   HelpCircle,
   Smartphone,
   Mic,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -127,12 +129,18 @@ const navigationSections: NavSection[] = [
   },
 ]
 
-export function Sidebar() {
+interface SidebarProps {
+  collapsed?: boolean
+  onCollapse?: (collapsed: boolean) => void
+}
+
+export function Sidebar({ collapsed = false, onCollapse }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
   const { can, loading } = usePermissions()
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [hoveredSection, setHoveredSection] = useState<string | null>(null)
 
   const handleLogout = async () => {
     sessionStorage.removeItem("myride_admin_role")
@@ -164,16 +172,26 @@ export function Sidebar() {
   }
 
   return (
-    <div className="flex h-full w-56 flex-col bg-card">
-      <div className="flex h-14 items-center px-4">
+    <div className={cn(
+      "flex h-full flex-col bg-card transition-all duration-300",
+      collapsed ? "w-16 overflow-visible" : "w-56"
+    )}>
+      <div className="flex h-14 items-center justify-between px-3">
         <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary flex-shrink-0">
             <Car className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="font-bold">MyRide</span>
+          {!collapsed && <span className="font-bold">MyRide</span>}
         </Link>
+        <button
+          onClick={() => onCollapse?.(!collapsed)}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </button>
       </div>
-      <nav className="flex-1 p-3 overflow-y-auto">
+      <nav className={cn("flex-1 p-3", collapsed ? "overflow-visible" : "overflow-y-auto")}>
         <div className="space-y-1">
           {visibleSections.map((section) => {
             const isExpanded = expanded[section.name] ?? isSectionActive(section)
@@ -188,12 +206,65 @@ export function Sidebar() {
                     "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
                     isActive
                       ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                    collapsed && "justify-center px-2"
                   )}
+                  title={collapsed ? section.name : undefined}
                 >
-                  <section.icon className="h-5 w-5" />
-                  <span>{section.name}</span>
+                  <section.icon className="h-5 w-5 flex-shrink-0" />
+                  {!collapsed && <span>{section.name}</span>}
                 </Link>
+              )
+            }
+
+            // When collapsed, show flyout menu on hover
+            if (collapsed && section.items) {
+              return (
+                <div
+                  key={section.name}
+                  className="relative"
+                  onMouseEnter={() => setHoveredSection(section.name)}
+                  onMouseLeave={() => setHoveredSection(null)}
+                >
+                  <button
+                    className={cn(
+                      "flex w-full items-center justify-center rounded-md px-2 py-2.5 text-sm font-medium transition-colors",
+                      isSectionActive(section)
+                        ? "bg-accent text-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    )}
+                  >
+                    <section.icon className="h-5 w-5" />
+                  </button>
+                  {hoveredSection === section.name && (
+                    <div className="absolute left-full top-0 z-50 pl-2">
+                      <div className="min-w-[180px] rounded-md border bg-popover p-2 shadow-lg">
+                        <div className="mb-2 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          {section.name}
+                        </div>
+                        {section.items.map((item) => {
+                          const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+                          return (
+                            <Link
+                              key={item.name}
+                              href={item.href}
+                              onClick={() => setHoveredSection(null)}
+                              className={cn(
+                                "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors",
+                                isActive
+                                  ? "bg-primary text-primary-foreground font-medium"
+                                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                              )}
+                            >
+                              <item.icon className="h-4 w-4" />
+                              <span>{item.name}</span>
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )
             }
 
@@ -208,7 +279,7 @@ export function Sidebar() {
                       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   )}
                 >
-                  <section.icon className="h-5 w-5" />
+                  <section.icon className="h-5 w-5 flex-shrink-0" />
                   <span className="flex-1 text-left">{section.name}</span>
                 </button>
                 {isExpanded && section.items && (
@@ -241,10 +312,14 @@ export function Sidebar() {
       <div className="p-3">
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground"
+          className={cn(
+            "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground",
+            collapsed && "justify-center px-2"
+          )}
+          title={collapsed ? "Log out" : undefined}
         >
-          <LogOut className="h-4 w-4" />
-          Log out
+          <LogOut className="h-4 w-4 flex-shrink-0" />
+          {!collapsed && "Log out"}
         </button>
       </div>
     </div>

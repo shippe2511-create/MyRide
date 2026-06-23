@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../services/realtime_service.dart';
 import '../widgets/shimmer_loading.dart';
 
 class AnnouncementsScreen extends StatefulWidget {
@@ -15,7 +16,8 @@ class AnnouncementsScreen extends StatefulWidget {
 class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   List<Map<String, dynamic>> _announcements = [];
   bool _isLoading = true;
-  RealtimeChannel? _announcementsSubscription;
+  StreamSubscription<Map<String, dynamic>>? _announcementsSubscription;
+  final _realtimeService = RealtimeService();
 
   @override
   void initState() {
@@ -26,23 +28,18 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
 
   @override
   void dispose() {
-    _announcementsSubscription?.unsubscribe();
+    _announcementsSubscription?.cancel();
+    _realtimeService.unsubscribe('announcements_realtime');
     super.dispose();
   }
 
   void _subscribeToAnnouncements() {
-    _announcementsSubscription = SupabaseService.client
-        .channel('announcements_realtime')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'announcements',
-          callback: (payload) {
-            debugPrint('Announcement update received: ${payload.eventType}');
-            _loadAnnouncements();
-          },
-        )
-        .subscribe();
+    _announcementsSubscription = _realtimeService
+        .subscribeToAnnouncements()
+        .listen((event) {
+      debugPrint('Announcement update received: ${event['eventType']}');
+      _loadAnnouncements();
+    });
   }
 
   Future<void> _loadAnnouncements() async {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +6,8 @@ import 'package:intl/intl.dart';
 import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../models/ride_request.dart';
+import '../services/realtime_service.dart';
+import '../services/supabase_service.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -16,6 +19,52 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   TripStatus? _statusFilter;
   DateTimeRange? _dateRange;
+  StreamSubscription<Map<String, dynamic>>? _ridesSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscribeToCompletedRides();
+  }
+
+  @override
+  void dispose() {
+    _ridesSubscription?.cancel();
+    final driverState = Provider.of<DriverState>(context, listen: false);
+    if (driverState.driverId.isNotEmpty) {
+      RealtimeService().unsubscribeFromCompletedRides(driverState.driverId);
+    }
+    super.dispose();
+  }
+
+  void _subscribeToCompletedRides() {
+    final driverState = Provider.of<DriverState>(context, listen: false);
+    final driverId = driverState.driverId;
+    if (driverId.isEmpty) return;
+
+    _ridesSubscription = RealtimeService().subscribeToCompletedRides(driverId).listen((data) {
+      debugPrint('History realtime update: ${data['event']}');
+      // Reload completed trips from database
+      _loadCompletedTrips();
+    });
+  }
+
+  Future<void> _loadCompletedTrips() async {
+    if (!mounted) return;
+
+    try {
+      final rides = await SupabaseService.getCompletedRides();
+
+      // Just trigger a rebuild - the DriverState already has the trips
+      // This realtime update ensures the UI refreshes when new trips are completed
+      if (mounted) {
+        setState(() {});
+      }
+      debugPrint('History updated: ${rides.length} completed rides');
+    } catch (e) {
+      debugPrint('Error loading completed trips: $e');
+    }
+  }
 
   List<CompletedTrip> _filterTrips(List<CompletedTrip> trips) {
     return trips.where((trip) {

@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/supabase_service.dart';
+import '../services/realtime_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_container.dart';
 
@@ -17,11 +19,40 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
   List<Map<String, dynamic>> _rides = [];
   bool _isLoading = true;
   String _filter = 'all';
+  StreamSubscription<Map<String, dynamic>>? _ridesSubscription;
+  final _realtimeService = RealtimeService();
 
   @override
   void initState() {
     super.initState();
     _loadRides();
+    _subscribeToRides();
+  }
+
+  @override
+  void dispose() {
+    _ridesSubscription?.cancel();
+    final customerId = widget.customerId ?? SupabaseService.userId;
+    if (customerId != null) {
+      _realtimeService.unsubscribe('customer_rides_$customerId');
+    }
+    super.dispose();
+  }
+
+  void _subscribeToRides() {
+    final customerId = widget.customerId ?? SupabaseService.userId;
+    if (customerId == null) return;
+
+    _ridesSubscription = _realtimeService
+        .subscribeToCustomerRides(customerId)
+        .listen((event) {
+      // Refresh the list when any ride changes (completed or cancelled)
+      final newRecord = event['newRecord'] as Map<String, dynamic>?;
+      final status = newRecord?['status'] as String?;
+      if (status == 'completed' || status == 'cancelled') {
+        _loadRides();
+      }
+    });
   }
 
   Future<void> _loadRides() async {

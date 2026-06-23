@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../services/realtime_service.dart';
 import '../providers/driver_state.dart';
 import '../widgets/shimmer_loading.dart';
 
@@ -16,11 +18,35 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   List<Map<String, dynamic>> _notifications = [];
   bool _isLoading = true;
+  StreamSubscription<Map<String, dynamic>>? _notificationsSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadNotifications();
+    _subscribeToNotifications();
+  }
+
+  @override
+  void dispose() {
+    _notificationsSubscription?.cancel();
+    final driverState = Provider.of<DriverState>(context, listen: false);
+    if (driverState.driverId.isNotEmpty) {
+      RealtimeService().unsubscribeFromNotifications(driverState.driverId);
+    }
+    super.dispose();
+  }
+
+  void _subscribeToNotifications() {
+    final driverState = Provider.of<DriverState>(context, listen: false);
+    final driverId = driverState.driverId;
+    if (driverId.isEmpty) return;
+
+    _notificationsSubscription = RealtimeService().subscribeToNotifications(driverId).listen((data) {
+      debugPrint('Notifications realtime update: ${data['event']}');
+      // Reload notifications when there's any change
+      _loadNotifications();
+    });
   }
 
   Future<void> _loadNotifications() async {

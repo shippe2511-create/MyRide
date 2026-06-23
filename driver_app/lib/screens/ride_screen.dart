@@ -11,6 +11,7 @@ import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
+import '../services/realtime_service.dart';
 import 'chat_screen.dart';
 
 const String _darkMapStyle = '''
@@ -48,6 +49,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   Timer? _timer;
   Timer? _etaTimer;
   Timer? _destinationChangeTimer;
+  StreamSubscription<Map<String, dynamic>>? _rideSubscription;
   int _elapsedSeconds = 0;
   int _etaSeconds = 0;
   bool _isShowingDestinationChange = false;
@@ -76,6 +78,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
 
     _startDriverSimulation();
     _startDestinationChangePolling();
+    _subscribeToRideUpdates();
 
     // Subscribe to chat notifications
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -87,6 +90,46 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     });
   }
 
+  void _subscribeToRideUpdates() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final driverState = Provider.of<DriverState>(context, listen: false);
+      final rideId = driverState.currentRide?.id;
+      if (rideId == null) return;
+
+      _rideSubscription = RealtimeService().subscribeToRide(rideId).listen((data) {
+        debugPrint('Ride realtime update: ${data['event']}');
+        final newRecord = data['new'] as Map<String, dynamic>?;
+        if (newRecord == null) return;
+
+        final status = newRecord['status'] as String?;
+
+        // Handle ride cancellation by customer
+        if (status == 'cancelled') {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Ride was cancelled by customer'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+            // Navigate back to home
+            Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+          }
+          return;
+        }
+
+        // Handle destination changes
+        if (newRecord['destination_change_status'] == 'pending' && !_isShowingDestinationChange) {
+          final newDestination = newRecord['pending_dropoff_name'] as String? ?? 'New Location';
+          _showDestinationChangeApproval(rideId, newDestination);
+        }
+
+        // Refresh ride data for other updates
+        driverState.refreshCurrentRide();
+      });
+    });
+  }
+
   @override
   void dispose() {
     _pulseController.dispose();
@@ -94,7 +137,16 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     _timer?.cancel();
     _etaTimer?.cancel();
     _destinationChangeTimer?.cancel();
+    _rideSubscription?.cancel();
     _mapController?.dispose();
+
+    // Unsubscribe from ride updates
+    final driverState = Provider.of<DriverState>(context, listen: false);
+    final rideId = driverState.currentRide?.id;
+    if (rideId != null) {
+      RealtimeService().unsubscribeFromRide(rideId);
+    }
+
     super.dispose();
   }
 

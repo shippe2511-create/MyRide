@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../services/realtime_service.dart';
 import '../widgets/shimmer_loading.dart';
 
 class ShiftScheduleScreen extends StatefulWidget {
@@ -14,6 +16,7 @@ class ShiftScheduleScreen extends StatefulWidget {
 class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
   int _selectedDay = DateTime.now().weekday - 1;
   bool _isLoading = true;
+  StreamSubscription<Map<String, dynamic>>? _shiftsSubscription;
 
   final List<String> _weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -26,6 +29,28 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
   void initState() {
     super.initState();
     _loadShifts();
+    _subscribeToShifts();
+  }
+
+  @override
+  void dispose() {
+    _shiftsSubscription?.cancel();
+    final driverId = SupabaseService.visibleUserId;
+    if (driverId != null) {
+      RealtimeService().unsubscribeFromShifts(driverId);
+    }
+    super.dispose();
+  }
+
+  void _subscribeToShifts() {
+    final driverId = SupabaseService.visibleUserId;
+    if (driverId == null) return;
+
+    _shiftsSubscription = RealtimeService().subscribeToShifts(driverId).listen((data) {
+      debugPrint('Shifts realtime update: ${data['event']}');
+      // Reload shifts when there's any change
+      _loadShifts();
+    });
   }
 
   Future<void> _loadShifts() async {

@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../services/realtime_service.dart';
 import '../widgets/shimmer_loading.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -14,11 +16,50 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   List<Map<String, dynamic>> _notifications = [];
   bool _isLoading = true;
+  StreamSubscription<Map<String, dynamic>>? _notificationsSubscription;
+  final _realtimeService = RealtimeService();
 
   @override
   void initState() {
     super.initState();
     _loadNotifications();
+    _subscribeToNotifications();
+  }
+
+  @override
+  void dispose() {
+    _notificationsSubscription?.cancel();
+    final userId = SupabaseService.userId;
+    if (userId != null) {
+      _realtimeService.unsubscribe('notifications_$userId');
+    }
+    super.dispose();
+  }
+
+  void _subscribeToNotifications() {
+    final userId = SupabaseService.userId;
+    if (userId == null) return;
+
+    _notificationsSubscription = _realtimeService
+        .subscribeToNotifications(userId)
+        .listen((notification) {
+      // Add new notification at the top of the list
+      if (mounted) {
+        setState(() {
+          _notifications.insert(0, notification);
+        });
+        // Show a snackbar for new notification
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(notification['title'] ?? 'New notification'),
+            backgroundColor: AppColors.yellow,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    });
   }
 
   Future<void> _loadNotifications() async {

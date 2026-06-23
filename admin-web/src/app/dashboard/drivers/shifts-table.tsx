@@ -73,6 +73,8 @@ export function ShiftsTable() {
   const [selectedDriver, setSelectedDriver] = useState<string>("all")
   const [selectedShifts, setSelectedShifts] = useState<string[]>([])
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [clearAllOpen, setClearAllOpen] = useState(false)
+  const [clearingAll, setClearingAll] = useState(false)
 
   const [formData, setFormData] = useState({
     driver_ids: [] as string[],
@@ -105,6 +107,18 @@ export function ShiftsTable() {
 
   useEffect(() => {
     loadData()
+
+    // Realtime subscription for shifts updates
+    const channel = supabase
+      .channel('shifts_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shifts' }, () => {
+        loadData()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [weekOffset])
 
   const loadData = async () => {
@@ -244,6 +258,21 @@ export function ShiftsTable() {
       setSelectedShifts([])
     }
     setBulkDeleting(false)
+  }
+
+  const handleClearAllShifts = async () => {
+    setClearingAll(true)
+    const { error } = await supabase.from("shifts").delete().neq("id", "00000000-0000-0000-0000-000000000000")
+
+    if (error) {
+      toast.error("Failed to clear shifts: " + error.message)
+    } else {
+      toast.success("All shifts cleared")
+      setShifts([])
+      setSelectedShifts([])
+    }
+    setClearingAll(false)
+    setClearAllOpen(false)
   }
 
   const openEditDialog = (shift: Shift) => {
@@ -512,6 +541,10 @@ export function ShiftsTable() {
                 Delete {selectedShifts.length}
               </Button>
             )}
+            <Button size="sm" variant="outline" className="text-red-500 border-red-500/50 hover:bg-red-500/10" onClick={() => setClearAllOpen(true)}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Clear All
+            </Button>
             <Button size="sm" variant="outline" onClick={() => setAutoScheduleOpen(true)}>
               <Wand2 className="h-4 w-4 mr-2" />
               Auto Schedule
@@ -887,6 +920,30 @@ export function ShiftsTable() {
             <AlertDialogAction onClick={handleAutoSchedule} disabled={autoScheduling}>
               {autoScheduling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Wand2 className="h-4 w-4 mr-2" />}
               Generate Shifts
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={clearAllOpen} onOpenChange={setClearAllOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear All Shifts</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete ALL shifts from the database.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-red-500 font-medium">
+              {shifts.length} shift(s) will be deleted.
+            </p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={clearingAll}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleClearAllShifts} disabled={clearingAll} className="bg-red-600 hover:bg-red-700">
+              {clearingAll ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Clear All Shifts
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

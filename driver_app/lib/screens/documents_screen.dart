@@ -4,9 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../services/realtime_service.dart';
 import '../providers/driver_state.dart';
 import '../widgets/shimmer_loading.dart';
 
@@ -21,7 +21,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = true;
   List<Map<String, dynamic>> _documents = [];
-  RealtimeChannel? _documentsSubscription;
+  StreamSubscription<Map<String, dynamic>>? _documentsSubscription;
 
   // Document types with icons
   final Map<String, IconData> _documentIcons = {
@@ -53,7 +53,11 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
 
   @override
   void dispose() {
-    _documentsSubscription?.unsubscribe();
+    _documentsSubscription?.cancel();
+    final driverState = Provider.of<DriverState>(context, listen: false);
+    if (driverState.driverId.isNotEmpty) {
+      RealtimeService().unsubscribeFromDocuments(driverState.driverId);
+    }
     super.dispose();
   }
 
@@ -61,23 +65,10 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     final driverState = Provider.of<DriverState>(context, listen: false);
     if (driverState.driverId.isEmpty) return;
 
-    _documentsSubscription = SupabaseService.client
-        .channel('driver_documents_${driverState.driverId}')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'driver_documents',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'driver_id',
-            value: driverState.driverId,
-          ),
-          callback: (payload) {
-            debugPrint('Document update received: ${payload.eventType}');
-            _loadDocuments();
-          },
-        )
-        .subscribe();
+    _documentsSubscription = RealtimeService().subscribeToDocuments(driverState.driverId).listen((data) {
+      debugPrint('Document realtime update: ${data['event']}');
+      _loadDocuments();
+    });
   }
 
   Future<void> _loadDocuments() async {

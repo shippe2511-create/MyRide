@@ -6,11 +6,11 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
+import '../services/realtime_service.dart';
 import '../widgets/status_animation.dart';
 import 'trip_complete_screen.dart';
 import 'chat_screen.dart';
@@ -48,9 +48,12 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
   late String _dropoff;
   String _driverName = 'Driver';
   Timer? _statusPollingTimer;
-  RealtimeChannel? _driverLocationChannel;
+  StreamSubscription<Map<String, dynamic>>? _driverLocationSubscription;
+  StreamSubscription<Map<String, dynamic>>? _rideSubscription;
   bool _tripCompleted = false;
   String _rideStatus = 'accepted'; // accepted, arrived, in_progress, completed
+  final _realtimeService = RealtimeService();
+  String? _driverId;
 
   @override
   void initState() {
@@ -75,6 +78,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
 
     _startStatusPolling();
     _subscribeToDriverLocation();
+    _subscribeToRideUpdates();
 
     // Subscribe to chat notifications
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -88,9 +92,44 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
 
   @override
   void dispose() {
-    _driverLocationChannel?.unsubscribe();
+    _driverLocationSubscription?.cancel();
+    _rideSubscription?.cancel();
     _statusPollingTimer?.cancel();
+    final rideId = widget.tripData['rideId'] as String?;
+    if (rideId != null) {
+      _realtimeService.unsubscribe('ride_$rideId');
+    }
+    if (_driverId != null) {
+      _realtimeService.unsubscribe('driver_location_$_driverId');
+    }
     super.dispose();
+  }
+
+  void _subscribeToRideUpdates() {
+    final rideId = widget.tripData['rideId'] as String?;
+    if (rideId == null) return;
+
+    _rideSubscription = _realtimeService.subscribeToRide(rideId).listen((update) {
+      if (!mounted || _tripCompleted) return;
+
+      final status = update['status'] as String?;
+      debugPrint('Trip realtime status: $status');
+
+      if (status != null && status != _rideStatus) {
+        setState(() => _rideStatus = status);
+      }
+
+      if (status == 'completed' && !_tripCompleted) {
+        _statusPollingTimer?.cancel();
+        _onTripCompleted();
+      } else if (status == 'cancelled') {
+        _statusPollingTimer?.cancel();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Trip was cancelled'), backgroundColor: Colors.red),
+        );
+        Navigator.popUntil(context, (route) => route.isFirst);
+      }
+    });
   }
 
   void _fitMapBounds() {
@@ -148,37 +187,27 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
       return;
     }
 
+    _driverId = driverId;
     debugPrint('Subscribing to driver location: $driverId');
 
-    _driverLocationChannel = Supabase.instance.client
-        .channel('driver_location_$driverId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'driver_locations',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'driver_id',
-            value: driverId,
-          ),
-          callback: (payload) {
-            debugPrint('Driver location update: ${payload.newRecord}');
-            final newRecord = payload.newRecord;
-            if (newRecord != null && mounted) {
-              final lat = newRecord['lat'] as num?;
-              final lng = newRecord['lng'] as num?;
-              if (lat != null && lng != null && _isValidMaldivesCoord(lat.toDouble(), lng.toDouble())) {
-                setState(() {
-                  _driverLocation = LatLng(lat.toDouble(), lng.toDouble());
-                });
-                _mapController?.animateCamera(
-                  CameraUpdate.newLatLng(_driverLocation),
-                );
-              }
-            }
-          },
-        )
-        .subscribe();
+    // Use RealtimeService for driver location
+    _driverLocationSubscription = _realtimeService
+        .subscribeToDriverLocation(driverId)
+        .listen((data) {
+      debugPrint('Driver location update: $data');
+      if (mounted) {
+        final lat = data['lat'] as double?;
+        final lng = data['lng'] as double?;
+        if (lat != null && lng != null && _isValidMaldivesCoord(lat, lng)) {
+          setState(() {
+            _driverLocation = LatLng(lat, lng);
+          });
+          _mapController?.animateCamera(
+            CameraUpdate.newLatLng(_driverLocation),
+          );
+        }
+      }
+    });
 
     // Also fetch initial location
     _fetchDriverLocation(driverId);
@@ -191,7 +220,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
 
   Future<void> _fetchDriverLocation(String driverId) async {
     try {
-      final response = await Supabase.instance.client
+      final response = await SupabaseService.client
           .from('driver_locations')
           .select('lat, lng')
           .eq('driver_id', driverId)
@@ -231,11 +260,11 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
 
           if (status == 'completed' && !_tripCompleted) {
             _statusPollingTimer?.cancel();
-            _driverLocationChannel?.unsubscribe();
+            _driverLocationSubscription?.cancel();
             _onTripCompleted(); // This sets _tripCompleted = true
           } else if (status == 'cancelled') {
             _statusPollingTimer?.cancel();
-            _driverLocationChannel?.unsubscribe();
+            _driverLocationSubscription?.cancel();
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Trip was cancelled'), backgroundColor: Colors.red),
             );

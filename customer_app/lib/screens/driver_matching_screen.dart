@@ -6,10 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
+import '../services/realtime_service.dart';
 import '../providers/app_state.dart';
 import 'driver_arriving_screen.dart';
 
@@ -60,8 +60,9 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
   int _driversChecked = 0;
   String _statusText = 'Finding your driver...';
   String? _rideId;
-  RealtimeChannel? _rideSubscription;
+  StreamSubscription<Map<String, dynamic>>? _rideSubscription;
   bool _driverFound = false;
+  final _realtimeService = RealtimeService();
 
   late LatLng _userLocation;
   List<LatLng> _driverLocations = [];
@@ -300,7 +301,7 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
   void _subscribeToRideUpdates() {
     if (_rideId == null) return;
 
-    _rideSubscription = SupabaseService.subscribeToRideUpdates(_rideId!, (update) {
+    _rideSubscription = _realtimeService.subscribeToRide(_rideId!).listen((update) {
       if (!mounted || _driverFound) return;
 
       final status = update['status'] as String?;
@@ -340,7 +341,7 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
     _driverFound = true;
 
     HapticFeedback.mediumImpact();
-    _rideSubscription?.unsubscribe();
+    _rideSubscription?.cancel();
     _statusPollingTimer?.cancel();
 
     // Get the ACTUAL driver who accepted from the ride record
@@ -430,8 +431,11 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
     _pulseController.dispose();
     _matchTimer.cancel();
     _driverMoveTimer.cancel();
-    _rideSubscription?.unsubscribe();
+    _rideSubscription?.cancel();
     _statusPollingTimer?.cancel();
+    if (_rideId != null) {
+      _realtimeService.unsubscribe('ride_$_rideId');
+    }
     super.dispose();
   }
 

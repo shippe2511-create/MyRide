@@ -5,11 +5,11 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
+import '../services/realtime_service.dart';
 import '../widgets/status_animation.dart';
 import '../widgets/app_notification_banner.dart';
 import 'trip_tracking_screen.dart';
@@ -79,11 +79,12 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
   int _currentEta = 0;
   late LatLng _pickupLocation;
   late LatLng _driverLocation;
-  RealtimeChannel? _rideSubscription;
-  RealtimeChannel? _driverLocationChannel;
+  StreamSubscription<Map<String, dynamic>>? _rideSubscription;
+  StreamSubscription<Map<String, dynamic>>? _driverLocationSubscription;
   bool _driverArrived = false;
   bool _tripStarted = false;
   GoogleMapController? _mapController;
+  final _realtimeService = RealtimeService();
 
   bool _isValidMaldivesCoord(double lat, double lng) {
     return lat >= -0.7 && lat <= 7.1 && lng >= 72.6 && lng <= 73.8;
@@ -119,36 +120,24 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
   void _subscribeToDriverLocation() async {
     if (widget.driverId == null) return;
 
-    // Subscribe to realtime location updates
-    _driverLocationChannel = Supabase.instance.client
-        .channel('driver_location_arriving_${widget.driverId}')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'driver_locations',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'driver_id',
-            value: widget.driverId,
-          ),
-          callback: (payload) {
-            final newRecord = payload.newRecord;
-            if (mounted) {
-              final lat = newRecord['lat'] as num?;
-              final lng = newRecord['lng'] as num?;
-              if (lat != null && lng != null && _isValidMaldivesCoord(lat.toDouble(), lng.toDouble())) {
-                setState(() {
-                  _driverLocation = LatLng(lat.toDouble(), lng.toDouble());
-                });
-              }
-            }
-          },
-        )
-        .subscribe();
+    // Subscribe to realtime location updates using RealtimeService
+    _driverLocationSubscription = _realtimeService
+        .subscribeToDriverLocation(widget.driverId!)
+        .listen((data) {
+      if (mounted) {
+        final lat = data['lat'] as double?;
+        final lng = data['lng'] as double?;
+        if (lat != null && lng != null && _isValidMaldivesCoord(lat, lng)) {
+          setState(() {
+            _driverLocation = LatLng(lat, lng);
+          });
+        }
+      }
+    });
 
     // Fetch initial location
     try {
-      final response = await Supabase.instance.client
+      final response = await SupabaseService.client
           .from('driver_locations')
           .select('lat, lng')
           .eq('driver_id', widget.driverId!)
@@ -171,7 +160,7 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
   void _subscribeToRideUpdates() {
     if (widget.rideId == null) return;
 
-    _rideSubscription = SupabaseService.subscribeToRideUpdates(widget.rideId!, (update) {
+    _rideSubscription = _realtimeService.subscribeToRide(widget.rideId!).listen((update) {
       _handleStatusUpdate(update['status'] as String?);
     });
   }
@@ -313,8 +302,14 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
   void dispose() {
     _etaTimer.cancel();
     _statusPollingTimer?.cancel();
-    _rideSubscription?.unsubscribe();
-    _driverLocationChannel?.unsubscribe();
+    _rideSubscription?.cancel();
+    _driverLocationSubscription?.cancel();
+    if (widget.rideId != null) {
+      _realtimeService.unsubscribe('ride_${widget.rideId}');
+    }
+    if (widget.driverId != null) {
+      _realtimeService.unsubscribe('driver_location_${widget.driverId}');
+    }
     _mapController?.dispose();
     super.dispose();
   }

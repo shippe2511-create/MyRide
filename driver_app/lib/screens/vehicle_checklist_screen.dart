@@ -151,36 +151,48 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.bgColor,
-      body: CustomScrollView(
-        slivers: [
-          // Animated header
-          SliverToBoxAdapter(
-            child: _buildHeader(context),
-          ),
-
-          // Quick actions
-          SliverToBoxAdapter(
-            child: _buildQuickActions(context),
-          ),
-
-          // Categories
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) => _buildCategorySection(context, _categories[index]),
-                childCount: _categories.length,
+      extendBody: true,
+      body: Stack(
+        children: [
+          CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              // Animated header
+              SliverToBoxAdapter(
+                child: _buildHeader(context),
               ),
-            ),
-          ),
 
-          // Bottom spacing
-          const SliverToBoxAdapter(
-            child: SizedBox(height: 120),
+              // Quick actions
+              SliverToBoxAdapter(
+                child: _buildQuickActions(context),
+              ),
+
+              // Categories
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => _buildCategorySection(context, _categories[index]),
+                    childCount: _categories.length,
+                  ),
+                ),
+              ),
+
+              // Bottom spacing for content to go behind bar
+              SliverToBoxAdapter(
+                child: SizedBox(height: MediaQuery.of(context).padding.bottom + 120),
+              ),
+            ],
+          ),
+          // Fixed bottom bar
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildBottomBar(context),
           ),
         ],
       ),
-      bottomSheet: _buildBottomBar(context),
     );
   }
 
@@ -744,8 +756,16 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
         MediaQuery.of(context).padding.bottom + 16,
       ),
       decoration: BoxDecoration(
-        color: context.cardColor,
-        border: Border(top: BorderSide(color: context.borderColor)),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            context.bgColor.withValues(alpha: 0.0),
+            context.bgColor.withValues(alpha: 0.9),
+            context.bgColor,
+          ],
+          stops: const [0.0, 0.3, 0.5],
+        ),
       ),
       child: SafeArea(
         top: false,

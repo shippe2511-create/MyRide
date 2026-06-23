@@ -104,59 +104,32 @@ export default function PushToTalkPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
-  const fetchMessagesRef = useRef<() => void>(() => {})
-
-  useEffect(() => {
-    fetchMessagesRef.current = async () => {
-      const { data, error } = await supabase
-        .from("voice_messages")
-        .select(`*, sender:profiles!voice_messages_sender_id_fkey(full_name)`)
-        .order("created_at", { ascending: false })
-        .limit(50)
-      if (error) {
-        console.error("Error fetching messages:", error)
-        return
-      }
-      if (data) setMessages(data)
-    }
-  })
-
   useEffect(() => {
     fetchData()
 
     // Realtime subscription for new messages
     const channel = supabase
-      .channel('voice-messages-realtime')
+      .channel('voice-messages-live')
       .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'voice_messages'
-      }, () => {
-        console.log('New voice message received via realtime')
-        fetchMessagesRef.current()
-      })
-      .on('postgres_changes', {
-        event: 'DELETE',
+        event: '*',
         schema: 'public',
         table: 'voice_messages'
       }, (payload) => {
-        console.log('Voice message deleted via realtime')
-        const deletedId = (payload.old as { id: string }).id
-        setMessages(prev => prev.filter(m => m.id !== deletedId))
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'voice_messages'
-      }, () => {
-        fetchMessagesRef.current()
+        console.log('Voice message change:', payload.eventType)
+        fetchMessages()
       })
       .subscribe((status) => {
-        console.log('Voice messages subscription status:', status)
+        console.log('Voice messages subscription:', status)
       })
+
+    // Polling fallback every 5 seconds
+    const pollInterval = setInterval(() => {
+      fetchMessages()
+    }, 5000)
 
     return () => {
       supabase.removeChannel(channel)
+      clearInterval(pollInterval)
       if (audioRef.current) {
         audioRef.current.pause()
       }

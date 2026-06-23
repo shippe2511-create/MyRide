@@ -659,75 +659,115 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
           ),
           const SizedBox(height: 16),
 
-          // Record Button with glow rings (matching admin style)
+          // Modern Record Button
           GestureDetector(
             onLongPressStart: (_) => _startRecording(),
             onLongPressEnd: (_) => _stopRecording(),
             child: AnimatedBuilder(
               animation: _pulseAnimation,
               builder: (context, child) {
-                return Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Outer pulsing glow ring
-                    if (_isRecording)
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        width: 130,
-                        height: 130,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.red.withOpacity(0.2),
+                final scale = _isRecording ? _pulseAnimation.value : 1.0;
+                final baseColor = _isRecording ? Colors.red : AppColors.yellow;
+
+                return SizedBox(
+                  width: 160,
+                  height: 160,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Outer animated ring 3
+                      if (_isRecording)
+                        Transform.scale(
+                          scale: scale * 1.1,
+                          child: Container(
+                            width: 150,
+                            height: 150,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.red.withOpacity(0.15),
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      // Outer animated ring 2
+                      Transform.scale(
+                        scale: _isRecording ? scale : 1.0,
+                        child: Container(
+                          width: 130,
+                          height: 130,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: baseColor.withOpacity(0.2),
+                              width: 2,
+                            ),
+                          ),
                         ),
                       ),
-                    // Middle glow ring
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: _isRecording ? 115 : 100,
-                      height: _isRecording ? 115 : 100,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: _isRecording
-                            ? Colors.red.withOpacity(0.3)
-                            : AppColors.yellow.withOpacity(0.2),
-                      ),
-                    ),
-                    // Main button
-                    Transform.scale(
-                      scale: _isRecording ? _pulseAnimation.value : 1.0,
-                      child: Container(
-                        width: 90,
-                        height: 90,
+                      // Inner glow ring
+                      Container(
+                        width: 115,
+                        height: 115,
                         decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              baseColor.withOpacity(0.3),
+                              baseColor.withOpacity(0.0),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Main button with gradient border
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
                           gradient: LinearGradient(
-                            colors: _isRecording
-                                ? [Colors.red, Colors.red.shade700]
-                                : [AppColors.yellow, AppColors.yellow.withOpacity(0.8)],
+                            colors: [
+                              baseColor.withOpacity(0.3),
+                              baseColor.withOpacity(0.1),
+                            ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: (_isRecording ? Colors.red : AppColors.yellow).withOpacity(0.5),
-                              blurRadius: _isRecording ? 30 : 20,
-                              spreadRadius: _isRecording ? 5 : 0,
-                            ),
-                          ],
                         ),
-                        child: Icon(
-                          _isRecording ? Icons.stop_rounded : Icons.mic_rounded,
-                          color: Colors.black,
-                          size: 40,
+                        padding: const EdgeInsets.all(3),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: _isRecording
+                                  ? [const Color(0xFFFF4757), const Color(0xFFFF6B81)]
+                                  : [AppColors.yellow, const Color(0xFFFFE066)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: baseColor.withOpacity(0.6),
+                                blurRadius: 25,
+                                spreadRadius: _isRecording ? 8 : 2,
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            _isRecording ? Icons.stop_rounded : Icons.mic_rounded,
+                            color: _isRecording ? Colors.white : Colors.black,
+                            size: 44,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 );
               },
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
 
           // Instructions
           Text(

@@ -21,8 +21,9 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
-  Plus, Loader2, Clock, Calendar, Trash2, Pencil, Users, Wand2
+  Plus, Loader2, Clock, Calendar, Trash2, Pencil, Users, Wand2, Check
 } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 
 interface DriverProfile {
@@ -72,11 +73,11 @@ export function ShiftsTable() {
   const [selectedDriver, setSelectedDriver] = useState<string>("all")
 
   const [formData, setFormData] = useState({
-    driver_id: "",
+    driver_ids: [] as string[],
     shift_dates: [] as string[],
-    start_time: "06:00",
-    end_time: "14:00",
-    shift_type: "morning",
+    start_time: "08:00",
+    end_time: "16:00",
+    shift_type: "full_day",
     status: "scheduled",
   })
   const [dateRangeMode, setDateRangeMode] = useState<"single" | "range" | "select">("select")
@@ -151,18 +152,17 @@ export function ShiftsTable() {
   const handleSave = async () => {
     const datesToCreate = dateRangeMode === "range" ? generateDatesFromRange() : formData.shift_dates
 
-    if (!formData.driver_id || datesToCreate.length === 0) {
-      toast.error("Please select a driver and at least one date")
-      return
-    }
-
-    setSaving(true)
-
     if (editingShift) {
+      if (formData.driver_ids.length === 0 || datesToCreate.length === 0) {
+        toast.error("Please select a driver and at least one date")
+        return
+      }
+
+      setSaving(true)
       const { error } = await supabase
         .from("shifts")
         .update({
-          driver_id: formData.driver_id,
+          driver_id: formData.driver_ids[0],
           shift_date: datesToCreate[0],
           start_time: formData.start_time,
           end_time: formData.end_time,
@@ -179,21 +179,33 @@ export function ShiftsTable() {
         loadData()
       }
     } else {
-      const shiftsToInsert = datesToCreate.map(date => ({
-        driver_id: formData.driver_id,
-        shift_date: date,
-        start_time: formData.start_time,
-        end_time: formData.end_time,
-        shift_type: formData.shift_type,
-        status: formData.status,
-      }))
+      if (formData.driver_ids.length === 0 || datesToCreate.length === 0) {
+        toast.error("Please select at least one driver and one date")
+        return
+      }
+
+      setSaving(true)
+      const shiftsToInsert: { driver_id: string; shift_date: string; start_time: string; end_time: string; shift_type: string; status: string }[] = []
+
+      for (const driverId of formData.driver_ids) {
+        for (const date of datesToCreate) {
+          shiftsToInsert.push({
+            driver_id: driverId,
+            shift_date: date,
+            start_time: formData.start_time,
+            end_time: formData.end_time,
+            shift_type: formData.shift_type,
+            status: formData.status,
+          })
+        }
+      }
 
       const { error } = await supabase.from("shifts").insert(shiftsToInsert)
 
       if (error) {
         toast.error("Failed to create shifts")
       } else {
-        toast.success(`${shiftsToInsert.length} shift(s) created`)
+        toast.success(`${shiftsToInsert.length} shift(s) created for ${formData.driver_ids.length} driver(s)`)
         closeDialog()
         loadData()
       }
@@ -220,7 +232,7 @@ export function ShiftsTable() {
     setEditingShift(shift)
     setDateRangeMode("select")
     setFormData({
-      driver_id: shift.driver_id,
+      driver_ids: [shift.driver_id],
       shift_dates: [shift.shift_date],
       start_time: shift.start_time.substring(0, 5),
       end_time: shift.end_time.substring(0, 5),
@@ -237,13 +249,36 @@ export function ShiftsTable() {
     setRangeStart("")
     setRangeEnd("")
     setFormData({
-      driver_id: "",
+      driver_ids: [],
       shift_dates: [],
-      start_time: "06:00",
-      end_time: "14:00",
-      shift_type: "morning",
+      start_time: "08:00",
+      end_time: "16:00",
+      shift_type: "full_day",
       status: "scheduled",
     })
+  }
+
+  const toggleDriverSelection = (driverId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      driver_ids: prev.driver_ids.includes(driverId)
+        ? prev.driver_ids.filter(id => id !== driverId)
+        : [...prev.driver_ids, driverId]
+    }))
+  }
+
+  const selectAllDrivers = () => {
+    setFormData(prev => ({
+      ...prev,
+      driver_ids: drivers.map(d => d.id)
+    }))
+  }
+
+  const clearDriverSelection = () => {
+    setFormData(prev => ({
+      ...prev,
+      driver_ids: []
+    }))
   }
 
   const toggleDate = (dateStr: string) => {
@@ -311,35 +346,20 @@ export function ShiftsTable() {
       const dateStr = date.toISOString().split("T")[0]
       const dayOfWeek = date.getDay()
 
-      if (dayOfWeek === 0 || dayOfWeek === 6) continue
+      // Maldives work week: Sunday (0) to Thursday (4)
+      // Skip Friday (5) and Saturday (6)
+      if (dayOfWeek === 5 || dayOfWeek === 6) continue
 
-      const shuffledDrivers = [...drivers].sort(() => Math.random() - 0.5)
-      const morningDrivers = shuffledDrivers.slice(0, Math.ceil(shuffledDrivers.length / 2))
-      const afternoonDrivers = shuffledDrivers.slice(Math.ceil(shuffledDrivers.length / 2))
-
-      for (const driver of morningDrivers) {
+      // All drivers get same shift: 8am-4pm
+      for (const driver of drivers) {
         const existingShift = shifts.find(s => s.driver_id === driver.id && s.shift_date === dateStr)
         if (!existingShift) {
           shiftsToCreate.push({
             driver_id: driver.id,
             shift_date: dateStr,
-            start_time: "06:00:00",
-            end_time: "14:00:00",
-            shift_type: "morning",
-            status: "scheduled",
-          })
-        }
-      }
-
-      for (const driver of afternoonDrivers) {
-        const existingShift = shifts.find(s => s.driver_id === driver.id && s.shift_date === dateStr)
-        if (!existingShift) {
-          shiftsToCreate.push({
-            driver_id: driver.id,
-            shift_date: dateStr,
-            start_time: "14:00:00",
-            end_time: "22:00:00",
-            shift_type: "afternoon",
+            start_time: "08:00:00",
+            end_time: "16:00:00",
+            shift_type: "full_day",
             status: "scheduled",
           })
         }
@@ -556,22 +576,76 @@ export function ShiftsTable() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Driver</label>
-              <Select value={formData.driver_id} onValueChange={(v) => setFormData({ ...formData, driver_id: v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select driver" />
-                </SelectTrigger>
-                <SelectContent>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">
+                  {editingShift ? "Driver" : "Drivers"}
+                  {!editingShift && formData.driver_ids.length > 0 && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      ({formData.driver_ids.length} selected)
+                    </span>
+                  )}
+                </label>
+                {!editingShift && (
+                  <div className="flex gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs"
+                      onClick={selectAllDrivers}
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs"
+                      onClick={clearDriverSelection}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                )}
+              </div>
+              {editingShift ? (
+                <Select value={formData.driver_ids[0] || ""} onValueChange={(v) => setFormData({ ...formData, driver_ids: [v] })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select driver" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {drivers.map(driver => {
+                      const profile = getDriverProfile(driver)
+                      return (
+                        <SelectItem key={driver.id} value={driver.id}>
+                          {profile?.full_name || "Unknown"}
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="border rounded-lg p-2 max-h-32 overflow-y-auto space-y-1">
                   {drivers.map(driver => {
                     const profile = getDriverProfile(driver)
+                    const isSelected = formData.driver_ids.includes(driver.id)
                     return (
-                      <SelectItem key={driver.id} value={driver.id}>
-                        {profile?.full_name || "Unknown"}
-                      </SelectItem>
+                      <div
+                        key={driver.id}
+                        className={`flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-accent ${isSelected ? 'bg-accent' : ''}`}
+                        onClick={() => toggleDriverSelection(driver.id)}
+                      >
+                        <Checkbox checked={isSelected} />
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage src={profile?.avatar_url || undefined} />
+                          <AvatarFallback className="text-xs">{profile?.full_name?.[0] || "D"}</AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm">{profile?.full_name || "Unknown"}</span>
+                      </div>
                     )
                   })}
-                </SelectContent>
-              </Select>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -747,14 +821,14 @@ export function ShiftsTable() {
           <AlertDialogHeader>
             <AlertDialogTitle>Auto-Schedule Shifts</AlertDialogTitle>
             <AlertDialogDescription>
-              This will automatically generate shifts for the next 7 weekdays.
-              Drivers will be randomly assigned to morning (6am-2pm) or afternoon (2pm-10pm) shifts.
+              This will automatically generate shifts for the next 7 days (Sunday to Thursday only).
+              All drivers will be assigned 8:00 AM - 4:00 PM shifts.
               Existing shifts will not be overwritten.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-4">
             <p className="text-sm text-muted-foreground">
-              <strong>{drivers.length}</strong> drivers will be scheduled across <strong>5</strong> weekdays.
+              <strong>{drivers.length}</strong> drivers will be scheduled across <strong>5</strong> work days (Sun-Thu).
             </p>
           </div>
           <AlertDialogFooter>

@@ -70,6 +70,11 @@ export default function SchedulingPage() {
   const [newTime, setNewTime] = useState("")
   const [newDays, setNewDays] = useState<string[]>(["Mon", "Tue", "Wed", "Thu", "Fri"])
 
+  // Bulk selection states
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
   // Import states
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [importStep, setImportStep] = useState<"upload" | "review">("upload")
@@ -171,6 +176,28 @@ export default function SchedulingPage() {
       toast.success("Route deleted")
       setRoutes(prev => prev.filter(r => r.id !== idToDelete))
     }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+
+    setBulkDeleting(true)
+    const idsToDelete = Array.from(selectedIds)
+
+    const { error } = await supabase
+      .from("transport_routes")
+      .delete()
+      .in("id", idsToDelete)
+
+    if (error) {
+      toast.error("Failed to delete routes")
+    } else {
+      toast.success(`Deleted ${idsToDelete.length} route${idsToDelete.length > 1 ? 's' : ''}`)
+      setRoutes(prev => prev.filter(r => !selectedIds.has(r.id)))
+      setSelectedIds(new Set())
+    }
+    setBulkDeleting(false)
+    setBulkDeleteOpen(false)
   }
 
   const openTimesDialog = async (route: TransportRoute) => {
@@ -479,10 +506,50 @@ export default function SchedulingPage() {
             </Card>
           </div>
 
+          {/* Bulk Action Bar */}
+          {selectedIds.size > 0 && (
+            <Card className="p-3 mb-4 bg-muted/50 border-primary/20">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  {selectedIds.size} route{selectedIds.size > 1 ? 's' : ''} selected
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedIds(new Set())}
+                  >
+                    Clear Selection
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setBulkDeleteOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Selected
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          )}
+
           <Card className="p-4">
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[50px]">
+                    <Checkbox
+                      checked={filteredRoutes.length > 0 && filteredRoutes.every(r => selectedIds.has(r.id))}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedIds(new Set(filteredRoutes.map(r => r.id)))
+                        } else {
+                          setSelectedIds(new Set())
+                        }
+                      }}
+                    />
+                  </TableHead>
                   <TableHead>Route</TableHead>
                   <TableHead>Code</TableHead>
                   <TableHead>Direction</TableHead>
@@ -494,13 +561,27 @@ export default function SchedulingPage() {
               <TableBody>
                 {filteredRoutes.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No routes found
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredRoutes.map(route => (
                     <TableRow key={route.id} className="group hover:bg-muted/50 transition-colors">
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(route.id)}
+                          onCheckedChange={(checked) => {
+                            const newSelected = new Set(selectedIds)
+                            if (checked) {
+                              newSelected.add(route.id)
+                            } else {
+                              newSelected.delete(route.id)
+                            }
+                            setSelectedIds(newSelected)
+                          }}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">{route.route_name}</TableCell>
                       <TableCell>{route.route_code || "-"}</TableCell>
                       <TableCell>
@@ -841,6 +922,35 @@ export default function SchedulingPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-500 hover:bg-red-600">
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Route{selectedIds.size > 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the selected route{selectedIds.size > 1 ? 's' : ''} and all their schedules. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-red-500 hover:bg-red-600"
+              disabled={bulkDeleting}
+            >
+              {bulkDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                `Delete ${selectedIds.size} Route${selectedIds.size > 1 ? 's' : ''}`
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

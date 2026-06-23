@@ -20,13 +20,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
-  AlertTriangle, Phone, MapPin, Clock, CheckCircle, XCircle, Loader2, RefreshCw, Shield, MoreVertical, Edit, Trash2, Plus, GripVertical, Flame, Heart, Building, Save, Search
+  AlertTriangle, Phone, MapPin, Clock, CheckCircle, XCircle, Loader2, RefreshCw, Shield, MoreVertical, Edit, Trash2, Plus, GripVertical, Flame, Heart, Building, Save, Search, X
 } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { PermissionGate } from "@/components/permission-gate"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu"
@@ -136,6 +137,8 @@ export default function SOSPage() {
   const [saving, setSaving] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [alertToDelete, setAlertToDelete] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
   const [stats, setStats] = useState({ active: 0, responding: 0, resolved: 0 })
   const [currentPage, setCurrentPage] = useState(1)
@@ -438,6 +441,67 @@ export default function SOSPage() {
     }
   }
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    setBulkDeleteOpen(false)
+
+    const idsToDelete = Array.from(selectedIds)
+    const alertsToRemove = alerts.filter(a => selectedIds.has(a.id))
+
+    const { error } = await supabase.from("sos_alerts").delete().in("id", idsToDelete)
+
+    if (error) {
+      toast.error("Failed to delete alerts")
+    } else {
+      toast.success(`${idsToDelete.length} alert(s) deleted`)
+      setAlerts(prev => prev.filter(a => !selectedIds.has(a.id)))
+      setSelectedIds(new Set())
+      // Update stats locally
+      setStats(prev => {
+        const newStats = { ...prev }
+        alertsToRemove.forEach(alert => {
+          if (alert.status === "active") newStats.active = Math.max(0, newStats.active - 1)
+          if (alert.status === "responding") newStats.responding = Math.max(0, newStats.responding - 1)
+          if (alert.status === "resolved" || alert.status === "false_alarm") newStats.resolved = Math.max(0, newStats.resolved - 1)
+        })
+        return newStats
+      })
+    }
+  }
+
+  // Get filtered alerts for checkbox logic
+  const filteredAlerts = alerts.filter(alert => {
+    if (!search) return true
+    const s = search.toLowerCase()
+    return (
+      alert.user?.full_name?.toLowerCase().includes(s) ||
+      alert.user?.phone?.toLowerCase().includes(s)
+    )
+  })
+
+  const allSelected = filteredAlerts.length > 0 && filteredAlerts.every(a => selectedIds.has(a.id))
+  const someSelected = filteredAlerts.some(a => selectedIds.has(a.id)) && !allSelected
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredAlerts.map(a => a.id)))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -535,9 +599,47 @@ export default function SOSPage() {
           </Select>
         </div>
 
+        {/* Bulk Action Bar */}
+        {selectedIds.size > 0 && (
+          <div className="flex items-center justify-between p-3 mb-4 bg-muted rounded-lg border">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">{selectedIds.size} selected</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedIds(new Set())}
+                className="h-7 px-2"
+              >
+                <X className="h-3 w-3 mr-1" />
+                Clear
+              </Button>
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setBulkDeleteOpen(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Selected
+            </Button>
+          </div>
+        )}
+
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[40px]">
+                <Checkbox
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (el) {
+                      (el as unknown as HTMLInputElement).indeterminate = someSelected
+                    }
+                  }}
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Select all"
+                />
+              </TableHead>
               <TableHead>User</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Location</TableHead>
@@ -546,33 +648,26 @@ export default function SOSPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {alerts.filter(alert => {
-              if (!search) return true
-              const s = search.toLowerCase()
-              return (
-                alert.user?.full_name?.toLowerCase().includes(s) ||
-                alert.user?.phone?.toLowerCase().includes(s)
-              )
-            }).length === 0 ? (
+            {filteredAlerts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   <Shield className="h-12 w-12 mx-auto mb-2 opacity-20" />
                   {search ? "No matching SOS alerts" : "No SOS alerts"}
                 </TableCell>
               </TableRow>
             ) : (
-              alerts.filter(alert => {
-                if (!search) return true
-                const s = search.toLowerCase()
-                return (
-                  alert.user?.full_name?.toLowerCase().includes(s) ||
-                  alert.user?.phone?.toLowerCase().includes(s)
-                )
-              }).map(alert => (
+              filteredAlerts.map(alert => (
                 <TableRow
                   key={alert.id}
-                  className={`group hover:bg-muted/50 transition-colors ${alert.status === "active" ? "bg-red-50 dark:bg-red-950/20" : ""}`}
+                  className={`group hover:bg-muted/50 transition-colors ${alert.status === "active" ? "bg-red-50 dark:bg-red-950/20" : ""} ${selectedIds.has(alert.id) ? "bg-muted/50" : ""}`}
                 >
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds.has(alert.id)}
+                      onCheckedChange={() => toggleSelect(alert.id)}
+                      aria-label={`Select alert ${alert.id}`}
+                    />
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Avatar className="h-8 w-8">
@@ -808,6 +903,23 @@ export default function SOSPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={deleteAlert} className="bg-red-600 hover:bg-red-700">
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} SOS Alert(s)</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedIds.size} selected SOS alert(s)? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-red-600 hover:bg-red-700">
+              Delete {selectedIds.size} Alert(s)
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

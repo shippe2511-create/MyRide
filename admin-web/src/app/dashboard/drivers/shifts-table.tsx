@@ -71,6 +71,8 @@ export function ShiftsTable() {
 
   const [weekOffset, setWeekOffset] = useState(0)
   const [selectedDriver, setSelectedDriver] = useState<string>("all")
+  const [selectedShifts, setSelectedShifts] = useState<string[]>([])
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   const [formData, setFormData] = useState({
     driver_ids: [] as string[],
@@ -226,6 +228,22 @@ export function ShiftsTable() {
       setShifts(prev => prev.filter(s => s.id !== idToDelete))
       toast.success("Shift deleted")
     }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedShifts.length === 0) return
+
+    setBulkDeleting(true)
+    const { error } = await supabase.from("shifts").delete().in("id", selectedShifts)
+
+    if (error) {
+      toast.error("Failed to delete shifts: " + error.message)
+    } else {
+      setShifts(prev => prev.filter(s => !selectedShifts.includes(s.id)))
+      toast.success(`${selectedShifts.length} shift(s) deleted`)
+      setSelectedShifts([])
+    }
+    setBulkDeleting(false)
   }
 
   const openEditDialog = (shift: Shift) => {
@@ -488,6 +506,12 @@ export function ShiftsTable() {
                 })}
               </SelectContent>
             </Select>
+            {selectedShifts.length > 0 && (
+              <Button size="sm" variant="destructive" onClick={handleBulkDelete} disabled={bulkDeleting}>
+                {bulkDeleting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                Delete {selectedShifts.length}
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={() => setAutoScheduleOpen(true)}>
               <Wand2 className="h-4 w-4 mr-2" />
               Auto Schedule
@@ -502,6 +526,18 @@ export function ShiftsTable() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={filteredShifts.length > 0 && selectedShifts.length === filteredShifts.length}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setSelectedShifts(filteredShifts.map(s => s.id))
+                    } else {
+                      setSelectedShifts([])
+                    }
+                  }}
+                />
+              </TableHead>
               <TableHead>Driver</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Time</TableHead>
@@ -513,15 +549,28 @@ export function ShiftsTable() {
           <TableBody>
             {filteredShifts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   No shifts scheduled for this week
                 </TableCell>
               </TableRow>
             ) : (
               filteredShifts.map(shift => {
                 const profile = getDriverProfile(shift.driver)
+                const isSelected = selectedShifts.includes(shift.id)
                 return (
-                  <TableRow key={shift.id}>
+                  <TableRow key={shift.id} className={isSelected ? "bg-accent/50" : ""}>
+                    <TableCell>
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedShifts(prev => [...prev, shift.id])
+                          } else {
+                            setSelectedShifts(prev => prev.filter(id => id !== shift.id))
+                          }
+                        }}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Avatar className="h-8 w-8">
@@ -699,12 +748,13 @@ export function ShiftsTable() {
                   )}
                 </div>
               ) : (
-                <div className="border rounded-lg p-2 max-h-48 overflow-y-auto">
-                  <div className="grid grid-cols-7 gap-1 text-center text-xs mb-2">
+                <div className="border rounded-lg p-2">
+                  <div className="grid grid-cols-7 gap-1 text-center text-xs mb-2 sticky top-0 bg-background pb-2">
                     {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(d => (
                       <span key={d} className="text-muted-foreground font-medium">{d}</span>
                     ))}
                   </div>
+                  <div className="max-h-40 overflow-y-auto">
                   {(() => {
                     const monthDates = getMonthDates()
                     const firstDayOfWeek = monthDates[0].getDay()
@@ -736,6 +786,7 @@ export function ShiftsTable() {
                       </div>
                     )
                   })()}
+                  </div>
                   {formData.shift_dates.length > 0 && (
                     <p className="text-xs text-muted-foreground mt-2 pt-2 border-t">
                       {formData.shift_dates.length} date(s) selected

@@ -136,10 +136,9 @@ class DriverState extends ChangeNotifier {
         _checklistCompletedDate!.day == now.day;
   }
 
-  // Check if current time is within duty roster hours
+  // Check if current time is within duty roster hours (defaults to 8am-4pm)
   bool get isWithinDutyHours {
     final todayShiftInfo = todayShift;
-    if (todayShiftInfo == null) return true; // No shift = allow
 
     final now = DateTime.now();
     final startParts = todayShiftInfo['start']!.split(':');
@@ -153,23 +152,30 @@ class DriverState extends ChangeNotifier {
     return now.isAfter(shiftStart) && now.isBefore(shiftEnd);
   }
 
-  // Get today's shift info from loaded shifts
-  Map<String, String>? get todayShift {
-    if (_weekShifts.isEmpty) return null;
+  // Default shift hours (8am-4pm) when no schedule is set
+  static const String _defaultShiftStart = '08:00';
+  static const String _defaultShiftEnd = '16:00';
 
+  // Get today's shift info from loaded shifts (defaults to 8am-4pm if not scheduled)
+  Map<String, String> get todayShift {
     final today = DateTime.now();
     final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
     for (final shift in _weekShifts) {
       if (shift['shift_date'] == todayStr) {
         return {
-          'start': shift['start_time']?.toString().substring(0, 5) ?? '00:00',
-          'end': shift['end_time']?.toString().substring(0, 5) ?? '23:59',
+          'start': shift['start_time']?.toString().substring(0, 5) ?? _defaultShiftStart,
+          'end': shift['end_time']?.toString().substring(0, 5) ?? _defaultShiftEnd,
           'type': shift['shift_type'] ?? 'regular',
         };
       }
     }
-    return null;
+    // Default shift: 8am-4pm
+    return {
+      'start': _defaultShiftStart,
+      'end': _defaultShiftEnd,
+      'type': 'default',
+    };
   }
 
   // Load shifts from database

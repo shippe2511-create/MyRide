@@ -155,36 +155,34 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHomeContent() {
+    final topPadding = MediaQuery.of(context).padding.top;
     return Consumer<DriverState>(
       builder: (context, state, _) {
-        return SafeArea(
-          child: Stack(
-            children: [
-              SingleChildScrollView(
-                controller: _scrollController,
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  children: [
-                    // Header
-                    _buildHeader(context, state),
+        return Stack(
+          children: [
+            SingleChildScrollView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+              child: Column(
+                children: [
+                  SizedBox(height: topPadding),
+                  // Header
+                  _buildHeader(context, state),
 
-                    // Main content
-                    SizedBox(
-                      height: MediaQuery.of(context).size.height -
-                              MediaQuery.of(context).padding.top -
-                              MediaQuery.of(context).padding.bottom - 200,
-                      child: state.hasActiveRide
-                          ? _buildActiveRideView(context, state)
-                          : state.isOnBreak
-                              ? _buildBreakView(context, state)
-                              : state.isOnline
-                                  ? _buildOnlineView(context, state)
-                                  : _buildOfflineView(context, state),
-                    ),
-                    SizedBox(height: MediaQuery.of(context).padding.bottom + 80),
-                  ],
-                ),
+                  // Main content - no fixed height, let it flow naturally
+                  state.hasActiveRide
+                      ? _buildActiveRideView(context, state)
+                      : state.isOnBreak
+                          ? _buildBreakView(context, state)
+                          : state.isOnline
+                              ? _buildOnlineView(context, state)
+                              : _buildOfflineView(context, state),
+
+                  // Extra padding so content can scroll behind nav bar
+                  SizedBox(height: MediaQuery.of(context).padding.bottom + 120),
+                ],
               ),
+            ),
 
               // Show ride request popup when there's an incoming request
               if (state.incomingRequests.isNotEmpty && !state.hasActiveRide && !_isPopupMinimized)
@@ -336,8 +334,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
             ],
-          ),
-        );
+          );
       },
     );
   }
@@ -458,11 +455,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildOfflineView(BuildContext context, DriverState state) {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          // Stats card
-          _buildStatsCard(context, state),
+    return Column(
+      children: [
+        // Stats card
+        _buildStatsCard(context, state),
 
           // Checklist status
           if (state.checklistCompleted)
@@ -576,8 +572,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ],
-        ),
-      );
+        );
   }
 
   Widget _buildOnlineView(BuildContext context, DriverState state) {
@@ -659,68 +654,65 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
-        // Waiting view - centered and expanded
-        Expanded(
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: AppColors.success.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(
-                    Icons.search,
-                    size: 32,
-                    color: AppColors.success,
-                  ),
+        // Waiting view - centered
+        const SizedBox(height: 60),
+        Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  'Looking for Rides',
+                child: const Icon(
+                  Icons.search,
+                  size: 32,
+                  color: AppColors.success,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Looking for Rides',
+                style: TextStyle(
+                  color: context.textColor,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: Text(
+                  'You\'ll be notified when a staff member requests a ride',
                   style: TextStyle(
-                    color: context.textColor,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+                    color: context.mutedColor,
+                    fontSize: 13,
                   ),
+                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 4),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40),
-                  child: Text(
-                    'You\'ll be notified when a staff member requests a ride',
-                    style: TextStyle(
-                      color: context.mutedColor,
-                      fontSize: 13,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
+        const SizedBox(height: 60),
 
-        // End Shift Button - fixed at bottom
-        SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-            child: SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: OutlinedButton.icon(
-                onPressed: () => _showEndShiftDialog(context, state),
-                icon: const Icon(Icons.logout_rounded, size: 20),
-                label: const Text('End Shift', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.error,
-                  side: const BorderSide(color: AppColors.error, width: 1.5),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
+        // End Shift Button
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+          child: SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: OutlinedButton.icon(
+              onPressed: () => _showEndShiftDialog(context, state),
+              icon: const Icon(Icons.logout_rounded, size: 20),
+              label: const Text('End Shift', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.error,
+                side: const BorderSide(color: AppColors.error, width: 1.5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
             ),
           ),
@@ -775,6 +767,115 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
+            ),
+          ),
+
+          // Break Tips Section
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Break Tips',
+                  style: TextStyle(
+                    color: context.textColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildBreakTip(context, Icons.directions_walk_rounded, 'Stretch your legs', 'Take a short walk to refresh'),
+                const SizedBox(height: 10),
+                _buildBreakTip(context, Icons.water_drop_rounded, 'Stay hydrated', 'Drink water to stay alert'),
+                const SizedBox(height: 10),
+                _buildBreakTip(context, Icons.visibility_rounded, 'Rest your eyes', 'Look away from screen for a moment'),
+              ],
+            ),
+          ),
+
+          // Motivational Quote
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.warning.withValues(alpha: 0.1),
+                    AppColors.warning.withValues(alpha: 0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.warning.withValues(alpha: 0.2)),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.format_quote_rounded, color: AppColors.warning, size: 28),
+                  const SizedBox(height: 12),
+                  Text(
+                    '"A moment of rest today leads to safer journeys tomorrow."',
+                    style: TextStyle(
+                      color: context.textColor,
+                      fontSize: 15,
+                      fontStyle: FontStyle.italic,
+                      height: 1.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBreakTip(BuildContext context, IconData icon, String title, String subtitle) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.borderColor),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.info.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: AppColors.info, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: context.textColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: context.mutedColor,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

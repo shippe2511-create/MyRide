@@ -115,6 +115,7 @@ class _BreakTimerWidgetState extends State<BreakTimerWidget> with SingleTickerPr
             mainAxisSize: MainAxisSize.min,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
                     width: 56,
@@ -154,26 +155,14 @@ class _BreakTimerWidgetState extends State<BreakTimerWidget> with SingleTickerPr
                       ],
                     ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        _formatDuration(_elapsed),
-                        style: TextStyle(
-                          color: context.textColor,
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                      Text(
-                        'elapsed',
-                        style: TextStyle(
-                          color: context.mutedColor,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    _formatDuration(_elapsed),
+                    style: TextStyle(
+                      color: context.textColor,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
                   ),
                 ],
               ),

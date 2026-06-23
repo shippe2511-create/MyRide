@@ -113,6 +113,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final topPadding = MediaQuery.of(context).padding.top;
     return Scaffold(
       backgroundColor: context.bgColor,
+      extendBody: true,
       body: Consumer<DriverState>(
         builder: (context, state, _) {
           final filteredTrips = _filterTrips(state.completedTrips);

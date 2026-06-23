@@ -36,14 +36,14 @@ export function PermissionGate({ permission, children, fallback }: PermissionGat
   const { can, loading } = usePermissions()
 
   if (loading) {
-    return <LoadingFallback />
+    return <div suppressHydrationWarning><LoadingFallback /></div>
   }
 
   if (!can(permission)) {
     return fallback ?? <DefaultFallback />
   }
 
-  return <>{children}</>
+  return <div suppressHydrationWarning>{children}</div>
 }
 
 export function ManageGate({ resource, children }: { resource: string; children: React.ReactNode }) {

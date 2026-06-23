@@ -449,6 +449,49 @@ class DriverState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Load today's checklist from database for this driver
+  Future<void> loadTodayChecklist() async {
+    if (_driverId.isEmpty) return;
+
+    try {
+      final today = DateTime.now();
+      final startOfDay = DateTime(today.year, today.month, today.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
+
+      final response = await SupabaseService.client
+          .from('vehicle_checklists')
+          .select()
+          .eq('driver_id', _driverId)
+          .gte('checked_at', startOfDay.toIso8601String())
+          .lt('checked_at', endOfDay.toIso8601String())
+          .order('checked_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (response != null) {
+        _checklistCompleted = true;
+        _checklistCompletedDate = DateTime.tryParse(response['checked_at'] ?? '') ?? today;
+        _checklistHasIssues = response['has_issues'] ?? false;
+        final issues = response['issues'];
+        if (issues is Map) {
+          _checklistIssues = Map<String, String>.from(
+            issues.map((k, v) => MapEntry(k.toString(), v.toString()))
+          );
+        }
+        debugPrint('Loaded today\'s checklist for driver $_driverId');
+      } else {
+        _checklistCompleted = false;
+        _checklistCompletedDate = null;
+        _checklistHasIssues = false;
+        _checklistIssues = {};
+        debugPrint('No checklist found for today');
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading today\'s checklist: $e');
+    }
+  }
+
   void resetChecklist() {
     _checklistCompleted = false;
     _checklistCompletedDate = null;

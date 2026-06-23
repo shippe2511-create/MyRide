@@ -130,6 +130,9 @@ class _LoginScreenState extends State<LoginScreen> {
           employeeId: existingUser['employee_id'] ?? '',
         );
 
+        // Load today's checklist status from database
+        await driverState.loadTodayChecklist();
+
         HapticFeedback.lightImpact();
         Navigator.pushReplacementNamed(context, '/home');
       } else {

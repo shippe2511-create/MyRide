@@ -417,6 +417,23 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
     );
   }
 
+  Future<void> _deleteMessage(String messageId) async {
+    try {
+      await SupabaseService.client
+          .from('voice_messages')
+          .delete()
+          .eq('id', messageId);
+
+      setState(() {
+        _messages.removeWhere((m) => m['id'] == messageId);
+      });
+      _showSnackBar('Message deleted');
+    } catch (e) {
+      debugPrint('Error deleting message: $e');
+      _showSnackBar('Failed to delete message', isError: true);
+    }
+  }
+
   Widget _buildMessageCard(Map<String, dynamic> message) {
     final isPlaying = _playingId == message['id'];
     final isPlayed = message['is_played'] == true;
@@ -425,8 +442,10 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
     final senderName = message['sender']?['full_name'] ?? (isFromAdmin ? 'Dispatch' : 'You');
     final recipientType = message['recipient_type'] ?? '';
     final duration = message['duration_seconds'] ?? 0;
+    final driverState = context.read<DriverState>();
+    final isOwnMessage = message['sender_id'] == driverState.profileId;
 
-    return Container(
+    final card = Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -453,7 +472,6 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                // Play Button
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   width: 56,
@@ -482,8 +500,6 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
                   ),
                 ),
                 const SizedBox(width: 16),
-
-                // Message Info
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -531,33 +547,18 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          Icon(
-                            Icons.graphic_eq_rounded,
-                            size: 16,
-                            color: Colors.white.withOpacity(0.5),
-                          ),
+                          Icon(Icons.graphic_eq_rounded, size: 16, color: Colors.white.withOpacity(0.5)),
                           const SizedBox(width: 4),
                           Text(
                             _formatDuration(duration),
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.5),
-                              fontSize: 13,
-                              fontFamily: 'monospace',
-                            ),
+                            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13, fontFamily: 'monospace'),
                           ),
                           const SizedBox(width: 16),
-                          Icon(
-                            Icons.access_time_rounded,
-                            size: 14,
-                            color: Colors.white.withOpacity(0.4),
-                          ),
+                          Icon(Icons.access_time_rounded, size: 14, color: Colors.white.withOpacity(0.4)),
                           const SizedBox(width: 4),
                           Text(
                             _formatTime(message['created_at']),
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.4),
-                              fontSize: 12,
-                            ),
+                            style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
                           ),
                         ],
                       ),
@@ -569,6 +570,43 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
           ),
         ),
       ),
+    );
+
+    if (!isOwnMessage) return card;
+
+    return Dismissible(
+      key: Key(message['id']),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        child: const Icon(Icons.delete, color: Colors.white, size: 28),
+      ),
+      confirmDismiss: (direction) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A2E),
+            title: const Text('Delete Message', style: TextStyle(color: Colors.white)),
+            content: const Text('Are you sure?', style: TextStyle(color: Colors.white70)),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ?? false;
+      },
+      onDismissed: (direction) => _deleteMessage(message['id']),
+      child: card,
     );
   }
 

@@ -104,6 +104,23 @@ export default function PushToTalkPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
+  const fetchMessagesRef = useRef<() => void>(() => {})
+
+  useEffect(() => {
+    fetchMessagesRef.current = async () => {
+      const { data, error } = await supabase
+        .from("voice_messages")
+        .select(`*, sender:profiles!voice_messages_sender_id_fkey(full_name)`)
+        .order("created_at", { ascending: false })
+        .limit(50)
+      if (error) {
+        console.error("Error fetching messages:", error)
+        return
+      }
+      if (data) setMessages(data)
+    }
+  })
+
   useEffect(() => {
     fetchData()
 
@@ -115,15 +132,16 @@ export default function PushToTalkPage() {
         schema: 'public',
         table: 'voice_messages'
       }, () => {
-        // Fetch full data with joins
-        fetchMessages()
+        console.log('New voice message received via realtime')
+        fetchMessagesRef.current()
       })
       .on('postgres_changes', {
         event: 'DELETE',
         schema: 'public',
         table: 'voice_messages'
       }, (payload) => {
-        const deletedId = payload.old.id
+        console.log('Voice message deleted via realtime')
+        const deletedId = (payload.old as { id: string }).id
         setMessages(prev => prev.filter(m => m.id !== deletedId))
       })
       .on('postgres_changes', {
@@ -131,7 +149,7 @@ export default function PushToTalkPage() {
         schema: 'public',
         table: 'voice_messages'
       }, () => {
-        fetchMessages()
+        fetchMessagesRef.current()
       })
       .subscribe((status) => {
         console.log('Voice messages subscription status:', status)
@@ -160,15 +178,20 @@ export default function PushToTalkPage() {
   }
 
   const fetchMessages = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("voice_messages")
       .select(`
         *,
-        sender:profiles!voice_messages_sender_id_fkey(full_name),
-        recipient:profiles!voice_messages_recipient_id_fkey(full_name)
+        sender:profiles!voice_messages_sender_id_fkey(full_name)
       `)
       .order("created_at", { ascending: false })
       .limit(50)
+
+    if (error) {
+      console.error("Error fetching messages:", error)
+      return
+    }
+    console.log("Fetched messages:", data?.length)
     if (data) setMessages(data)
   }
 

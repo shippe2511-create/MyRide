@@ -68,6 +68,10 @@ export function ShiftsTable() {
   const [editingShift, setEditingShift] = useState<Shift | null>(null)
   const [autoScheduleOpen, setAutoScheduleOpen] = useState(false)
   const [autoScheduling, setAutoScheduling] = useState(false)
+  const [autoScheduleDrivers, setAutoScheduleDrivers] = useState<string[]>([])
+  const [autoSchedulePeriod, setAutoSchedulePeriod] = useState<"week" | "month">("week")
+  const [autoScheduleStartTime, setAutoScheduleStartTime] = useState("08:00")
+  const [autoScheduleEndTime, setAutoScheduleEndTime] = useState("16:00")
 
   const [weekOffset, setWeekOffset] = useState(0)
   const [selectedDriver, setSelectedDriver] = useState<string>("all")
@@ -375,8 +379,12 @@ export function ShiftsTable() {
     : shifts.filter(s => s.driver_id === selectedDriver)
 
   const handleAutoSchedule = async () => {
-    if (drivers.length === 0) {
-      toast.error("No drivers available")
+    const selectedDriversList = autoScheduleDrivers.length > 0
+      ? drivers.filter(d => autoScheduleDrivers.includes(d.id))
+      : drivers
+
+    if (selectedDriversList.length === 0) {
+      toast.error("No drivers selected")
       return
     }
 
@@ -387,7 +395,10 @@ export function ShiftsTable() {
     const startDate = new Date(today)
     startDate.setDate(startDate.getDate() + 1)
 
-    for (let day = 0; day < 7; day++) {
+    // Calculate number of days based on period
+    const daysToSchedule = autoSchedulePeriod === "month" ? 31 : 7
+
+    for (let day = 0; day < daysToSchedule; day++) {
       const date = new Date(startDate)
       date.setDate(date.getDate() + day)
       const dateStr = date.toISOString().split("T")[0]
@@ -397,24 +408,21 @@ export function ShiftsTable() {
       // Skip Friday (5) and Saturday (6)
       if (dayOfWeek === 5 || dayOfWeek === 6) continue
 
-      // All drivers get same shift: 8am-4pm
-      for (const driver of drivers) {
-        const existingShift = shifts.find(s => s.driver_id === driver.id && s.shift_date === dateStr)
-        if (!existingShift) {
-          shiftsToCreate.push({
-            driver_id: driver.id,
-            shift_date: dateStr,
-            start_time: "08:00:00",
-            end_time: "16:00:00",
-            shift_type: "full_day",
-            status: "scheduled",
-          })
-        }
+      // Selected drivers get shift with selected times
+      for (const driver of selectedDriversList) {
+        shiftsToCreate.push({
+          driver_id: driver.id,
+          shift_date: dateStr,
+          start_time: autoScheduleStartTime + ":00",
+          end_time: autoScheduleEndTime + ":00",
+          shift_type: "full_day",
+          status: "scheduled",
+        })
       }
     }
 
     if (shiftsToCreate.length === 0) {
-      toast.info("All shifts already scheduled for next week")
+      toast.info("No shifts to create")
       setAutoScheduling(false)
       setAutoScheduleOpen(false)
       return
@@ -425,12 +433,14 @@ export function ShiftsTable() {
     if (error) {
       toast.error("Failed to create shifts: " + error.message)
     } else {
-      toast.success(`Created ${shiftsToCreate.length} shifts for next week`)
+      const periodText = autoSchedulePeriod === "month" ? "month" : "week"
+      toast.success(`Created ${shiftsToCreate.length} shifts for ${selectedDriversList.length} driver(s) for the next ${periodText}`)
       loadData()
     }
 
     setAutoScheduling(false)
     setAutoScheduleOpen(false)
+    setAutoScheduleDrivers([])
   }
 
   const stats = {
@@ -900,19 +910,126 @@ export function ShiftsTable() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={autoScheduleOpen} onOpenChange={setAutoScheduleOpen}>
-        <AlertDialogContent>
+      <AlertDialog open={autoScheduleOpen} onOpenChange={(open) => {
+        setAutoScheduleOpen(open)
+        if (!open) {
+          setAutoScheduleDrivers([])
+          setAutoSchedulePeriod("week")
+          setAutoScheduleStartTime("08:00")
+          setAutoScheduleEndTime("16:00")
+        }
+      }}>
+        <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>Auto-Schedule Shifts</AlertDialogTitle>
             <AlertDialogDescription>
-              This will automatically generate shifts for the next 7 days (Sunday to Thursday only).
-              All drivers will be assigned 8:00 AM - 4:00 PM shifts.
-              Existing shifts will not be overwritten.
+              Generate 8:00 AM - 4:00 PM shifts for work days (Sun-Thu).
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="py-4">
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Period</label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={autoSchedulePeriod === "week" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setAutoSchedulePeriod("week")}
+                >
+                  Next 7 Days
+                </Button>
+                <Button
+                  type="button"
+                  variant={autoSchedulePeriod === "month" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setAutoSchedulePeriod("month")}
+                >
+                  Full Month
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">
+                  Drivers
+                  {autoScheduleDrivers.length > 0 && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      ({autoScheduleDrivers.length} selected)
+                    </span>
+                  )}
+                </label>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={() => setAutoScheduleDrivers(drivers.map(d => d.id))}
+                  >
+                    Select All
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={() => setAutoScheduleDrivers([])}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </div>
+              <div className="border rounded-lg p-2 max-h-32 overflow-y-auto space-y-1">
+                {drivers.map(driver => {
+                  const profile = getDriverProfile(driver)
+                  const isSelected = autoScheduleDrivers.includes(driver.id)
+                  return (
+                    <div
+                      key={driver.id}
+                      className={`flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-accent ${isSelected ? 'bg-accent' : ''}`}
+                      onClick={() => {
+                        if (isSelected) {
+                          setAutoScheduleDrivers(prev => prev.filter(id => id !== driver.id))
+                        } else {
+                          setAutoScheduleDrivers(prev => [...prev, driver.id])
+                        }
+                      }}
+                    >
+                      <Checkbox checked={isSelected} />
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={profile?.avatar_url || undefined} />
+                        <AvatarFallback className="text-xs">{profile?.full_name?.[0] || "D"}</AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm">{profile?.full_name || "Unknown"}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Shift Time</label>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-muted-foreground">Start</label>
+                  <Input
+                    type="time"
+                    value={autoScheduleStartTime}
+                    onChange={(e) => setAutoScheduleStartTime(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">End</label>
+                  <Input
+                    type="time"
+                    value={autoScheduleEndTime}
+                    onChange={(e) => setAutoScheduleEndTime(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
             <p className="text-sm text-muted-foreground">
-              <strong>{drivers.length}</strong> drivers will be scheduled across <strong>5</strong> work days (Sun-Thu).
+              <strong>{autoScheduleDrivers.length || drivers.length}</strong> driver(s) will be scheduled across{" "}
+              <strong>{autoSchedulePeriod === "month" ? "~22" : "5"}</strong> work days.
             </p>
           </div>
           <AlertDialogFooter>

@@ -550,89 +550,87 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildOnlineView(BuildContext context, DriverState state) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 100),
-      child: Column(
-        children: [
-          // Stats card
-          _buildStatsCard(context, state),
+    return Column(
+      children: [
+        // Stats card
+        _buildStatsCard(context, state),
 
-          // Quick Actions
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: context.cardColor,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: context.borderColor),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Quick Actions',
-                    style: TextStyle(
-                      color: context.mutedColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
+        // Quick Actions
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: context.cardColor,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: context.borderColor),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Quick Actions',
+                  style: TextStyle(
+                    color: context.mutedColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildActionButton(
+                      context,
+                      icon: Icons.coffee,
+                      label: 'Break',
+                      color: AppColors.warning,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        _showBreakOptions(context, state);
+                      },
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildActionButton(
-                        context,
-                        icon: Icons.coffee,
-                        label: 'Break',
-                        color: AppColors.warning,
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          _showBreakOptions(context, state);
-                        },
-                      ),
-                      _buildActionButton(
-                        context,
-                        icon: Icons.history,
-                        label: 'History',
-                        color: AppColors.info,
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          _onTabChanged(1);
-                        },
-                      ),
-                      _buildActionButton(
-                        context,
-                        icon: Icons.support_agent,
-                        label: 'Support',
-                        color: Colors.purple,
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          _showSupportSheet(context);
-                        },
-                      ),
-                      _buildActionButton(
-                        context,
-                        icon: Icons.warning_rounded,
-                        label: 'SOS',
-                        color: AppColors.error,
-                        onTap: () {
-                          HapticFeedback.heavyImpact();
-                          _showSOSDialog(context);
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                    _buildActionButton(
+                      context,
+                      icon: Icons.history,
+                      label: 'History',
+                      color: AppColors.info,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        _onTabChanged(1);
+                      },
+                    ),
+                    _buildActionButton(
+                      context,
+                      icon: Icons.support_agent,
+                      label: 'Support',
+                      color: Colors.purple,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        _showSupportSheet(context);
+                      },
+                    ),
+                    _buildActionButton(
+                      context,
+                      icon: Icons.warning_rounded,
+                      label: 'SOS',
+                      color: AppColors.error,
+                      onTap: () {
+                        HapticFeedback.heavyImpact();
+                        _showSOSDialog(context);
+                      },
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
+        ),
 
-          // Waiting view
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+        // Waiting view - centered and expanded
+        Expanded(
+          child: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -659,38 +657,44 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  'You\'ll be notified when a staff member requests a ride',
-                  style: TextStyle(
-                    color: context.mutedColor,
-                    fontSize: 13,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  child: Text(
+                    'You\'ll be notified when a staff member requests a ride',
+                    style: TextStyle(
+                      color: context.mutedColor,
+                      fontSize: 13,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
                 ),
               ],
             ),
           ),
+        ),
 
-          // End Shift Button - with proper spacing above nav bar
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+        // End Shift Button - fixed at bottom
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
             child: SizedBox(
               width: double.infinity,
-              height: 56,
+              height: 52,
               child: OutlinedButton.icon(
                 onPressed: () => _showEndShiftDialog(context, state),
-                icon: const Icon(Icons.logout_rounded, size: 22),
-                label: const Text('End Shift', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                icon: const Icon(Icons.logout_rounded, size: 20),
+                label: const Text('End Shift', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.error,
                   side: const BorderSide(color: AppColors.error, width: 1.5),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

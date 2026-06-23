@@ -9,7 +9,9 @@ import '../providers/driver_state.dart';
 import '../services/supabase_service.dart';
 
 class VehicleChecklistScreen extends StatefulWidget {
-  const VehicleChecklistScreen({super.key});
+  final bool isPostShift;
+
+  const VehicleChecklistScreen({super.key, this.isPostShift = false});
 
   @override
   State<VehicleChecklistScreen> createState() => _VehicleChecklistScreenState();
@@ -220,7 +222,7 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
               ),
               const Spacer(),
               Text(
-                'Pre-Trip Check',
+                widget.isPostShift ? 'Post-Shift Check' : 'Pre-Trip Check',
                 style: TextStyle(
                   color: context.textColor,
                   fontSize: 18,
@@ -353,7 +355,7 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                   const SizedBox(width: 8),
                   Text(
                     _allChecked
-                        ? (_hasIssues ? 'Issues will be reported' : 'Ready to go online')
+                        ? (_hasIssues ? 'Issues will be reported' : (widget.isPostShift ? 'Ready to end shift' : 'Ready to go online'))
                         : 'Swipe right for OK, left for Issue',
                     style: TextStyle(
                       color: context.textColor,

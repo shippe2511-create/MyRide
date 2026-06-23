@@ -847,6 +847,30 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                       ),
                     ),
 
+                    // Radio/Push to Talk Button
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.pushNamed(context, '/push-to-talk');
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.yellow,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.radio, color: Colors.black, size: 16),
+                            SizedBox(width: 6),
+                            Text('Radio', style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.w700)),
+                          ],
+                        ),
+                      ),
+                    ),
+
                     const Spacer(),
 
                     // Seats indicator

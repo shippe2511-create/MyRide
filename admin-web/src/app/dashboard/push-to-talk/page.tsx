@@ -38,6 +38,17 @@ import {
   Clock,
   Send,
 } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { PermissionGate } from "@/components/permission-gate"
 
 interface VoiceSettings {
@@ -88,6 +99,10 @@ export default function PushToTalkPage() {
   // Playback state
   const [playingId, setPlayingId] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  // Multi-select state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -300,6 +315,41 @@ export default function PushToTalkPage() {
       setMessages(prev => prev.filter(m => m.id !== id))
       toast.success("Message deleted")
     }
+  }
+
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedIds(newSelected)
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === messages.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(messages.map(m => m.id)))
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds)
+    const { error } = await supabase
+      .from("voice_messages")
+      .delete()
+      .in("id", ids)
+
+    if (error) {
+      toast.error("Failed to delete messages")
+    } else {
+      setMessages(prev => prev.filter(m => !selectedIds.has(m.id)))
+      setSelectedIds(new Set())
+      toast.success(`${ids.length} message(s) deleted`)
+    }
+    setDeleteDialogOpen(false)
   }
 
   const formatDuration = (seconds: number) => {
@@ -544,11 +594,23 @@ export default function PushToTalkPage() {
           <div className="lg:col-span-2">
             <Card>
               <div className="flex items-center justify-between p-4 border-b">
-                <h3 className="font-semibold flex items-center gap-2">
-                  <Volume2 className="h-4 w-4" />
-                  Recent Messages
-                </h3>
-                <Badge variant="secondary">{messages.length}</Badge>
+                <div className="flex items-center gap-4">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Volume2 className="h-4 w-4" />
+                    Recent Messages
+                  </h3>
+                  <Badge variant="secondary">{messages.length}</Badge>
+                </div>
+                {selectedIds.size > 0 && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setDeleteDialogOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete ({selectedIds.size})
+                  </Button>
+                )}
               </div>
 
               <div className="overflow-auto max-h-[600px]">
@@ -561,6 +623,12 @@ export default function PushToTalkPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-12">
+                          <Checkbox
+                            checked={selectedIds.size === messages.length && messages.length > 0}
+                            onCheckedChange={toggleSelectAll}
+                          />
+                        </TableHead>
                         <TableHead>From</TableHead>
                         <TableHead>To</TableHead>
                         <TableHead>Duration</TableHead>
@@ -572,6 +640,12 @@ export default function PushToTalkPage() {
                     <TableBody>
                       {messages.map((message) => (
                         <TableRow key={message.id}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedIds.has(message.id)}
+                              onCheckedChange={() => toggleSelect(message.id)}
+                            />
+                          </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <Avatar className="h-8 w-8">
@@ -640,6 +714,26 @@ export default function PushToTalkPage() {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Voice Messages</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedIds.size} voice message(s)? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PermissionGate>
   )
 }

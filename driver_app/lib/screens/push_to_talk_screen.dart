@@ -18,10 +18,12 @@ class PushToTalkScreen extends StatefulWidget {
   State<PushToTalkScreen> createState() => _PushToTalkScreenState();
 }
 
-class _PushToTalkScreenState extends State<PushToTalkScreen> {
+class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerProviderStateMixin {
   final PushToTalkService _service = PushToTalkService();
   late RecorderController _recorderController;
   final AudioPlayer _player = AudioPlayer();
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
 
   List<Map<String, dynamic>> _messages = [];
   bool _loading = true;
@@ -39,6 +41,15 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> {
       ..androidEncoder = AndroidEncoder.aac
       ..androidOutputFormat = AndroidOutputFormat.mpeg4
       ..iosEncoder = IosEncoder.kAudioFormatMPEG4AAC;
+
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
     _loadMessages();
     _subscribeToNewMessages();
   }
@@ -49,6 +60,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> {
     _recordingTimer?.cancel();
     _recorderController.dispose();
     _player.dispose();
+    _pulseController.dispose();
     super.dispose();
   }
 
@@ -57,6 +69,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> {
       setState(() {
         _messages.insert(0, message);
       });
+      HapticFeedback.mediumImpact();
     });
   }
 
@@ -72,12 +85,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> {
 
   Future<void> _startRecording() async {
     if (!_service.canDriverSend) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Driver voice messages are disabled'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showSnackBar('Driver voice messages are disabled', isError: true);
       return;
     }
 
@@ -87,7 +95,9 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> {
 
       await _recorderController.record(path: _recordingPath);
 
-      HapticFeedback.mediumImpact();
+      HapticFeedback.heavyImpact();
+      _pulseController.repeat(reverse: true);
+
       setState(() {
         _isRecording = true;
         _recordingDuration = 0;
@@ -103,12 +113,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> {
       });
     } catch (e) {
       debugPrint('Error starting recording: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to start recording: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showSnackBar('Failed to start recording', isError: true);
     }
   }
 
@@ -116,6 +121,9 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> {
     if (!_isRecording) return;
 
     _recordingTimer?.cancel();
+    _pulseController.stop();
+    _pulseController.reset();
+
     final path = await _recorderController.stop();
 
     HapticFeedback.lightImpact();
@@ -155,14 +163,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> {
         'duration_seconds': _recordingDuration,
       });
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Voice message sent to dispatch'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      _showSnackBar('Message sent to dispatch');
 
       // Clean up temp file
       await file.delete();
@@ -171,15 +172,21 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> {
       _loadMessages();
     } catch (e) {
       debugPrint('Error sending voice message: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to send: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      _showSnackBar('Failed to send message', isError: true);
     }
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : AppColors.success,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
   }
 
   Future<void> _playMessage(Map<String, dynamic> message) async {
@@ -240,196 +247,152 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Row(
+      backgroundColor: const Color(0xFF0A0A0A),
+      body: SafeArea(
+        child: Column(
           children: [
-            Icon(Icons.radio, color: Colors.yellow),
-            SizedBox(width: 8),
-            Text('Push to Talk', style: TextStyle(color: Colors.white)),
+            // Header
+            _buildHeader(),
+
+            // Messages List
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.yellow))
+                  : _messages.isEmpty
+                      ? _buildEmptyState()
+                      : _buildMessagesList(),
+            ),
+
+            // Recording Button Area
+            if (_service.featureEnabled)
+              _buildRecordingArea(),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _loadMessages,
-          ),
-        ],
       ),
-      body: Column(
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0A0A),
+        border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.1))),
+      ),
+      child: Row(
         children: [
-          // Info Card
-          Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey[900],
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[800]!),
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
             ),
-            child: Row(
+          ),
+          const SizedBox(width: 16),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.yellow, AppColors.yellow.withOpacity(0.7)],
+              ),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.radio, color: Colors.black, size: 20),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.yellow.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.mic, color: Colors.yellow, size: 24),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Voice Messages',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _service.featureEnabled
-                            ? 'Talk with dispatch'
-                            : 'Feature disabled',
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
+                Text(
+                  'Dispatch Radio',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                Badge(
-                  backgroundColor: _service.featureEnabled ? Colors.green : Colors.grey,
-                  label: Text(
-                    _service.featureEnabled ? 'ON' : 'OFF',
-                    style: const TextStyle(fontSize: 10),
+                Text(
+                  'Voice communication with dispatch',
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontSize: 12,
                   ),
                 ),
               ],
             ),
           ),
-
-          // Messages List
-          Expanded(
-            child: _loading
-                ? const Center(
-                    child: CircularProgressIndicator(color: Colors.yellow),
-                  )
-                : _messages.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.volume_off,
-                              size: 64,
-                              color: Colors.grey[700],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No voice messages yet',
-                              style: TextStyle(
-                                color: Colors.grey[500],
-                                fontSize: 16,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Hold the button below to send a message',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadMessages,
-                        color: Colors.yellow,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _messages.length,
-                          itemBuilder: (context, index) {
-                            final message = _messages[index];
-                            return _buildMessageCard(message);
-                          },
-                        ),
-                      ),
-          ),
-
-          // Recording Button
-          if (_service.featureEnabled && _service.canDriverSend)
-            Container(
-              padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).padding.bottom + 16),
+          GestureDetector(
+            onTap: _loadMessages,
+            child: Container(
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.grey[900],
-                border: Border(top: BorderSide(color: Colors.grey[800]!)),
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Column(
-                children: [
-                  if (_isRecording)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        _formatDuration(_recordingDuration),
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ),
-                  GestureDetector(
-                    onLongPressStart: (_) => _startRecording(),
-                    onLongPressEnd: (_) => _stopRecording(),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: _isRecording ? 90 : 70,
-                      height: _isRecording ? 90 : 70,
-                      decoration: BoxDecoration(
-                        color: _isRecording ? Colors.red : Colors.yellow,
-                        shape: BoxShape.circle,
-                        boxShadow: _isRecording
-                            ? [
-                                BoxShadow(
-                                  color: Colors.red.withOpacity(0.5),
-                                  blurRadius: 20,
-                                  spreadRadius: 5,
-                                )
-                              ]
-                            : null,
-                      ),
-                      child: Icon(
-                        _isRecording ? Icons.mic : Icons.mic_none,
-                        color: Colors.black,
-                        size: _isRecording ? 40 : 32,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    _isRecording ? 'Release to send' : 'Hold to talk',
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
+              child: const Icon(Icons.refresh, color: Colors.white, size: 20),
             ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppColors.yellow.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.headset_mic_rounded,
+              size: 48,
+              color: AppColors.yellow.withOpacity(0.5),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'No messages yet',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Hold the mic button to send\na message to dispatch',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.5),
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMessagesList() {
+    return RefreshIndicator(
+      onRefresh: _loadMessages,
+      color: AppColors.yellow,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _messages.length,
+        itemBuilder: (context, index) {
+          final message = _messages[index];
+          return _buildMessageCard(message);
+        },
       ),
     );
   }
@@ -439,97 +402,253 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> {
     final isPlayed = message['is_played'] == true;
     final senderType = message['sender_type'] ?? 'admin';
     final isFromAdmin = senderType == 'admin';
-    final senderName = message['sender']?['full_name'] ?? (isFromAdmin ? 'Dispatch' : 'Driver');
+    final senderName = message['sender']?['full_name'] ?? (isFromAdmin ? 'Dispatch' : 'You');
     final recipientType = message['recipient_type'] ?? '';
+    final duration = message['duration_seconds'] ?? 0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey[900],
-        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          colors: isFromAdmin
+              ? [const Color(0xFF1A1A2E), const Color(0xFF16213E)]
+              : [const Color(0xFF0F3460), const Color(0xFF1A1A2E)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isFromAdmin ? Colors.yellow.withOpacity(0.3) : Colors.blue.withOpacity(0.3),
+          color: isFromAdmin
+              ? AppColors.yellow.withOpacity(0.3)
+              : Colors.blue.withOpacity(0.3),
+          width: 1,
         ),
       ),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => _playMessage(message),
-            child: Container(
-              width: 50,
-              height: 50,
-              decoration: const BoxDecoration(
-                color: Colors.yellow,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                isPlaying ? Icons.pause : Icons.play_arrow,
-                color: Colors.black,
-                size: 28,
-              ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _playMessage(message),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Play Button
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isPlaying
+                          ? [Colors.red, Colors.red.shade700]
+                          : [AppColors.yellow, AppColors.yellow.withOpacity(0.8)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: (isPlaying ? Colors.red : AppColors.yellow).withOpacity(0.4),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    color: Colors.black,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+
+                // Message Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            senderName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (recipientType == 'all_drivers' || recipientType == 'broadcast')
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppColors.yellow.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'ALL',
+                                style: TextStyle(
+                                  color: AppColors.yellow,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          if (!isPlayed) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: Colors.blue,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.graphic_eq_rounded,
+                            size: 16,
+                            color: Colors.white.withOpacity(0.5),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _formatDuration(duration),
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.5),
+                              fontSize: 13,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Icon(
+                            Icons.access_time_rounded,
+                            size: 14,
+                            color: Colors.white.withOpacity(0.4),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _formatTime(message['created_at']),
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.4),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      senderName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (recipientType == 'broadcast' || recipientType == 'all_drivers')
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecordingArea() {
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).padding.bottom + 20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF1A1A1A),
+            const Color(0xFF0A0A0A),
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.1))),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Recording Duration
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            height: _isRecording ? 40 : 0,
+            child: _isRecording
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
                       Container(
-                        margin: const EdgeInsets.only(left: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.yellow.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          recipientType == 'broadcast' ? 'BROADCAST' : 'ALL DRIVERS',
-                          style: const TextStyle(
-                            color: Colors.yellow,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    if (!isPlayed)
-                      Container(
-                        margin: const EdgeInsets.only(left: 8),
-                        width: 8,
-                        height: 8,
+                        width: 12,
+                        height: 12,
                         decoration: const BoxDecoration(
-                          color: Colors.blue,
+                          color: Colors.red,
                           shape: BoxShape.circle,
                         ),
                       ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
-                    const SizedBox(width: 4),
-                    Text(
-                      _formatDuration(message['duration_seconds'] ?? 0),
-                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                      const SizedBox(width: 8),
+                      Text(
+                        _formatDuration(_recordingDuration),
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                  )
+                : const SizedBox(),
+          ),
+          const SizedBox(height: 16),
+
+          // Record Button
+          GestureDetector(
+            onLongPressStart: (_) => _startRecording(),
+            onLongPressEnd: (_) => _stopRecording(),
+            child: AnimatedBuilder(
+              animation: _pulseAnimation,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _isRecording ? _pulseAnimation.value : 1.0,
+                  child: Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: _isRecording
+                            ? [Colors.red, Colors.red.shade700]
+                            : [AppColors.yellow, AppColors.yellow.withOpacity(0.8)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: (_isRecording ? Colors.red : AppColors.yellow).withOpacity(0.5),
+                          blurRadius: _isRecording ? 30 : 20,
+                          spreadRadius: _isRecording ? 5 : 0,
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Text(
-                      _formatTime(message['created_at']),
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    child: Icon(
+                      _isRecording ? Icons.stop_rounded : Icons.mic_rounded,
+                      color: Colors.black,
+                      size: 36,
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Instructions
+          Text(
+            _isRecording ? 'Release to send' : 'Hold to talk',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.6),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],

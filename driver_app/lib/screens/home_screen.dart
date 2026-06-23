@@ -583,6 +583,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     _buildActionButton(
                       context,
+                      icon: Icons.mic,
+                      label: 'Radio',
+                      color: AppColors.success,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.pushNamed(context, '/push-to-talk');
+                      },
+                    ),
+                    _buildActionButton(
+                      context,
                       icon: Icons.coffee,
                       label: 'Break',
                       color: AppColors.warning,
@@ -599,16 +609,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       onTap: () {
                         HapticFeedback.lightImpact();
                         _onTabChanged(1);
-                      },
-                    ),
-                    _buildActionButton(
-                      context,
-                      icon: Icons.support_agent,
-                      label: 'Support',
-                      color: Colors.purple,
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        _showSupportSheet(context);
                       },
                     ),
                     _buildActionButton(

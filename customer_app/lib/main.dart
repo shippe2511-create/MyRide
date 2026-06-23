@@ -22,7 +22,6 @@ import 'services/notification_service.dart';
 import 'services/cache_service.dart';
 import 'services/supabase_service.dart';
 import 'services/location_service.dart';
-import 'services/voice_service.dart';
 import 'widgets/offline_banner.dart';
 import 'widgets/app_notification_banner.dart';
 
@@ -102,12 +101,7 @@ void main() async {
     debugPrint('Location init error: $e');
   }
 
-  try {
-    // Initialize voice service for broadcast messages
-    await VoiceService().initialize();
-  } catch (e) {
-    debugPrint('Voice service init error: $e');
-  }
+  // Voice service removed - push to talk is only for admin-driver communication
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(

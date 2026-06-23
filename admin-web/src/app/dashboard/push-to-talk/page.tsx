@@ -80,7 +80,7 @@ export default function PushToTalkPage() {
   // Recording state
   const [isRecording, setIsRecording] = useState(false)
   const [recordingDuration, setRecordingDuration] = useState(0)
-  const [selectedRecipient, setSelectedRecipient] = useState<string>("broadcast")
+  const [selectedRecipient, setSelectedRecipient] = useState<string>("all_drivers")
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -361,15 +361,9 @@ export default function PushToTalkPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="broadcast">
-                        <span className="flex items-center gap-2">
-                          <Radio className="h-4 w-4" />
-                          Broadcast to All
-                        </span>
-                      </SelectItem>
                       <SelectItem value="all_drivers">
                         <span className="flex items-center gap-2">
-                          <Users className="h-4 w-4" />
+                          <Radio className="h-4 w-4" />
                           All Drivers
                         </span>
                       </SelectItem>
@@ -395,22 +389,50 @@ export default function PushToTalkPage() {
                     </div>
                   )}
 
-                  <Button
-                    size="lg"
-                    className={`h-20 w-20 rounded-full ${isRecording ? "bg-red-500 hover:bg-red-600" : ""}`}
-                    onMouseDown={settings?.feature_enabled ? startRecording : undefined}
-                    onMouseUp={settings?.feature_enabled ? stopRecording : undefined}
-                    onMouseLeave={isRecording ? stopRecording : undefined}
-                    onTouchStart={settings?.feature_enabled ? startRecording : undefined}
-                    onTouchEnd={settings?.feature_enabled ? stopRecording : undefined}
+                  <button
+                    type="button"
+                    className={`h-20 w-20 rounded-full flex items-center justify-center transition-all cursor-pointer select-none ${
+                      isRecording
+                        ? "bg-red-500 hover:bg-red-600 scale-110"
+                        : "bg-primary hover:bg-primary/90"
+                    } ${!settings?.feature_enabled ? "opacity-50 cursor-not-allowed" : ""}`}
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      if (settings?.feature_enabled && !isRecording) {
+                        startRecording()
+                      }
+                    }}
+                    onMouseUp={(e) => {
+                      e.preventDefault()
+                      if (isRecording) {
+                        stopRecording()
+                      }
+                    }}
+                    onMouseLeave={() => {
+                      if (isRecording) {
+                        stopRecording()
+                      }
+                    }}
+                    onTouchStart={(e) => {
+                      e.preventDefault()
+                      if (settings?.feature_enabled && !isRecording) {
+                        startRecording()
+                      }
+                    }}
+                    onTouchEnd={(e) => {
+                      e.preventDefault()
+                      if (isRecording) {
+                        stopRecording()
+                      }
+                    }}
                     disabled={!settings?.feature_enabled}
                   >
                     {isRecording ? (
-                      <MicOff className="h-8 w-8" />
+                      <MicOff className="h-8 w-8 text-white" />
                     ) : (
-                      <Mic className="h-8 w-8" />
+                      <Mic className="h-8 w-8 text-primary-foreground" />
                     )}
-                  </Button>
+                  </button>
 
                   <p className="text-sm text-muted-foreground mt-4">
                     {settings?.feature_enabled

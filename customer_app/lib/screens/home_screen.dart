@@ -11,9 +11,7 @@ import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../services/location_service.dart';
-import '../services/voice_service.dart';
 import '../widgets/onboarding_tooltip.dart';
-import '../widgets/voice_notification_widget.dart';
 import 'search_screen.dart';
 import 'activity_screen.dart';
 import 'inbox_screen.dart';
@@ -66,8 +64,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   RealtimeChannel? _announcementsSubscription;
 
-  // Voice message listener
-  StreamSubscription<VoiceMessage>? _voiceMessageSubscription;
 
   @override
   void initState() {
@@ -81,34 +77,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _checkForScheduledRides();
     _initNotifications();
     _subscribeToAnnouncements();
-    _initVoiceMessageListener();
-  }
-
-  void _initVoiceMessageListener() {
-    final voiceService = VoiceService();
-
-    // Subscribe to new broadcast voice messages
-    _voiceMessageSubscription = voiceService.onNewMessage.listen((message) {
-      if (mounted) {
-        debugPrint('HomeScreen: New voice broadcast received');
-        VoiceNotificationOverlay.show(context, message);
-      }
-    });
-
-    // Check for any unplayed broadcasts on startup
-    _checkUnplayedVoiceBroadcasts();
-  }
-
-  Future<void> _checkUnplayedVoiceBroadcasts() async {
-    try {
-      final unplayed = await VoiceService().getUnplayedBroadcasts();
-      if (unplayed.isNotEmpty && mounted) {
-        // Show the most recent unplayed message
-        VoiceNotificationOverlay.show(context, unplayed.first);
-      }
-    } catch (e) {
-      debugPrint('HomeScreen: Error checking unplayed voice broadcasts: $e');
-    }
   }
 
   void _subscribeToAnnouncements() {
@@ -221,7 +189,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _pulseController.dispose();
     _scheduledRideTimer?.cancel();
     _announcementsSubscription?.unsubscribe();
-    _voiceMessageSubscription?.cancel();
     super.dispose();
   }
 

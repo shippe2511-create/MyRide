@@ -18,7 +18,18 @@ import {
   User,
   RefreshCw,
   Loader2,
+  Trash2,
 } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { SkeletonCard } from "@/components/ui/skeleton-card"
 import { PermissionGate } from "@/components/permission-gate"
 
@@ -58,9 +69,14 @@ export default function SupportChatPage() {
   const [sending, setSending] = useState(false)
   const [search, setSearch] = useState("")
   const [adminId, setAdminId] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [chatToDelete, setChatToDelete] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const [stats, setStats] = useState({ total: 0, open: 0, active: 0, resolved: 0 })
+
+  const canDelete = userRole === 'admin' || userRole === 'super-admin'
 
   useEffect(() => {
     loadAdminId()
@@ -90,13 +106,48 @@ export default function SupportChatPage() {
     if (user) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, role')
         .eq('email', user.email)
         .single()
       if (profile) {
         setAdminId(profile.id)
+        setUserRole(profile.role)
       }
     }
+  }
+
+  const handleDeleteChat = async () => {
+    if (!chatToDelete) return
+
+    // First delete all messages in the chat
+    await supabase
+      .from('support_chat_messages')
+      .delete()
+      .eq('chat_id', chatToDelete)
+
+    // Then delete the chat itself
+    const { error } = await supabase
+      .from('support_chats')
+      .delete()
+      .eq('id', chatToDelete)
+
+    if (error) {
+      toast.error('Failed to delete chat')
+    } else {
+      toast.success('Chat deleted')
+      setChats(prev => prev.filter(c => c.id !== chatToDelete))
+      if (selectedChat?.id === chatToDelete) {
+        setSelectedChat(null)
+        setMessages([])
+      }
+    }
+    setDeleteDialogOpen(false)
+    setChatToDelete(null)
+  }
+
+  const confirmDelete = (chatId: string) => {
+    setChatToDelete(chatId)
+    setDeleteDialogOpen(true)
   }
 
   const loadChats = async () => {
@@ -418,6 +469,16 @@ export default function SupportChatPage() {
                       Resolve
                     </Button>
                   )}
+                  {canDelete && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                      onClick={() => confirmDelete(selectedChat.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -486,6 +547,26 @@ export default function SupportChatPage() {
         </Card>
       </div>
     </div>
+
+    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Chat</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete this chat? This will permanently delete all messages in this conversation. This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDeleteChat}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </PermissionGate>
   )
 }

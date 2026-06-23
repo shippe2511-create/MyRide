@@ -92,6 +92,7 @@ export default function AppConfigPage() {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [activeTab, setActiveTab] = useState("general")
 
   // General settings
   const [settings, setSettings] = useState<AppSettings>(defaultSettings)
@@ -332,7 +333,7 @@ export default function AppConfigPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="general">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="general" className="flex items-center gap-2">
             <Settings2 className="h-4 w-4" />

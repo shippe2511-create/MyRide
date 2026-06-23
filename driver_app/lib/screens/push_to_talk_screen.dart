@@ -621,41 +621,70 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
           ),
           const SizedBox(height: 16),
 
-          // Record Button
+          // Record Button with glow rings (matching admin style)
           GestureDetector(
             onLongPressStart: (_) => _startRecording(),
             onLongPressEnd: (_) => _stopRecording(),
             child: AnimatedBuilder(
               animation: _pulseAnimation,
               builder: (context, child) {
-                return Transform.scale(
-                  scale: _isRecording ? _pulseAnimation.value : 1.0,
-                  child: Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: _isRecording
-                            ? [Colors.red, Colors.red.shade700]
-                            : [AppColors.yellow, AppColors.yellow.withOpacity(0.8)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: (_isRecording ? Colors.red : AppColors.yellow).withOpacity(0.5),
-                          blurRadius: _isRecording ? 30 : 20,
-                          spreadRadius: _isRecording ? 5 : 0,
+                return Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Outer pulsing glow ring
+                    if (_isRecording)
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        width: 130,
+                        height: 130,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.red.withOpacity(0.2),
                         ),
-                      ],
+                      ),
+                    // Middle glow ring
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: _isRecording ? 115 : 100,
+                      height: _isRecording ? 115 : 100,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _isRecording
+                            ? Colors.red.withOpacity(0.3)
+                            : AppColors.yellow.withOpacity(0.2),
+                      ),
                     ),
-                    child: Icon(
-                      _isRecording ? Icons.stop_rounded : Icons.mic_rounded,
-                      color: Colors.black,
-                      size: 36,
+                    // Main button
+                    Transform.scale(
+                      scale: _isRecording ? _pulseAnimation.value : 1.0,
+                      child: Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: _isRecording
+                                ? [Colors.red, Colors.red.shade700]
+                                : [AppColors.yellow, AppColors.yellow.withOpacity(0.8)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: (_isRecording ? Colors.red : AppColors.yellow).withOpacity(0.5),
+                              blurRadius: _isRecording ? 30 : 20,
+                              spreadRadius: _isRecording ? 5 : 0,
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          _isRecording ? Icons.stop_rounded : Icons.mic_rounded,
+                          color: Colors.black,
+                          size: 40,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 );
               },
             ),

@@ -1,24 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
-import '../theme/app_theme.dart';
-import '../services/push_to_talk_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-/// Widget displaying a single voice message with play/pause controls.
 class VoiceMessageWidget extends StatefulWidget {
   final Map<String, dynamic> message;
-  final String currentDriverId;
-  final bool isPlaying;
-  final VoidCallback onPlay;
-  final VoidCallback onStop;
+  final VoidCallback? onPlayed;
 
   const VoiceMessageWidget({
     super.key,
     required this.message,
-    required this.currentDriverId,
-    required this.isPlaying,
-    required this.onPlay,
-    required this.onStop,
+    this.onPlayed,
   });
 
   @override
@@ -26,278 +16,156 @@ class VoiceMessageWidget extends StatefulWidget {
 }
 
 class _VoiceMessageWidgetState extends State<VoiceMessageWidget> {
-  String _senderName = 'Loading...';
-  bool _loadingSenderName = true;
+  bool _isPlaying = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadSenderName();
-  }
-
-  Future<void> _loadSenderName() async {
-    final senderId = widget.message['sender_id'] as String?;
-    final senderType = widget.message['sender_type'] as String?;
-
-    if (senderId == widget.currentDriverId) {
-      setState(() {
-        _senderName = 'You';
-        _loadingSenderName = false;
-      });
-      return;
-    }
-
-    if (senderId != null && senderType != null) {
-      final name = await PushToTalkService().getSenderName(senderId, senderType);
-      if (mounted) {
-        setState(() {
-          _senderName = name;
-          _loadingSenderName = false;
-        });
-      }
-    } else {
-      setState(() {
-        _senderName = 'Unknown';
-        _loadingSenderName = false;
-      });
-    }
-  }
-
-  String _formatDuration(int seconds) {
-    final minutes = seconds ~/ 60;
+  String _formatDuration(int? seconds) {
+    if (seconds == null) return '0:00';
+    final mins = seconds ~/ 60;
     final secs = seconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+    return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
-  String _formatTimestamp(String? timestamp) {
-    if (timestamp == null) return '';
-    try {
-      final dt = DateTime.parse(timestamp).toLocal();
-      final now = DateTime.now();
-      final diff = now.difference(dt);
+  String _formatTime(String? dateStr) {
+    if (dateStr == null) return '';
+    final date = DateTime.tryParse(dateStr);
+    if (date == null) return '';
 
-      if (diff.inMinutes < 1) {
-        return 'Just now';
-      } else if (diff.inHours < 1) {
-        return '${diff.inMinutes}m ago';
-      } else if (diff.inDays < 1) {
-        return DateFormat('h:mm a').format(dt);
-      } else if (diff.inDays == 1) {
-        return 'Yesterday ${DateFormat('h:mm a').format(dt)}';
-      } else if (diff.inDays < 7) {
-        return DateFormat('EEE h:mm a').format(dt);
-      } else {
-        return DateFormat('MMM d, h:mm a').format(dt);
-      }
-    } catch (e) {
-      return '';
+    final now = DateTime.now();
+    final diff = now.difference(date);
+
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+
+  Future<void> _playMessage() async {
+    final audioUrl = widget.message['audio_url'] as String?;
+    if (audioUrl == null) return;
+
+    setState(() => _isPlaying = true);
+
+    // Open audio URL in browser/player
+    final uri = Uri.parse(audioUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
+
+    widget.onPlayed?.call();
+    setState(() => _isPlaying = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isFromMe = widget.message['sender_id'] == widget.currentDriverId;
     final isPlayed = widget.message['is_played'] == true;
-    final duration = widget.message['duration_seconds'] as int? ?? 0;
-    final timestamp = widget.message['created_at'] as String?;
     final senderType = widget.message['sender_type'] as String?;
     final recipientType = widget.message['recipient_type'] as String?;
-
-    final isBroadcast = recipientType == 'all_drivers';
-    final isFromAdmin = senderType == 'admin';
+    final duration = widget.message['duration_seconds'] as int?;
+    final sender = widget.message['sender'] as Map<String, dynamic>?;
+    final senderName = sender?['full_name'] ?? (senderType == 'admin' ? 'Dispatch' : 'Unknown');
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isPlayed ? Colors.grey[800]! : Colors.yellow.withOpacity(0.5),
+          width: isPlayed ? 1 : 2,
+        ),
+      ),
       child: Row(
-        mainAxisAlignment: isFromMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
-          if (!isFromMe) ...[
-            // Sender avatar
-            Container(
-              width: 40,
-              height: 40,
+          // Play Button
+          GestureDetector(
+            onTap: _playMessage,
+            child: Container(
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
-                color: isFromAdmin
-                    ? AppColors.info.withValues(alpha: 0.2)
-                    : AppColors.yellow.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.yellow,
+                borderRadius: BorderRadius.circular(24),
               ),
               child: Icon(
-                isFromAdmin ? Icons.admin_panel_settings : Icons.person,
-                color: isFromAdmin ? AppColors.info : AppColors.yellow,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 10),
-          ],
-          // Message bubble
-          Flexible(
-            child: Container(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.75,
-              ),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isFromMe
-                    ? AppColors.yellow.withValues(alpha: 0.15)
-                    : context.cardColor,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(isFromMe ? 16 : 4),
-                  bottomRight: Radius.circular(isFromMe ? 4 : 16),
-                ),
-                border: Border.all(
-                  color: isFromMe
-                      ? AppColors.yellow.withValues(alpha: 0.3)
-                      : context.borderColor,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Sender name and broadcast indicator
-                  Row(
-                    children: [
-                      if (_loadingSenderName)
-                        SizedBox(
-                          width: 12,
-                          height: 12,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: context.mutedColor,
-                          ),
-                        )
-                      else
-                        Expanded(
-                          child: Text(
-                            _senderName,
-                            style: TextStyle(
-                              color: isFromAdmin ? AppColors.info : context.textColor,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      if (isBroadcast) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.info.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.campaign, size: 12, color: AppColors.info),
-                              const SizedBox(width: 3),
-                              Text(
-                                'Broadcast',
-                                style: TextStyle(
-                                  color: AppColors.info,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  // Play button and duration
-                  Row(
-                    children: [
-                      // Play/Stop button
-                      GestureDetector(
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          if (widget.isPlaying) {
-                            widget.onStop();
-                          } else {
-                            widget.onPlay();
-                          }
-                        },
-                        child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: widget.isPlaying
-                                ? AppColors.error
-                                : AppColors.success,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            widget.isPlaying ? Icons.stop : Icons.play_arrow,
-                            color: Colors.white,
-                            size: 26,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      // Waveform placeholder and duration
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Fake waveform
-                            Row(
-                              children: List.generate(12, (index) {
-                                final height = 4.0 + (index % 3) * 6 + (index % 5) * 3;
-                                return Container(
-                                  margin: const EdgeInsets.only(right: 3),
-                                  width: 3,
-                                  height: height.clamp(4.0, 20.0),
-                                  decoration: BoxDecoration(
-                                    color: widget.isPlaying
-                                        ? AppColors.success
-                                        : context.mutedColor.withValues(alpha: 0.5),
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                );
-                              }),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _formatDuration(duration),
-                              style: TextStyle(
-                                color: context.mutedColor,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Played indicator
-                      if (!isFromMe && !isPlayed)
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: AppColors.info,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  // Timestamp
-                  Text(
-                    _formatTimestamp(timestamp),
-                    style: TextStyle(
-                      color: context.mutedColor,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
+                _isPlaying ? Icons.pause : Icons.play_arrow,
+                color: Colors.black,
+                size: 28,
               ),
             ),
           ),
-          if (isFromMe) const SizedBox(width: 10),
+          const SizedBox(width: 16),
+
+          // Message Info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      senderName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (recipientType == 'broadcast' || recipientType == 'all_drivers')
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.yellow.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'BROADCAST',
+                          style: TextStyle(
+                            color: Colors.yellow,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    if (!isPlayed) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.blue,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
+                    const SizedBox(width: 4),
+                    Text(
+                      _formatDuration(duration),
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      _formatTime(widget.message['created_at'] as String?),
+                      style: TextStyle(
+                        color: Colors.grey[500],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

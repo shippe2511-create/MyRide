@@ -20,6 +20,8 @@ class PushToTalkService {
   RealtimeChannel? _voiceMessageSubscription;
   final StreamController<Map<String, dynamic>> _newMessageController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<String> _deletedMessageController =
+      StreamController<String>.broadcast();
 
   // Getters
   bool get featureEnabled => _featureEnabled;
@@ -27,6 +29,7 @@ class PushToTalkService {
   bool get canDriverSend => _allowedSenders.contains('driver');
   bool get broadcastEnabled => _broadcastEnabled;
   Stream<Map<String, dynamic>> get onNewMessage => _newMessageController.stream;
+  Stream<String> get onMessageDeleted => _deletedMessageController.stream;
 
   /// Initialize the service and load settings
   Future<void> initialize() async {
@@ -90,21 +93,41 @@ class PushToTalkService {
             }
           },
         )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'voice_messages',
+          callback: (payload) {
+            final oldRecord = payload.oldRecord;
+            final messageId = oldRecord['id'];
+            if (messageId != null) {
+              debugPrint('Voice message deleted: $messageId');
+              _deletedMessageController.add(messageId.toString());
+            }
+          },
+        )
         .subscribe();
 
     debugPrint('Subscribed to voice messages');
   }
 
   /// Get recent voice messages for this driver
-  Future<List<Map<String, dynamic>>> getMessages({int limit = 20}) async {
-    final userId = SupabaseService.visibleUserId;
-    if (userId == null) return [];
+  Future<List<Map<String, dynamic>>> getMessages({int limit = 20, String? profileId}) async {
+    final visibleUserId = SupabaseService.visibleUserId;
+    if (visibleUserId == null) return [];
 
     try {
+      // Get messages sent TO this driver (broadcasts, all_drivers, or direct)
+      // AND messages sent BY this driver (using profileId)
+      String filter = 'recipient_type.eq.broadcast,recipient_type.eq.all_drivers,recipient_id.eq.$visibleUserId';
+      if (profileId != null) {
+        filter += ',sender_id.eq.$profileId';
+      }
+
       final response = await SupabaseService.client
           .from('voice_messages')
           .select('*, sender:profiles!voice_messages_sender_id_fkey(full_name)')
-          .or('recipient_type.eq.broadcast,recipient_type.eq.all_drivers,recipient_id.eq.$userId')
+          .or(filter)
           .order('created_at', ascending: false)
           .limit(limit);
 

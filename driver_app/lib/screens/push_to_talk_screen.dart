@@ -31,6 +31,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
   bool _isRecording = false;
   int _recordingDuration = 0;
   Timer? _recordingTimer;
+  Timer? _pollingTimer;
   String? _recordingPath;
   StreamSubscription? _messageSubscription;
   String? _playingId;
@@ -55,6 +56,13 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
     _loadMessages();
     _loadOnlineDrivers();
     _subscribeToNewMessages();
+    _startPolling();
+  }
+
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _loadMessages(showLoading: false);
+    });
   }
 
   Future<void> _loadOnlineDrivers() async {
@@ -78,6 +86,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
   void dispose() {
     _messageSubscription?.cancel();
     _recordingTimer?.cancel();
+    _pollingTimer?.cancel();
     _recorderController.dispose();
     _player.dispose();
     _pulseController.dispose();
@@ -91,16 +100,28 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
       });
       HapticFeedback.mediumImpact();
     });
+
+    // Also listen for deleted messages
+    _service.onMessageDeleted.listen((messageId) {
+      setState(() {
+        _messages.removeWhere((m) => m['id'] == messageId);
+      });
+    });
   }
 
-  Future<void> _loadMessages() async {
-    setState(() => _loading = true);
+  Future<void> _loadMessages({bool showLoading = true}) async {
+    if (showLoading && _messages.isEmpty) {
+      setState(() => _loading = true);
+    }
     await _service.loadSettings();
-    final messages = await _service.getMessages();
-    setState(() {
-      _messages = messages;
-      _loading = false;
-    });
+    final driverState = context.read<DriverState>();
+    final messages = await _service.getMessages(profileId: driverState.profileId);
+    if (mounted) {
+      setState(() {
+        _messages = messages;
+        _loading = false;
+      });
+    }
   }
 
   Future<void> _startRecording() async {

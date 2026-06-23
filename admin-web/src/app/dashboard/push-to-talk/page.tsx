@@ -109,11 +109,33 @@ export default function PushToTalkPage() {
 
     // Realtime subscription for new messages
     const channel = supabase
-      .channel('voice-messages')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'voice_messages' }, () => {
+      .channel('voice-messages-realtime')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'voice_messages'
+      }, () => {
+        // Fetch full data with joins
         fetchMessages()
       })
-      .subscribe()
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'voice_messages'
+      }, (payload) => {
+        const deletedId = payload.old.id
+        setMessages(prev => prev.filter(m => m.id !== deletedId))
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'voice_messages'
+      }, () => {
+        fetchMessages()
+      })
+      .subscribe((status) => {
+        console.log('Voice messages subscription status:', status)
+      })
 
     return () => {
       supabase.removeChannel(channel)
@@ -439,52 +461,69 @@ export default function PushToTalkPage() {
                     </div>
                   )}
 
-                  <button
-                    type="button"
-                    className={`h-20 w-20 rounded-full flex items-center justify-center transition-all cursor-pointer select-none ${
+                  <div className="relative">
+                    {/* Outer glow ring */}
+                    <div className={`absolute inset-0 rounded-full transition-all duration-300 ${
                       isRecording
-                        ? "bg-red-500 hover:bg-red-600 scale-110"
-                        : "bg-primary hover:bg-primary/90"
-                    } ${!settings?.feature_enabled ? "opacity-50 cursor-not-allowed" : ""}`}
-                    onMouseDown={(e) => {
-                      e.preventDefault()
-                      if (settings?.feature_enabled && !isRecording) {
-                        startRecording()
-                      }
-                    }}
-                    onMouseUp={(e) => {
-                      e.preventDefault()
-                      if (isRecording) {
-                        stopRecording()
-                      }
-                    }}
-                    onMouseLeave={() => {
-                      if (isRecording) {
-                        stopRecording()
-                      }
-                    }}
-                    onTouchStart={(e) => {
-                      e.preventDefault()
-                      if (settings?.feature_enabled && !isRecording) {
-                        startRecording()
-                      }
-                    }}
-                    onTouchEnd={(e) => {
-                      e.preventDefault()
-                      if (isRecording) {
-                        stopRecording()
-                      }
-                    }}
-                    disabled={!settings?.feature_enabled}
-                  >
-                    {isRecording ? (
-                      <MicOff className="h-8 w-8 text-white" />
-                    ) : (
-                      <Mic className="h-8 w-8 text-primary-foreground" />
-                    )}
-                  </button>
+                        ? "bg-red-500/30 animate-ping"
+                        : "bg-primary/20"
+                    }`} style={{ transform: 'scale(1.3)' }} />
 
-                  <p className="text-sm text-muted-foreground mt-4">
+                    {/* Middle ring */}
+                    <div className={`absolute inset-0 rounded-full transition-all duration-200 ${
+                      isRecording
+                        ? "bg-red-500/40 scale-125"
+                        : "bg-primary/30 scale-110"
+                    }`} />
+
+                    {/* Main button */}
+                    <button
+                      type="button"
+                      className={`relative h-24 w-24 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer select-none shadow-lg ${
+                        isRecording
+                          ? "bg-gradient-to-br from-red-500 to-red-600 scale-110 shadow-red-500/50"
+                          : "bg-gradient-to-br from-primary to-primary/80 hover:scale-105 shadow-primary/50"
+                      } ${!settings?.feature_enabled ? "opacity-50 cursor-not-allowed" : ""}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        if (settings?.feature_enabled && !isRecording) {
+                          startRecording()
+                        }
+                      }}
+                      onMouseUp={(e) => {
+                        e.preventDefault()
+                        if (isRecording) {
+                          stopRecording()
+                        }
+                      }}
+                      onMouseLeave={() => {
+                        if (isRecording) {
+                          stopRecording()
+                        }
+                      }}
+                      onTouchStart={(e) => {
+                        e.preventDefault()
+                        if (settings?.feature_enabled && !isRecording) {
+                          startRecording()
+                        }
+                      }}
+                      onTouchEnd={(e) => {
+                        e.preventDefault()
+                        if (isRecording) {
+                          stopRecording()
+                        }
+                      }}
+                      disabled={!settings?.feature_enabled}
+                    >
+                      {isRecording ? (
+                        <MicOff className="h-10 w-10 text-white drop-shadow-lg" />
+                      ) : (
+                        <Mic className="h-10 w-10 text-primary-foreground drop-shadow-lg" />
+                      )}
+                    </button>
+                  </div>
+
+                  <p className="text-sm text-muted-foreground mt-6">
                     {settings?.feature_enabled
                       ? "Hold to record, release to send"
                       : "Feature disabled"

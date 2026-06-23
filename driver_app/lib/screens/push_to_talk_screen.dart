@@ -670,40 +670,58 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
                 final baseColor = _isRecording ? Colors.red : AppColors.yellow;
 
                 return SizedBox(
-                  width: 160,
-                  height: 160,
+                  width: 180,
+                  height: 180,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      // Outer animated ring 3
-                      if (_isRecording)
-                        Transform.scale(
-                          scale: scale * 1.1,
-                          child: Container(
-                            width: 150,
-                            height: 150,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.red.withOpacity(0.15),
-                                width: 2,
-                              ),
-                            ),
-                          ),
-                        ),
-                      // Outer animated ring 2
+                      // Outermost ring (always visible)
                       Transform.scale(
-                        scale: _isRecording ? scale : 1.0,
+                        scale: _isRecording ? scale * 1.05 : 1.0,
                         child: Container(
-                          width: 130,
-                          height: 130,
+                          width: 170,
+                          height: 170,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: baseColor.withOpacity(0.2),
+                              color: baseColor.withOpacity(0.25),
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Second ring
+                      Transform.scale(
+                        scale: _isRecording ? scale : 1.0,
+                        child: Container(
+                          width: 150,
+                          height: 150,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: baseColor.withOpacity(0.4),
                               width: 2,
                             ),
                           ),
+                        ),
+                      ),
+                      // Third ring with glow
+                      Container(
+                        width: 130,
+                        height: 130,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: baseColor.withOpacity(0.5),
+                            width: 2.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: baseColor.withOpacity(0.3),
+                              blurRadius: 15,
+                              spreadRadius: 2,
+                            ),
+                          ],
                         ),
                       ),
                       // Inner glow ring
@@ -714,28 +732,28 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
                           shape: BoxShape.circle,
                           gradient: RadialGradient(
                             colors: [
-                              baseColor.withOpacity(0.3),
-                              baseColor.withOpacity(0.0),
+                              baseColor.withOpacity(0.5),
+                              baseColor.withOpacity(0.1),
                             ],
                           ),
                         ),
                       ),
                       // Main button with gradient border
                       Container(
-                        width: 100,
-                        height: 100,
+                        width: 95,
+                        height: 95,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           gradient: LinearGradient(
                             colors: [
+                              baseColor.withOpacity(0.6),
                               baseColor.withOpacity(0.3),
-                              baseColor.withOpacity(0.1),
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
                         ),
-                        padding: const EdgeInsets.all(3),
+                        padding: const EdgeInsets.all(4),
                         child: Container(
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
@@ -748,9 +766,9 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: baseColor.withOpacity(0.6),
-                                blurRadius: 25,
-                                spreadRadius: _isRecording ? 8 : 2,
+                                color: baseColor.withOpacity(0.8),
+                                blurRadius: 30,
+                                spreadRadius: _isRecording ? 10 : 5,
                               ),
                             ],
                           ),

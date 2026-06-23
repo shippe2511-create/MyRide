@@ -34,6 +34,7 @@ import {
   Cog,
   HelpCircle,
   Smartphone,
+  Mic,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -84,6 +85,7 @@ const navigationSections: NavSection[] = [
     items: [
       { name: "Rides", href: "/dashboard/rides", icon: MapPin, permission: "rides:view" },
       { name: "Live Tracking", href: "/dashboard/tracking", icon: Radio, permission: "tracking:view" },
+      { name: "Push to Talk", href: "/dashboard/push-to-talk", icon: Mic, permission: "settings:view" },
       { name: "Schedules", href: "/dashboard/scheduling", icon: Calendar, permission: "schedules:view" },
       { name: "Service Zones", href: "/dashboard/zones", icon: Map, permission: "zones:view" },
     ]

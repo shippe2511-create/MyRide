@@ -42,6 +42,8 @@
 	<string>MyRide Driver needs your location to track rides</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>MyRide Driver needs photo library access to select photos</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>MyRide Driver needs microphone access for voice messages</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

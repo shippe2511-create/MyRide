@@ -18,6 +18,8 @@ import 'screens/shift_schedule_screen.dart';
 import 'screens/help_screen.dart';
 import 'screens/about_screen.dart';
 import 'screens/support_chat_screen.dart';
+import 'screens/push_to_talk_screen.dart';
+import 'services/push_to_talk_service.dart';
 import 'theme/app_theme.dart';
 import 'services/supabase_service.dart';
 import 'services/notification_service.dart';
@@ -98,6 +100,12 @@ void main() async {
     debugPrint('Offline service init failed: $e');
   }
 
+  try {
+    await PushToTalkService().initialize();
+  } catch (e) {
+    debugPrint('Push to talk service init failed: $e');
+  }
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -143,6 +151,7 @@ class DriverApp extends StatelessWidget {
             '/help': (_) => const HelpScreen(),
             '/about': (_) => const AboutScreen(),
             '/support-chat': (_) => const SupportChatScreen(),
+            '/push-to-talk': (_) => const PushToTalkScreen(),
           },
           builder: (context, child) {
             return OfflineBanner(

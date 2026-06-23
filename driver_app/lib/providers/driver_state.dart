@@ -230,6 +230,8 @@ class DriverState extends ChangeNotifier {
         loadShifts();
         // Load actual stats from database
         loadDriverStats();
+        // Check for active ride on app start
+        _checkForActiveRide();
       }
 
       // Fetch employee_id from database if not set but logged in
@@ -544,9 +546,14 @@ class DriverState extends ChangeNotifier {
   }
 
   Future<void> _checkForActiveRide() async {
-    if (_driverId.isEmpty) return;
+    debugPrint('_checkForActiveRide called with driverId: $_driverId');
+    if (_driverId.isEmpty) {
+      debugPrint('_checkForActiveRide: driverId is empty, returning');
+      return;
+    }
 
     try {
+      debugPrint('Checking active ride for driver: $_driverId');
       final activeRide = await SupabaseService.getActiveRideByDriverId(_driverId);
       if (activeRide != null) {
         debugPrint('Found active ride: ${activeRide['id']} with status ${activeRide['status']}');

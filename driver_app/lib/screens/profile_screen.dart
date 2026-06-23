@@ -216,25 +216,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top;
     return Scaffold(
       backgroundColor: context.bgColor,
-      body: SafeArea(
-        child: Consumer<DriverState>(
-          builder: (context, state, _) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header
-                  Text(
-                    'Profile',
-                    style: TextStyle(
-                      color: context.textColor,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                    ),
+      body: Consumer<DriverState>(
+        builder: (context, state, _) {
+          return SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(20, topPadding + 16, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Text(
+                  'Profile',
+                  style: TextStyle(
+                    color: context.textColor,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
                   ),
+                ),
                   const SizedBox(height: 20),
 
                   // Profile header with photo
@@ -494,12 +495,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     fontSize: 13,
                   ),
                 ),
-                  const SizedBox(height: 40),
-                ],
-              ),
-            );
-          },
-        ),
+                SizedBox(height: MediaQuery.of(context).padding.bottom + 100),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

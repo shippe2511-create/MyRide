@@ -110,72 +110,87 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top;
     return Scaffold(
       backgroundColor: context.bgColor,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Trip History',
-                      style: TextStyle(
-                        color: context.textColor,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
+      body: Consumer<DriverState>(
+        builder: (context, state, _) {
+          final filteredTrips = _filterTrips(state.completedTrips);
+
+          return CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(height: topPadding),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Trip History',
+                              style: TextStyle(
+                                color: context.textColor,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          if (_hasFilters)
+                            TextButton(
+                              onPressed: _clearFilters,
+                              child: Text(
+                                'Clear',
+                                style: TextStyle(
+                                  color: AppColors.yellow,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          const SizedBox(width: 4),
+                          _FilterButton(
+                            hasFilters: _hasFilters,
+                            onTap: _showFilterSheet,
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  if (_hasFilters)
-                    TextButton(
-                      onPressed: _clearFilters,
-                      child: Text(
-                        'Clear',
-                        style: TextStyle(
-                          color: AppColors.yellow,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                    if (_hasFilters) _buildActiveFilters(),
+                  ],
+                ),
+              ),
+              if (state.completedTrips.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _buildEmptyState(context),
+                )
+              else if (filteredTrips.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _buildNoResultsState(context),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.all(16),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final trip = filteredTrips[index];
+                        return _buildTripCard(context, trip);
+                      },
+                      childCount: filteredTrips.length,
                     ),
-                  const SizedBox(width: 4),
-                  _FilterButton(
-                    hasFilters: _hasFilters,
-                    onTap: _showFilterSheet,
                   ),
-                ],
+                ),
+              SliverToBoxAdapter(
+                child: SizedBox(height: MediaQuery.of(context).padding.bottom + 100),
               ),
-            ),
-            if (_hasFilters) _buildActiveFilters(),
-            Expanded(
-              child: Consumer<DriverState>(
-                builder: (context, state, _) {
-                  final filteredTrips = _filterTrips(state.completedTrips);
-
-                  if (state.completedTrips.isEmpty) {
-                    return _buildEmptyState(context);
-                  }
-
-                  if (filteredTrips.isEmpty) {
-                    return _buildNoResultsState(context);
-                  }
-
-                  return ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: filteredTrips.length,
-                    itemBuilder: (context, index) {
-                      final trip = filteredTrips[index];
-                      return _buildTripCard(context, trip);
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
   }

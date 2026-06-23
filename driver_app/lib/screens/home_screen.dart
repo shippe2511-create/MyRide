@@ -27,10 +27,14 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0;
   bool _isPopupMinimized = false;
   bool _hasNavigatedToActiveRide = false;
+  bool _isNavVisible = true;
+  final ScrollController _scrollController = ScrollController();
+  double _lastScrollOffset = 0;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     // Mark that we're on home screen and listen for active ride
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final state = context.read<DriverState>();
@@ -48,11 +52,28 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     // Remove listener
     try {
       context.read<DriverState>().removeListener(_onDriverStateChanged);
     } catch (_) {}
     super.dispose();
+  }
+
+  void _onScroll() {
+    final currentOffset = _scrollController.offset;
+    if (currentOffset > _lastScrollOffset && currentOffset > 50) {
+      // Scrolling down - hide nav
+      if (_isNavVisible) {
+        setState(() => _isNavVisible = false);
+      }
+    } else if (currentOffset < _lastScrollOffset) {
+      // Scrolling up - show nav
+      if (!_isNavVisible) {
+        setState(() => _isNavVisible = true);
+      }
+    }
+    _lastScrollOffset = currentOffset;
   }
 
   void _onDriverStateChanged() {
@@ -119,6 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.bgColor,
+      extendBody: true,
       body: IndexedStack(
         index: _selectedTab,
         children: [
@@ -137,22 +159,30 @@ class _HomeScreenState extends State<HomeScreen> {
         return SafeArea(
           child: Stack(
             children: [
-              Column(
-                children: [
-                  // Header
-                  _buildHeader(context, state),
+              SingleChildScrollView(
+                controller: _scrollController,
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  children: [
+                    // Header
+                    _buildHeader(context, state),
 
-                  // Main content
-                  Expanded(
-                    child: state.hasActiveRide
-                        ? _buildActiveRideView(context, state)
-                        : state.isOnBreak
-                            ? _buildBreakView(context, state)
-                            : state.isOnline
-                                ? _buildOnlineView(context, state)
-                                : _buildOfflineView(context, state),
-                  ),
-                ],
+                    // Main content
+                    SizedBox(
+                      height: MediaQuery.of(context).size.height -
+                              MediaQuery.of(context).padding.top -
+                              MediaQuery.of(context).padding.bottom - 200,
+                      child: state.hasActiveRide
+                          ? _buildActiveRideView(context, state)
+                          : state.isOnBreak
+                              ? _buildBreakView(context, state)
+                              : state.isOnline
+                                  ? _buildOnlineView(context, state)
+                                  : _buildOfflineView(context, state),
+                    ),
+                    SizedBox(height: MediaQuery.of(context).padding.bottom + 80),
+                  ],
+                ),
               ),
 
               // Show ride request popup when there's an incoming request

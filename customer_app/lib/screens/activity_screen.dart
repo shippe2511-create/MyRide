@@ -123,43 +123,44 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
     final topPadding = MediaQuery.of(context).padding.top;
     return Scaffold(
       backgroundColor: context.bgColor,
-      body: Column(
-        children: [
-          SizedBox(height: topPadding),
-          Expanded(
-            child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(context),
-            _buildTabs(context),
-            Expanded(
-              child: _isLoading
-                  ? const ShimmerList(itemCount: 5)
-                  : TabBarView(
-                      controller: _tabController,
-                      children: [
-                        RefreshIndicator(
-                          onRefresh: _loadTrips,
-                          color: AppColors.yellow,
-                          child: _buildTripList(_getFilteredTrips(0)),
-                        ),
-                        RefreshIndicator(
-                          onRefresh: _loadTrips,
-                          color: AppColors.yellow,
-                          child: _buildTripList(_getFilteredTrips(1)),
-                        ),
-                        RefreshIndicator(
-                          onRefresh: _loadTrips,
-                          color: AppColors.yellow,
-                          child: _buildTripList(_getFilteredTrips(2)),
-                        ),
-                      ],
-                    ),
+      body: NestedScrollView(
+        physics: const BouncingScrollPhysics(),
+        headerSliverBuilder: (context, innerBoxIsScrolled) {
+          return [
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(height: topPadding),
+                  _buildHeader(context),
+                  _buildTabs(context),
+                ],
+              ),
             ),
-          ],
-            ),
-          ),
-        ],
+          ];
+        },
+        body: _isLoading
+            ? const ShimmerList(itemCount: 5)
+            : TabBarView(
+                controller: _tabController,
+                children: [
+                  RefreshIndicator(
+                    onRefresh: _loadTrips,
+                    color: AppColors.yellow,
+                    child: _buildTripList(_getFilteredTrips(0)),
+                  ),
+                  RefreshIndicator(
+                    onRefresh: _loadTrips,
+                    color: AppColors.yellow,
+                    child: _buildTripList(_getFilteredTrips(1)),
+                  ),
+                  RefreshIndicator(
+                    onRefresh: _loadTrips,
+                    color: AppColors.yellow,
+                    child: _buildTripList(_getFilteredTrips(2)),
+                  ),
+                ],
+              ),
       ),
     );
   }

@@ -103,37 +103,43 @@ class _InboxScreenState extends State<InboxScreen> {
     final topPadding = MediaQuery.of(context).padding.top;
     return Scaffold(
       backgroundColor: context.bgColor,
-      body: Column(
-        children: [
-          SizedBox(height: topPadding),
-          Expanded(
-            child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(context),
-            Expanded(
-              child: _isLoading
-                  ? const ShimmerList(itemCount: 5)
-                  : RefreshIndicator(
-                      onRefresh: _onRefresh,
-                      color: AppColors.yellow,
-                      child: _messages.isEmpty
-                          ? ListView(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              children: [_buildEmptyState()],
-                            )
-                          : ListView.builder(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              padding: const EdgeInsets.symmetric(horizontal: 20),
-                              itemCount: _messages.length,
-                              itemBuilder: (context, index) => _buildMessageCard(_messages[index]),
-                            ),
+      body: RefreshIndicator(
+        onRefresh: _onRefresh,
+        color: AppColors.yellow,
+        child: _isLoading
+            ? const ShimmerList(itemCount: 5)
+            : CustomScrollView(
+                physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(height: topPadding),
+                        _buildHeader(context),
+                      ],
                     ),
-            ),
-          ],
-            ),
-          ),
-        ],
+                  ),
+                  if (_messages.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _buildEmptyState(),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) => _buildMessageCard(_messages[index]),
+                          childCount: _messages.length,
+                        ),
+                      ),
+                    ),
+                  SliverToBoxAdapter(
+                    child: SizedBox(height: MediaQuery.of(context).padding.bottom + 100),
+                  ),
+                ],
+              ),
       ),
     );
   }

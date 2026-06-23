@@ -38,6 +38,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Search,
@@ -104,6 +114,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
   const [dialogType, setDialogType] = useState<"view" | "edit" | "delete" | "add" | null>(null)
   const [loading, setLoading] = useState(false)
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
   // Sync with server data when props change
   useEffect(() => {
@@ -474,9 +485,10 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return
-    if (!window.confirm(`Are you sure you want to delete ${selectedIds.size} drivers?`)) return
     const idsToDelete = new Set(selectedIds)
     setBulkLoading(true)
+    setBulkDeleteOpen(false)
+
     const { error } = await supabase
       .from("profiles")
       .delete()
@@ -577,7 +589,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
               <Ban className="mr-2 h-4 w-4" />
               Suspend
             </Button>
-            <Button size="sm" variant="destructive" onClick={handleBulkDelete} disabled={bulkLoading}>
+            <Button size="sm" variant="destructive" onClick={() => setBulkDeleteOpen(true)} disabled={bulkLoading}>
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </Button>
@@ -924,6 +936,23 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Drivers</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedIds.size} driver(s)? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -51,9 +51,16 @@ import {
   RefreshCw,
   Ticket,
   AlertCircle,
+  Trash2,
+  X,
 } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { PermissionGate } from "@/components/permission-gate"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface SupportTicket {
   id: string
@@ -104,6 +111,8 @@ export default function SupportTicketsPage() {
   const [saving, setSaving] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
   const [stats, setStats] = useState({
     total: 0,
@@ -290,6 +299,43 @@ export default function SupportTicketsPage() {
     return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
   }
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    const idsToDelete = Array.from(selectedIds)
+    setBulkDeleteOpen(false)
+
+    const { error } = await supabase
+      .from("support_tickets")
+      .delete()
+      .in("id", idsToDelete)
+
+    if (error) {
+      toast.error("Failed to delete selected tickets")
+    } else {
+      toast.success(`${idsToDelete.length} ticket(s) deleted`)
+      setSelectedIds(new Set())
+      loadTickets()
+    }
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredTickets.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredTickets.map(t => t.id)))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedIds(newSelected)
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -369,6 +415,29 @@ export default function SupportTicketsPage() {
         </Card>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 p-3 bg-muted rounded-lg border">
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSelectedIds(new Set())}
+          >
+            <X className="h-4 w-4 mr-1" />
+            Clear
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setBulkDeleteOpen(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            Delete Selected
+          </Button>
+        </div>
+      )}
+
       <Card className="p-4">
         <div className="flex items-center gap-3 mb-4">
           <div className="relative flex-1 max-w-sm">
@@ -397,6 +466,12 @@ export default function SupportTicketsPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12">
+                <Checkbox
+                  checked={filteredTickets.length > 0 && selectedIds.size === filteredTickets.length}
+                  onCheckedChange={toggleSelectAll}
+                />
+              </TableHead>
               <TableHead>User</TableHead>
               <TableHead>Driver</TableHead>
               <TableHead>Category</TableHead>
@@ -409,7 +484,7 @@ export default function SupportTicketsPage() {
           <TableBody>
             {filteredTickets.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   {search ? "No matching tickets" : "No tickets found"}
                 </TableCell>
               </TableRow>
@@ -419,8 +494,14 @@ export default function SupportTicketsPage() {
                   key={ticket.id}
                   className={`group hover:bg-muted/50 transition-colors ${
                     ticket.status === "open" ? "bg-red-50 dark:bg-red-950/20" : ""
-                  }`}
+                  } ${selectedIds.has(ticket.id) ? 'bg-muted/50' : ''}`}
                 >
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds.has(ticket.id)}
+                      onCheckedChange={() => toggleSelect(ticket.id)}
+                    />
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Avatar className="h-8 w-8">
@@ -545,6 +626,24 @@ export default function SupportTicketsPage() {
           </div>
         )}
       </Card>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Ticket(s)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {selectedIds.size} selected ticket(s). This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-red-500 hover:bg-red-600">
+              Delete All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* View/Edit Dialog */}
       <Dialog open={dialogType === "view"} onOpenChange={() => setDialogType(null)}>

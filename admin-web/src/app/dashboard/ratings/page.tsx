@@ -17,11 +17,17 @@ import {
 } from "@/components/ui/dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
-import { Star, Search, TrendingUp, TrendingDown, AlertTriangle, Loader2, Car, Phone, MapPin, Calendar, CheckCircle2, XCircle, Clock, Award, Zap, Target, Activity, Trophy, Medal, Crown, Download } from "lucide-react"
+import { Star, Search, TrendingUp, TrendingDown, AlertTriangle, Loader2, Car, Phone, MapPin, Calendar, CheckCircle2, XCircle, Clock, Award, Zap, Target, Activity, Trophy, Medal, Crown, Download, Trash2, X } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { formatDate } from "@/lib/utils"
 import { PermissionGate } from "@/components/permission-gate"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { toast } from "sonner"
 
 // Circular Progress Component
 const CircularProgress = ({ value, size = 120, strokeWidth = 10, color = "yellow" }: { value: number, size?: number, strokeWidth?: number, color?: string }) => {
@@ -151,6 +157,9 @@ export default function RatingsPage() {
   const [filter, setFilter] = useState<"all" | "low" | "high">("all")
   const [selectedDriver, setSelectedDriver] = useState<DriverDetails | null>(null)
   const [loadingDetails, setLoadingDetails] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [allRatingsData, setAllRatingsData] = useState<{id: string, to_user_id: string}[]>([])
 
   useEffect(() => {
     loadData()
@@ -195,6 +204,9 @@ export default function RatingsPage() {
 
     // Filter ratings to only those given TO drivers (from customers)
     const driverRatings = allRatings.filter(r => r.to_user?.role === "driver")
+
+    // Store ratings data for bulk delete
+    setAllRatingsData(driverRatings.map(r => ({ id: r.id, to_user_id: r.to_user_id })))
 
     // Calculate per-driver stats
     const driverStats: DriverRating[] = allDrivers.map(driver => {
@@ -458,6 +470,44 @@ export default function RatingsPage() {
     return matchesSearch
   })
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    const idsToDelete = Array.from(selectedIds)
+    setBulkDeleteOpen(false)
+
+    const { error } = await supabase
+      .from("ratings")
+      .delete()
+      .in("id", idsToDelete)
+
+    if (error) {
+      toast.error("Failed to delete selected ratings")
+    } else {
+      toast.success(`${idsToDelete.length} rating(s) deleted`)
+      setSelectedIds(new Set())
+      loadData()
+    }
+  }
+
+  const toggleSelectAll = () => {
+    // Select all recent reviews that are displayed
+    if (selectedIds.size === recentReviews.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(recentReviews.map(r => r.id)))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedIds(newSelected)
+  }
+
   const exportCSV = () => {
     const headers = ["Driver", "Phone", "Avg Rating", "Total Ratings", "5 Star Count", "1 Star Count", "Trend"]
     const rows = filteredDrivers.map(d => [
@@ -562,6 +612,29 @@ export default function RatingsPage() {
         </Card>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 p-3 bg-muted rounded-lg border">
+          <span className="text-sm font-medium">{selectedIds.size} rating(s) selected</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSelectedIds(new Set())}
+          >
+            <X className="h-4 w-4 mr-1" />
+            Clear
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setBulkDeleteOpen(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            Delete Selected
+          </Button>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -569,7 +642,7 @@ export default function RatingsPage() {
               <Car className="h-4 w-4" />
               Driver Performance
             </CardTitle>
-            <CardDescription>Rating summary for all drivers</CardDescription>
+            <CardDescription>Rating summary for all drivers. Select ratings from recent reviews below to delete.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4 mb-4">
@@ -593,6 +666,41 @@ export default function RatingsPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Recent Reviews with Selection */}
+            {recentReviews.length > 0 && (
+              <div className="mb-4 p-3 border rounded-lg bg-muted/30">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-medium">Recent Reviews</h4>
+                  <Checkbox
+                    checked={recentReviews.length > 0 && selectedIds.size === recentReviews.length}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </div>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {recentReviews.slice(0, 10).map(review => (
+                    <div key={review.id} className={`flex items-center gap-2 p-2 rounded border text-sm ${selectedIds.has(review.id) ? 'bg-muted border-primary' : 'bg-background'}`}>
+                      <Checkbox
+                        checked={selectedIds.has(review.id)}
+                        onCheckedChange={() => toggleSelect(review.id)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium truncate">{review.customer_name}</span>
+                          <span className="text-muted-foreground">rated</span>
+                          <span className="font-medium truncate">{review.driver_name}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Star key={s} className={`h-3 w-3 ${s <= review.rating ? "fill-yellow-400 text-yellow-400" : "text-muted"}`} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <Table>
               <TableHeader>
@@ -769,6 +877,24 @@ export default function RatingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Rating(s)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {selectedIds.size} selected rating(s). This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-red-500 hover:bg-red-600">
+              Delete All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Clean Modern Driver Dialog */}
       <Dialog open={!!selectedDriver} onOpenChange={() => setSelectedDriver(null)}>

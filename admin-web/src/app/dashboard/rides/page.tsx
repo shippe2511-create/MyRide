@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -144,6 +145,9 @@ export default function RidesPage() {
   const [editStatus, setEditStatus] = useState("")
   const [saving, setSaving] = useState(false)
   const [deleteRideId, setDeleteRideId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 20
 
@@ -200,6 +204,40 @@ export default function RidesPage() {
     setDeleteRideId(null)
   }
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    setBulkDeleting(true)
+    const ids = Array.from(selectedIds)
+    const { error } = await supabase.from("rides").delete().in("id", ids)
+    if (error) {
+      toast.error("Failed to delete rides")
+    } else {
+      toast.success(`${ids.length} ride${ids.length > 1 ? "s" : ""} deleted`)
+      setSelectedIds(new Set())
+      refetch()
+    }
+    setBulkDeleting(false)
+    setBulkDeleteOpen(false)
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === paginatedRides.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(paginatedRides.map(r => r.id)))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedIds(newSelected)
+  }
+
   const filteredRides = rides.filter(ride => {
     if (!search) return true
     const s = search.toLowerCase()
@@ -239,6 +277,7 @@ export default function RidesPage() {
 
   useEffect(() => {
     setCurrentPage(1)
+    setSelectedIds(new Set())
   }, [search, statusFilter, dateRange])
 
   // Realtime subscription for rides updates
@@ -423,9 +462,40 @@ export default function RidesPage() {
           }}
         />
 
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-3 p-3 mb-3 bg-muted/50 rounded-lg border">
+            <span className="text-sm font-medium">
+              {selectedIds.size} ride{selectedIds.size > 1 ? "s" : ""} selected
+            </span>
+            <div className="flex-1" />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedIds(new Set())}
+            >
+              Clear Selection
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setBulkDeleteOpen(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Selected
+            </Button>
+          </div>
+        )}
+
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={paginatedRides.length > 0 && selectedIds.size === paginatedRides.length}
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Select all"
+                />
+              </TableHead>
               <TableHead>Customer</TableHead>
               <TableHead>Route</TableHead>
               <TableHead>Driver</TableHead>
@@ -437,7 +507,7 @@ export default function RidesPage() {
           <TableBody>
             {paginatedRides.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="p-0">
+                <TableCell colSpan={7} className="p-0">
                   <EmptyState
                     icon="rides"
                     title="No rides found"
@@ -452,6 +522,13 @@ export default function RidesPage() {
                   className="group cursor-pointer hover:bg-muted/50"
                   onClick={() => setSelectedRide(ride)}
                 >
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={selectedIds.has(ride.id)}
+                      onCheckedChange={() => toggleSelect(ride.id)}
+                      aria-label={`Select ride ${ride.id}`}
+                    />
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Avatar className="h-8 w-8">
@@ -534,7 +611,7 @@ export default function RidesPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage(p => p - 1)}
+                onClick={() => { setCurrentPage(p => p - 1); setSelectedIds(new Set()); }}
                 disabled={currentPage === 1}
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -542,7 +619,7 @@ export default function RidesPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage(p => p + 1)}
+                onClick={() => { setCurrentPage(p => p + 1); setSelectedIds(new Set()); }}
                 disabled={currentPage === totalPages}
               >
                 <ChevronRight className="h-4 w-4" />
@@ -680,6 +757,29 @@ export default function RidesPage() {
               className="bg-red-500 hover:bg-red-600"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Ride{selectedIds.size > 1 ? "s" : ""}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedIds.size} selected ride{selectedIds.size > 1 ? "s" : ""}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-red-500 hover:bg-red-600"
+              disabled={bulkDeleting}
+            >
+              {bulkDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Delete {selectedIds.size} Ride{selectedIds.size > 1 ? "s" : ""}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

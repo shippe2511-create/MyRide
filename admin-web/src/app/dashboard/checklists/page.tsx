@@ -27,12 +27,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { DialogFooter } from "@/components/ui/dialog"
 import {
   ClipboardCheck, AlertTriangle, CheckCircle, XCircle, Car,
-  Loader2, RefreshCw, Download, MoreHorizontal, Pencil, Trash2, Search, Eye, Flag
+  Loader2, RefreshCw, Download, MoreHorizontal, Pencil, Trash2, Search, Eye, Flag, X
 } from "lucide-react"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { PermissionGate } from "@/components/permission-gate"
+import { Checkbox } from "@/components/ui/checkbox"
 
 interface IssueDetail {
   note: string
@@ -69,6 +70,8 @@ export default function ChecklistsPage() {
   const [saving, setSaving] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
   const [stats, setStats] = useState({ total: 0, withIssues: 0, passed: 0 })
 
@@ -225,6 +228,53 @@ export default function ChecklistsPage() {
     setEditingChecklist({ ...editingChecklist, all_items: newItems, has_issues: hasIssues })
   }
 
+  // Get filtered checklists for selection purposes
+  const filteredChecklists = checklists.filter(c => {
+    if (!search) return true
+    const s = search.toLowerCase()
+    return (
+      c.driver_name?.toLowerCase().includes(s) ||
+      c.vehicle_number?.toLowerCase().includes(s)
+    )
+  })
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    const idsToDelete = Array.from(selectedIds)
+    setBulkDeleteOpen(false)
+
+    const { error } = await supabase
+      .from("vehicle_checklists")
+      .delete()
+      .in("id", idsToDelete)
+
+    if (error) {
+      toast.error("Failed to delete selected checklists")
+    } else {
+      toast.success(`${idsToDelete.length} checklist(s) deleted`)
+      setSelectedIds(new Set())
+      loadChecklists()
+    }
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredChecklists.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredChecklists.map(c => c.id)))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedIds(newSelected)
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -296,6 +346,29 @@ export default function ChecklistsPage() {
         </Card>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 p-3 bg-muted rounded-lg border">
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSelectedIds(new Set())}
+          >
+            <X className="h-4 w-4 mr-1" />
+            Clear
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setBulkDeleteOpen(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            Delete Selected
+          </Button>
+        </div>
+      )}
+
       <Card className="p-4">
         <div className="flex items-center gap-3 mb-4">
           <div className="relative flex-1 max-w-sm">
@@ -322,6 +395,12 @@ export default function ChecklistsPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12">
+                <Checkbox
+                  checked={filteredChecklists.length > 0 && selectedIds.size === filteredChecklists.length}
+                  onCheckedChange={toggleSelectAll}
+                />
+              </TableHead>
               <TableHead>Driver</TableHead>
               <TableHead>Vehicle</TableHead>
               <TableHead>Status</TableHead>
@@ -331,31 +410,23 @@ export default function ChecklistsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {checklists.filter(c => {
-              if (!search) return true
-              const s = search.toLowerCase()
-              return (
-                c.driver_name?.toLowerCase().includes(s) ||
-                c.vehicle_number?.toLowerCase().includes(s)
-              )
-            }).length === 0 ? (
+            {filteredChecklists.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   {search ? "No matching checklists" : "No checklists found"}
                 </TableCell>
               </TableRow>
             ) : (
-              checklists.filter(c => {
-                if (!search) return true
-                const s = search.toLowerCase()
-                return (
-                  c.driver_name?.toLowerCase().includes(s) ||
-                  c.vehicle_number?.toLowerCase().includes(s)
-                )
-              }).map(checklist => {
+              filteredChecklists.map(checklist => {
                 const failedItems = getFailedItems(checklist)
                 return (
-                  <TableRow key={checklist.id} className={`group hover:bg-muted/50 transition-colors ${checklist.has_issues ? "bg-red-50 dark:bg-red-950/20" : ""}`}>
+                  <TableRow key={checklist.id} className={`group hover:bg-muted/50 transition-colors ${checklist.has_issues ? "bg-red-50 dark:bg-red-950/20" : ""} ${selectedIds.has(checklist.id) ? 'bg-muted/50' : ''}`}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(checklist.id)}
+                        onCheckedChange={() => toggleSelect(checklist.id)}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Avatar className="h-8 w-8">
@@ -653,6 +724,24 @@ export default function ChecklistsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Checklist(s)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {selectedIds.size} selected checklist(s). This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-red-500 hover:bg-red-600">
+              Delete All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open) setDeleteId(null) }}>

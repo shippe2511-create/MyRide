@@ -23,7 +23,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Plus, Shield, Loader2, RefreshCw, Pencil, Trash2, MoreHorizontal, KeyRound, Eye, EyeOff, Info, Settings2, Download } from "lucide-react"
+import { Plus, Shield, Loader2, RefreshCw, Pencil, Trash2, MoreHorizontal, KeyRound, Eye, EyeOff, Info, Settings2, Download, X } from "lucide-react"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -31,6 +31,7 @@ import { usePermissions } from "@/hooks/usePermissions"
 import { ROLE_DESCRIPTIONS, type Role, type Permission, getPermissionsForRole } from "@/lib/permissions"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { PermissionGate } from "@/components/permission-gate"
 
@@ -104,6 +105,8 @@ export default function AdminsPage() {
   const [permissionsAdmin, setPermissionsAdmin] = useState<AdminUser | null>(null)
   const [customPermissions, setCustomPermissions] = useState<Record<string, boolean>>({})
   const [savingPermissions, setSavingPermissions] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
   const [formData, setFormData] = useState({
     full_name: "",
@@ -306,6 +309,43 @@ export default function AdminsPage() {
     setCustomPermissions({})
   }
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    const idsToDelete = Array.from(selectedIds)
+    setBulkDeleteOpen(false)
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ role: "user" })
+      .in("id", idsToDelete)
+
+    if (error) {
+      toast.error("Failed to remove selected admins")
+    } else {
+      toast.success(`${idsToDelete.length} admin(s) removed`)
+      setSelectedIds(new Set())
+      loadAdmins()
+    }
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === admins.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(admins.map(a => a.id)))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedIds(newSelected)
+  }
+
   const getRoleColor = (role: string) => {
     return ROLES.find(r => r.value === role)?.color || "bg-gray-500"
   }
@@ -399,10 +439,41 @@ export default function AdminsPage() {
         })}
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 p-3 bg-muted rounded-lg border">
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSelectedIds(new Set())}
+          >
+            <X className="h-4 w-4 mr-1" />
+            Clear
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setBulkDeleteOpen(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            Remove Selected
+          </Button>
+        </div>
+      )}
+
       <Card className="p-4">
         <Table>
           <TableHeader>
             <TableRow>
+              {isSuperAdmin && (
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={admins.length > 0 && selectedIds.size === admins.length}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </TableHead>
+              )}
               <TableHead>User</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
@@ -414,13 +485,21 @@ export default function AdminsPage() {
           <TableBody>
             {admins.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={isSuperAdmin ? 7 : 6} className="text-center py-8 text-muted-foreground">
                   No admin users found
                 </TableCell>
               </TableRow>
             ) : (
               admins.map(admin => (
-                <TableRow key={admin.id} className="group hover:bg-muted/50 transition-colors">
+                <TableRow key={admin.id} className={`group hover:bg-muted/50 transition-colors ${selectedIds.has(admin.id) ? 'bg-muted/50' : ''}`}>
+                  {isSuperAdmin && (
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(admin.id)}
+                        onCheckedChange={() => toggleSelect(admin.id)}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8">
@@ -508,6 +587,24 @@ export default function AdminsPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-500 hover:bg-red-600">
               Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {selectedIds.size} Admin(s)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove admin privileges from {selectedIds.size} selected user(s). Their accounts will remain but they won't have admin access.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-red-500 hover:bg-red-600">
+              Remove All
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -31,6 +31,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -107,6 +117,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
   })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
   // Sync with server data when props change
   useEffect(() => {
@@ -389,9 +400,10 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return
-    if (!window.confirm(`Are you sure you want to delete ${selectedIds.size} customers?`)) return
     const idsToDelete = new Set(selectedIds)
     setBulkLoading(true)
+    setBulkDeleteOpen(false)
+
     const { error } = await supabase
       .from("profiles")
       .delete()
@@ -529,7 +541,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
               <Ban className="mr-2 h-4 w-4" />
               Suspend
             </Button>
-            <Button size="sm" variant="destructive" onClick={handleBulkDelete} disabled={bulkLoading}>
+            <Button size="sm" variant="destructive" onClick={() => setBulkDeleteOpen(true)} disabled={bulkLoading}>
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </Button>
@@ -911,6 +923,23 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Customers</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedIds.size} customer(s)? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

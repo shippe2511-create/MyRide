@@ -16,6 +16,11 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ComboboxInput } from "@/components/ui/combobox-input"
@@ -90,6 +95,8 @@ export default function VehiclesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType | null>(null)
   const [saving, setSaving] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     display_name: "",
@@ -235,6 +242,44 @@ export default function VehiclesPage() {
     }
   }
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    setSaving(true)
+
+    const { error } = await supabase
+      .from("vehicle_types")
+      .delete()
+      .in("id", Array.from(selectedIds))
+
+    if (error) {
+      toast.error("Failed to delete vehicles: " + error.message)
+    } else {
+      toast.success(`Deleted ${selectedIds.size} vehicle${selectedIds.size > 1 ? "s" : ""}`)
+      setSelectedIds(new Set())
+      loadVehicles()
+    }
+    setBulkDeleteOpen(false)
+    setSaving(false)
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === vehicles.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(vehicles.map(v => v.id)))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    const newSet = new Set(selectedIds)
+    if (newSet.has(id)) {
+      newSet.delete(id)
+    } else {
+      newSet.add(id)
+    }
+    setSelectedIds(newSet)
+  }
+
   const activeCount = vehicles.filter(v => v.is_active).length
 
   const exportCSV = () => {
@@ -342,6 +387,27 @@ export default function VehiclesPage() {
         </Card>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between p-4 bg-muted/50 border rounded-lg">
+          <span className="text-sm font-medium">
+            {selectedIds.size} vehicle{selectedIds.size > 1 ? "s" : ""} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+              Clear selection
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setBulkDeleteOpen(true)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete selected
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>All Vehicle Types</CardTitle>
@@ -353,6 +419,13 @@ export default function VehiclesPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={vehicles.length > 0 && selectedIds.size === vehicles.length}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead className="w-12"></TableHead>
                 <TableHead>Vehicle</TableHead>
                 <TableHead>Category</TableHead>
@@ -364,7 +437,7 @@ export default function VehiclesPage() {
             <TableBody>
               {vehicles.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No vehicle types configured. Add your first vehicle type to get started.
                   </TableCell>
                 </TableRow>
@@ -373,6 +446,13 @@ export default function VehiclesPage() {
                   const IconComponent = getIconComponent(vehicle.icon)
                   return (
                     <TableRow key={vehicle.id} className="group hover:bg-muted/50 transition-colors">
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(vehicle.id)}
+                          onCheckedChange={() => toggleSelect(vehicle.id)}
+                          aria-label={`Select ${vehicle.display_name}`}
+                        />
+                      </TableCell>
                       <TableCell>
                         <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
                       </TableCell>
@@ -543,6 +623,28 @@ export default function VehiclesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Delete AlertDialog */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} vehicle{selectedIds.size > 1 ? "s" : ""}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the selected vehicle type{selectedIds.size > 1 ? "s" : ""} and may affect existing rides and bookings.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              disabled={saving}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {saving ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
     </PermissionGate>
   )

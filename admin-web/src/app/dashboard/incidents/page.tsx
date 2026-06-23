@@ -47,12 +47,19 @@ import {
   Plus,
   XCircle,
   FileWarning,
+  Trash2,
+  X,
 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { FilterPills } from "@/components/ui/filter-pills"
 import { PermissionGate } from "@/components/permission-gate"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface Incident {
   id: string
@@ -88,6 +95,8 @@ export default function IncidentsPage() {
     location_name: "",
   })
   const [resolution, setResolution] = useState("")
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
   useEffect(() => {
     loadIncidents()
@@ -226,6 +235,43 @@ export default function IncidentsPage() {
     })
   }
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    const idsToDelete = Array.from(selectedIds)
+    setBulkDeleteOpen(false)
+
+    const { error } = await supabase
+      .from("incidents")
+      .delete()
+      .in("id", idsToDelete)
+
+    if (error) {
+      toast.error("Failed to delete selected incidents")
+    } else {
+      toast.success(`${idsToDelete.length} incident(s) deleted`)
+      setSelectedIds(new Set())
+      loadIncidents()
+    }
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredIncidents.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredIncidents.map(i => i.id)))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedIds(newSelected)
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -356,10 +402,39 @@ export default function IncidentsPage() {
         }}
       />
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 p-3 bg-muted rounded-lg border">
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSelectedIds(new Set())}
+          >
+            <X className="h-4 w-4 mr-1" />
+            Clear
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setBulkDeleteOpen(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            Delete Selected
+          </Button>
+        </div>
+      )}
+
       <div className="rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12">
+                <Checkbox
+                  checked={filteredIncidents.length > 0 && selectedIds.size === filteredIncidents.length}
+                  onCheckedChange={toggleSelectAll}
+                />
+              </TableHead>
               <TableHead>Incident</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Severity</TableHead>
@@ -372,7 +447,7 @@ export default function IncidentsPage() {
           <TableBody>
             {filteredIncidents.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-16">
+                <TableCell colSpan={8} className="py-16">
                   <EmptyState
                     icon="incidents"
                     title="No incidents found"
@@ -382,7 +457,13 @@ export default function IncidentsPage() {
               </TableRow>
             ) : (
               filteredIncidents.map((incident) => (
-                <TableRow key={incident.id} className="group hover:bg-muted/50 transition-colors">
+                <TableRow key={incident.id} className={`group hover:bg-muted/50 transition-colors ${selectedIds.has(incident.id) ? 'bg-muted/50' : ''}`}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds.has(incident.id)}
+                      onCheckedChange={() => toggleSelect(incident.id)}
+                    />
+                  </TableCell>
                   <TableCell>
                     <div>
                       <p className="font-medium">{incident.title}</p>
@@ -445,6 +526,24 @@ export default function IncidentsPage() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Incident(s)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {selectedIds.size} selected incident(s). This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-red-500 hover:bg-red-600">
+              Delete All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={dialogType === "add"} onOpenChange={(open) => { if (!open) setDialogType(null) }}>
         <DialogContent>

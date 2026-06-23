@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/ride_request.dart';
 import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
@@ -1339,97 +1338,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showSupportSheet(BuildContext context) async {
-    // Fetch support info from admin settings
-    String supportPhone = '+960 333-3333';
-    try {
-      final response = await Supabase.instance.client
-          .from('app_settings')
-          .select('support_phone')
-          .limit(1)
-          .maybeSingle();
-      if (response != null && response['support_phone'] != null) {
-        supportPhone = response['support_phone'];
-      }
-    } catch (_) {}
-
-    if (!mounted) return;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: context.cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: context.borderColor,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Contact Support',
-              style: TextStyle(
-                color: context.textColor,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 20),
-            ListTile(
-              leading: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.success.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(Icons.phone, color: AppColors.success),
-              ),
-              title: Text('Call Support', style: TextStyle(color: context.textColor, fontWeight: FontWeight.w600)),
-              subtitle: Text(supportPhone, style: TextStyle(color: context.mutedColor)),
-              onTap: () async {
-                Navigator.pop(ctx);
-                final cleanPhone = supportPhone.replaceAll(RegExp(r'[^\d+]'), '');
-                final uri = Uri.parse('tel:$cleanPhone');
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri);
-                }
-              },
-            ),
-            ListTile(
-              leading: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.info.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(Icons.chat, color: AppColors.info),
-              ),
-              title: Text('Live Chat', style: TextStyle(color: context.textColor, fontWeight: FontWeight.w600)),
-              subtitle: Text('Chat with support team', style: TextStyle(color: context.mutedColor)),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.pushNamed(context, '/support-chat');
-              },
-            ),
-            SizedBox(height: MediaQuery.of(ctx).padding.bottom + 16),
-          ],
-        ),
       ),
     );
   }

@@ -26,7 +26,6 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
   late Animation<double> _pulseAnimation;
 
   List<Map<String, dynamic>> _messages = [];
-  List<Map<String, dynamic>> _onlineDrivers = [];
   bool _loading = true;
   bool _isRecording = false;
   int _recordingDuration = 0;
@@ -35,7 +34,6 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
   String? _recordingPath;
   StreamSubscription? _messageSubscription;
   String? _playingId;
-  String _selectedRecipient = 'admin'; // 'admin', 'all_drivers', or driver profile_id
 
   @override
   void initState() {
@@ -54,7 +52,6 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
     );
 
     _loadMessages();
-    _loadOnlineDrivers();
     _subscribeToNewMessages();
     _startPolling();
   }
@@ -63,23 +60,6 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
     _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       _loadMessages(showLoading: false);
     });
-  }
-
-  Future<void> _loadOnlineDrivers() async {
-    try {
-      final driverState = context.read<DriverState>();
-      final response = await SupabaseService.client
-          .from('drivers')
-          .select('id, profile_id, is_online, profile:profiles!drivers_profile_id_fkey(id, full_name)')
-          .eq('is_online', true)
-          .neq('profile_id', driverState.profileId); // Exclude self
-
-      setState(() {
-        _onlineDrivers = List<Map<String, dynamic>>.from(response ?? []);
-      });
-    } catch (e) {
-      debugPrint('Error loading online drivers: $e');
-    }
   }
 
   @override

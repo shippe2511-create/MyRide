@@ -6,10 +6,9 @@ import { createClient } from "@/lib/supabase/client"
 import { DriversTable } from "./drivers-table"
 import { DocumentsTable } from "./documents-table"
 import { ShiftsTable } from "./shifts-table"
-import { ActivityTable } from "./activity-table"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, UserCheck, Clock, FileText, Calendar, Activity } from "lucide-react"
+import { Users, UserCheck, Clock, FileText, Calendar } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { useSearchParams } from "next/navigation"
 import { PermissionGate } from "@/components/permission-gate"
@@ -42,7 +41,7 @@ function useDriversData(search?: string, status?: string, page: number = 1) {
 
       const [driversRes, driverRecordsRes, totalRes, activeRes, pendingRes] = await Promise.all([
         query,
-        supabase.from("drivers").select("id, profile_id, vehicle_id, vehicle:vehicle_types(id, display_name, plate_no)"),
+        supabase.from("drivers").select("id, profile_id, vehicle_id, is_online, is_on_break, break_type, break_start_time, total_trips, rating, updated_at, vehicle:vehicle_types(id, display_name, plate_no)"),
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver"),
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver").eq("status", "approved"),
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver").eq("status", "pending"),
@@ -56,7 +55,14 @@ function useDriversData(search?: string, status?: string, page: number = 1) {
           driver_record: driverRecord ? {
             id: driverRecord.id,
             vehicle_id: driverRecord.vehicle_id,
-            vehicle: driverRecord.vehicle
+            vehicle: driverRecord.vehicle,
+            is_online: driverRecord.is_online,
+            is_on_break: driverRecord.is_on_break,
+            break_type: driverRecord.break_type,
+            break_start_time: driverRecord.break_start_time,
+            total_trips: driverRecord.total_trips,
+            rating: driverRecord.rating,
+            updated_at: driverRecord.updated_at,
           } : null
         }
       })
@@ -176,10 +182,6 @@ export default function DriversPage() {
               <Users className="h-4 w-4" />
               Drivers
             </TabsTrigger>
-            <TabsTrigger value="activity" className="gap-2">
-              <Activity className="h-4 w-4" />
-              Activity
-            </TabsTrigger>
             <TabsTrigger value="documents" className="gap-2">
               <FileText className="h-4 w-4" />
               Documents
@@ -197,10 +199,6 @@ export default function DriversPage() {
               currentPage={page}
               pageSize={pageSize}
             />
-          </TabsContent>
-
-          <TabsContent value="activity" className="mt-4">
-            <ActivityTable />
           </TabsContent>
 
           <TabsContent value="documents" className="mt-4">

@@ -9,7 +9,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import { Download, FileSpreadsheet, FileText, Loader2, Calendar, Users, Car, Star, BarChart3, TrendingUp, Package, AlertTriangle, Shield, ClipboardCheck, Fuel } from "lucide-react"
+import { Download, FileSpreadsheet, FileText, Loader2, Calendar, Users, Car, Star, BarChart3, TrendingUp, Package, AlertTriangle, Shield, ClipboardCheck, Fuel, Coffee, Clock, MessageSquare, Ticket } from "lucide-react"
 import { toast } from "sonner"
 
 const reportTypes = [
@@ -17,6 +17,10 @@ const reportTypes = [
   { id: "customers", name: "Customers Report", description: "Customer list with contact info", icon: Users },
   { id: "drivers", name: "Drivers Report", description: "Driver list with ratings and trips", icon: Car },
   { id: "driver_performance", name: "Driver Performance", description: "KPIs: completion rate, cancellations, activity", icon: TrendingUp },
+  { id: "shifts", name: "Shift Schedule", description: "Driver shift assignments and times", icon: Clock },
+  { id: "break_history", name: "Break History", description: "Driver break times and durations", icon: Coffee },
+  { id: "quota_usage", name: "Quota Usage", description: "Customer ride quota consumption", icon: Ticket },
+  { id: "support_tickets", name: "Support Tickets", description: "Customer support requests and status", icon: MessageSquare },
   { id: "ratings", name: "Ratings Report", description: "All ratings and feedback", icon: Star },
   { id: "usage", name: "Daily Usage", description: "Rides per day summary", icon: BarChart3 },
   { id: "sos_alerts", name: "SOS Alerts", description: "All emergency alerts with status", icon: AlertTriangle },
@@ -129,6 +133,39 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Date": "date",
     "Notes": "notes",
   },
+  break_history: {
+    "Driver": "driver_name",
+    "Break Type": "break_type",
+    "Started At": "started_at",
+    "Ended At": "ended_at",
+    "Duration (mins)": "duration_minutes",
+    "Date": "date",
+  },
+  shifts: {
+    "Driver": "driver_name",
+    "Shift Date": "shift_date",
+    "Start Time": "start_time",
+    "End Time": "end_time",
+    "Shift Type": "shift_type",
+    "Status": "status",
+  },
+  quota_usage: {
+    "Customer": "customer_name",
+    "Campaign": "campaign_name",
+    "Today": "rides_today",
+    "This Week": "rides_this_week",
+    "This Month": "rides_this_month",
+    "Last Ride": "last_ride_date",
+  },
+  support_tickets: {
+    "Ticket ID": "id",
+    "Customer": "customer_name",
+    "Category": "category",
+    "Status": "status",
+    "Created": "created_at",
+    "Resolved": "resolved_at",
+    "Description": "description",
+  },
 }
 
 export default function ReportsPage() {
@@ -154,6 +191,19 @@ export default function ReportsPage() {
     const d = new Date(dateStr)
     return d.toLocaleTimeString("en-US", {
       timeZone: "Indian/Maldives",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
+    })
+  }
+
+  const formatDateTime = (dateStr: string) => {
+    if (!dateStr) return ""
+    const d = new Date(dateStr)
+    return d.toLocaleString("en-US", {
+      timeZone: "Indian/Maldives",
+      month: "short",
+      day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
       hour12: true
@@ -203,6 +253,11 @@ export default function ReportsPage() {
       let rows: Record<string, string>[] = []
       let filename = ""
       const labels = columnLabels[reportType]
+      if (!labels) {
+        toast.error(`No column labels defined for: ${reportType}`)
+        if (showLoading) setLoading(null)
+        return
+      }
       const headers = Object.keys(labels)
 
       switch (reportType) {
@@ -363,6 +418,123 @@ export default function ReportsPage() {
           })
 
           filename = `driver_performance_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "break_history": {
+          let query = supabase
+            .from("break_history")
+            .select(`
+              break_type, started_at, ended_at, duration_minutes, created_at,
+              driver:drivers!break_history_driver_id_fkey(
+                profile:profiles!drivers_profile_id_fkey(full_name)
+              )
+            `)
+            .order("created_at", { ascending: false })
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          const { data: breaks } = await query
+
+          rows = (breaks || []).map((b: Record<string, unknown>) => {
+            const driver = b.driver as Record<string, unknown> | null
+            const profile = driver?.profile as Record<string, unknown> | null
+            return {
+              "Driver": String(profile?.full_name || "-"),
+              "Break Type": String(b.break_type || "-"),
+              "Started At": b.started_at ? formatDateTime(String(b.started_at)) : "-",
+              "Ended At": b.ended_at ? formatDateTime(String(b.ended_at)) : "In Progress",
+              "Duration (mins)": b.duration_minutes != null ? String(b.duration_minutes) : "-",
+              "Date": formatDate(String(b.created_at || "")),
+            }
+          })
+          filename = `break_history_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "shifts": {
+          let query = supabase
+            .from("shifts")
+            .select(`
+              shift_date, start_time, end_time, shift_type, status, created_at,
+              driver:drivers!shifts_driver_id_fkey(
+                profile:profiles!drivers_profile_id_fkey(full_name)
+              )
+            `)
+            .order("shift_date", { ascending: false })
+          if (dateFilter) {
+            query = query.gte("shift_date", dateFilter.start).lte("shift_date", dateFilter.end)
+          }
+          const { data: shifts } = await query
+
+          rows = (shifts || []).map((s: Record<string, unknown>) => {
+            const driver = s.driver as Record<string, unknown> | null
+            const profile = driver?.profile as Record<string, unknown> | null
+            return {
+              "Driver": String(profile?.full_name || "-"),
+              "Shift Date": formatDate(String(s.shift_date || "")),
+              "Start Time": String(s.start_time || "-"),
+              "End Time": String(s.end_time || "-"),
+              "Shift Type": formatStatus(String(s.shift_type || "")),
+              "Status": formatStatus(String(s.status || "")),
+            }
+          })
+          filename = `shifts_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "quota_usage": {
+          const { data: quotas } = await supabase
+            .from("ride_quotas")
+            .select(`
+              rides_today, rides_this_week, rides_this_month, last_ride_date, updated_at,
+              user:profiles!ride_quotas_user_id_fkey(full_name),
+              campaign:ride_campaigns!ride_quotas_campaign_id_fkey(name)
+            `)
+            .order("updated_at", { ascending: false })
+
+          rows = (quotas || []).map((q: Record<string, unknown>) => {
+            const user = q.user as Record<string, unknown> | null
+            const campaign = q.campaign as Record<string, unknown> | null
+            return {
+              "Customer": String(user?.full_name || "-"),
+              "Campaign": String(campaign?.name || "-"),
+              "Today": String(q.rides_today || "0"),
+              "This Week": String(q.rides_this_week || "0"),
+              "This Month": String(q.rides_this_month || "0"),
+              "Last Ride": q.last_ride_date ? formatDate(String(q.last_ride_date)) : "-",
+            }
+          })
+          filename = `quota_usage_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "support_tickets": {
+          let query = supabase
+            .from("support_tickets")
+            .select(`
+              id, category, description, status, created_at, resolved_at,
+              user:profiles!support_tickets_user_id_fkey(full_name)
+            `)
+            .order("created_at", { ascending: false })
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          const { data: tickets } = await query
+
+          rows = (tickets || []).map((t: Record<string, unknown>) => {
+            const user = t.user as Record<string, unknown> | null
+            return {
+              "Ticket ID": String(t.id || "-").slice(0, 8),
+              "Customer": String(user?.full_name || "-"),
+              "Category": formatStatus(String(t.category || "-")),
+              "Status": formatStatus(String(t.status || "")),
+              "Created": formatDateTime(String(t.created_at || "")),
+              "Resolved": t.resolved_at ? formatDateTime(String(t.resolved_at)) : "-",
+              "Description": String(t.description || "-").slice(0, 100),
+            }
+          })
+          filename = `support_tickets_${new Date().toISOString().split("T")[0]}.csv`
           break
         }
 
@@ -547,9 +719,15 @@ export default function ReportsPage() {
           filename = `vehicle_logs_${new Date().toISOString().split("T")[0]}.csv`
           break
         }
+
+        default: {
+          toast.error(`Unknown report type: ${reportType}`)
+          if (showLoading) setLoading(null)
+          return
+        }
       }
 
-      if (rows.length === 0) {
+      if (!rows || rows.length === 0) {
         toast.error("No data to export")
         if (showLoading) setLoading(null)
         return
@@ -701,8 +879,12 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent>
               <Button
+                type="button"
                 className="w-full"
-                onClick={() => generateReport(report.id)}
+                onClick={(e) => {
+                  e.preventDefault()
+                  generateReport(report.id)
+                }}
                 disabled={loading !== null}
               >
                 {loading === report.id ? (

@@ -942,11 +942,32 @@ class DriverState extends ChangeNotifier {
     _breakStartTime = DateTime.now();
     _incomingRequests.clear();
 
-    // Save break state
+    // Save break state locally
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isOnBreak', true);
     await prefs.setString('breakType', type);
     await prefs.setString('breakStartTime', _breakStartTime!.toIso8601String());
+
+    // Sync to Supabase (use UTC time)
+    if (_driverId.isNotEmpty) {
+      await SupabaseService.client
+          .from('drivers')
+          .update({
+            'is_on_break': true,
+            'break_type': type,
+            'break_start_time': _breakStartTime!.toUtc().toIso8601String(),
+          })
+          .eq('id', _driverId);
+
+      // Log to break history
+      await SupabaseService.client
+          .from('break_history')
+          .insert({
+            'driver_id': _driverId,
+            'break_type': type,
+            'started_at': _breakStartTime!.toUtc().toIso8601String(),
+          });
+    }
 
     // Schedule break reminder after 30 minutes (works even when app is closed)
     NotificationService().scheduleBreakReminder(
@@ -965,15 +986,50 @@ class DriverState extends ChangeNotifier {
     // Cancel break reminder
     NotificationService().cancelBreakReminder();
 
-    // Clear break state
+    // Clear break state locally
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isOnBreak', false);
     await prefs.remove('breakType');
     await prefs.remove('breakStartTime');
 
-    if (_isOnline) {
+    // Sync to Supabase and log break end
+    if (_driverId.isNotEmpty) {
+      // Get the current break start time before clearing
+      final driverData = await SupabaseService.client
+          .from('drivers')
+          .select('break_start_time')
+          .eq('id', _driverId)
+          .maybeSingle();
 
+      // Update driver status
+      await SupabaseService.client
+          .from('drivers')
+          .update({
+            'is_on_break': false,
+            'break_type': null,
+            'break_start_time': null,
+          })
+          .eq('id', _driverId);
+
+      // Update break history with end time and duration
+      if (driverData != null && driverData['break_start_time'] != null) {
+        final startTime = DateTime.parse(driverData['break_start_time']);
+        final endTime = DateTime.now().toUtc();
+        final durationMinutes = endTime.difference(startTime).inMinutes;
+
+        await SupabaseService.client
+            .from('break_history')
+            .update({
+              'ended_at': endTime.toIso8601String(),
+              'duration_minutes': durationMinutes,
+            })
+            .eq('driver_id', _driverId)
+            .isFilter('ended_at', null)
+            .order('created_at', ascending: false)
+            .limit(1);
+      }
     }
+
     notifyListeners();
   }
 

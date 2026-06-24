@@ -74,6 +74,7 @@ interface Vehicle {
   is_active: boolean
 }
 import { formatDate } from "@/lib/utils"
+import { formatDistanceToNow } from "date-fns"
 import { logActivity } from "@/lib/activity-logger"
 
 interface Driver {
@@ -91,6 +92,13 @@ interface Driver {
     id: string
     vehicle_id: string | null
     vehicle?: Vehicle | null
+    is_online?: boolean
+    is_on_break?: boolean
+    break_type?: string | null
+    break_start_time?: string | null
+    total_trips?: number
+    rating?: number
+    updated_at?: string
   } | null
 }
 
@@ -611,11 +619,11 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                 />
               </TableHead>
               <TableHead>Driver</TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead>Employee ID</TableHead>
-              <TableHead>Department</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Joined</TableHead>
+              <TableHead>Live Status</TableHead>
+              <TableHead>Vehicle</TableHead>
+              <TableHead className="text-center">Trips</TableHead>
+              <TableHead className="text-center">Rating</TableHead>
+              <TableHead>Account</TableHead>
               <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
@@ -641,17 +649,56 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                         <AvatarImage src={driver.avatar_url ? `${driver.avatar_url}?t=${Date.now()}` : undefined} />
                         <AvatarFallback>{getInitials(driver.full_name)}</AvatarFallback>
                       </Avatar>
-                      <span className="font-medium">{driver.full_name}</span>
+                      <div>
+                        <span className="font-medium">{driver.full_name}</span>
+                        <p className="text-xs text-muted-foreground">{driver.phone || driver.employee_id || "-"}</p>
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="space-y-1">
-                      <p className="text-sm">{driver.email || "-"}</p>
-                      <p className="text-sm text-muted-foreground">{driver.phone || "-"}</p>
+                    {driver.driver_record?.is_on_break ? (
+                      <div className="space-y-1">
+                        <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 mr-1.5" />
+                          {driver.driver_record.break_type || "Break"}
+                        </Badge>
+                        {driver.driver_record.break_start_time && (
+                          <p className="text-xs text-yellow-500">
+                            {formatDistanceToNow(new Date(driver.driver_record.break_start_time))}
+                          </p>
+                        )}
+                      </div>
+                    ) : driver.driver_record?.is_online ? (
+                      <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/30">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse" />
+                        Online
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-slate-500/10 text-slate-400 border-slate-500/30">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5" />
+                        Offline
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {driver.driver_record?.vehicle ? (
+                      <div className="flex items-center gap-2">
+                        <Car className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">{driver.driver_record.vehicle.plate_no || driver.driver_record.vehicle.display_name}</span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span className="font-medium">{driver.driver_record?.total_trips || 0}</span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <span className="text-yellow-500">★</span>
+                      <span className="font-medium">{driver.driver_record?.rating?.toFixed(1) || "0.0"}</span>
                     </div>
                   </TableCell>
-                  <TableCell>{driver.employee_id || "-"}</TableCell>
-                  <TableCell>{driver.department || "-"}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {statusBadge(driver.status)}
@@ -669,7 +716,6 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>{formatDate(driver.created_at)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button

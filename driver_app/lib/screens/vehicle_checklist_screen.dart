@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -748,28 +749,29 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
   }
 
   Widget _buildBottomBar(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        16,
-        20,
-        MediaQuery.of(context).padding.bottom + 16,
-      ),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            context.bgColor.withValues(alpha: 0.0),
-            context.bgColor.withValues(alpha: 0.9),
-            context.bgColor,
-          ],
-          stops: const [0.0, 0.3, 0.5],
-        ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Row(
+    final isDark = context.isDark;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final bgColor = isDark
+        ? const Color(0xFF1A1A1A).withValues(alpha: 0.85)
+        : Colors.white.withValues(alpha: 0.9);
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.black.withValues(alpha: 0.08);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPadding + 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: borderColor, width: 1),
+            ),
+            child: Row(
           children: [
             // Info
             Expanded(
@@ -891,9 +893,11 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                 ),
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
+    ),
     );
   }
 

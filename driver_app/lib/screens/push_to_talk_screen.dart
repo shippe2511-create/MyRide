@@ -322,7 +322,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
               ),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.radio, color: Colors.black, size: 20),
+            child: const Icon(Icons.mic, color: Colors.black, size: 20),
           ),
           const SizedBox(width: 12),
           const Expanded(
@@ -330,7 +330,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Dispatch Radio',
+                  'Push to Talk',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,
@@ -338,7 +338,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
                   ),
                 ),
                 Text(
-                  'Voice communication with dispatch',
+                  'Voice messages with dispatch',
                   style: TextStyle(
                     color: Colors.white54,
                     fontSize: 12,

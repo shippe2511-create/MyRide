@@ -609,7 +609,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     _buildActionButton(
                       context,
                       icon: Icons.mic,
-                      label: 'Radio',
+                      label: 'PTT',
                       color: AppColors.success,
                       onTap: () {
                         HapticFeedback.lightImpact();

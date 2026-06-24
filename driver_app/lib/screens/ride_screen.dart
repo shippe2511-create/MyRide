@@ -863,9 +863,9 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.radio, color: Colors.black, size: 16),
+                            Icon(Icons.mic, color: Colors.black, size: 16),
                             SizedBox(width: 6),
-                            Text('Radio', style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.w700)),
+                            Text('PTT', style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.w700)),
                           ],
                         ),
                       ),

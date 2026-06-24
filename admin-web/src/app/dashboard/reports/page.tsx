@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback, memo, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { PermissionGate } from "@/components/permission-gate"
@@ -11,6 +11,57 @@ import {
 import { Input } from "@/components/ui/input"
 import { Download, FileSpreadsheet, FileText, Loader2, Calendar, Users, Car, Star, BarChart3, TrendingUp, Package, AlertTriangle, Shield, ClipboardCheck, Fuel, Coffee, Clock, MessageSquare, Ticket } from "lucide-react"
 import { toast } from "sonner"
+
+const supabase = createClient()
+
+interface ReportCardProps {
+  report: { id: string; name: string; description: string; icon: React.ComponentType<{ className?: string }> }
+  isLoading: boolean
+  onDownload: (id: string) => void
+}
+
+const ReportCard = memo(function ReportCard({ report, isLoading, onDownload }: ReportCardProps) {
+  const Icon = report.icon
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        if (isLoading) return
+        onDownload(report.id)
+      }}
+      className="group relative flex items-center gap-4 p-4 rounded-xl border bg-card hover:bg-accent/50 hover:border-primary/30 transition-all duration-200 text-left cursor-pointer select-none"
+    >
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+        {isLoading ? (
+          <Loader2 className="h-5 w-5 text-primary animate-spin" />
+        ) : (
+          <Icon className="h-5 w-5 text-primary" />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="font-medium truncate">{report.name}</p>
+        <p className="text-xs text-muted-foreground truncate">{report.description}</p>
+      </div>
+      <Download className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+    </div>
+  )
+})
+
+function downloadCSV(csvContent: string, filename: string) {
+  const blob = new Blob(["﻿" + csvContent], { type: "text/csv;charset=utf-8" })
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.setAttribute("href", url)
+  link.setAttribute("download", filename)
+  link.style.visibility = "hidden"
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(url)
+}
 
 const reportTypes = [
   { id: "rides", name: "Rides Report", description: "All rides with pickup, dropoff, and status", icon: Car },
@@ -169,11 +220,18 @@ const columnLabels: Record<string, Record<string, string>> = {
 }
 
 export default function ReportsPage() {
-  const supabase = createClient()
   const [loading, setLoading] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState("all")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
+
+  // Use refs for date values to prevent generateReport from changing
+  const dateRangeRef = useRef(dateRange)
+  const startDateRef = useRef(startDate)
+  const endDateRef = useRef(endDate)
+  dateRangeRef.current = dateRange
+  startDateRef.current = startDate
+  endDateRef.current = endDate
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return ""
@@ -224,10 +282,13 @@ export default function ReportsPage() {
 
   const getDateFilter = () => {
     const now = new Date()
-    if (dateRange === "custom" && startDate && endDate) {
-      return { start: startDate, end: endDate }
+    const dr = dateRangeRef.current
+    const sd = startDateRef.current
+    const ed = endDateRef.current
+    if (dr === "custom" && sd && ed) {
+      return { start: sd, end: ed }
     }
-    switch (dateRange) {
+    switch (dr) {
       case "today":
         const today = now.toISOString().split("T")[0]
         return { start: today, end: today }
@@ -245,11 +306,11 @@ export default function ReportsPage() {
     }
   }
 
-  const generateReport = async (reportType: string, showLoading = true) => {
-    if (showLoading) setLoading(reportType)
-    const dateFilter = getDateFilter()
-
+  const generateReport = useCallback(async (reportType: string, showLoading = true): Promise<void> => {
     try {
+      if (showLoading) setLoading(reportType)
+      const dateFilter = getDateFilter()
+
       let rows: Record<string, string>[] = []
       let filename = ""
       const labels = columnLabels[reportType]
@@ -745,24 +806,17 @@ export default function ReportsPage() {
       )
 
       const csv = [headers.join(","), ...csvRows].join("\n")
-      const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }) // BOM for Excel
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = filename
-      a.click()
-      URL.revokeObjectURL(url)
-
+      downloadCSV(csv, filename)
       toast.success(`${rows.length} records exported`)
-    } catch (error) {
-      toast.error("Failed to generate report")
-      console.error(error)
+    } catch (error: unknown) {
+      console.error("Report generation error:", error)
+      toast.error(`Failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      if (showLoading) setLoading(null)
     }
+  }, [])
 
-    if (showLoading) setLoading(null)
-  }
-
-  const downloadAllReports = async () => {
+  const downloadAllReports = useCallback(async () => {
     setLoading("all")
     toast.info("Downloading all reports...")
 
@@ -779,131 +833,110 @@ export default function ReportsPage() {
 
     setLoading(null)
     toast.success(`${successCount} reports downloaded!`)
-  }
+  }, [generateReport])
+
+  const categories = [
+    { name: "People", reports: ["customers", "drivers", "driver_performance"] },
+    { name: "Operations", reports: ["rides", "shifts", "break_history", "quota_usage"] },
+    { name: "Feedback", reports: ["ratings", "support_tickets"] },
+    { name: "Safety", reports: ["sos_alerts", "incidents"] },
+    { name: "Vehicles", reports: ["vehicle_checks", "vehicle_logs"] },
+    { name: "Analytics", reports: ["usage"] },
+  ]
 
   return (
-    <PermissionGate permission="reports:view">
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <FileSpreadsheet className="h-6 w-6" />
-            Reports
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Generate and export reports in CSV format
+          <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
+          <p className="text-muted-foreground mt-1">
+            Export data in CSV format for analysis
           </p>
         </div>
         <Button
-          onClick={downloadAllReports}
+          type="button"
+          onClick={() => {
+            if (loading) return
+            downloadAllReports().catch(console.error)
+          }}
           disabled={loading !== null}
-          variant="outline"
           size="lg"
+          className="gap-2"
         >
           {loading === "all" ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
               Downloading...
             </>
           ) : (
             <>
-              <Package className="mr-2 h-4 w-4" />
-              Download All Reports
+              <Package className="h-4 w-4" />
+              Download All
             </>
           )}
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Date Range
-          </CardTitle>
-          <CardDescription>Filter reports by date (optional)</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4 items-center">
-            <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Time period" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Time</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">Last 7 Days</SelectItem>
-                <SelectItem value="month">Last 30 Days</SelectItem>
-                <SelectItem value="year">Last Year</SelectItem>
-                <SelectItem value="custom">Custom Range</SelectItem>
-              </SelectContent>
-            </Select>
-            {dateRange === "custom" && (
-              <>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">From:</span>
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-40"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">To:</span>
-                  <Input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-40"
-                  />
-                </div>
-              </>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {reportTypes.map((report) => (
-          <Card key={report.id} className="hover:border-primary/50 transition-colors">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <report.icon className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <CardTitle className="text-base">{report.name}</CardTitle>
-                  <CardDescription className="text-xs">{report.description}</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Button
-                type="button"
-                className="w-full"
-                onClick={(e) => {
-                  e.preventDefault()
-                  generateReport(report.id)
-                }}
-                disabled={loading !== null}
-              >
-                {loading === report.id ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Download className="mr-2 h-4 w-4" />
-                    Export CSV
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
+      {/* Date Filter - Compact */}
+      <div className="flex flex-wrap items-center gap-3 p-4 rounded-xl bg-muted/30 border">
+        <Calendar className="h-4 w-4 text-muted-foreground" />
+        <Select value={dateRange} onValueChange={setDateRange}>
+          <SelectTrigger className="w-36 h-9">
+            <SelectValue placeholder="Time period" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Time</SelectItem>
+            <SelectItem value="today">Today</SelectItem>
+            <SelectItem value="week">Last 7 Days</SelectItem>
+            <SelectItem value="month">Last 30 Days</SelectItem>
+            <SelectItem value="year">Last Year</SelectItem>
+            <SelectItem value="custom">Custom Range</SelectItem>
+          </SelectContent>
+        </Select>
+        {dateRange === "custom" && (
+          <>
+            <div className="h-4 w-px bg-border" />
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-36 h-9"
+            />
+            <span className="text-muted-foreground text-sm">to</span>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-36 h-9"
+            />
+          </>
+        )}
       </div>
+
+      {/* Reports by Category */}
+      {categories.map((category) => {
+        const categoryReports = reportTypes.filter(r => category.reports.includes(r.id))
+        if (categoryReports.length === 0) return null
+
+        return (
+          <div key={category.name} className="space-y-3">
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+              {category.name}
+            </h2>
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {categoryReports.map((report) => (
+                <ReportCard
+                  key={report.id}
+                  report={report}
+                  isLoading={loading === report.id}
+                  onDownload={generateReport}
+                />
+              ))}
+            </div>
+          </div>
+        )
+      })}
     </div>
-    </PermissionGate>
   )
 }

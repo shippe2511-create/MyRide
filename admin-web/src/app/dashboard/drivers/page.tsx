@@ -6,9 +6,10 @@ import { createClient } from "@/lib/supabase/client"
 import { DriversTable } from "./drivers-table"
 import { DocumentsTable } from "./documents-table"
 import { ShiftsTable } from "./shifts-table"
+import { ActivityTable } from "./activity-table"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, UserCheck, Clock, FileText, Calendar } from "lucide-react"
+import { Users, UserCheck, Clock, FileText, Calendar, Activity } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { useSearchParams } from "next/navigation"
 import { PermissionGate } from "@/components/permission-gate"
@@ -175,6 +176,10 @@ export default function DriversPage() {
               <Users className="h-4 w-4" />
               Drivers
             </TabsTrigger>
+            <TabsTrigger value="activity" className="gap-2">
+              <Activity className="h-4 w-4" />
+              Activity
+            </TabsTrigger>
             <TabsTrigger value="documents" className="gap-2">
               <FileText className="h-4 w-4" />
               Documents
@@ -192,6 +197,10 @@ export default function DriversPage() {
               currentPage={page}
               pageSize={pageSize}
             />
+          </TabsContent>
+
+          <TabsContent value="activity" className="mt-4">
+            <ActivityTable />
           </TabsContent>
 
           <TabsContent value="documents" className="mt-4">

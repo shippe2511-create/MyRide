@@ -450,11 +450,16 @@ class DriverState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void completeChecklist({bool hasIssues = false, Map<String, String> issues = const {}}) {
+  void completeChecklist({bool hasIssues = false, Map<String, String> issues = const {}}) async {
     _checklistCompleted = true;
     _checklistCompletedDate = DateTime.now();
     _checklistHasIssues = hasIssues;
     _checklistIssues = Map.from(issues);
+
+    // Clear the needsNewChecklist flag since we just completed one
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('needsNewChecklist', false);
+
     notifyListeners();
   }
 
@@ -463,6 +468,20 @@ class DriverState extends ChangeNotifier {
     if (_driverId.isEmpty) return;
 
     try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Check if we need a new checklist (after ending shift)
+      final needsNew = prefs.getBool('needsNewChecklist') ?? false;
+      if (needsNew) {
+        _checklistCompleted = false;
+        _checklistCompletedDate = null;
+        _checklistHasIssues = false;
+        _checklistIssues = {};
+        debugPrint('New checklist required for new shift');
+        notifyListeners();
+        return;
+      }
+
       final today = DateTime.now();
       final startOfDay = DateTime(today.year, today.month, today.day);
       final endOfDay = startOfDay.add(const Duration(days: 1));
@@ -639,14 +658,21 @@ class DriverState extends ChangeNotifier {
     _stopRidePolling();
     _unsubscribeFromRides();
 
+    // Reset checklist for next shift
+    _checklistCompleted = false;
+    _checklistCompletedDate = null;
+    _checklistHasIssues = false;
+    _checklistIssues = {};
+
     // Haptic and voice feedback
     HapticFeedback.lightImpact();
     VoiceService().announceGoingOffline();
 
-    // Clear online and break state when going offline
+    // Clear online, break state and mark checklist as needed for next shift
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isOnline', false);
     await prefs.setBool('isOnBreak', false);
+    await prefs.setBool('needsNewChecklist', true);  // Require checklist for next shift
     await prefs.remove('breakType');
     await prefs.remove('breakStartTime');
 

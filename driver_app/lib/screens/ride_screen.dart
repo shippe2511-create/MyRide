@@ -1070,7 +1070,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                 right: 0,
                 bottom: 0,
                 height: _isPanelExpanded
-                    ? MediaQuery.of(context).size.height * 0.62
+                    ? MediaQuery.of(context).size.height * 0.57
                     : 200 + MediaQuery.of(context).padding.bottom,
                 child: Container(
                   decoration: BoxDecoration(
@@ -1125,7 +1125,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                                 child: Column(
                                   children: [
                                     _buildCustomerCard(ride, state),
-                                    const SizedBox(height: 16),
+                                    const SizedBox(height: 12),
                                     _buildRouteCard(ride),
                                     if (state.queuedRequests.isNotEmpty) ...[
                                       const SizedBox(height: 16),
@@ -1165,7 +1165,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
 
                       // Always show swipe action at bottom
                       Padding(
-                        padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(context).padding.bottom + 16),
+                        padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(context).padding.bottom + 12),
                         child: _buildSwipeAction(state, ride),
                       ),
                     ],
@@ -1249,10 +1249,10 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
 
   Widget _buildCustomerCard(RideRequest ride, DriverState state) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: context.bgColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.yellow.withValues(alpha: 0.3)),
       ),
       child: Column(
@@ -1360,10 +1360,10 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     final isPickup = ride.status == RideStatus.accepted || ride.status == RideStatus.arrivedAtPickup;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: context.bgColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         children: [

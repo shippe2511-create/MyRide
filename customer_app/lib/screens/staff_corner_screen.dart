@@ -149,7 +149,7 @@ class _StaffCornerScreenState extends State<StaffCornerScreen> {
   }
 
   Widget _buildPostCard(Map<String, dynamic> post) {
-    final createdAt = DateTime.tryParse(post['created_at'] ?? '');
+    final createdAt = DateTime.tryParse(post['created_at'] ?? '')?.toLocal();
     final category = post['category'] ?? 'General';
     final imageUrl = post['image_url'] ?? '';
 
@@ -296,7 +296,7 @@ class _StaffCornerScreenState extends State<StaffCornerScreen> {
   }
 
   void _showPostDetail(Map<String, dynamic> post) {
-    final createdAt = DateTime.tryParse(post['created_at'] ?? '');
+    final createdAt = DateTime.tryParse(post['created_at'] ?? '')?.toLocal();
     final imageUrl = post['image_url'] ?? '';
 
     showModalBottomSheet(

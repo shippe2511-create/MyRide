@@ -148,7 +148,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               id: msg['id'].toString(),
               text: msg['message'] ?? '',
               isCustomer: isCustomer,
-              time: DateTime.tryParse(msg['created_at'] ?? '') ?? DateTime.now(),
+              time: (DateTime.tryParse(msg['created_at'] ?? '') ?? DateTime.now()).toLocal(),
               status: msg['is_read'] == true ? MessageStatus.read : MessageStatus.delivered,
             ));
           }
@@ -177,7 +177,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               id: newMessage['id'].toString(),
               text: newMessage['message'] ?? '',
               isCustomer: false,
-              time: DateTime.tryParse(newMessage['created_at'] ?? '') ?? DateTime.now(),
+              time: (DateTime.tryParse(newMessage['created_at'] ?? '') ?? DateTime.now()).toLocal(),
               status: MessageStatus.read,
             ));
           });

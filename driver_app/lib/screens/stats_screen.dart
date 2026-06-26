@@ -353,7 +353,7 @@ class _DriverStatsScreenState extends State<DriverStatsScreen> {
   }
 
   Widget _buildRideItem(Map<String, dynamic> ride, bool isDark, Color textColor, Color mutedColor) {
-    final createdAt = DateTime.tryParse(ride['created_at'] ?? '');
+    final createdAt = DateTime.tryParse(ride['created_at'] ?? '')?.toLocal();
     final pickupName = ride['pickup_name'] ?? 'Unknown';
     final dropoffName = ride['dropoff_name'] ?? 'Unknown';
     final distance = ride['distance_km'] ?? 0.0;

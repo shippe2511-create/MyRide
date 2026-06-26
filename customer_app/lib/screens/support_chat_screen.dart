@@ -79,7 +79,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
               id: msg['id'].toString(),
               text: msg['message'] ?? '',
               isCustomer: msg['sender_type'] == 'customer',
-              time: DateTime.tryParse(msg['created_at'] ?? '') ?? DateTime.now(),
+              time: (DateTime.tryParse(msg['created_at'] ?? '') ?? DateTime.now()).toLocal(),
               isRead: msg['is_read'] ?? false,
             ));
           }
@@ -104,7 +104,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
               id: newMessage['id'].toString(),
               text: newMessage['message'] ?? '',
               isCustomer: false,
-              time: DateTime.tryParse(newMessage['created_at'] ?? '') ?? DateTime.now(),
+              time: (DateTime.tryParse(newMessage['created_at'] ?? '') ?? DateTime.now()).toLocal(),
             ));
           });
           _scrollToBottom();

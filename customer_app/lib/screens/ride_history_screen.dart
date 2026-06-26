@@ -172,7 +172,7 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
 
   Widget _buildRideCard(Map<String, dynamic> ride, bool isDark) {
     final status = ride['status'] as String? ?? 'unknown';
-    final createdAt = DateTime.tryParse(ride['created_at'] ?? '');
+    final createdAt = DateTime.tryParse(ride['created_at'] ?? '')?.toLocal();
     final pickupName = ride['pickup_name'] ?? 'Unknown';
     final dropoffName = ride['dropoff_name'] ?? 'Unknown';
     final driver = ride['driver'] as Map<String, dynamic>?;

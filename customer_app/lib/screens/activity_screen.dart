@@ -67,7 +67,7 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
           id: ride['id'] ?? '',
           pickup: ride['pickup_name'] ?? 'Unknown',
           dropoff: ride['dropoff_name'] ?? 'Unknown',
-          date: DateTime.tryParse(ride['created_at'] ?? '') ?? DateTime.now(),
+          date: (DateTime.tryParse(ride['created_at'] ?? '') ?? DateTime.now()).toLocal(),
           status: status == 'cancelled' ? TripStatus.cancelled : TripStatus.completed,
           driverName: driverProfile?['full_name'] ?? 'Driver',
           vehicleNumber: vehicle?['plate_no'] ?? '-',

@@ -289,7 +289,7 @@ class _SearchScreenState extends State<SearchScreen> {
       for (final ride in rides.take(10)) {
         final dropoffName = ride['dropoff_name'] as String?;
         if (dropoffName != null && dropoffName.isNotEmpty && !recentDestinations.containsKey(dropoffName)) {
-          final createdAt = DateTime.tryParse(ride['created_at'] ?? '');
+          final createdAt = DateTime.tryParse(ride['created_at'] ?? '')?.toLocal();
           String timeAgo = '';
           if (createdAt != null) {
             final diff = DateTime.now().difference(createdAt);

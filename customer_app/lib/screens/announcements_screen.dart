@@ -171,7 +171,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   }
 
   Widget _buildAnnouncementCard(Map<String, dynamic> announcement) {
-    final createdAt = DateTime.tryParse(announcement['created_at'] ?? '');
+    final createdAt = DateTime.tryParse(announcement['created_at'] ?? '')?.toLocal();
     final isNew = createdAt != null && DateTime.now().difference(createdAt).inDays < 3;
     final priority = announcement['priority'] ?? 'normal';
     final color = priority == 'high'
@@ -300,7 +300,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   }
 
   void _showAnnouncementDetail(Map<String, dynamic> announcement) {
-    final createdAt = DateTime.tryParse(announcement['created_at'] ?? '');
+    final createdAt = DateTime.tryParse(announcement['created_at'] ?? '')?.toLocal();
     final priority = announcement['priority'] ?? 'normal';
     final color = priority == 'high'
         ? AppColors.error

@@ -953,7 +953,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   itemCount: _announcements.length,
                   itemBuilder: (context, index) {
                     final a = _announcements[index];
-                    final createdAt = DateTime.tryParse(a['created_at'] ?? '');
+                    final createdAt = DateTime.tryParse(a['created_at'] ?? '')?.toLocal();
                     final isNew = createdAt != null && DateTime.now().difference(createdAt).inDays < 3;
                     return _buildAnnouncementCard(
                       context,

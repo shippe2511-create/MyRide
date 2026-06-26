@@ -130,7 +130,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final title = notification['title'] as String? ?? 'Notification';
     final message = notification['message'] as String? ?? '';
     final timeStr = notification['created_at'] as String?;
-    final time = timeStr != null ? DateTime.tryParse(timeStr) : null;
+    final time = timeStr != null ? DateTime.tryParse(timeStr)?.toLocal() : null;
 
     IconData icon;
     Color iconColor;

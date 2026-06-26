@@ -1315,7 +1315,7 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
             dialogClosed = true;
             if (Navigator.canPop(ctx)) {
               Navigator.pop(ctx);
-              _showDriverAcceptedChange(newDestination, destinationName);
+              _showDriverAcceptedChange(destinationName, destinationName);
             }
           } else if (status == 'rejected') {
             timer.cancel();
@@ -1381,11 +1381,11 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
                       Navigator.pop(ctx);
                     },
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: context.mutedColor,
-                      side: BorderSide(color: context.borderColor),
+                      foregroundColor: Colors.red,
+                      side: BorderSide(color: Colors.red.withValues(alpha: 0.5)),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: Text('Cancel Request', style: TextStyle(fontWeight: FontWeight.w600)),
+                    child: Text('Cancel Request', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red)),
                   ),
                 ),
               ],

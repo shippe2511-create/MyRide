@@ -37,10 +37,14 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _scrollController.addListener(_onScroll);
     // Mark that we're on home screen and listen for active ride
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final state = context.read<DriverState>();
       state.setOnHomeScreen(true);
       state.addListener(_onDriverStateChanged);
+
+      // Load today's checklist from DB (may have been completed earlier)
+      await state.loadTodayChecklist();
+
       _checkForActiveRide();
 
       // If driver was online from previous session, re-initialize subscriptions

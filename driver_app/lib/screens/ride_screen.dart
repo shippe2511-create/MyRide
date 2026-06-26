@@ -69,15 +69,16 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   bool _isQueueExpanded = false;
   bool _isPanelExpanded = true;
   bool _isNavigatingAway = false;
+  String? _currentRideId;
 
   @override
   void initState() {
     super.initState();
 
-    // Reset static flags for new ride session
+    // Reset ALL static flags for new ride session
     _isShowingDestinationChange = false;
     _lastPendingDestination = null;
-    // Don't clear _acceptedDestinations here - it prevents re-showing same destination
+    _acceptedDestinations.clear();  // Clear so new requests can come through
 
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1500),
@@ -90,8 +91,12 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     );
 
     _startDriverSimulation();
-    _startDestinationChangePolling();
     _subscribeToRideUpdates();
+
+    // Start polling after a short delay to ensure ride is loaded
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) _startDestinationChangePolling();
+    });
 
     // Subscribe to chat notifications
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -110,9 +115,22 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final driverState = Provider.of<DriverState>(context, listen: false);
       final rideId = driverState.currentRide?.id;
-      if (rideId == null) return;
+      if (rideId == null) {
+        debugPrint('SUBSCRIBE: No ride ID yet, will retry');
+        // Retry after delay
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            _isSubscribed = false;
+            _subscribeToRideUpdates();
+          }
+        });
+        return;
+      }
 
-      // Start polling for destination changes as backup
+      _currentRideId = rideId;
+      debugPrint('SUBSCRIBE: Got ride ID $rideId, starting polling');
+
+      // Start polling for destination changes
       _startDestinationChangePolling();
 
       _rideSubscription = RealtimeService().subscribeToRide(rideId).listen((data) {
@@ -170,14 +188,18 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
         return;
       }
 
-      final state = context.read<DriverState>();
-      final ride = state.currentRide;
-      if (ride == null) {
-        debugPrint('POLL: No ride, skipping');
+      // Always get fresh ride ID from state (don't use cached)
+      final rideId = context.read<DriverState>().currentRide?.id;
+
+      if (rideId == null) {
+        debugPrint('POLL: No ride ID, skipping');
         return;
       }
 
-      await _checkPendingDestinationChange(ride.id);
+      // Update cached ID
+      _currentRideId = rideId;
+
+      await _checkPendingDestinationChange(rideId);
     });
   }
 
@@ -192,14 +214,17 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
       debugPrint('CHECK: status=$status, pendingDest=$pendingDest');
 
       if (status == 'pending' && pendingDest != null && pendingDest.isNotEmpty) {
-        // Skip if already accepted or currently showing
-        if (_acceptedDestinations.contains(pendingDest) || pendingDest == _lastPendingDestination) {
-          debugPrint('CHECK: Skipping $pendingDest (accepted or duplicate)');
+        // Only skip if we're currently showing a dialog for this exact destination
+        if (_lastPendingDestination == pendingDest && _isShowingDestinationChange) {
+          debugPrint('CHECK: Already showing dialog for $pendingDest');
           return;
         }
 
         _lastPendingDestination = pendingDest;
         _showDestinationChangeApproval(rideId, pendingDest);
+      } else if (status != 'pending') {
+        // Clear tracking when no pending request
+        _lastPendingDestination = null;
       }
     } catch (e) {
       debugPrint('CHECK error: $e');
@@ -316,6 +341,10 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     ).then((_) {
       debugPrint('DIALOG: Sheet closed, resetting flag');
       _isShowingDestinationChange = false;
+      // Restart polling after dialog closes
+      if (mounted) {
+        _startDestinationChangePolling();
+      }
     });
   }
 
@@ -1906,13 +1935,18 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     );
   }
 
-  void _showCompletionDialog(DriverState state) {
+  Future<void> _showCompletionDialog(DriverState state) async {
     // Complete the trip and go straight to home with a toast
-    state.completeTrip();
+    final success = await state.completeTrip();
 
-    AppSnackbar.success(context, 'Trip Completed', subtitle: 'Duration: $_formattedTime');
+    if (!mounted) return;
 
-    Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+    if (success) {
+      AppSnackbar.success(context, 'Trip Completed', subtitle: 'Duration: $_formattedTime');
+      Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+    } else {
+      AppSnackbar.error(context, 'Failed to complete trip');
+    }
   }
 }
 

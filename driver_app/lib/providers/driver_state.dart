@@ -248,6 +248,13 @@ class DriverState extends ChangeNotifier {
         _loadAvatarFromDb();
       }
 
+      // Load online state
+      final wasOnline = prefs.getBool('isOnline') ?? false;
+      if (wasOnline && _driverId.isNotEmpty) {
+        _isOnline = true;
+        // Will re-initialize subscriptions in home_screen via goOnline check
+      }
+
       // Load break state if saved
       final wasOnBreak = prefs.getBool('isOnBreak') ?? false;
       if (wasOnBreak) {
@@ -511,6 +518,10 @@ class DriverState extends ChangeNotifier {
     _breakStartTime = null;
     _incomingRequests.clear(); // Clear any stale requests
 
+    // Save online state
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isOnline', true);
+
     // Haptic and voice feedback
     HapticFeedback.mediumImpact();
     VoiceService().announceGoingOnline();
@@ -632,8 +643,9 @@ class DriverState extends ChangeNotifier {
     HapticFeedback.lightImpact();
     VoiceService().announceGoingOffline();
 
-    // Clear break state when going offline
+    // Clear online and break state when going offline
     final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isOnline', false);
     await prefs.setBool('isOnBreak', false);
     await prefs.remove('breakType');
     await prefs.remove('breakStartTime');

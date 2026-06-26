@@ -604,8 +604,8 @@ class DriverState extends ChangeNotifier {
 
   void _startRidePolling() {
     _ridePollingTimer?.cancel();
-    // Poll for new rides every 5 seconds as backup to real-time
-    _ridePollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    // Poll for new rides every 2 seconds as backup to real-time
+    _ridePollingTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (_isOnline && !_isOnBreak && !hasActiveRide) {
         _loadPendingRides();
       }
@@ -880,15 +880,31 @@ class DriverState extends ChangeNotifier {
 
   // Refresh current ride data (after destination change etc)
   Future<void> refreshCurrentRide() async {
-    if (_currentRide == null) return;
+    if (_currentRide == null) {
+      debugPrint('refreshCurrentRide: No current ride');
+      return;
+    }
+    if (_driverId.isEmpty) {
+      debugPrint('refreshCurrentRide: No driver ID');
+      return;
+    }
     try {
-      final rideData = await SupabaseService.getActiveRide();
+      debugPrint('refreshCurrentRide: Fetching for driver $_driverId...');
+      final rideData = await SupabaseService.getActiveRideByDriverId(_driverId);
+      debugPrint('refreshCurrentRide: DB data dropoff_name=${rideData?['dropoff_name']}');
+
       if (rideData != null) {
         final updatedRide = _convertSupabaseRideToRequest(rideData);
         if (updatedRide != null) {
-          _currentRide = updatedRide.copyWith(status: _currentRide!.status);
+          debugPrint('refreshCurrentRide: OLD=${_currentRide!.dropoffLocation}, NEW=${updatedRide.dropoffLocation}');
+          _currentRide = updatedRide;
+          debugPrint('refreshCurrentRide: Calling notifyListeners()');
           notifyListeners();
+        } else {
+          debugPrint('refreshCurrentRide: updatedRide is null');
         }
+      } else {
+        debugPrint('refreshCurrentRide: rideData is null');
       }
     } catch (e) {
       debugPrint('Error refreshing current ride: $e');
@@ -898,6 +914,13 @@ class DriverState extends ChangeNotifier {
   RideRequest? _convertSupabaseRideToRequest(Map<String, dynamic> ride) {
     try {
       final customer = ride['customer'] as Map<String, dynamic>?;
+      final statusStr = ride['status'] as String? ?? 'pending';
+      final status = statusStr == 'accepted' ? RideStatus.accepted :
+                     statusStr == 'arrived' ? RideStatus.arrivedAtPickup :
+                     statusStr == 'in_progress' ? RideStatus.inProgress :
+                     statusStr == 'completed' ? RideStatus.completed :
+                     statusStr == 'cancelled' ? RideStatus.cancelled : RideStatus.pending;
+
       return RideRequest(
         id: ride['id'] ?? '',
         customerId: ride['customer_id'] as String?,
@@ -914,6 +937,7 @@ class DriverState extends ChangeNotifier {
         requestTime: DateTime.tryParse(ride['created_at'] ?? '') ?? DateTime.now(),
         estimatedDistance: (ride['distance_km'] as num?)?.toDouble() ?? 5.0,
         estimatedDuration: (ride['duration_minutes'] as num?)?.toInt() ?? 15,
+        status: status,
       );
     } catch (e) {
       debugPrint('Error converting ride: $e');
@@ -1162,8 +1186,17 @@ class DriverState extends ChangeNotifier {
     }
   }
 
-  Future<void> arrivedAtPickup() async {
-    if (_currentRide != null) {
+  Future<bool> arrivedAtPickup() async {
+    if (_currentRide == null) return false;
+
+    final rideId = _currentRide!.id;
+
+    // Update in Supabase FIRST
+    try {
+      await SupabaseService.updateRideStatus(rideId, 'arrived');
+      debugPrint('arrivedAtPickup: DB updated successfully for $rideId');
+
+      // Only update local state after successful DB update
       _currentRide = _currentRide!.copyWith(status: RideStatus.arrivedAtPickup);
 
       // Notify customer that driver has arrived
@@ -1173,18 +1206,24 @@ class DriverState extends ChangeNotifier {
       );
 
       notifyListeners();
-
-      // Update in Supabase
-      try {
-        await SupabaseService.updateRideStatus(_currentRide!.id, 'arrived');
-      } catch (e) {
-        debugPrint('Error updating ride status: $e');
-      }
+      return true;
+    } catch (e) {
+      debugPrint('arrivedAtPickup ERROR: $e');
+      return false;
     }
   }
 
-  Future<void> startTrip() async {
-    if (_currentRide != null) {
+  Future<bool> startTrip() async {
+    if (_currentRide == null) return false;
+
+    final rideId = _currentRide!.id;
+
+    // Update in Supabase FIRST
+    try {
+      await SupabaseService.updateRideStatus(rideId, 'in_progress');
+      debugPrint('startTrip: DB updated successfully for $rideId');
+
+      // Only update local state after successful DB update
       _currentRide = _currentRide!.copyWith(status: RideStatus.inProgress);
 
       // Haptic and voice feedback
@@ -1192,27 +1231,34 @@ class DriverState extends ChangeNotifier {
       VoiceService().announceTripStarted();
 
       notifyListeners();
-
-      // Update in Supabase
-      try {
-        await SupabaseService.updateRideStatus(_currentRide!.id, 'in_progress');
-      } catch (e) {
-        debugPrint('Error updating ride status: $e');
-      }
+      return true;
+    } catch (e) {
+      debugPrint('startTrip ERROR: $e');
+      return false;
     }
   }
 
-  Future<void> completeTrip() async {
-    if (_currentRide != null) {
-      final rideId = _currentRide!.id;
-      final distance = _currentRide!.estimatedDistance;
-      final duration = _currentRide!.estimatedDuration;
+  Future<bool> completeTrip() async {
+    if (_currentRide == null) return false;
 
+    final rideId = _currentRide!.id;
+    final distance = _currentRide!.estimatedDistance;
+    final duration = _currentRide!.estimatedDuration;
+    final customerName = _currentRide!.customerName;
+    final pickupLocation = _currentRide!.pickupLocation;
+    final dropoffLocation = _currentRide!.dropoffLocation;
+
+    // Update in Supabase FIRST
+    try {
+      await SupabaseService.completeRide(rideId, distanceKm: distance, durationMinutes: duration);
+      debugPrint('completeTrip: DB updated successfully for $rideId');
+
+      // Only update local state after successful DB update
       _completedTrips.insert(0, CompletedTrip(
         id: rideId,
-        customerName: _currentRide!.customerName,
-        pickupLocation: _currentRide!.pickupLocation,
-        dropoffLocation: _currentRide!.dropoffLocation,
+        customerName: customerName,
+        pickupLocation: pickupLocation,
+        dropoffLocation: dropoffLocation,
         tripDate: DateTime.now(),
         durationMinutes: duration,
         distanceKm: distance,
@@ -1231,31 +1277,15 @@ class DriverState extends ChangeNotifier {
         duration: duration,
       );
 
-      // Update in Supabase
-      try {
-        await SupabaseService.completeRide(rideId, distanceKm: distance, durationMinutes: duration);
-      } catch (e) {
-        debugPrint('Error completing ride: $e');
-      }
-
-      // Auto-start next queued ride if available
-      if (_queuedRequests.isNotEmpty) {
-        _currentRide = _queuedRequests.first.copyWith(status: RideStatus.accepted);
-        _queuedRequests.removeAt(0);
-        NotificationService().showRideRequestNotification(
-          customerName: _currentRide!.customerName,
-          pickup: _currentRide!.pickupLocation,
-          dropoff: _currentRide!.dropoffLocation,
-          distance: _currentRide!.estimatedDistance,
-        );
-      } else {
-        _currentRide = null;
-        if (_isOnline) {
-
-        }
-      }
+      // Clear current ride - don't auto-start queued rides (they need fresh acceptance)
+      _currentRide = null;
+      _queuedRequests.clear(); // Clear any stale queued rides
 
       notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('completeTrip ERROR: $e');
+      return false;
     }
   }
 

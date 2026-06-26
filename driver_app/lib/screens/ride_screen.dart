@@ -10,8 +10,10 @@ import '../models/ride_request.dart';
 import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/notification_service.dart';
 import '../services/realtime_service.dart';
+import '../widgets/app_snackbar.dart';
 import 'chat_screen.dart';
 
 const String _darkMapStyle = '''
@@ -42,6 +44,11 @@ class RideScreen extends StatefulWidget {
 }
 
 class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
+  // STATIC flags to prevent duplicates across multiple widget instances
+  static bool _isShowingDestinationChange = false;
+  static String? _lastPendingDestination;
+  static Set<String> _acceptedDestinations = {};
+
   GoogleMapController? _mapController;
   late AnimationController _pulseController;
   late AnimationController _routeAnimController;
@@ -52,7 +59,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   StreamSubscription<Map<String, dynamic>>? _rideSubscription;
   int _elapsedSeconds = 0;
   int _etaSeconds = 0;
-  bool _isShowingDestinationChange = false;
+  bool _isSubscribed = false;
   double _driverLat = 4.2050;
   double _driverLng = 73.5380;
   double _prevDriverLat = 4.2050;
@@ -66,6 +73,12 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+
+    // Reset static flags for new ride session
+    _isShowingDestinationChange = false;
+    _lastPendingDestination = null;
+    // Don't clear _acceptedDestinations here - it prevents re-showing same destination
+
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
@@ -91,10 +104,16 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   }
 
   void _subscribeToRideUpdates() {
+    if (_isSubscribed) return;  // Prevent duplicate subscriptions
+    _isSubscribed = true;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final driverState = Provider.of<DriverState>(context, listen: false);
       final rideId = driverState.currentRide?.id;
       if (rideId == null) return;
+
+      // Start polling for destination changes as backup
+      _startDestinationChangePolling();
 
       _rideSubscription = RealtimeService().subscribeToRide(rideId).listen((data) {
         debugPrint('Ride realtime update: ${data['event']}');
@@ -106,23 +125,14 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
         // Handle ride cancellation by customer
         if (status == 'cancelled') {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Ride was cancelled by customer'),
-                backgroundColor: Colors.orange,
-              ),
-            );
-            // Navigate back to home
+            AppSnackbar.warning(context, 'Ride cancelled', subtitle: 'Customer cancelled the ride');
             Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
           }
           return;
         }
 
-        // Handle destination changes
-        if (newRecord['destination_change_status'] == 'pending' && !_isShowingDestinationChange) {
-          final newDestination = newRecord['pending_dropoff_name'] as String? ?? 'New Location';
-          _showDestinationChangeApproval(rideId, newDestination);
-        }
+        // Don't handle destination changes from realtime - causes duplicates
+        // Use polling only
 
         // Refresh ride data for other updates
         driverState.refreshCurrentRide();
@@ -151,48 +161,86 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   }
 
   void _startDestinationChangePolling() {
+    _destinationChangeTimer?.cancel();
+    debugPrint('POLL: Starting destination change polling');
     _destinationChangeTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
-      if (!mounted || _isShowingDestinationChange) return;
+      if (!mounted) return;
+      if (_isShowingDestinationChange) {
+        debugPrint('POLL: Dialog showing, skipping');
+        return;
+      }
 
       final state = context.read<DriverState>();
       final ride = state.currentRide;
-      if (ride == null) return;
-
-      final pending = await SupabaseService.getPendingDestinationChange(ride.id);
-      if (pending != null && pending['destination_change_status'] == 'pending') {
-        final newDestination = pending['pending_dropoff_name'] as String? ?? 'New Location';
-        _showDestinationChangeApproval(ride.id, newDestination);
+      if (ride == null) {
+        debugPrint('POLL: No ride, skipping');
+        return;
       }
+
+      await _checkPendingDestinationChange(ride.id);
     });
   }
 
-  void _showDestinationChangeApproval(String rideId, String newDestination) {
+  Future<void> _checkPendingDestinationChange(String rideId) async {
     if (_isShowingDestinationChange) return;
+
+    try {
+      final pending = await SupabaseService.getPendingDestinationChange(rideId);
+      final status = pending?['destination_change_status'] as String?;
+      final pendingDest = pending?['pending_dropoff_name'] as String?;
+
+      debugPrint('CHECK: status=$status, pendingDest=$pendingDest');
+
+      if (status == 'pending' && pendingDest != null && pendingDest.isNotEmpty) {
+        // Skip if already accepted or currently showing
+        if (_acceptedDestinations.contains(pendingDest) || pendingDest == _lastPendingDestination) {
+          debugPrint('CHECK: Skipping $pendingDest (accepted or duplicate)');
+          return;
+        }
+
+        _lastPendingDestination = pendingDest;
+        _showDestinationChangeApproval(rideId, pendingDest);
+      }
+    } catch (e) {
+      debugPrint('CHECK error: $e');
+    }
+  }
+
+  void _showDestinationChangeApproval(String rideId, String newDestination) {
+    if (_isShowingDestinationChange) {
+      debugPrint('DIALOG: Already showing, skipping');
+      return;
+    }
     _isShowingDestinationChange = true;
+    _destinationChangeTimer?.cancel();
+    debugPrint('DIALOG: Showing dialog for $newDestination');
 
     HapticFeedback.heavyImpact();
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => Dialog(
-        backgroundColor: context.cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: context.cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 70,
-                height: 70,
+                width: 60,
+                height: 60,
                 decoration: BoxDecoration(
                   color: AppColors.yellow.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.edit_location_alt, color: AppColors.yellow, size: 36),
+                child: Icon(Icons.edit_location_alt, color: AppColors.yellow, size: 32),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               Text('Destination Change', style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
               Text('Customer wants to change destination', textAlign: TextAlign.center, style: TextStyle(color: context.mutedColor, fontSize: 14)),
@@ -219,57 +267,43 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               Row(
                 children: [
                   Expanded(
                     child: SizedBox(
-                      height: 50,
-                      child: OutlinedButton(
-                        onPressed: () async {
-                          Navigator.pop(ctx);
-                          _isShowingDestinationChange = false;
-                          await SupabaseService.rejectDestinationChange(rideId);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Destination change declined'), backgroundColor: Colors.orange),
-                            );
-                          }
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          debugPrint('DECLINE tapped');
+                          Navigator.of(sheetContext, rootNavigator: true).pop();
+                          _handleDecline(rideId);
                         },
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red,
-                          side: BorderSide(color: Colors.red),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade700,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
-                        child: Text('Decline', style: TextStyle(fontWeight: FontWeight.w600)),
+                        child: const Text('Decline', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: SizedBox(
-                      height: 50,
+                      height: 56,
                       child: ElevatedButton(
-                        onPressed: () async {
-                          Navigator.pop(ctx);
-                          _isShowingDestinationChange = false;
-                          final success = await SupabaseService.approveDestinationChange(rideId);
-                          if (mounted) {
-                            if (success) {
-                              // Refresh ride data
-                              context.read<DriverState>().refreshCurrentRide();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Destination updated'), backgroundColor: Colors.green),
-                              );
-                            }
-                          }
+                        onPressed: () {
+                          debugPrint('ACCEPT tapped');
+                          Navigator.of(sheetContext, rootNavigator: true).pop();
+                          _handleAccept(rideId, newDestination);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.yellow,
                           foregroundColor: Colors.black,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
-                        child: Text('Accept', style: TextStyle(fontWeight: FontWeight.w700)),
+                        child: const Text('Accept', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                       ),
                     ),
                   ),
@@ -280,8 +314,53 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
         ),
       ),
     ).then((_) {
+      debugPrint('DIALOG: Sheet closed, resetting flag');
       _isShowingDestinationChange = false;
     });
+  }
+
+  Future<void> _handleAccept(String rideId, String newDestination) async {
+    _lastPendingDestination = null;
+    _acceptedDestinations.add(newDestination);  // Track accepted to prevent re-showing
+    debugPrint('_handleAccept: Starting for $newDestination');
+
+    try {
+      // Use atomic RPC function
+      final result = await Supabase.instance.client.rpc('approve_destination_change', params: {
+        'p_ride_id': rideId,
+      });
+
+      debugPrint('_handleAccept: RPC result=$result');
+
+      if (mounted) {
+        AppSnackbar.success(context, 'Destination updated', subtitle: newDestination);
+
+        // Wait for DB to propagate
+        await Future.delayed(const Duration(seconds: 1));
+
+        // Refresh ride data
+        debugPrint('_handleAccept: Refreshing ride...');
+        await context.read<DriverState>().refreshCurrentRide();
+
+        final ride = context.read<DriverState>().currentRide;
+        debugPrint('_handleAccept: After refresh dropoff=${ride?.dropoffLocation}');
+
+        if (ride != null && mounted) {
+          _generateRoute(ride);
+          setState(() {});
+        }
+      }
+    } catch (e) {
+      debugPrint('_handleAccept error: $e');
+      if (mounted) AppSnackbar.error(context, 'Failed to update');
+    }
+  }
+
+  void _handleDecline(String rideId) async {
+    _lastPendingDestination = null;
+    debugPrint('_handleDecline: Starting');
+    AppSnackbar.warning(context, 'Destination change declined');
+    await SupabaseService.rejectDestinationChange(rideId);
   }
 
   Future<void> _initDriverLocation() async {
@@ -962,8 +1041,8 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                 right: 0,
                 bottom: 0,
                 height: _isPanelExpanded
-                    ? MediaQuery.of(context).size.height * 0.56
-                    : 140 + MediaQuery.of(context).padding.bottom,
+                    ? MediaQuery.of(context).size.height * 0.62
+                    : 200 + MediaQuery.of(context).padding.bottom,
                 child: Container(
                   decoration: BoxDecoration(
                     color: context.cardColor,
@@ -1009,53 +1088,56 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                         ),
                       ),
 
-                      // Content
+                      // Scrollable content (when expanded)
                       Expanded(
-                        child: SingleChildScrollView(
-                          padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(context).padding.bottom + 16),
-                          child: Column(
-                            children: [
-                              // Show full content when expanded
-                              if (_isPanelExpanded) ...[
-                                _buildCustomerCard(ride, state),
-                                const SizedBox(height: 16),
-                                _buildRouteCard(ride),
-                                if (state.queuedRequests.isNotEmpty) ...[
-                                  const SizedBox(height: 16),
-                                  _buildQueueCard(state),
-                                ],
-                                const SizedBox(height: 16),
-                                // Cancel button (show when waiting for customer and panel expanded)
-                                if (ride.status == RideStatus.arrivedAtPickup) ...[
-                                  GestureDetector(
-                                    onTap: () => _showCancelOptions(state, ride),
-                                    child: Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.error.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
-                                      ),
-                                      child: const Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(Icons.cancel_outlined, color: AppColors.error, size: 20),
-                                          SizedBox(width: 8),
-                                          Text('Cancel Ride', style: TextStyle(color: AppColors.error, fontSize: 14, fontWeight: FontWeight.w600)),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                ],
-                              ],
+                        child: _isPanelExpanded
+                            ? SingleChildScrollView(
+                                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                                child: Column(
+                                  children: [
+                                    _buildCustomerCard(ride, state),
+                                    const SizedBox(height: 16),
+                                    _buildRouteCard(ride),
+                                    if (state.queuedRequests.isNotEmpty) ...[
+                                      const SizedBox(height: 16),
+                                      _buildQueueCard(state),
+                                    ],
+                                  ],
+                                ),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
 
-                              // Always show swipe action
-                              _buildSwipeAction(state, ride),
-                            ],
+                      // Cancel button (show when waiting for customer) - always visible
+                      if (ride.status == RideStatus.arrivedAtPickup)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                          child: GestureDetector(
+                            onTap: () => _showCancelOptions(state, ride),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: AppColors.error.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.cancel_outlined, color: AppColors.error, size: 20),
+                                  SizedBox(width: 8),
+                                  Text('Cancel Ride', style: TextStyle(color: AppColors.error, fontSize: 14, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
+
+                      // Always show swipe action at bottom
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(context).padding.bottom + 16),
+                        child: _buildSwipeAction(state, ride),
                       ),
                     ],
                   ),
@@ -1476,6 +1558,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildSwipeAction(DriverState state, RideRequest ride) {
+    debugPrint('_buildSwipeAction: ride.status = ${ride.status}');
     String actionText;
     Color actionColor;
     IconData actionIcon;
@@ -1748,13 +1831,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
             onPressed: () {
               Navigator.pop(ctx);
               state.cancelRide(ride, reason);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Ride cancelled: $reason'),
-                  backgroundColor: AppColors.error,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              AppSnackbar.error(context, 'Ride cancelled', subtitle: reason);
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(
@@ -1812,13 +1889,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                 onPressed: () {
                   state.addToQueue(request);
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${request.customerName} added to queue'),
-                      backgroundColor: AppColors.success,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
+                  AppSnackbar.success(context, 'Added to queue', subtitle: request.customerName);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.yellow,
@@ -1839,19 +1910,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     // Complete the trip and go straight to home with a toast
     state.completeTrip();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.white),
-            const SizedBox(width: 12),
-            Text('Trip Completed ✓  Duration: $_formattedTime'),
-          ],
-        ),
-        backgroundColor: AppColors.success,
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    AppSnackbar.success(context, 'Trip Completed', subtitle: 'Duration: $_formattedTime');
 
     Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
   }
@@ -2114,6 +2173,119 @@ class _SwipeButtonState extends State<_SwipeButton> with TickerProviderStateMixi
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DestChangeDialog extends StatefulWidget {
+  final String newDestination;
+  final Future<void> Function() onAccept;
+  final Future<void> Function() onDecline;
+
+  const _DestChangeDialog({
+    required this.newDestination,
+    required this.onAccept,
+    required this.onDecline,
+  });
+
+  @override
+  State<_DestChangeDialog> createState() => _DestChangeDialogState();
+}
+
+class _DestChangeDialogState extends State<_DestChangeDialog> {
+  bool _tapped = false;
+
+  void _handleDecline() {
+    if (_tapped) return;
+    _tapped = true;
+    widget.onDecline();
+  }
+
+  void _handleAccept() {
+    if (_tapped) return;
+    _tapped = true;
+    widget.onAccept();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: context.cardColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: AppColors.yellow.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.edit_location_alt, color: AppColors.yellow, size: 32),
+            ),
+            const SizedBox(height: 16),
+            Text('Destination Change', style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Text('Customer wants to change destination', textAlign: TextAlign.center, style: TextStyle(color: context.mutedColor, fontSize: 14)),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: context.isDark ? context.bgColor : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.location_on, color: AppColors.yellow, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('New Destination', style: TextStyle(color: context.mutedColor, fontSize: 11)),
+                        Text(widget.newDestination, style: TextStyle(color: context.textColor, fontSize: 15, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _handleDecline,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade700,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Decline', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _handleAccept,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.yellow,
+                      foregroundColor: Colors.black,
+                      minimumSize: const Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Accept', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

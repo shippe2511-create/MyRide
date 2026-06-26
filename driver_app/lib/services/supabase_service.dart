@@ -374,6 +374,7 @@ class SupabaseService {
 
   // Get active ride by driver ID (for phone-based login)
   static Future<Map<String, dynamic>?> getActiveRideByDriverId(String driverId) async {
+    debugPrint('getActiveRideByDriverId called with driverId: $driverId');
     try {
       final response = await client
           .from('rides')
@@ -383,10 +384,10 @@ class SupabaseService {
           .order('created_at', ascending: false)
           .limit(1)
           .maybeSingle();
-      debugPrint('Active ride for driver $driverId: $response');
+      debugPrint('getActiveRideByDriverId result for $driverId: ${response != null ? 'FOUND ride ${response['id']}' : 'NO RIDE FOUND'}');
       return response;
     } catch (e) {
-      debugPrint('Error getting active ride: $e');
+      debugPrint('getActiveRideByDriverId ERROR: $e');
       return null;
     }
   }
@@ -437,16 +438,42 @@ class SupabaseService {
       throw Exception('Driver not logged in');
     }
 
-    final result = await client.rpc('update_ride_status', params: {
-      'p_ride_id': rideId,
-      'p_caller_id': driverId,
-      'p_caller_type': 'driver',
-      'p_new_status': status,
-      'p_cancel_reason': cancelReason,
-    });
+    debugPrint('updateRideStatus: rideId=$rideId, status=$status, driverId=$driverId');
 
-    if (result != null && result['success'] == false) {
-      throw Exception(result['error'] ?? 'Failed to update ride status');
+    try {
+      final result = await client.rpc('update_ride_status', params: {
+        'p_ride_id': rideId,
+        'p_caller_id': driverId,
+        'p_caller_type': 'driver',
+        'p_new_status': status,
+        'p_cancel_reason': cancelReason,
+      });
+
+      debugPrint('updateRideStatus RPC result: $result');
+
+      if (result != null && result['success'] == false) {
+        throw Exception(result['error'] ?? 'Failed to update ride status');
+      }
+    } catch (e) {
+      debugPrint('RPC failed, using direct update: $e');
+      // Fallback: direct update if RPC fails
+      final updateData = <String, dynamic>{
+        'status': status,
+      };
+      if (status == 'arrived') {
+        updateData['arrived_at'] = DateTime.now().toUtc().toIso8601String();
+      } else if (status == 'in_progress') {
+        updateData['started_at'] = DateTime.now().toUtc().toIso8601String();
+      } else if (status == 'completed') {
+        updateData['completed_at'] = DateTime.now().toUtc().toIso8601String();
+      } else if (status == 'cancelled') {
+        updateData['cancelled_at'] = DateTime.now().toUtc().toIso8601String();
+        updateData['cancel_reason'] = cancelReason;
+      }
+
+      debugPrint('Direct update data: $updateData for ride $rideId');
+      final result = await client.from('rides').update(updateData).eq('id', rideId).select();
+      debugPrint('Direct update result: $result');
     }
   }
 
@@ -456,17 +483,33 @@ class SupabaseService {
       throw Exception('Driver not logged in');
     }
 
-    final result = await client.rpc('update_ride_status', params: {
-      'p_ride_id': rideId,
-      'p_caller_id': driverId,
-      'p_caller_type': 'driver',
-      'p_new_status': 'completed',
-      'p_distance_km': distanceKm,
-      'p_duration_minutes': durationMinutes,
-    });
+    debugPrint('completeRide: rideId=$rideId, driverId=$driverId');
 
-    if (result != null && result['success'] == false) {
-      throw Exception(result['error'] ?? 'Failed to complete ride');
+    try {
+      final result = await client.rpc('update_ride_status', params: {
+        'p_ride_id': rideId,
+        'p_caller_id': driverId,
+        'p_caller_type': 'driver',
+        'p_new_status': 'completed',
+        'p_distance_km': distanceKm,
+        'p_duration_minutes': durationMinutes,
+      });
+
+      debugPrint('completeRide RPC result: $result');
+
+      if (result != null && result['success'] == false) {
+        throw Exception(result['error'] ?? 'Failed to complete ride');
+      }
+    } catch (e) {
+      debugPrint('completeRide RPC failed, using direct update: $e');
+      // Fallback: direct update if RPC fails
+      final result = await client.from('rides').update({
+        'status': 'completed',
+        'completed_at': DateTime.now().toUtc().toIso8601String(),
+        'distance_km': distanceKm,
+        'duration_minutes': durationMinutes,
+      }).eq('id', rideId).select();
+      debugPrint('completeRide direct update result: $result');
     }
   }
 
@@ -920,14 +963,13 @@ class SupabaseService {
         .subscribe();
   }
 
-  // Check for pending destination change request (driver polls this)
+  // Check for destination change status (driver polls this)
   static Future<Map<String, dynamic>?> getPendingDestinationChange(String rideId) async {
     try {
       final response = await client
           .from('rides')
-          .select('pending_dropoff_name, pending_dropoff_lat, pending_dropoff_lng, destination_change_status')
+          .select('dropoff_name, pending_dropoff_name, pending_dropoff_lat, pending_dropoff_lng, destination_change_status')
           .eq('id', rideId)
-          .eq('destination_change_status', 'pending')
           .maybeSingle();
       return response;
     } catch (e) {
@@ -937,6 +979,7 @@ class SupabaseService {
 
   // Approve destination change (driver)
   static Future<bool> approveDestinationChange(String rideId) async {
+    debugPrint('approveDestinationChange called for ride: $rideId');
     try {
       // Get pending destination
       final pending = await client
@@ -945,18 +988,31 @@ class SupabaseService {
           .eq('id', rideId)
           .maybeSingle();
 
-      if (pending == null) return false;
+      debugPrint('approveDestinationChange pending data: $pending');
+
+      if (pending == null || pending['pending_dropoff_name'] == null) {
+        debugPrint('approveDestinationChange: No pending destination name found');
+        return false;
+      }
+
+      final newDropoffName = pending['pending_dropoff_name'] as String;
+      final newDropoffLat = pending['pending_dropoff_lat'];
+      final newDropoffLng = pending['pending_dropoff_lng'];
+
+      debugPrint('approveDestinationChange: Updating to $newDropoffName');
 
       // Update actual destination and clear pending
       await client.from('rides').update({
-        'dropoff_name': pending['pending_dropoff_name'],
-        'dropoff_lat': pending['pending_dropoff_lat'],
-        'dropoff_lng': pending['pending_dropoff_lng'],
+        'dropoff_name': newDropoffName,
+        'dropoff_lat': newDropoffLat,
+        'dropoff_lng': newDropoffLng,
         'destination_change_status': 'approved',
         'pending_dropoff_name': null,
         'pending_dropoff_lat': null,
         'pending_dropoff_lng': null,
       }).eq('id', rideId);
+
+      debugPrint('approveDestinationChange: SUCCESS - updated to $newDropoffName');
       return true;
     } catch (e) {
       debugPrint('Error approving destination change: $e');

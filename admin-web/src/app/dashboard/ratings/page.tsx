@@ -685,11 +685,9 @@ export default function RatingsPage() {
                         onCheckedChange={() => toggleSelect(review.id)}
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium truncate">{review.customer_name}</span>
-                          <span className="text-muted-foreground">rated</span>
-                          <span className="font-medium truncate">{review.driver_name}</span>
-                        </div>
+                        <span className="font-medium truncate">{review.customer_name}</span>
+                        <span className="text-muted-foreground mx-1">rated</span>
+                        <span className="font-medium truncate">{review.driver_name}</span>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         {[1, 2, 3, 4, 5].map((s) => (

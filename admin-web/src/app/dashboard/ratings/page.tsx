@@ -164,10 +164,13 @@ export default function RatingsPage() {
   useEffect(() => {
     loadData()
 
-    // Real-time subscription
+    // Real-time subscription for ratings and drivers
     const channel = supabase
       .channel('ratings_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ratings' }, () => {
+        loadData()
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'drivers' }, () => {
         loadData()
       })
       .subscribe()

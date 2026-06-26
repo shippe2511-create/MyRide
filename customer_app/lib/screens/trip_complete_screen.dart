@@ -257,6 +257,7 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
                       appState.rateDriver(_rating, _selectedFeedback.join(', '));
 
                       // Submit rating to database
+                      debugPrint('Rating submit: rideId=${widget.rideId}, driverId=${widget.driverId}');
                       if (widget.rideId != null && widget.driverId != null) {
                         await SupabaseService.submitRideRating(
                           rideId: widget.rideId!,

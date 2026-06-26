@@ -412,16 +412,17 @@ class DriverState extends ChangeNotifier {
 
       _totalTrips = (completedRides as List).length;
 
-      // Get today's trips
+      // Get today's trips (convert local midnight to UTC for comparison)
       final now = DateTime.now();
       final todayStart = DateTime(now.year, now.month, now.day);
+      final todayStartUtc = todayStart.toUtc().toIso8601String();
 
       final todayRides = await Supabase.instance.client
           .from('rides')
           .select('id')
           .eq('driver_id', _driverId)
           .eq('status', 'completed')
-          .gte('created_at', todayStart.toIso8601String());
+          .gte('created_at', todayStartUtc);
 
       _todayTrips = (todayRides as List).length;
 
@@ -812,6 +813,35 @@ class DriverState extends ChangeNotifier {
 
     // Subscribe to driver profile updates (status changes from admin)
     _subscribeToDriverProfile();
+
+    // Subscribe to rides changes for stats refresh
+    _subscribeToRidesChanges();
+  }
+
+  RealtimeChannel? _ridesStatsSubscription;
+
+  void _subscribeToRidesChanges() {
+    if (_driverId.isEmpty) return;
+
+    _ridesStatsSubscription?.unsubscribe();
+    _ridesStatsSubscription = Supabase.instance.client
+        .channel('rides_stats_$_driverId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'rides',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'driver_id',
+            value: _driverId,
+          ),
+          callback: (payload) {
+            debugPrint('Rides change detected: ${payload.eventType}');
+            // Refresh stats when rides are added, updated, or deleted
+            refreshStats();
+          },
+        )
+        .subscribe();
   }
 
   void _subscribeToDriverProfile() {
@@ -836,10 +866,70 @@ class DriverState extends ChangeNotifier {
             if (status != null && status != 'approved') {
               debugPrint('Driver status changed to: $status');
             }
+            // Update rating if changed
+            final newRating = (newRecord['rating'] as num?)?.toDouble();
+            if (newRating != null && newRating != _rating) {
+              _rating = newRating;
+              debugPrint('Driver rating updated to: $_rating');
+            }
+            // Update total trips if changed - also refresh today's trips
+            final newTotalTrips = (newRecord['total_trips'] as num?)?.toInt();
+            if (newTotalTrips != null && newTotalTrips != _totalTrips) {
+              _totalTrips = newTotalTrips;
+              debugPrint('Driver total trips updated to: $_totalTrips');
+              // Also refresh today's count since total changed
+              refreshStats();
+            }
             notifyListeners();
           },
         )
         .subscribe();
+  }
+
+  Future<void> refreshStats() async {
+    if (_driverId.isEmpty) return;
+    try {
+      // Get actual completed trips count
+      final completedRides = await Supabase.instance.client
+          .from('rides')
+          .select('id')
+          .eq('driver_id', _driverId)
+          .eq('status', 'completed');
+
+      _totalTrips = (completedRides as List).length;
+
+      // Get today's trips (convert local midnight to UTC for comparison)
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day);
+      final todayStartUtc = todayStart.toUtc().toIso8601String();
+
+      final todayRides = await Supabase.instance.client
+          .from('rides')
+          .select('id')
+          .eq('driver_id', _driverId)
+          .eq('status', 'completed')
+          .gte('created_at', todayStartUtc);
+
+      _todayTrips = (todayRides as List).length;
+
+      // Calculate average rating from ratings table
+      final ratings = await Supabase.instance.client
+          .from('ratings')
+          .select('rating')
+          .eq('to_user_id', _profileId);
+
+      if ((ratings as List).isNotEmpty) {
+        final sum = ratings.fold<num>(0, (sum, r) => sum + (r['rating'] as num));
+        _rating = sum / ratings.length;
+      } else {
+        _rating = 0.0;
+      }
+
+      debugPrint('Stats refreshed: today=$_todayTrips, total=$_totalTrips, rating=$_rating');
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error refreshing stats: $e');
+    }
   }
 
   void _subscribeToRideCancellations() {

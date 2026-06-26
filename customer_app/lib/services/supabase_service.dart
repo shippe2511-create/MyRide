@@ -363,26 +363,41 @@ class SupabaseService {
   }) async {
     // Use auth.uid() directly to match RLS policy
     final id = currentUser?.id;
-    if (id == null) return;
+    debugPrint('rateDriver: userId=$id, rideId=$rideId, rating=$rating');
+    if (id == null) {
+      debugPrint('rateDriver: No user ID, aborting');
+      return;
+    }
 
     // Get driver ID from ride
     final ride = await client.from('rides').select('driver_id').eq('id', rideId).single();
     final driverId = ride['driver_id'];
-    if (driverId == null) return;
+    debugPrint('rateDriver: driverId=$driverId');
+    if (driverId == null) {
+      debugPrint('rateDriver: No driver ID, aborting');
+      return;
+    }
 
     // Get driver's profile ID
     final driver = await client.from('drivers').select('profile_id').eq('id', driverId).single();
     final driverUserId = driver['profile_id'];
+    debugPrint('rateDriver: driverProfileId=$driverUserId');
 
     final fullComment = [feedback, comment].where((s) => s != null && s.isNotEmpty).join(' - ');
 
-    await client.from('ratings').insert({
-      'ride_id': rideId,
-      'from_user_id': id,
-      'to_user_id': driverUserId,
-      'rating': rating,
-      'comment': fullComment.isEmpty ? null : fullComment,
-    });
+    try {
+      await client.from('ratings').insert({
+        'ride_id': rideId,
+        'from_user_id': id,
+        'to_user_id': driverUserId,
+        'rating': rating,
+        'comment': fullComment.isEmpty ? null : fullComment,
+      });
+      debugPrint('rateDriver: Rating inserted successfully');
+    } catch (e) {
+      debugPrint('rateDriver ERROR: $e');
+      rethrow;
+    }
 
     // Update ride as rated
     await client.from('rides').update({'is_rated': true}).eq('id', rideId);
@@ -1256,9 +1271,10 @@ class SupabaseService {
   }) async {
     debugPrint('submitRideRating called: rideId=$rideId, driverId=$driverId, rating=$rating');
     try {
-      final myUserId = currentUser?.id;
+      final myUserId = userId;
+      debugPrint('User ID for rating: $myUserId');
       if (myUserId == null) {
-        debugPrint('Error: No current user');
+        debugPrint('Error: No current user (userId is null)');
         return false;
       }
 

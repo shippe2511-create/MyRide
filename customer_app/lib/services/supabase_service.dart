@@ -361,7 +361,8 @@ class SupabaseService {
     String? feedback,
     String? comment,
   }) async {
-    final id = userId;
+    // Use auth.uid() directly to match RLS policy
+    final id = currentUser?.id;
     if (id == null) return;
 
     // Get driver ID from ride

@@ -123,6 +123,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
   const [loading, setLoading] = useState(false)
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [favoriteCounts, setFavoriteCounts] = useState<Record<string, number>>({})
 
   // Sync with server data when props change
   useEffect(() => {
@@ -163,7 +164,22 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
 
   useEffect(() => {
     loadVehicles()
+    loadFavoriteCounts()
   }, [])
+
+  const loadFavoriteCounts = async () => {
+    const { data, error } = await supabase
+      .from('favorite_drivers')
+      .select('driver_id')
+
+    if (!error && data) {
+      const counts: Record<string, number> = {}
+      data.forEach(row => {
+        counts[row.driver_id] = (counts[row.driver_id] || 0) + 1
+      })
+      setFavoriteCounts(counts)
+    }
+  }
 
   const loadVehicles = async () => {
     const { data, error } = await supabase
@@ -623,6 +639,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
               <TableHead>Vehicle</TableHead>
               <TableHead className="text-center">Trips</TableHead>
               <TableHead className="text-center">Rating</TableHead>
+              <TableHead className="text-center">Favorites</TableHead>
               <TableHead>Account</TableHead>
               <TableHead className="w-12"></TableHead>
             </TableRow>
@@ -630,7 +647,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
           <TableBody>
             {drivers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   No drivers found
                 </TableCell>
               </TableRow>
@@ -684,7 +701,10 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                     {driver.driver_record?.vehicle ? (
                       <div className="flex items-center gap-2">
                         <Car className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{driver.driver_record.vehicle.plate_no || driver.driver_record.vehicle.display_name}</span>
+                        <span className="text-sm font-medium">{driver.driver_record.vehicle.display_name || 'Vehicle'}</span>
+                        {driver.driver_record.vehicle.plate_no && (
+                          <span className="text-xs text-muted-foreground">({driver.driver_record.vehicle.plate_no})</span>
+                        )}
                       </div>
                     ) : (
                       <span className="text-muted-foreground text-sm">-</span>
@@ -698,6 +718,16 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                       <span className="text-yellow-500">★</span>
                       <span className="font-medium">{driver.driver_record?.rating?.toFixed(1) || "0.0"}</span>
                     </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {driver.driver_record?.id && favoriteCounts[driver.driver_record.id] ? (
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="text-pink-500">♥</span>
+                        <span className="font-medium">{favoriteCounts[driver.driver_record.id]}</span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">0</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">

@@ -14,6 +14,7 @@ import 'package:http/http.dart' as http;
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../widgets/app_snackbar.dart';
 import 'chat_screen.dart';
 import 'support_chat_screen.dart';
 
@@ -551,23 +552,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           appState.updateUserName(nameController.text);
                           appState.updateUserEmail(emailController.text);
                           Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Profile updated'),
-                              backgroundColor: AppColors.success,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          );
+                          AppSnackbar.success(context, 'Profile updated');
                         } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Failed to save: $e'),
-                              backgroundColor: AppColors.error,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          );
+                          AppSnackbar.error(context, 'Failed to save', subtitle: '$e');
                         }
                       },
                       style: ElevatedButton.styleFrom(
@@ -721,14 +708,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not access camera/gallery'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
+        AppSnackbar.error(context, 'Could not access camera/gallery');
       }
     }
   }
@@ -864,12 +844,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               if (name == 'Home') appState.updateHomeAddress(address);
               if (name == 'Work') appState.updateWorkAddress(address);
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text('$name address saved'),
-                  backgroundColor: AppColors.success,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ));
+                AppSnackbar.success(context, '$name address saved');
               }
             }
           },
@@ -891,14 +866,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               'lat': lat,
               'lng': lng,
             });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('$name added'),
-                backgroundColor: AppColors.success,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            );
+            AppSnackbar.success(context, '$name added');
           },
         ),
       ),
@@ -954,7 +922,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Navigator.pop(ctx);
                     _showEmergencyContacts(context);
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to remove contact'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))));
+                    AppSnackbar.error(context, 'Failed to remove contact');
                   }
                 },
               )),
@@ -1073,10 +1041,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             });
                             appState.addEmergencyContact(newContact);
                             Navigator.pop(ctx);
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${nameController.text} added as emergency contact'), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))));
+                            AppSnackbar.success(context, '${nameController.text} added as emergency contact');
                           } catch (e) {
                             setSaveState(() => isSaving = false);
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save contact'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))));
+                            AppSnackbar.error(context, 'Failed to save contact');
                           }
                         },
                         style: ElevatedButton.styleFrom(backgroundColor: AppColors.yellow, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
@@ -1131,7 +1099,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onTap: () {
                       HapticFeedback.mediumImpact();
                       Clipboard.setData(const ClipboardData(text: referralCode));
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code copied!'), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating));
+                      AppSnackbar.success(context, 'Code copied!');
                     },
                     child: const Icon(Icons.copy, color: AppColors.yellow, size: 20),
                   ),
@@ -1438,7 +1406,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 20),
             _buildActionItem('Download My Data', Icons.download, () async {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Preparing your data...'), backgroundColor: AppColors.info));
+              AppSnackbar.info(context, 'Preparing your data...');
               try {
                 final data = await SupabaseService.exportUserData();
                 if (context.mounted) {
@@ -1446,7 +1414,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 }
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to export data: $e'), backgroundColor: AppColors.error));
+                  AppSnackbar.error(context, 'Failed to export data', subtitle: '$e');
                 }
               }
             }),
@@ -1567,7 +1535,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     }
                                   } catch (e) {
                                     if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete account: $e'), backgroundColor: AppColors.error));
+                                      AppSnackbar.error(context, 'Failed to delete account', subtitle: '$e');
                                     }
                                   }
                                 }
@@ -1617,7 +1585,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _buildSelectableOption('English', true, () {
                   appState.setCurrentLanguage('en');
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Language set to English'), backgroundColor: AppColors.success));
+                  AppSnackbar.success(context, 'Language set to English');
                 }),
                 SizedBox(height: MediaQuery.of(context).padding.bottom),
               ],
@@ -1651,17 +1619,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   setSheetState(() => selectedTheme = 'Dark Mode');
                   appState.toggleDarkMode(true);
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Dark mode enabled'), backgroundColor: AppColors.success));
+                  AppSnackbar.success(context, 'Dark mode enabled');
                 }),
                 _buildSelectableOption('Light Mode', selectedTheme == 'Light Mode', () {
                   setSheetState(() => selectedTheme = 'Light Mode');
                   appState.toggleDarkMode(false);
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Light mode enabled (dark UI in this version)'), backgroundColor: AppColors.success));
+                  AppSnackbar.success(context, 'Light mode enabled');
                 }),
                 _buildSelectableOption('System Default', false, () {
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('System default enabled'), backgroundColor: AppColors.success));
+                  AppSnackbar.success(context, 'System default enabled');
                 }),
                 SizedBox(height: MediaQuery.of(context).padding.bottom),
               ],
@@ -2055,7 +2023,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: ElevatedButton(
                         onPressed: isSubmitting ? null : () async {
                           if (descriptionController.text.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please describe your issue'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12)))));
+                            AppSnackbar.error(context, 'Please describe your issue');
                             return;
                           }
                           setButtonState(() => isSubmitting = true);
@@ -2066,12 +2034,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           );
                           if (context.mounted) {
                             Navigator.pop(ctx);
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                              content: Text(success ? 'Issue reported. We\'ll get back to you soon.' : 'Failed to submit. Please try again.'),
-                              backgroundColor: success ? AppColors.success : AppColors.error,
-                              behavior: SnackBarBehavior.floating,
-                              shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-                            ));
+                            if (success) {
+                              AppSnackbar.success(context, 'Issue reported. We\'ll get back to you soon.');
+                            } else {
+                              AppSnackbar.error(context, 'Failed to submit. Please try again.');
+                            }
                           }
                         },
                         style: ElevatedButton.styleFrom(backgroundColor: AppColors.yellow, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
@@ -2881,15 +2848,11 @@ class _AddPlaceScreenState extends State<_AddPlaceScreen> {
                     child: ElevatedButton(
                       onPressed: () {
                         if (_nameController.text.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please enter a place name'), backgroundColor: AppColors.error),
-                          );
+                          AppSnackbar.error(context, 'Please enter a place name');
                           return;
                         }
                         if (_selectedAddress.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please select a location on the map'), backgroundColor: AppColors.error),
-                          );
+                          AppSnackbar.error(context, 'Please select a location on the map');
                           return;
                         }
                         widget.onSave(

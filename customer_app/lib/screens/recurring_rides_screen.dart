@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../widgets/shimmer_loading.dart';
+import '../widgets/app_snackbar.dart';
 
 class RecurringRidesScreen extends StatefulWidget {
   const RecurringRidesScreen({super.key});
@@ -84,13 +85,7 @@ class _RecurringRidesScreenState extends State<RecurringRidesScreen> {
       if (success) {
         _loadRecurringRides();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Schedule deleted'),
-              backgroundColor: AppColors.yellow,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          AppSnackbar.success(context, 'Schedule deleted');
         }
       }
     }
@@ -360,16 +355,12 @@ class _AddRecurringRideSheetState extends State<AddRecurringRideSheet> {
 
   Future<void> _save() async {
     if (_pickupController.text.isEmpty || _dropoffController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter pickup and dropoff locations')),
-      );
+      AppSnackbar.warning(context, 'Please enter pickup and dropoff locations');
       return;
     }
 
     if (_selectedDays.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one day')),
-      );
+      AppSnackbar.warning(context, 'Please select at least one day');
       return;
     }
 
@@ -394,9 +385,7 @@ class _AddRecurringRideSheetState extends State<AddRecurringRideSheet> {
       widget.onSaved();
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to create schedule')),
-        );
+        AppSnackbar.error(context, 'Failed to create schedule');
       }
     }
   }

@@ -11,7 +11,7 @@ import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../services/realtime_service.dart';
 import '../providers/app_state.dart';
-import 'driver_arriving_screen.dart';
+import 'trip_tracking_screen.dart';
 
 const String _googleApiKey = 'AIzaSyBZ7HVy2dUvTCC5SZkz0MaFCBON2QorFbI';
 
@@ -309,6 +309,16 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
 
       if (status == 'accepted' || status == 'arrived' || status == 'in_progress') {
         _matchTimer.cancel();
+
+        // Show notification when driver accepts
+        if (status == 'accepted') {
+          NotificationService.showNotification(
+            title: 'Driver Found!',
+            body: 'A driver has accepted your ride request.',
+          );
+          HapticFeedback.heavyImpact();
+        }
+
         _onDriverFound();
       }
     });
@@ -378,8 +388,8 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
           driverProfileId = driver['profile_id'] as String? ?? profile?['id'] as String?;
 
           if (vehicle != null) {
-            vehicleNumber = vehicle['plate_no'] ?? '';
-            vehicleModel = vehicle['display_name'] ?? 'Vehicle';
+            vehicleNumber = vehicle['display_name'] ?? vehicle['plate_no'] ?? '';
+            vehicleModel = vehicle['name'] ?? 'Vehicle';
           }
 
           debugPrint('Found actual driver: $driverName, driverId: $driverId, profileId: $driverProfileId');
@@ -403,24 +413,25 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (_) => DriverArrivingScreen(
-          pickup: widget.pickup,
-          dropoff: widget.dropoff,
-          rideType: widget.rideType,
-          driverName: driverName,
-          driverRating: driverRating,
-          vehicleNumber: vehicleNumber,
-          vehicleModel: vehicleModel,
-          driverPhone: driverPhone,
-          driverPhoto: driverPhoto,
-          driverProfileId: driverProfileId,
-          driverId: driverId,
-          eta: 4,
-          rideId: _rideId,
-          pickupLat: widget.pickupLat,
-          pickupLng: widget.pickupLng,
-          dropoffLat: widget.dropoffLat,
-          dropoffLng: widget.dropoffLng,
+        builder: (_) => TripTrackingScreen(
+          tripData: {
+            'rideId': _rideId,
+            'driverName': driverName,
+            'driverRating': driverRating,
+            'vehicleNumber': vehicleNumber,
+            'vehicleModel': vehicleModel,
+            'driverPhone': driverPhone,
+            'driverPhoto': driverPhoto,
+            'driverProfileId': driverProfileId,
+            'driverId': driverId,
+            'pickup': widget.pickup,
+            'dropoff': widget.dropoff,
+            'pickup_lat': widget.pickupLat,
+            'pickup_lng': widget.pickupLng,
+            'dropoff_lat': widget.dropoffLat,
+            'dropoff_lng': widget.dropoffLng,
+            'status': 'accepted',
+          },
         ),
       ),
     );
@@ -435,8 +446,24 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
     _statusPollingTimer?.cancel();
     if (_rideId != null) {
       _realtimeService.unsubscribe('ride_$_rideId');
+      // Auto-cancel ride if leaving without driver assignment
+      _autoCancelIfPending();
     }
     super.dispose();
+  }
+
+  Future<void> _autoCancelIfPending() async {
+    if (_rideId == null) return;
+    try {
+      // Check if ride is still pending (no driver assigned)
+      final ride = await SupabaseService.getRideById(_rideId!);
+      if (ride != null && ride['status'] == 'pending') {
+        debugPrint('Auto-cancelling pending ride $_rideId');
+        await SupabaseService.cancelRide(_rideId!, reason: 'Customer left matching screen');
+      }
+    } catch (e) {
+      debugPrint('Error auto-cancelling ride: $e');
+    }
   }
 
   @override

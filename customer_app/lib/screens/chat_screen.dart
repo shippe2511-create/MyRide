@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../providers/app_state.dart';
+import '../widgets/app_snackbar.dart';
 
 enum MessageType { text, voice, location, image }
 enum MessageStatus { sending, sent, delivered, read }
@@ -133,9 +134,11 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   Future<void> _loadMessages() async {
     if (widget.rideId == null) return;
+    debugPrint('ChatScreen: Loading messages for rideId=${widget.rideId}');
     final appState = Provider.of<AppState>(context, listen: false);
     try {
       final messages = await SupabaseService.getChatMessages(widget.rideId!);
+      debugPrint('ChatScreen: Loaded ${messages.length} messages');
       if (mounted) {
         setState(() {
           _messages.clear();
@@ -404,13 +407,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         ));
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Image sent'), backgroundColor: AppColors.success),
-      );
+      AppSnackbar.success(context, 'Image sent');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to pick image'), backgroundColor: AppColors.error),
-      );
+      AppSnackbar.error(context, 'Failed to pick image');
     }
   }
 
@@ -679,13 +678,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           const SizedBox(width: 8),
           _buildHeaderAction(Icons.videocam, AppColors.info, () {
             HapticFeedback.lightImpact();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Video call coming soon'),
-                backgroundColor: context.cardColor,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+            AppSnackbar.info(context, 'Video call coming soon');
           }),
         ],
       ),

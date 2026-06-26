@@ -6,6 +6,7 @@ import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/notification_service.dart';
 import '../services/supabase_service.dart';
+import '../widgets/app_snackbar.dart';
 
 class ScheduleScreen extends StatefulWidget {
   final String? initialTransportType;
@@ -1446,20 +1447,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
 
     setState(() => _showReminders = true);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.check_circle, color: context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5), size: 20),
-            const SizedBox(width: 10),
-            const Expanded(child: Text('Reminder set successfully!')),
-          ],
-        ),
-        backgroundColor: AppColors.yellow,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    AppSnackbar.success(context, 'Reminder set successfully!');
   }
 
   void _addToCalendar(BuildContext ctx, Map<String, dynamic> trip) {
@@ -1486,20 +1474,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
 
     Add2Calendar.addEvent2Cal(event);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.calendar_today, color: Colors.black, size: 18),
-            const SizedBox(width: 10),
-            const Expanded(child: Text('Added to calendar')),
-          ],
-        ),
-        backgroundColor: AppColors.yellow,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    AppSnackbar.success(context, 'Added to calendar');
   }
 
   void _showRouteMap(bool isDark) {

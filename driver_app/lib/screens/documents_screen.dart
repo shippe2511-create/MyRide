@@ -9,6 +9,7 @@ import '../services/supabase_service.dart';
 import '../services/realtime_service.dart';
 import '../providers/driver_state.dart';
 import '../widgets/shimmer_loading.dart';
+import '../widgets/app_snackbar.dart';
 
 class DocumentsScreen extends StatefulWidget {
   const DocumentsScreen({super.key});
@@ -645,14 +646,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error capturing document: $e'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
+        AppSnackbar.error(context, 'Error capturing document', subtitle: '$e');
       }
     }
   }
@@ -764,28 +758,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
 
   Future<void> _uploadDocument(XFile image, String? docType, DateTime? expiryDate) async {
     // Show loading
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text('Uploading document...'),
-          ],
-        ),
-        backgroundColor: AppColors.info,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 30),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
+    AppSnackbar.info(context, 'Uploading document...');
 
     try {
       // Get driver ID from state
@@ -811,28 +784,12 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Document uploaded successfully! Pending review.'),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
+        AppSnackbar.success(context, 'Document uploaded!', subtitle: 'Pending review');
         _loadDocuments();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Upload failed: $e'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
+        AppSnackbar.error(context, 'Upload failed', subtitle: '$e');
       }
     }
   }
@@ -931,14 +888,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   Future<void> _deleteDocument(Map<String, dynamic> doc) async {
     final documentId = doc['id']?.toString();
     if (documentId == null || documentId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Cannot delete: document ID not found'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
+      AppSnackbar.error(context, 'Cannot delete', subtitle: 'Document ID not found');
       return;
     }
 
@@ -952,24 +902,10 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
 
     if (mounted) {
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Document removed'),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
+        AppSnackbar.success(context, 'Document removed');
         _loadDocuments();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Failed to remove document'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
+        AppSnackbar.error(context, 'Failed to remove document');
       }
     }
   }

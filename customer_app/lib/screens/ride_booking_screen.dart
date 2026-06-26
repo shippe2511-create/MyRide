@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../widgets/app_snackbar.dart';
 import 'driver_matching_screen.dart';
 
 const String _darkMapStyle = '''
@@ -270,26 +271,12 @@ class _RideBookingScreenState extends State<RideBookingScreen> {
 
       if (mounted) {
         Navigator.pop(ctx); // Close bottom sheet
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Ride scheduled for ${DateFormat('MMM d, h:mm a').format(scheduledTime)}'),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
+        AppSnackbar.success(context, 'Ride scheduled for ${DateFormat('MMM d, h:mm a').format(scheduledTime)}');
         Navigator.pop(context); // Go back to home
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to schedule ride: $e'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
+        AppSnackbar.error(context, 'Failed to schedule ride', subtitle: '$e');
       }
     } finally {
       if (mounted) setState(() => _isScheduling = false);

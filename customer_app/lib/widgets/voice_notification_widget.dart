@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/voice_service.dart';
+import 'app_snackbar.dart';
 
 /// Widget that shows a notification banner when a new broadcast voice message arrives
 /// and provides playback controls for the audio message.
@@ -104,14 +105,7 @@ class _VoiceNotificationWidgetState extends State<VoiceNotificationWidget>
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Could not play voice message'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
+        AppSnackbar.error(context, 'Could not play voice message');
       }
     }
   }

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../widgets/shimmer_loading.dart';
+import '../widgets/app_snackbar.dart';
 
 class VehicleLogsScreen extends StatefulWidget {
   const VehicleLogsScreen({super.key});
@@ -912,14 +913,7 @@ class _AddLogSheetState extends State<AddLogSheet> {
   Future<void> _save() async {
     if (_amountController.text.isEmpty) {
       HapticFeedback.heavyImpact();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please enter an amount'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
+      AppSnackbar.error(context, 'Please enter an amount');
       return;
     }
 
@@ -941,14 +935,7 @@ class _AddLogSheetState extends State<AddLogSheet> {
       widget.onSaved();
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Failed to save log'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
+        AppSnackbar.error(context, 'Failed to save log');
       }
     }
   }

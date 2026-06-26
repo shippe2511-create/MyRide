@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../providers/driver_state.dart';
+import '../widgets/app_snackbar.dart';
 
 enum MessageType { text, voice, location, image }
 enum MessageStatus { sending, sent, delivered, read }
@@ -232,12 +233,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         // Message will be added via the subscription
       } catch (e) {
         debugPrint('Error sending message: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to send message'),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        AppSnackbar.error(context, 'Failed to send message');
       }
       return;
     }
@@ -373,9 +369,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         locationName: "Current location (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})",
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to get location'), backgroundColor: AppColors.error),
-      );
+      AppSnackbar.error(context, 'Failed to get location');
     }
   }
 
@@ -397,26 +391,15 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         ));
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Image sent'), backgroundColor: AppColors.success),
-      );
+      AppSnackbar.success(context, 'Image sent');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to pick image'), backgroundColor: AppColors.error),
-      );
+      AppSnackbar.error(context, 'Failed to pick image');
     }
   }
 
   void _toggleRecording() {
     HapticFeedback.mediumImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Voice messages coming soon'),
-        backgroundColor: AppColors.info,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
+    AppSnackbar.info(context, 'Voice messages coming soon');
   }
 
   void _cancelRecording() {

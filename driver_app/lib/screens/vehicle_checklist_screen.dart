@@ -8,6 +8,7 @@ import 'dart:math' as math;
 import '../theme/app_theme.dart';
 import '../providers/driver_state.dart';
 import '../services/supabase_service.dart';
+import '../widgets/app_snackbar.dart';
 
 class VehicleChecklistScreen extends StatefulWidget {
   final bool isPostShift;
@@ -814,9 +815,7 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                       // Validate driver ID exists
                       if (driverState.driverId.isEmpty) {
                         debugPrint('Cannot save checklist: driverId is empty');
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Error: Driver not logged in properly')),
-                        );
+                        AppSnackbar.error(context, 'Error', subtitle: 'Driver not logged in properly');
                         return;
                       }
 
@@ -834,9 +833,7 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                       } catch (e) {
                         debugPrint('Failed to save checklist: $e');
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Failed to save: $e')),
-                          );
+                          AppSnackbar.error(context, 'Failed to save', subtitle: '$e');
                         }
                         return;
                       }

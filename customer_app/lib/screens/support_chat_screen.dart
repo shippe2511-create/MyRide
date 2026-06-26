@@ -6,6 +6,7 @@ import 'dart:async';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../providers/app_state.dart';
+import '../widgets/app_snackbar.dart';
 
 class SupportChatMessage {
   final String id;
@@ -150,9 +151,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     if (mounted) {
       setState(() => _isSending = false);
       if (!success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to send message'), backgroundColor: AppColors.error),
-        );
+        AppSnackbar.error(context, 'Failed to send message');
       }
     }
   }

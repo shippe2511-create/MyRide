@@ -150,7 +150,8 @@
       "Read(//Users/athifabdulla/Documents/**)",
       "Read(//Users/athifabdulla/**)",
       "Bash(grep -n \"^import {$\" /Users/athifabdulla/Downloads/MyRide/admin-web/src/app/dashboard/report-builder/page.tsx)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(tee /tmp/driver_console.log)"
     ],
     "additionalDirectories": [
       "/tmp"

@@ -249,7 +249,8 @@ class SupabaseService {
             *,
             driver:drivers!rides_driver_id_fkey(
               *,
-              profile:profiles!drivers_profile_id_fkey(id, full_name, phone, avatar_url)
+              profile:profiles!drivers_profile_id_fkey(id, full_name, phone, avatar_url),
+              vehicle:vehicle_types!drivers_vehicle_id_fkey(id, display_name, plate_no, name)
             )
           ''')
           .eq('customer_id', customerId)
@@ -309,16 +310,31 @@ class SupabaseService {
     final id = userId;
     if (id == null) throw Exception('User not logged in');
 
-    final result = await client.rpc('update_ride_status', params: {
-      'p_ride_id': rideId,
-      'p_caller_id': id,
-      'p_caller_type': 'customer',
-      'p_new_status': 'cancelled',
-      'p_cancel_reason': reason,
-    });
+    debugPrint('cancelRide: rideId=$rideId, userId=$id, reason=$reason');
 
-    if (result != null && result['success'] == false) {
-      throw Exception(result['error'] ?? 'Failed to cancel ride');
+    try {
+      final result = await client.rpc('update_ride_status', params: {
+        'p_ride_id': rideId,
+        'p_caller_id': id,
+        'p_caller_type': 'customer',
+        'p_new_status': 'cancelled',
+        'p_cancel_reason': reason,
+      });
+
+      debugPrint('cancelRide RPC result: $result');
+
+      if (result != null && result['success'] == false) {
+        throw Exception(result['error'] ?? 'Failed to cancel ride');
+      }
+    } catch (e) {
+      debugPrint('cancelRide RPC failed, using direct update: $e');
+      // Fallback: direct update if RPC fails
+      final result = await client.from('rides').update({
+        'status': 'cancelled',
+        'cancelled_at': DateTime.now().toUtc().toIso8601String(),
+        'cancel_reason': reason ?? 'Cancelled by customer',
+      }).eq('id', rideId).select();
+      debugPrint('cancelRide direct update result: $result');
     }
   }
 
@@ -369,6 +385,31 @@ class SupabaseService {
 
     // Update ride as rated
     await client.from('rides').update({'is_rated': true}).eq('id', rideId);
+
+    // Calculate and update driver's average rating
+    try {
+      final ratingsResult = await client
+          .from('ratings')
+          .select('rating')
+          .eq('to_user_id', driverUserId);
+
+      if (ratingsResult.isNotEmpty) {
+        final ratings = List<Map<String, dynamic>>.from(ratingsResult);
+        final totalRatings = ratings.length;
+        final sumRatings = ratings.fold<int>(0, (sum, r) => sum + (r['rating'] as int));
+        final avgRating = sumRatings / totalRatings;
+
+        // Update driver's rating in drivers table
+        await client
+            .from('drivers')
+            .update({'rating': avgRating})
+            .eq('id', driverId);
+
+        debugPrint('Updated driver $driverId rating to $avgRating (from $totalRatings ratings)');
+      }
+    } catch (e) {
+      debugPrint('Error updating driver rating: $e');
+    }
   }
 
   // Saved Places methods
@@ -1212,24 +1253,60 @@ class SupabaseService {
     required int rating,
     String? comment,
   }) async {
+    debugPrint('submitRideRating called: rideId=$rideId, driverId=$driverId, rating=$rating');
     try {
-      final userId = currentUser?.id;
-      if (userId == null) return false;
+      final myUserId = currentUser?.id;
+      if (myUserId == null) {
+        debugPrint('Error: No current user');
+        return false;
+      }
 
+      // Get driver's profile_id from drivers table
+      final driverRecord = await client
+          .from('drivers')
+          .select('profile_id')
+          .eq('id', driverId)
+          .maybeSingle();
+
+      debugPrint('Driver record lookup: $driverRecord');
+      final driverProfileId = driverRecord?['profile_id'] as String?;
+      if (driverProfileId == null) {
+        debugPrint('Error: Could not find driver profile for $driverId');
+        return false;
+      }
+
+      debugPrint('Inserting rating: ride_id=$rideId, from=$myUserId, to=$driverProfileId, rating=$rating');
       await client.from('ratings').insert({
         'ride_id': rideId,
-        'from_user_id': userId,
-        'to_user_id': driverId,
+        'from_user_id': myUserId,
+        'to_user_id': driverProfileId,
         'rating': rating,
         'comment': comment,
-        'created_at': DateTime.now().toIso8601String(),
       });
+      debugPrint('Rating inserted successfully');
 
-      // Update ride with rating
-      await client.from('rides').update({
-        'rating': rating,
-        'rating_comment': comment,
-      }).eq('id', rideId);
+      // Update ride as rated
+      await client.from('rides').update({'is_rated': true}).eq('id', rideId);
+
+      // Calculate and update driver's average rating
+      final ratingsResult = await client
+          .from('ratings')
+          .select('rating')
+          .eq('to_user_id', driverProfileId);
+
+      if (ratingsResult.isNotEmpty) {
+        final ratings = List<Map<String, dynamic>>.from(ratingsResult);
+        final totalRatings = ratings.length;
+        final sumRatings = ratings.fold<int>(0, (sum, r) => sum + (r['rating'] as int));
+        final avgRating = sumRatings / totalRatings;
+
+        await client
+            .from('drivers')
+            .update({'rating': avgRating})
+            .eq('id', driverId);
+
+        debugPrint('Updated driver $driverId rating to $avgRating');
+      }
 
       return true;
     } catch (e) {

@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../widgets/status_toggle.dart';
 import '../widgets/ride_request_popup.dart';
 import '../widgets/break_timer.dart';
+import '../widgets/app_snackbar.dart';
 import 'vehicle_checklist_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
@@ -208,12 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               } else {
                                 // Another driver got it first
                                 if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(result['error'] ?? 'This ride was taken by another driver'),
-                                      backgroundColor: Colors.orange,
-                                    ),
-                                  );
+                                  AppSnackbar.warning(context, result['error'] ?? 'This ride was taken by another driver');
                                 }
                               }
                             },
@@ -654,7 +650,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
 
         // Waiting view - centered
-        const SizedBox(height: 60),
+        const SizedBox(height: 24),
         Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -696,11 +692,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 60),
+        const SizedBox(height: 24),
 
         // End Shift Button
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
           child: SizedBox(
             width: double.infinity,
             height: 52,
@@ -988,14 +984,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           state.goOffline();
                           state.resetChecklist();
                           HapticFeedback.heavyImpact();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('Shift ended. Have a great day!'),
-                              backgroundColor: AppColors.success,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          );
+                          AppSnackbar.success(context, 'Shift ended', subtitle: 'Have a great day!');
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.error,
@@ -1668,21 +1657,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? () {
                             HapticFeedback.heavyImpact();
                             state.addToQueue(request);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Row(
-                                  children: [
-                                    const Icon(Icons.check_circle, color: Colors.white, size: 20),
-                                    const SizedBox(width: 10),
-                                    Text('${request.customerName} added • ${state.availableSeats} seats left'),
-                                  ],
-                                ),
-                                backgroundColor: AppColors.success,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
+                            AppSnackbar.success(context, '${request.customerName} added', subtitle: '${state.availableSeats} seats left');
                           }
                         : null,
                     icon: Icon(state.hasAvailableSeats ? Icons.add_circle : Icons.block, size: 18),

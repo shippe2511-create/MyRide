@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/realtime_service.dart';
 import '../widgets/shimmer_loading.dart';
+import '../widgets/app_snackbar.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -49,15 +50,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           _notifications.insert(0, notification);
         });
         // Show a snackbar for new notification
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(notification['title'] ?? 'New notification'),
-            backgroundColor: AppColors.yellow,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        AppSnackbar.info(context, notification['title'] ?? 'New notification');
       }
     });
   }
@@ -374,14 +367,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         notification['is_read'] = true;
       }
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('All notifications marked as read'),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
+    AppSnackbar.success(context, 'All notifications marked as read');
   }
 
   String _formatTime(DateTime time) {

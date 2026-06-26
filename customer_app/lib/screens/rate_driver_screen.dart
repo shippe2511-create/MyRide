@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../widgets/app_snackbar.dart';
 
 class RateDriverScreen extends StatefulWidget {
   final String rideId;
@@ -51,9 +52,7 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
 
   Future<void> _submitRating() async {
     if (_rating == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please select a rating'), backgroundColor: AppColors.error),
-      );
+      AppSnackbar.warning(context, 'Please select a rating');
       return;
     }
 
@@ -70,18 +69,11 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Thanks for your feedback!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+        AppSnackbar.success(context, 'Thanks for your feedback!');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to submit rating'), backgroundColor: AppColors.error),
-        );
+        AppSnackbar.error(context, 'Failed to submit rating');
       }
     }
 

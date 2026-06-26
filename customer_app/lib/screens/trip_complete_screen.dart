@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../widgets/glass_container.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/status_animation.dart';
+import '../widgets/app_snackbar.dart';
 import '../services/supabase_service.dart';
 
 class TripCompleteScreen extends StatefulWidget {
@@ -251,38 +252,39 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
                   onPressed: _isSubmitting ? null : () async {
                     setState(() => _isSubmitting = true);
 
-                    final appState = Provider.of<AppState>(context, listen: false);
-                    appState.rateDriver(_rating, _selectedFeedback.join(', '));
+                    try {
+                      final appState = Provider.of<AppState>(context, listen: false);
+                      appState.rateDriver(_rating, _selectedFeedback.join(', '));
 
-                    // Submit rating to database
-                    if (widget.rideId != null && widget.driverId != null) {
-                      await SupabaseService.submitRideRating(
-                        rideId: widget.rideId!,
-                        driverId: widget.driverId!,
-                        rating: _rating,
-                        comment: _selectedFeedback.isNotEmpty ? _selectedFeedback.join(', ') : null,
-                      );
-                    }
+                      // Submit rating to database
+                      if (widget.rideId != null && widget.driverId != null) {
+                        await SupabaseService.submitRideRating(
+                          rideId: widget.rideId!,
+                          driverId: widget.driverId!,
+                          rating: _rating,
+                          comment: _selectedFeedback.isNotEmpty ? _selectedFeedback.join(', ') : null,
+                        );
+                      }
 
-                    if (_addToFavorites && widget.driverId != null) {
-                      await SupabaseService.addFavoriteDriver(widget.driverId!);
-                      appState.addFavoriteDriver(_driverInfo);
-                    }
+                      if (_addToFavorites && widget.driverId != null) {
+                        await SupabaseService.addFavoriteDriver(widget.driverId!);
+                        appState.addFavoriteDriver(_driverInfo);
+                      }
 
-                    if (!mounted) return;
-                    Navigator.of(context).popUntil((route) => route.isFirst);
-                    Navigator.pushReplacementNamed(context, '/home');
+                      if (!mounted) return;
+                      Navigator.of(context).popUntil((route) => route.isFirst);
+                      Navigator.pushReplacementNamed(context, '/home');
 
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(_addToFavorites
+                      AppSnackbar.info(context, _addToFavorites
                           ? 'Thanks! ${_driverInfo['name']} added to favorites'
-                          : 'Thanks for your feedback!'),
-                        backgroundColor: AppColors.yellow,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    );
+                          : 'Thanks for your feedback!');
+                    } catch (e) {
+                      debugPrint('Error submitting rating: $e');
+                      if (mounted) {
+                        setState(() => _isSubmitting = false);
+                        AppSnackbar.error(context, 'Failed to submit rating', subtitle: '$e');
+                      }
+                    }
                   },
                 ),
               ),

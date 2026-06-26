@@ -10,6 +10,7 @@ import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_container.dart';
 import '../widgets/primary_button.dart';
+import '../widgets/app_snackbar.dart';
 import '../services/supabase_service.dart';
 import '../services/location_service.dart';
 import 'driver_matching_screen.dart';
@@ -1252,28 +1253,9 @@ class _SearchScreenState extends State<SearchScreen> {
                             _savedPlaces.removeAt(index);
                           });
                           HapticFeedback.mediumImpact();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  Icon(Icons.delete_outline, color: Colors.white, size: 20),
-                                  const SizedBox(width: 10),
-                                  Text('${place['name']} removed'),
-                                ],
-                              ),
-                              backgroundColor: AppColors.red,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                          );
+                          AppSnackbar.error(context, '${place['name']} removed');
                         } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Failed to remove ${place['name']}'),
-                              backgroundColor: AppColors.red,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
+                          AppSnackbar.error(context, 'Failed to remove ${place['name']}');
                         }
                       }
                     },
@@ -1666,35 +1648,9 @@ class _SearchScreenState extends State<SearchScreen> {
                             });
                             Navigator.pop(ctx);
                             HapticFeedback.mediumImpact();
-                            ScaffoldMessenger.of(this.context).showSnackBar(
-                              SnackBar(
-                                content: Row(
-                                  children: [
-                                    Icon(Icons.check_circle, color: Colors.white, size: 20),
-                                    const SizedBox(width: 10),
-                                    Text('${nameController.text} added to saved places'),
-                                  ],
-                                ),
-                                backgroundColor: AppColors.green,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            );
+                            AppSnackbar.success(this.context, '${nameController.text} added to saved places');
                           } else {
-                            ScaffoldMessenger.of(this.context).showSnackBar(
-                              SnackBar(
-                                content: const Row(
-                                  children: [
-                                    Icon(Icons.error, color: Colors.white, size: 20),
-                                    SizedBox(width: 10),
-                                    Text('Failed to save place. Please try again.'),
-                                  ],
-                                ),
-                                backgroundColor: AppColors.error,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            );
+                            AppSnackbar.error(this.context, 'Failed to save place. Please try again.');
                           }
                         }
                       },
@@ -3125,37 +3081,11 @@ class _TrackingScreenState extends State<TrackingScreen> {
         HapticFeedback.mediumImpact();
         if (isSharing) {
           appState.stopTripSharing();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Row(
-                children: [
-                  Icon(Icons.location_off, color: Colors.white, size: 20),
-                  SizedBox(width: 10),
-                  Text('Trip sharing stopped'),
-                ],
-              ),
-              backgroundColor: context.mutedColor,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          );
+          AppSnackbar.info(context, 'Trip sharing stopped');
         } else {
           final contacts = appState.trustedContacts.map((c) => c['name'] ?? '').toList();
           appState.startTripSharing(contacts);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.white, size: 20),
-                  SizedBox(width: 10),
-                  Text('Trip shared with trusted contacts'),
-                ],
-              ),
-              backgroundColor: AppColors.green,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          );
+          AppSnackbar.success(context, 'Trip shared with trusted contacts');
         }
       },
       child: AnimatedContainer(
@@ -3263,14 +3193,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Calling driver...'),
-                          backgroundColor: AppColors.yellow,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      );
+                      AppSnackbar.info(context, 'Calling driver...');
                     },
                     icon: Icon(Icons.phone, size: 18),
                     label: Text('Call', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -4193,7 +4116,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Calling driver...'), backgroundColor: AppColors.yellow, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))));
+                      AppSnackbar.info(context, 'Calling driver...');
                     },
                     icon: Icon(Icons.phone, size: 18),
                     label: Text('Call', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -4297,14 +4220,7 @@ class _TripProgressScreenState extends State<TripProgressScreen> {
       child: GestureDetector(
         onLongPress: () => _showSosDialog(context),
         onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Hold for 2 seconds to trigger SOS'),
-              backgroundColor: Colors.red.shade700,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          );
+          AppSnackbar.warning(context, 'Hold for 2 seconds to trigger SOS');
         },
         child: Container(
           width: 50,
@@ -4371,20 +4287,7 @@ class _TripProgressScreenState extends State<TripProgressScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Row(
-                    children: [
-                      Icon(Icons.check_circle, color: Colors.white, size: 20),
-                      SizedBox(width: 10),
-                      Text('Emergency alert sent'),
-                    ],
-                  ),
-                  backgroundColor: Colors.red,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              );
+              AppSnackbar.error(context, 'Emergency alert sent');
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
@@ -4796,14 +4699,7 @@ class SafetyScreen extends StatelessWidget {
               TextButton(
                 onPressed: () {
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Emergency contacts notified'),
-                      backgroundColor: AppColors.red,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  );
+                  AppSnackbar.error(context, 'Emergency contacts notified');
                 },
                 child: Text('Confirm SOS', style: TextStyle(color: AppColors.red, fontWeight: FontWeight.w700)),
               ),
@@ -4849,14 +4745,7 @@ class SafetyScreen extends StatelessWidget {
             'Share live location',
             'Send your live trip to a contact',
             () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Location shared with trusted contacts'),
-                  backgroundColor: AppColors.yellow,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              );
+              AppSnackbar.info(context, 'Location shared with trusted contacts');
             },
           ),
           _buildToolItem(

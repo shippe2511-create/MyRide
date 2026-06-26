@@ -12,6 +12,7 @@ import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../services/location_service.dart';
 import '../widgets/onboarding_tooltip.dart';
+import '../widgets/app_snackbar.dart';
 import 'search_screen.dart';
 import 'activity_screen.dart';
 import 'inbox_screen.dart';
@@ -63,6 +64,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   double? _lastDropoffLng;
 
   RealtimeChannel? _announcementsSubscription;
+  RealtimeChannel? _rideStatusSubscription;
+  String? _subscribedRideId;
 
 
   @override
@@ -105,13 +108,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _checkForScheduledRides() {
-    _scheduledRideTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+    _scheduledRideTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
       if (!mounted) return;
       try {
         final appState = Provider.of<AppState>(context, listen: false);
         final rides = await SupabaseService.getMyScheduledRides(appState.profileId);
 
         if (rides.isEmpty) {
+          // Unsubscribe from ride status updates
+          if (_subscribedRideId != null) {
+            _rideStatusSubscription?.unsubscribe();
+            _rideStatusSubscription = null;
+            _subscribedRideId = null;
+          }
           // Clear ongoing trip if no active rides
           if (_ongoingTrip != null) {
             setState(() => _ongoingTrip = null);
@@ -125,17 +134,69 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
         debugPrint('Checking ride $rideId status: $status');
 
+        // Subscribe to realtime updates for this ride
+        if (rideId != null && _subscribedRideId != rideId) {
+          _rideStatusSubscription?.unsubscribe();
+          _subscribedRideId = rideId;
+          _rideStatusSubscription = SupabaseService.client
+              .channel('home_ride_$rideId')
+              .onPostgresChanges(
+                event: PostgresChangeEvent.update,
+                schema: 'public',
+                table: 'rides',
+                filter: PostgresChangeFilter(
+                  type: PostgresChangeFilterType.eq,
+                  column: 'id',
+                  value: rideId,
+                ),
+                callback: (payload) {
+                  if (!mounted) return;
+                  final newStatus = payload.newRecord['status'] as String?;
+                  debugPrint('Realtime ride status update: $newStatus');
+
+                  // Show notifications for status changes
+                  if (newStatus == 'accepted') {
+                    NotificationService.showNotification(
+                      title: 'Driver Assigned',
+                      body: 'Your driver is on the way to pick you up!',
+                    );
+                    HapticFeedback.heavyImpact();
+                  } else if (newStatus == 'arrived') {
+                    NotificationService.showNotification(
+                      title: 'Driver Arrived',
+                      body: 'Your driver has arrived at the pickup location.',
+                    );
+                    HapticFeedback.heavyImpact();
+                  }
+
+                  if (newStatus == 'cancelled' || newStatus == 'completed') {
+                    _rideStatusSubscription?.unsubscribe();
+                    _subscribedRideId = null;
+                    setState(() => _ongoingTrip = null);
+                  }
+                },
+              )
+              .subscribe();
+        }
+
         // Update ongoing trip for banner display
         if (status == 'accepted' || status == 'arrived' || status == 'in_progress') {
-          // Extract driver name from nested driver.profile
+          // Extract driver info from nested driver.profile and vehicle
           final driver = ride['driver'] as Map<String, dynamic>?;
           final driverProfile = driver?['profile'] as Map<String, dynamic>?;
+          final driverVehicle = driver?['vehicle'] as Map<String, dynamic>?;
           final driverName = driverProfile?['full_name'] as String? ?? 'Driver';
+          final vehicleNumber = driverVehicle?['display_name'] as String? ?? driverVehicle?['plate_no'] as String?;
+          final driverPhone = driverProfile?['phone'] as String?;
+          final driverRating = driver?['rating'];
 
           setState(() {
             _ongoingTrip = {
               'rideId': rideId,
               'driverName': driverName,
+              'driverRating': driverRating,
+              'driverPhone': driverPhone,
+              'vehicleNumber': vehicleNumber,
               'pickup': ride['pickup_name'] ?? 'Pickup',
               'dropoff': ride['dropoff_name'] ?? 'Dropoff',
               'status': status,
@@ -147,11 +208,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             };
           });
 
-          // Auto-navigate only once per ride
+          // Auto-navigate only once per ride, and only if we're the top route
           if (_scheduledRideId != rideId) {
             _scheduledRideId = rideId;
 
-            if (mounted) {
+            if (mounted && ModalRoute.of(context)?.isCurrent == true) {
               HapticFeedback.heavyImpact();
               setState(() => _scheduledTime = null);
 
@@ -189,6 +250,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _pulseController.dispose();
     _scheduledRideTimer?.cancel();
     _announcementsSubscription?.unsubscribe();
+    _rideStatusSubscription?.unsubscribe();
     super.dispose();
   }
 
@@ -1861,9 +1923,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               ? () async {
                                   final minTime = DateTime.now().add(const Duration(minutes: 5));
                                   if (selectedDate.isBefore(minTime)) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Select a time at least 5 minutes from now'), backgroundColor: Colors.orange, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                                    );
+                                    AppSnackbar.warning(context, 'Select a time at least 5 minutes from now');
                                     return;
                                   }
                                   Navigator.pop(context);
@@ -1887,15 +1947,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                     );
                                     setState(() => _scheduledTime = selectedDate);
                                     if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Row(children: [Icon(Icons.check_circle_rounded, color: Colors.white), const SizedBox(width: 12), Expanded(child: Text('Ride scheduled for ${_formatScheduledTime(selectedDate)}'))]),
-                                          backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                        ),
-                                      );
+                                      AppSnackbar.success(context, 'Ride scheduled for ${_formatScheduledTime(selectedDate)}');
                                     }
                                   } catch (e) {
-                                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to schedule'), backgroundColor: Colors.red));
+                                    if (mounted) AppSnackbar.error(context, 'Failed to schedule');
                                   }
                                 }
                               : null,

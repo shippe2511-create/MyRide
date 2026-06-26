@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../providers/driver_state.dart';
+import '../widgets/app_snackbar.dart';
 
 class SOSScreen extends StatefulWidget {
   const SOSScreen({super.key});
@@ -543,31 +544,11 @@ Sent via MyRide Driver SOS''';
       await Share.share(message, subject: 'Emergency - My Location');
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Location ready to share'),
-              ],
-            ),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
+        AppSnackbar.success(context, 'Location ready to share');
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to get location: $e'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
+        AppSnackbar.error(context, 'Failed to get location', subtitle: '$e');
       }
     }
   }

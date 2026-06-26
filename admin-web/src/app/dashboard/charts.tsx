@@ -18,6 +18,7 @@ import {
   Pie,
   Cell,
 } from "recharts"
+import { ActivityFeed } from "@/components/activity-feed"
 
 export function DashboardCharts() {
   const supabase = createClient()
@@ -177,7 +178,8 @@ export function DashboardCharts() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="space-y-6">
+      {/* Row 1: Ride Activity (full width) */}
       <Card>
         <CardHeader>
           <CardTitle>Ride Activity</CardTitle>
@@ -191,82 +193,46 @@ export function DashboardCharts() {
               <TabsTrigger value="yearly">Yearly</TabsTrigger>
             </TabsList>
             <TabsContent value="weekly">
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={weeklyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                   <XAxis dataKey="name" stroke="#888" />
                   <YAxis stroke="#888" />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "#1f1f1f", border: "1px solid #333" }}
-                    labelStyle={{ color: "#fff" }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="rides"
-                    stroke="#facc15"
-                    fill="#facc15"
-                    fillOpacity={0.2}
-                  />
+                  <Tooltip contentStyle={{ backgroundColor: "#1f1f1f", border: "1px solid #333" }} labelStyle={{ color: "#fff" }} />
+                  <Area type="monotone" dataKey="rides" stroke="#facc15" fill="#facc15" fillOpacity={0.2} />
                 </AreaChart>
               </ResponsiveContainer>
             </TabsContent>
             <TabsContent value="monthly">
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={monthlyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                   <XAxis dataKey="name" stroke="#888" />
                   <YAxis stroke="#888" />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "#1f1f1f", border: "1px solid #333" }}
-                    labelStyle={{ color: "#fff" }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="rides"
-                    stroke="#facc15"
-                    fill="#facc15"
-                    fillOpacity={0.2}
-                  />
+                  <Tooltip contentStyle={{ backgroundColor: "#1f1f1f", border: "1px solid #333" }} labelStyle={{ color: "#fff" }} />
+                  <Area type="monotone" dataKey="rides" stroke="#facc15" fill="#facc15" fillOpacity={0.2} />
                 </AreaChart>
               </ResponsiveContainer>
             </TabsContent>
             <TabsContent value="quarterly">
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={quarterlyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                   <XAxis dataKey="name" stroke="#888" />
                   <YAxis stroke="#888" />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "#1f1f1f", border: "1px solid #333" }}
-                    labelStyle={{ color: "#fff" }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="rides"
-                    stroke="#facc15"
-                    fill="#facc15"
-                    fillOpacity={0.2}
-                  />
+                  <Tooltip contentStyle={{ backgroundColor: "#1f1f1f", border: "1px solid #333" }} labelStyle={{ color: "#fff" }} />
+                  <Area type="monotone" dataKey="rides" stroke="#facc15" fill="#facc15" fillOpacity={0.2} />
                 </AreaChart>
               </ResponsiveContainer>
             </TabsContent>
             <TabsContent value="yearly">
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={yearlyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                   <XAxis dataKey="name" stroke="#888" />
                   <YAxis stroke="#888" />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "#1f1f1f", border: "1px solid #333" }}
-                    labelStyle={{ color: "#fff" }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="rides"
-                    stroke="#facc15"
-                    fill="#facc15"
-                    fillOpacity={0.2}
-                  />
+                  <Tooltip contentStyle={{ backgroundColor: "#1f1f1f", border: "1px solid #333" }} labelStyle={{ color: "#fff" }} />
+                  <Area type="monotone" dataKey="rides" stroke="#facc15" fill="#facc15" fillOpacity={0.2} />
                 </AreaChart>
               </ResponsiveContainer>
             </TabsContent>
@@ -274,61 +240,56 @@ export function DashboardCharts() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Ride Status Distribution</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie
-                data={statusData}
-                cx="50%"
-                cy="50%"
-                innerRadius={50}
-                outerRadius={80}
-                paddingAngle={5}
-                dataKey="value"
-              >
-                {statusData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{ backgroundColor: "#1f1f1f", border: "1px solid #333" }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="flex justify-center gap-4 mt-2">
-            {statusData.map((entry) => {
-              const total = statusData.reduce((sum, d) => sum + d.value, 0)
-              const percent = total > 0 ? Math.round((entry.value / total) * 100) : 0
-              return (
-                <div key={entry.name} className="flex items-center gap-1.5 text-xs">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
-                  <span className="text-muted-foreground">{entry.name}</span>
-                  <span className="font-medium">{percent}%</span>
-                </div>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Row 2: Status Distribution & Activity Feed */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>Ride Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie data={statusData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={5} dataKey="value">
+                  {statusData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={{ backgroundColor: "#1f1f1f", border: "1px solid #333" }} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="flex justify-center gap-3 mt-2">
+              {statusData.map((entry) => {
+                const total = statusData.reduce((sum, d) => sum + d.value, 0)
+                const percent = total > 0 ? Math.round((entry.value / total) * 100) : 0
+                return (
+                  <div key={entry.name} className="flex items-center gap-1 text-xs">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                    <span className="text-muted-foreground">{entry.name}</span>
+                    <span className="font-medium">{percent}%</span>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
 
-      <Card className="lg:col-span-2">
+        <div className="lg:col-span-2">
+          <ActivityFeed />
+        </div>
+      </div>
+
+      {/* Row 3: Peak Hours (full width) */}
+      <Card>
         <CardHeader>
           <CardTitle>Peak Hours Analysis</CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={250}>
+          <ResponsiveContainer width="100%" height={280}>
             <BarChart data={hourlyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" />
               <XAxis dataKey="hour" stroke="#888" />
               <YAxis stroke="#888" />
-              <Tooltip
-                contentStyle={{ backgroundColor: "#1f1f1f", border: "1px solid #333" }}
-                labelStyle={{ color: "#fff" }}
-              />
+              <Tooltip contentStyle={{ backgroundColor: "#1f1f1f", border: "1px solid #333" }} labelStyle={{ color: "#fff" }} />
               <Bar dataKey="rides" fill="#facc15" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>

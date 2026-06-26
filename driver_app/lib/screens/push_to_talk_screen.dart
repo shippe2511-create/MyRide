@@ -10,6 +10,7 @@ import '../services/push_to_talk_service.dart';
 import '../services/supabase_service.dart';
 import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_snackbar.dart';
 
 class PushToTalkScreen extends StatefulWidget {
   const PushToTalkScreen({super.key});
@@ -199,15 +200,11 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
 
   void _showSnackBar(String message, {bool isError = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
+    if (isError) {
+      AppSnackbar.error(context, message);
+    } else {
+      AppSnackbar.success(context, message);
+    }
   }
 
   Future<void> _playMessage(Map<String, dynamic> message) async {

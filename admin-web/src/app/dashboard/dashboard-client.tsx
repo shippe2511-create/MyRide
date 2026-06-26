@@ -17,7 +17,6 @@ import {
   Activity
 } from "lucide-react"
 import { DashboardCharts } from "./charts"
-import { ActivityFeed } from "@/components/activity-feed"
 import Link from "next/link"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
@@ -256,14 +255,7 @@ export function DashboardClient() {
       </div>
 
       {/* Charts and Activity */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <DashboardCharts />
-        </div>
-        <div>
-          <ActivityFeed />
-        </div>
-      </div>
+      <DashboardCharts />
 
       {/* Recent Rides */}
       <Card>

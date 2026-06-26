@@ -5,6 +5,7 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_container.dart';
 import '../widgets/primary_button.dart';
+import '../widgets/app_snackbar.dart';
 
 class ScheduledRidesScreen extends StatefulWidget {
   final String? customerId;
@@ -68,14 +69,7 @@ class _ScheduledRidesScreenState extends State<ScheduledRidesScreen> {
         HapticFeedback.mediumImpact();
         _loadScheduledRides();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Ride cancelled'),
-              backgroundColor: AppColors.yellow,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          );
+          AppSnackbar.info(context, 'Ride cancelled');
         }
       }
     }
@@ -359,14 +353,7 @@ class _ScheduleRideBottomSheetState extends State<ScheduleRideBottomSheet> {
 
   Future<void> _scheduleRide() async {
     if (_selectedDate.isBefore(DateTime.now().add(const Duration(minutes: 15)))) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please select a time at least 15 minutes from now'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
+      AppSnackbar.error(context, 'Please select a time at least 15 minutes from now');
       return;
     }
 
@@ -388,14 +375,7 @@ class _ScheduleRideBottomSheetState extends State<ScheduleRideBottomSheet> {
     if (result != null && mounted) {
       HapticFeedback.mediumImpact();
       Navigator.pop(context, true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Ride scheduled for ${DateFormat('MMM d, h:mm a').format(_selectedDate)}'),
-          backgroundColor: AppColors.yellow,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
+      AppSnackbar.info(context, 'Ride scheduled for ${DateFormat('MMM d, h:mm a').format(_selectedDate)}');
     }
   }
 

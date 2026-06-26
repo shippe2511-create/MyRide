@@ -12,6 +12,7 @@ import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../services/realtime_service.dart';
 import '../widgets/status_animation.dart';
+import '../widgets/app_snackbar.dart';
 import 'trip_complete_screen.dart';
 import 'chat_screen.dart';
 
@@ -124,9 +125,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
         _onTripCompleted();
       } else if (status == 'cancelled') {
         _statusPollingTimer?.cancel();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Trip was cancelled'), backgroundColor: Colors.red),
-        );
+        AppSnackbar.error(context, 'Trip was cancelled');
         Navigator.popUntil(context, (route) => route.isFirst);
       }
     });
@@ -253,9 +252,19 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
           final status = ride['status'] as String?;
           debugPrint('Trip polling status: $status');
 
-          // Update status for UI
+          // Update status for UI and show notifications
           if (status != null && status != _rideStatus) {
+            final oldStatus = _rideStatus;
             setState(() => _rideStatus = status);
+
+            // Show notification when driver arrives
+            if (status == 'arrived' && oldStatus != 'arrived') {
+              NotificationService.showNotification(
+                title: 'Driver Arrived',
+                body: 'Your driver has arrived at the pickup location.',
+              );
+              HapticFeedback.heavyImpact();
+            }
           }
 
           if (status == 'completed' && !_tripCompleted) {
@@ -265,9 +274,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
           } else if (status == 'cancelled') {
             _statusPollingTimer?.cancel();
             _driverLocationSubscription?.cancel();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Trip was cancelled'), backgroundColor: Colors.red),
-            );
+            AppSnackbar.error(context, 'Trip Cancelled', subtitle: 'The trip was cancelled');
             Navigator.popUntil(context, (route) => route.isFirst);
           }
         }
@@ -303,7 +310,8 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
 
           driverId = driver?['id'] as String?;
           driverName = driverProfile?['full_name'] as String?;
-          vehicleNumber = vehicle?['plate_no'] as String? ?? vehicle?['display_name'] as String?;
+          vehicleNumber = vehicle?['display_name'] as String? ?? vehicle?['plate_no'] as String?;
+          debugPrint('Trip complete vehicle data: display_name=${vehicle?['display_name']}, plate_no=${vehicle?['plate_no']}, using=$vehicleNumber');
           distance = (ride['distance_km'] as num?)?.toDouble();
 
           // Calculate duration from started_at to completed_at
@@ -449,13 +457,13 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
             ),
           ),
 
-          // Simple bottom sheet
+          // Bottom sheet - Uber style
           DraggableScrollableSheet(
-            initialChildSize: 0.48,
-            minChildSize: 0.35,
-            maxChildSize: 0.6,
+            initialChildSize: 0.42,
+            minChildSize: 0.25,
+            maxChildSize: 0.55,
             snap: true,
-            snapSizes: const [0.48],
+            snapSizes: const [0.42],
             builder: (context, scrollController) {
               final statusColor = _rideStatus == 'in_progress' ? AppColors.success
                   : (_rideStatus == 'arrived' ? const Color(0xFF2196F3) : AppColors.yellow);
@@ -487,27 +495,11 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                       ),
                     ),
 
-                    // Status Row with Animation
+                    // Uber-style status header
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                      padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
                       child: Row(
                         children: [
-                          if (_rideStatus == 'in_progress')
-                            const StatusAnimation(
-                              type: TripAnimationType.inProgress,
-                              size: 44,
-                            )
-                          else
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: statusColor,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(statusIcon, color: Colors.white, size: 22),
-                            ),
-                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -516,102 +508,103 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                                   statusText,
                                   style: TextStyle(
                                     color: context.textColor,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.5,
                                   ),
                                 ),
-                                if (_rideStatus == 'in_progress')
-                                  const Padding(
-                                    padding: EdgeInsets.only(top: 4),
-                                    child: LoadingDots(size: 6),
-                                  ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Arriving in $_etaMinutes min',
+                                  style: TextStyle(color: context.mutedColor, fontSize: 15),
+                                ),
                               ],
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: statusColor.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              '$_etaMinutes min',
-                              style: TextStyle(color: statusColor, fontSize: 14, fontWeight: FontWeight.w700),
+                          GestureDetector(
+                            onTap: () async {
+                              HapticFeedback.lightImpact();
+                              // Open navigation to driver's location
+                              final lat = _driverLocation.latitude;
+                              final lng = _driverLocation.longitude;
+                              final url = Uri.parse('https://maps.apple.com/?daddr=$lat,$lng&dirflg=d');
+                              if (await canLaunchUrl(url)) {
+                                await launchUrl(url, mode: LaunchMode.externalApplication);
+                              }
+                            },
+                            child: Container(
+                              width: 52,
+                              height: 52,
+                              decoration: BoxDecoration(
+                                color: statusColor,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Icon(statusIcon, color: Colors.white, size: 26),
                             ),
                           ),
                         ],
                       ),
                     ),
 
-                    // Simple Driver Card
+                    // Driver info with inline actions - Uber style
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: context.isDark ? const Color(0xFF1E1E22) : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: context.isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: AppColors.yellow,
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Icon(Icons.person_rounded, color: Colors.black, size: 28),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _driverName,
-                                    style: TextStyle(color: context.textColor, fontSize: 17, fontWeight: FontWeight.w700),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Icon(Icons.star_rounded, color: AppColors.yellow, size: 16),
-                                      const SizedBox(width: 4),
-                                      Text('${widget.tripData['driverRating'] ?? 4.9}', style: TextStyle(color: context.mutedColor, fontSize: 14, fontWeight: FontWeight.w600)),
-                                      const SizedBox(width: 10),
-                                      Text('•', style: TextStyle(color: context.mutedColor)),
-                                      const SizedBox(width: 10),
-                                      Text(widget.tripData['vehicleNumber'] ?? 'MV70', style: TextStyle(color: context.mutedColor, fontSize: 14, fontWeight: FontWeight.w600)),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Modern Action Buttons
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
                       child: Row(
                         children: [
-                          Expanded(child: _buildActionButton(Icons.phone_rounded, 'Call')),
+                          // Driver avatar
+                          Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: AppColors.yellow,
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            child: const Icon(Icons.person_rounded, color: Colors.black, size: 32),
+                          ),
+                          const SizedBox(width: 16),
+                          // Driver info
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _driverName,
+                                  style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(Icons.star_rounded, color: AppColors.yellow, size: 16),
+                                    const SizedBox(width: 4),
+                                    Text('${widget.tripData['driverRating'] ?? 0.0}', style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600)),
+                                    const SizedBox(width: 12),
+                                    Text('•', style: TextStyle(color: context.mutedColor)),
+                                    const SizedBox(width: 12),
+                                    Text(widget.tripData['vehicleNumber'] ?? '', style: TextStyle(color: context.mutedColor, fontSize: 14)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Action buttons inline
+                          _buildCircleAction(Icons.chat_bubble_rounded, () => _messageDriver()),
                           const SizedBox(width: 12),
-                          Expanded(child: _buildActionButton(Icons.chat_bubble_rounded, 'Message')),
-                          const SizedBox(width: 12),
-                          Expanded(child: _buildActionButton(Icons.share_location_rounded, 'Share')),
+                          _buildCircleAction(Icons.phone_rounded, () => _callDriver()),
                         ],
                       ),
                     ),
 
-                    // Simple Route Card
+                    // Divider
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                      child: Container(height: 1, color: context.isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.08)),
+                    ),
+
+                    // Route Card - Simplified
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                       child: Container(
-                        padding: const EdgeInsets.all(14),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: context.isDark ? const Color(0xFF1E1E22) : Colors.white,
                           borderRadius: BorderRadius.circular(16),
@@ -626,11 +619,11 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                                   height: 10,
                                   decoration: BoxDecoration(color: AppColors.success, shape: BoxShape.circle),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: 14),
                                 Expanded(
                                   child: Text(
                                     widget.tripData['pickup'] ?? 'Current location',
-                                    style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600),
+                                    style: TextStyle(color: context.textColor, fontSize: 15, fontWeight: FontWeight.w500),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -652,18 +645,18 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                                   height: 10,
                                   decoration: BoxDecoration(color: AppColors.error, shape: BoxShape.circle),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: 14),
                                 Expanded(
                                   child: Text(
                                     _dropoff,
-                                    style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600),
+                                    style: TextStyle(color: context.textColor, fontSize: 15, fontWeight: FontWeight.w500),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 GestureDetector(
                                   onTap: () => _showChangeDestinationSheet(),
-                                  child: Text('Change', style: TextStyle(color: AppColors.yellow, fontSize: 13, fontWeight: FontWeight.w700)),
+                                  child: Text('Edit', style: TextStyle(color: AppColors.yellow, fontSize: 14, fontWeight: FontWeight.w600)),
                                 ),
                               ],
                             ),
@@ -677,6 +670,24 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCircleAction(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: context.isDark ? const Color(0xFF2A2A2E) : Colors.grey[100],
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: context.textColor, size: 22),
       ),
     );
   }
@@ -697,24 +708,48 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
         }
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: context.isDark ? const Color(0xFF1E1E22) : Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: context.isDark
+                ? [const Color(0xFF1E1E22), const Color(0xFF252528)]
+                : [Colors.white, const Color(0xFFF8F8FA)],
+          ),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: context.isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 12,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
         child: Column(
           children: [
             Container(
-              width: 42,
-              height: 42,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
-                color: buttonColor.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [buttonColor, buttonColor.withValues(alpha: 0.8)],
+                ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: buttonColor.withValues(alpha: 0.4),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              child: Icon(icon, color: buttonColor, size: 22),
+              child: Icon(icon, color: Colors.white, size: 24),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Text(label, style: TextStyle(color: context.textColor, fontSize: 13, fontWeight: FontWeight.w600)),
           ],
         ),
@@ -738,7 +773,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
           driverName: widget.tripData['driverName'] ?? driverProfile?['full_name'] ?? 'Driver',
           driverPhone: widget.tripData['driverPhone'] ?? driverProfile?['phone'] ?? '',
           vehicleNumber: widget.tripData['vehicleNumber'] ?? 'Unknown',
-          driverRating: widget.tripData['driverRating']?.toDouble() ?? 4.9,
+          driverRating: widget.tripData['driverRating']?.toDouble() ?? 0.0,
           rideId: widget.tripData['rideId'] as String?,
           driverUserId: driverProfileId,
         ),
@@ -1255,9 +1290,7 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
 
     if (!sent) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send request'), backgroundColor: Colors.red),
-        );
+        AppSnackbar.error(context, 'Failed to send request');
       }
       return;
     }
@@ -1709,20 +1742,7 @@ Location: https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocati
 
   void _showSOSConfirmed(String message) {
     HapticFeedback.heavyImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Text(message),
-          ],
-        ),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    AppSnackbar.success(context, message);
   }
 }
 

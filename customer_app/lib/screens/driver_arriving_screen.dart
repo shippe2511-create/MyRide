@@ -12,6 +12,7 @@ import '../services/notification_service.dart';
 import '../services/realtime_service.dart';
 import '../widgets/status_animation.dart';
 import '../widgets/app_notification_banner.dart';
+import '../widgets/app_snackbar.dart';
 import 'trip_tracking_screen.dart';
 import 'trip_complete_screen.dart';
 import 'chat_screen.dart';
@@ -246,9 +247,7 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
       );
     } else if (status == 'cancelled') {
       _statusPollingTimer?.cancel();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ride was cancelled'), backgroundColor: Colors.red),
-      );
+      AppSnackbar.error(context, 'Ride was cancelled');
       Navigator.popUntil(context, (route) => route.isFirst);
     }
   }
@@ -609,9 +608,7 @@ https://maps.google.com/?q=${_pickupLocation.latitude},${_pickupLocation.longitu
     }
     if (mounted) {
       Navigator.popUntil(context, (route) => route.isFirst);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ride cancelled'), backgroundColor: AppColors.error),
-      );
+      AppSnackbar.error(context, 'Ride cancelled');
     }
   }
 
@@ -931,20 +928,7 @@ Map: https://maps.google.com/?q=${_pickupLocation.latitude},${_pickupLocation.lo
 
   void _showSOSConfirmed(String message) {
     HapticFeedback.heavyImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Text(message),
-          ],
-        ),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    AppSnackbar.success(context, message);
   }
 }
 

@@ -1458,4 +1458,125 @@ class SupabaseService {
       return {};
     }
   }
+
+  // =====================================================
+  // POOL TRIP METHODS
+  // =====================================================
+
+  /// Start a new pool trip
+  static Future<Map<String, dynamic>> startPoolTrip(String vehicleId, String driverId) async {
+    try {
+      final result = await client.rpc('start_pooled_trip', params: {
+        'p_vehicle_id': vehicleId,
+        'p_driver_id': driverId,
+      });
+      return Map<String, dynamic>.from(result);
+    } catch (e) {
+      debugPrint('Error starting pool trip: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// Get active pool trip for driver
+  static Future<Map<String, dynamic>?> getActivePoolTrip(String driverId) async {
+    try {
+      final result = await client
+          .from('pooled_trips')
+          .select('''
+            *,
+            vehicle:vehicles!pooled_trips_vehicle_id_fkey(vehicle_number, vehicle_model, capacity)
+          ''')
+          .eq('driver_id', driverId)
+          .eq('status', 'active')
+          .maybeSingle();
+
+      return result;
+    } catch (e) {
+      debugPrint('Error getting active pool trip: $e');
+      return null;
+    }
+  }
+
+  /// Get trip stops
+  static Future<List<Map<String, dynamic>>> getPoolTripStops(String tripId) async {
+    try {
+      final result = await client.rpc('get_trip_stops', params: {
+        'p_trip_id': tripId,
+      });
+      return List<Map<String, dynamic>>.from(result);
+    } catch (e) {
+      debugPrint('Error getting trip stops: $e');
+      return [];
+    }
+  }
+
+  /// Complete a stop
+  static Future<Map<String, dynamic>> completePoolStop(String stopId) async {
+    try {
+      final result = await client.rpc('complete_pool_stop', params: {
+        'p_stop_id': stopId,
+      });
+      return Map<String, dynamic>.from(result);
+    } catch (e) {
+      debugPrint('Error completing stop: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// End pool trip
+  static Future<bool> endPoolTrip(String tripId) async {
+    try {
+      await client
+          .from('pooled_trips')
+          .update({
+            'status': 'completed',
+            'completed_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', tripId);
+      return true;
+    } catch (e) {
+      debugPrint('Error ending pool trip: $e');
+      return false;
+    }
+  }
+
+  /// Subscribe to pool trip updates
+  static RealtimeChannel subscribeToPoolTrip(String tripId, Function(Map<String, dynamic>) onUpdate) {
+    return client
+        .channel('pool_trip_$tripId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'pooled_trips',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: tripId,
+          ),
+          callback: (payload) {
+            onUpdate(payload.newRecord);
+          },
+        )
+        .subscribe();
+  }
+
+  /// Subscribe to pool bookings for a trip
+  static RealtimeChannel subscribeToPoolBookings(String tripId, Function(Map<String, dynamic>) onUpdate) {
+    return client
+        .channel('pool_bookings_$tripId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'pool_bookings',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (payload) {
+            onUpdate(payload.newRecord);
+          },
+        )
+        .subscribe();
+  }
 }

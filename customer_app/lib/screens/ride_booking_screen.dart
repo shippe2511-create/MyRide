@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../widgets/app_snackbar.dart';
 import 'driver_matching_screen.dart';
+import 'pool_ride_screen.dart';
 
 const String _darkMapStyle = '''
 [
@@ -41,6 +42,7 @@ class _RideBookingScreenState extends State<RideBookingScreen> {
   late LatLng pickupLoc;
   late LatLng dropoffLoc;
   bool _isScheduling = false;
+  bool _isPoolRide = false;
 
   @override
   void initState() {
@@ -500,6 +502,90 @@ class _RideBookingScreenState extends State<RideBookingScreen> {
                           ),
                         ),
 
+                        const SizedBox(height: 16),
+
+                        // Ride type toggle
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: context.borderColor.withValues(alpha: 0.5)),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () {
+                                    HapticFeedback.selectionClick();
+                                    setState(() => _isPoolRide = false);
+                                  },
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    decoration: BoxDecoration(
+                                      color: !_isPoolRide ? AppColors.yellow : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.directions_car,
+                                          color: !_isPoolRide ? Colors.black : context.mutedColor,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Regular',
+                                          style: TextStyle(
+                                            color: !_isPoolRide ? Colors.black : context.mutedColor,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () {
+                                    HapticFeedback.selectionClick();
+                                    setState(() => _isPoolRide = true);
+                                  },
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    decoration: BoxDecoration(
+                                      color: _isPoolRide ? const Color(0xFF22C55E) : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.event_seat,
+                                          color: _isPoolRide ? Colors.white : context.mutedColor,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Pool',
+                                          style: TextStyle(
+                                            color: _isPoolRide ? Colors.white : context.mutedColor,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
                         const SizedBox(height: 20),
 
                         // Request button
@@ -509,6 +595,21 @@ class _RideBookingScreenState extends State<RideBookingScreen> {
                           child: ElevatedButton(
                             onPressed: () {
                               HapticFeedback.mediumImpact();
+                              if (_isPoolRide) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => PoolRideScreen(
+                                      pickupName: widget.pickup,
+                                      pickupLat: pickupLoc.latitude,
+                                      pickupLng: pickupLoc.longitude,
+                                      dropoffName: widget.dropoff,
+                                      dropoffLat: dropoffLoc.latitude,
+                                      dropoffLng: dropoffLoc.longitude,
+                                    ),
+                                  ),
+                                );
+                              } else {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -523,19 +624,23 @@ class _RideBookingScreenState extends State<RideBookingScreen> {
                                   ),
                                 ),
                               );
+                              }
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.yellow,
+                              backgroundColor: _isPoolRide ? const Color(0xFF22C55E) : AppColors.yellow,
                               foregroundColor: Colors.black,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                               elevation: 0,
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.local_taxi, size: 22),
-                                SizedBox(width: 10),
-                                Text('Request Ride', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                                Icon(_isPoolRide ? Icons.event_seat : Icons.local_taxi, size: 22, color: _isPoolRide ? Colors.white : Colors.black),
+                                const SizedBox(width: 10),
+                                Text(
+                                  _isPoolRide ? 'Find Pool Ride' : 'Request Ride',
+                                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: _isPoolRide ? Colors.white : Colors.black),
+                                ),
                               ],
                             ),
                           ),

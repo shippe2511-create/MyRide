@@ -11,11 +11,13 @@ import '../widgets/status_toggle.dart';
 import '../widgets/ride_request_popup.dart';
 import '../widgets/break_timer.dart';
 import '../widgets/app_snackbar.dart';
+import '../services/supabase_service.dart';
 import 'vehicle_checklist_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
 import 'ride_screen.dart';
 import 'chat_screen.dart';
+import 'pool_trip_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -649,6 +651,61 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ],
+            ),
+          ),
+        ),
+
+        // Pool Ride Mode card
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          child: GestureDetector(
+            onTap: () => _startPoolMode(context, state),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [const Color(0xFF22C55E).withValues(alpha: 0.15), const Color(0xFF22C55E).withValues(alpha: 0.05)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF22C55E).withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF22C55E),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.event_seat, color: Colors.white, size: 26),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Start Pool Mode',
+                          style: TextStyle(
+                            color: context.textColor,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Pick up multiple passengers along your route',
+                          style: TextStyle(color: context.mutedColor, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward_ios, color: context.mutedColor, size: 16),
+                ],
+              ),
             ),
           ),
         ),
@@ -1333,6 +1390,70 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _startPoolMode(BuildContext context, DriverState state) async {
+    final driverId = state.driverId;
+
+    if (driverId.isEmpty) {
+      AppSnackbar.error(context, 'Driver info missing');
+      return;
+    }
+
+    // Get vehicle ID from database
+    final vehicleData = await SupabaseService.client
+        .from('vehicles')
+        .select('id')
+        .eq('driver_id', driverId)
+        .maybeSingle();
+
+    final vehicleId = vehicleData?['id'] as String?;
+    if (vehicleId == null) {
+      AppSnackbar.error(context, 'No vehicle assigned');
+      return;
+    }
+
+    // Check for existing active pool trip
+    final existingTrip = await SupabaseService.getActivePoolTrip(driverId);
+    if (existingTrip != null) {
+      // Navigate to existing trip
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PoolTripScreen(
+            tripId: existingTrip['id'],
+            vehicleNumber: existingTrip['vehicle']?['vehicle_number'] ?? 'Vehicle',
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Start new pool trip
+    HapticFeedback.heavyImpact();
+    final result = await SupabaseService.startPoolTrip(vehicleId, driverId);
+
+    if (result['success'] == true) {
+      final tripId = result['trip_id'];
+      final totalSeats = result['total_seats'];
+
+      if (!mounted) return;
+      AppSnackbar.success(context, 'Pool trip started with $totalSeats seats');
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PoolTripScreen(
+            tripId: tripId,
+            vehicleNumber: state.vehicleNumber,
+          ),
+        ),
+      );
+    } else {
+      if (!mounted) return;
+      AppSnackbar.error(context, result['error'] ?? 'Failed to start pool trip');
+    }
   }
 
   void _showSOSDialog(BuildContext context) {

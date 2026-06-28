@@ -37,6 +37,9 @@ import {
   Volume2,
   Clock,
   Send,
+  Search,
+  Calendar,
+  Filter,
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -92,6 +95,7 @@ export default function PushToTalkPage() {
   const [isRecording, setIsRecording] = useState(false)
   const [recordingDuration, setRecordingDuration] = useState(0)
   const [selectedRecipient, setSelectedRecipient] = useState<string>("all_drivers")
+  const [selectedDrivers, setSelectedDrivers] = useState<Set<string>>(new Set())
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -103,6 +107,12 @@ export default function PushToTalkPage() {
   // Multi-select state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+
+  // Filter state
+  const [filterSender, setFilterSender] = useState<string>("all")
+  const [filterStatus, setFilterStatus] = useState<string>("all")
+  const [filterDate, setFilterDate] = useState<string>("all")
+  const [searchQuery, setSearchQuery] = useState<string>("")
 
   useEffect(() => {
     fetchData()
@@ -127,23 +137,10 @@ export default function PushToTalkPage() {
       fetchMessages()
     }, 5000)
 
-    // Global mouseup/touchend to catch release outside button
-    const handleGlobalRelease = () => {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop()
-        if (recordingIntervalRef.current) {
-          clearInterval(recordingIntervalRef.current)
-        }
-      }
-    }
-    window.addEventListener('mouseup', handleGlobalRelease)
-    window.addEventListener('touchend', handleGlobalRelease)
 
     return () => {
       supabase.removeChannel(channel)
       clearInterval(pollInterval)
-      window.removeEventListener('mouseup', handleGlobalRelease)
-      window.removeEventListener('touchend', handleGlobalRelease)
       if (audioRef.current) {
         audioRef.current.pause()
       }
@@ -284,11 +281,34 @@ export default function PushToTalkPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    // Determine recipient
+    // Handle selected drivers - send to each one
+    if (selectedRecipient === "selected" && selectedDrivers.size > 0) {
+      const messages = Array.from(selectedDrivers).map(driverId => ({
+        sender_id: user.id,
+        sender_type: "admin",
+        recipient_id: driverId,
+        recipient_type: "driver",
+        audio_url: urlData.publicUrl,
+        duration_seconds: recordingDuration,
+      }))
+
+      const { error } = await supabase.from("voice_messages").insert(messages)
+
+      if (error) {
+        toast.error("Failed to send voice messages")
+      } else {
+        toast.success(`Voice message sent to ${selectedDrivers.size} driver${selectedDrivers.size > 1 ? 's' : ''}`)
+        setRecordingDuration(0)
+        fetchMessages()
+      }
+      return
+    }
+
+    // Determine recipient for single/broadcast
     let recipientId: string | null = null
     let recipientType = selectedRecipient
 
-    if (selectedRecipient !== "broadcast" && selectedRecipient !== "all_drivers") {
+    if (selectedRecipient !== "broadcast" && selectedRecipient !== "all_drivers" && selectedRecipient !== "selected") {
       recipientId = selectedRecipient
       recipientType = "driver"
     }
@@ -310,6 +330,7 @@ export default function PushToTalkPage() {
     } else {
       toast.success("Voice message sent")
       setRecordingDuration(0)
+      fetchMessages()
     }
   }
 
@@ -365,12 +386,51 @@ export default function PushToTalkPage() {
   }
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === messages.length) {
+    if (selectedIds.size === filteredMessages.length) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(messages.map(m => m.id)))
+      setSelectedIds(new Set(filteredMessages.map(m => m.id)))
     }
   }
+
+  // Filter messages based on all criteria
+  const filteredMessages = messages.filter(m => {
+    // Sender filter
+    if (filterSender !== "all") {
+      if (filterSender === "admin" && m.sender_type !== "admin") return false
+      if (filterSender === "driver" && m.sender_type !== "driver") return false
+      if (filterSender.startsWith("driver:")) {
+        const driverId = filterSender.replace("driver:", "")
+        if (m.sender_id !== driverId) return false
+      }
+    }
+
+    // Status filter
+    if (filterStatus === "new" && m.is_played) return false
+    if (filterStatus === "played" && !m.is_played) return false
+
+    // Date filter
+    if (filterDate !== "all") {
+      const msgDate = new Date(m.created_at)
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000)
+      const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+      if (filterDate === "today" && msgDate < today) return false
+      if (filterDate === "yesterday" && (msgDate < yesterday || msgDate >= today)) return false
+      if (filterDate === "week" && msgDate < weekAgo) return false
+    }
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      const senderName = m.sender?.full_name?.toLowerCase() || ""
+      if (!senderName.includes(query)) return false
+    }
+
+    return true
+  })
 
   const handleBulkDelete = async () => {
     const ids = Array.from(selectedIds)
@@ -443,7 +503,10 @@ export default function PushToTalkPage() {
               <div className="space-y-4">
                 <div>
                   <Label>Send To</Label>
-                  <Select value={selectedRecipient} onValueChange={setSelectedRecipient}>
+                  <Select value={selectedRecipient} onValueChange={(v) => {
+                    setSelectedRecipient(v)
+                    if (v !== "selected") setSelectedDrivers(new Set())
+                  }}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -452,6 +515,12 @@ export default function PushToTalkPage() {
                         <span className="flex items-center gap-2">
                           <Radio className="h-4 w-4" />
                           All Drivers
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="selected">
+                        <span className="flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          Selected Drivers
                         </span>
                       </SelectItem>
                       {drivers.map(driver => (
@@ -465,6 +534,37 @@ export default function PushToTalkPage() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {selectedRecipient === "selected" && (
+                  <div className="space-y-2 max-h-[150px] overflow-y-auto border rounded-lg p-2">
+                    {drivers.map(driver => (
+                      <div key={driver.profile_id} className="flex items-center gap-2">
+                        <Checkbox
+                          id={driver.profile_id}
+                          checked={selectedDrivers.has(driver.profile_id)}
+                          onCheckedChange={(checked) => {
+                            const newSet = new Set(selectedDrivers)
+                            if (checked) {
+                              newSet.add(driver.profile_id)
+                            } else {
+                              newSet.delete(driver.profile_id)
+                            }
+                            setSelectedDrivers(newSet)
+                          }}
+                        />
+                        <Label htmlFor={driver.profile_id} className="flex items-center gap-2 cursor-pointer">
+                          {driver.is_online && <span className="h-2 w-2 rounded-full bg-green-500" />}
+                          {driver.profile.full_name}
+                        </Label>
+                      </div>
+                    ))}
+                    {selectedDrivers.size > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {selectedDrivers.size} driver{selectedDrivers.size > 1 ? 's' : ''} selected
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex flex-col items-center py-6">
                   {isRecording && (
@@ -647,28 +747,80 @@ export default function PushToTalkPage() {
           {/* Right Column - Messages */}
           <div className="lg:col-span-2">
             <Card>
-              <div className="flex items-center justify-between p-4 border-b">
-                <div className="flex items-center gap-4">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <Volume2 className="h-4 w-4" />
-                    Recent Messages
-                  </h3>
-                  <Badge variant="secondary">{messages.length}</Badge>
+              <div className="p-4 border-b space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <Volume2 className="h-4 w-4" />
+                      Recent Messages
+                    </h3>
+                    <Badge variant="secondary">{filteredMessages.length}</Badge>
+                  </div>
+                  {selectedIds.size > 0 && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setDeleteDialogOpen(true)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete ({selectedIds.size})
+                    </Button>
+                  )}
                 </div>
-                {selectedIds.size > 0 && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => setDeleteDialogOpen(true)}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete ({selectedIds.size})
-                  </Button>
-                )}
+                <div className="flex flex-wrap gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by name..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 w-[180px]"
+                    />
+                  </div>
+                  <Select value={filterSender} onValueChange={setFilterSender}>
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue placeholder="Sender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Senders</SelectItem>
+                      <SelectItem value="admin">Admin Only</SelectItem>
+                      <SelectItem value="driver">All Drivers</SelectItem>
+                      {drivers.map(driver => (
+                        <SelectItem key={`filter-${driver.profile_id}`} value={`driver:${driver.profile_id}`}>
+                          <span className="flex items-center gap-2">
+                            {driver.is_online && <span className="h-2 w-2 rounded-full bg-green-500" />}
+                            {driver.profile.full_name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterStatus} onValueChange={setFilterStatus}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="new">New</SelectItem>
+                      <SelectItem value="played">Played</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterDate} onValueChange={setFilterDate}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue placeholder="Date" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Time</SelectItem>
+                      <SelectItem value="today">Today</SelectItem>
+                      <SelectItem value="yesterday">Yesterday</SelectItem>
+                      <SelectItem value="week">Last 7 Days</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="overflow-auto max-h-[600px]">
-                {messages.length === 0 ? (
+                {filteredMessages.length === 0 ? (
                   <div className="p-8 text-center text-muted-foreground">
                     <Volume2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
                     <p>No voice messages yet</p>
@@ -679,7 +831,7 @@ export default function PushToTalkPage() {
                       <TableRow>
                         <TableHead className="w-12">
                           <Checkbox
-                            checked={selectedIds.size === messages.length && messages.length > 0}
+                            checked={selectedIds.size === filteredMessages.length && filteredMessages.length > 0}
                             onCheckedChange={toggleSelectAll}
                           />
                         </TableHead>
@@ -692,7 +844,7 @@ export default function PushToTalkPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {messages.map((message) => (
+                      {filteredMessages.map((message) => (
                         <TableRow key={message.id}>
                           <TableCell>
                             <Checkbox

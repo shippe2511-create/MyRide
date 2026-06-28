@@ -5,6 +5,16 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   LayoutDashboard,
   Users,
   Car,
@@ -142,12 +152,17 @@ export function Sidebar({ collapsed = false, onCollapse }: SidebarProps) {
   const { can, loading } = usePermissions()
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [hoveredSection, setHoveredSection] = useState<string | null>(null)
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false)
 
   const handleLogout = async () => {
     sessionStorage.removeItem("myride_admin_role")
     sessionStorage.removeItem("myride_admin_custom_perms")
     await supabase.auth.signOut()
     router.push("/login")
+  }
+
+  const confirmLogout = () => {
+    setShowLogoutDialog(true)
   }
 
   const getVisibleSections = () => {
@@ -312,7 +327,7 @@ export function Sidebar({ collapsed = false, onCollapse }: SidebarProps) {
       </nav>
       <div className="p-3">
         <button
-          onClick={handleLogout}
+          onClick={confirmLogout}
           className={cn(
             "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground",
             collapsed && "justify-center px-2"
@@ -323,6 +338,21 @@ export function Sidebar({ collapsed = false, onCollapse }: SidebarProps) {
           {!collapsed && "Log out"}
         </button>
       </div>
+
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to log out?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You will be signed out of the admin panel and redirected to the login page.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleLogout}>Log out</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

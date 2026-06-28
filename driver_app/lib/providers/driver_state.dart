@@ -883,40 +883,16 @@ class DriverState extends ChangeNotifier {
   Future<void> refreshStats() async {
     if (_driverId.isEmpty) return;
     try {
-      // Get actual completed trips count
-      final completedRides = await Supabase.instance.client
-          .from('rides')
-          .select('id')
-          .eq('driver_id', _driverId)
-          .eq('status', 'completed');
+      // Single RPC call for all stats
+      final result = await Supabase.instance.client.rpc('get_driver_stats', params: {
+        'p_driver_id': _driverId,
+        'p_profile_id': _profileId,
+      });
 
-      _totalTrips = (completedRides as List).length;
-
-      // Get today's trips (convert local midnight to UTC for comparison)
-      final now = DateTime.now();
-      final todayStart = DateTime(now.year, now.month, now.day);
-      final todayStartUtc = todayStart.toUtc().toIso8601String();
-
-      final todayRides = await Supabase.instance.client
-          .from('rides')
-          .select('id')
-          .eq('driver_id', _driverId)
-          .eq('status', 'completed')
-          .gte('created_at', todayStartUtc);
-
-      _todayTrips = (todayRides as List).length;
-
-      // Calculate average rating from ratings table
-      final ratings = await Supabase.instance.client
-          .from('ratings')
-          .select('rating')
-          .eq('to_user_id', _profileId);
-
-      if ((ratings as List).isNotEmpty) {
-        final sum = ratings.fold<num>(0, (sum, r) => sum + (r['rating'] as num));
-        _rating = sum / ratings.length;
-      } else {
-        _rating = 0.0;
+      if (result != null) {
+        _totalTrips = (result['total_trips'] as num?)?.toInt() ?? 0;
+        _todayTrips = (result['today_trips'] as num?)?.toInt() ?? 0;
+        _rating = (result['rating'] as num?)?.toDouble() ?? 0.0;
       }
 
       debugPrint('Stats refreshed: today=$_todayTrips, total=$_totalTrips, rating=$_rating');

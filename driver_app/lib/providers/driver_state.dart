@@ -1216,8 +1216,15 @@ class DriverState extends ChangeNotifier {
 
       if (result['success'] == true) {
         // Success - update local state
-        _currentRide = request.copyWith(status: RideStatus.accepted);
         _incomingRequests.removeWhere((r) => r.id == request.id);
+
+        // If driver already has an active ride, queue this one
+        if (_currentRide != null) {
+          _queuedRequests.add(request.copyWith(status: RideStatus.queued));
+          debugPrint('Ride ${request.id} queued - driver has active ride');
+        } else {
+          _currentRide = request.copyWith(status: RideStatus.accepted);
+        }
 
         // Haptic and voice feedback
         HapticFeedback.mediumImpact();
@@ -1376,13 +1383,22 @@ class DriverState extends ChangeNotifier {
         duration: duration,
       );
 
-      // Clear current ride
+      // Clear current ride and promote next queued ride
       _currentRide = null;
-      _queuedRequests.clear();
+
+      // First check local queue
+      if (_queuedRequests.isNotEmpty) {
+        _currentRide = _queuedRequests.first.copyWith(status: RideStatus.accepted);
+        _queuedRequests.removeAt(0);
+        debugPrint('Promoted queued ride to current: ${_currentRide?.id}');
+      }
+
       notifyListeners();
 
-      // Check for next active ride assigned to this driver
-      await _checkForActiveRide();
+      // If no local queue, check database for any active rides
+      if (_currentRide == null) {
+        await _checkForActiveRide();
+      }
 
       return true;
     } catch (e) {

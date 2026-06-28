@@ -370,29 +370,36 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
               _fitMapBounds();
             },
             markers: {
-              Marker(
-                markerId: const MarkerId('pickup'),
-                position: _pickupLocation,
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-                infoWindow: const InfoWindow(title: 'Pickup'),
-              ),
-              Marker(
-                markerId: const MarkerId('dropoff'),
-                position: _dropoffLocation,
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-                infoWindow: const InfoWindow(title: 'Drop-off'),
-              ),
+              // Always show driver marker
               Marker(
                 markerId: const MarkerId('driver'),
                 position: _driverLocation,
                 icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
                 infoWindow: const InfoWindow(title: 'Driver'),
               ),
+              // Show pickup marker before trip starts
+              if (_rideStatus != 'in_progress')
+                Marker(
+                  markerId: const MarkerId('pickup'),
+                  position: _pickupLocation,
+                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                  infoWindow: const InfoWindow(title: 'Pickup'),
+                ),
+              // Show dropoff marker during trip
+              if (_rideStatus == 'in_progress')
+                Marker(
+                  markerId: const MarkerId('dropoff'),
+                  position: _dropoffLocation,
+                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                  infoWindow: const InfoWindow(title: 'Drop-off'),
+                ),
             },
             polylines: {
               Polyline(
                 polylineId: const PolylineId('route'),
-                points: [_pickupLocation, _driverLocation, _dropoffLocation],
+                points: _rideStatus == 'in_progress'
+                    ? [_driverLocation, _dropoffLocation]  // During trip: driver to dropoff
+                    : [_driverLocation, _pickupLocation],   // Before pickup: driver to pickup
                 color: AppColors.yellow,
                 width: 4,
               ),

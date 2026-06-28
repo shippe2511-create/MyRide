@@ -1376,11 +1376,14 @@ class DriverState extends ChangeNotifier {
         duration: duration,
       );
 
-      // Clear current ride - don't auto-start queued rides (they need fresh acceptance)
+      // Clear current ride
       _currentRide = null;
-      _queuedRequests.clear(); // Clear any stale queued rides
-
+      _queuedRequests.clear();
       notifyListeners();
+
+      // Check for next active ride assigned to this driver
+      await _checkForActiveRide();
+
       return true;
     } catch (e) {
       debugPrint('completeTrip ERROR: $e');

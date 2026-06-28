@@ -381,7 +381,7 @@ class SupabaseService {
           .select('*, customer:profiles!customer_id(*)')
           .eq('driver_id', driverId)
           .inFilter('status', ['accepted', 'arrived', 'in_progress'])
-          .order('created_at', ascending: false)
+          .order('created_at', ascending: true)  // FIFO: oldest first
           .limit(1)
           .maybeSingle();
       debugPrint('getActiveRideByDriverId result for $driverId: ${response != null ? 'FOUND ride ${response['id']}' : 'NO RIDE FOUND'}');

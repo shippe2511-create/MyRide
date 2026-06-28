@@ -13,6 +13,7 @@ class RealtimeService {
   final SupabaseClient _client = Supabase.instance.client;
   final Map<String, RealtimeChannel> _channels = {};
   final Map<String, StreamController> _controllers = {};
+  final Map<String, int> _reconnectAttempts = {};
 
   // ============ RIDES ============
 
@@ -350,16 +351,27 @@ class RealtimeService {
     debugPrint('All realtime subscriptions disposed');
   }
 
-  /// Auto-reconnect with exponential backoff
+  /// Auto-reconnect with exponential backoff (2s, 4s, 8s, 16s, max 30s)
   void _reconnect(String key, Stream<Map<String, dynamic>> Function() resubscribe) {
-    Future.delayed(const Duration(seconds: 2), () {
+    final attempts = _reconnectAttempts[key] ?? 0;
+    final delaySeconds = (2 * (1 << attempts)).clamp(2, 30);
+    _reconnectAttempts[key] = attempts + 1;
+
+    debugPrint('Reconnect $key in ${delaySeconds}s (attempt ${attempts + 1})');
+
+    Future.delayed(Duration(seconds: delaySeconds), () {
       if (!_controllers.containsKey(key) || (_controllers[key]?.isClosed ?? true)) {
-        return; // Already unsubscribed, don't reconnect
+        _reconnectAttempts.remove(key);
+        return;
       }
       debugPrint('Attempting to reconnect: $key');
       _unsubscribe(key);
       resubscribe();
     });
+  }
+
+  void _resetReconnectAttempts(String key) {
+    _reconnectAttempts.remove(key);
   }
 
   /// Check if a subscription exists

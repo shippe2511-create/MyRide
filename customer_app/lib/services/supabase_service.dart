@@ -311,29 +311,18 @@ class SupabaseService {
 
     debugPrint('cancelRide: rideId=$rideId, userId=$id, reason=$reason');
 
-    try {
-      final result = await client.rpc('update_ride_status', params: {
-        'p_ride_id': rideId,
-        'p_caller_id': id,
-        'p_caller_type': 'customer',
-        'p_new_status': 'cancelled',
-        'p_cancel_reason': reason,
-      });
+    final result = await client.rpc('update_ride_status', params: {
+      'p_ride_id': rideId,
+      'p_caller_id': id,
+      'p_caller_type': 'customer',
+      'p_new_status': 'cancelled',
+      'p_cancel_reason': reason,
+    });
 
-      debugPrint('cancelRide RPC result: $result');
+    debugPrint('cancelRide RPC result: $result');
 
-      if (result != null && result['success'] == false) {
-        throw Exception(result['error'] ?? 'Failed to cancel ride');
-      }
-    } catch (e) {
-      debugPrint('cancelRide RPC failed, using direct update: $e');
-      // Fallback: direct update if RPC fails
-      final result = await client.from('rides').update({
-        'status': 'cancelled',
-        'cancelled_at': DateTime.now().toUtc().toIso8601String(),
-        'cancel_reason': reason ?? 'Cancelled by customer',
-      }).eq('id', rideId).select();
-      debugPrint('cancelRide direct update result: $result');
+    if (result != null && result['success'] == false) {
+      throw Exception(result['error'] ?? 'Failed to cancel ride');
     }
   }
 

@@ -440,40 +440,18 @@ class SupabaseService {
 
     debugPrint('updateRideStatus: rideId=$rideId, status=$status, driverId=$driverId');
 
-    try {
-      final result = await client.rpc('update_ride_status', params: {
-        'p_ride_id': rideId,
-        'p_caller_id': driverId,
-        'p_caller_type': 'driver',
-        'p_new_status': status,
-        'p_cancel_reason': cancelReason,
-      });
+    final result = await client.rpc('update_ride_status', params: {
+      'p_ride_id': rideId,
+      'p_caller_id': driverId,
+      'p_caller_type': 'driver',
+      'p_new_status': status,
+      'p_cancel_reason': cancelReason,
+    });
 
-      debugPrint('updateRideStatus RPC result: $result');
+    debugPrint('updateRideStatus RPC result: $result');
 
-      if (result != null && result['success'] == false) {
-        throw Exception(result['error'] ?? 'Failed to update ride status');
-      }
-    } catch (e) {
-      debugPrint('RPC failed, using direct update: $e');
-      // Fallback: direct update if RPC fails
-      final updateData = <String, dynamic>{
-        'status': status,
-      };
-      if (status == 'arrived') {
-        updateData['arrived_at'] = DateTime.now().toUtc().toIso8601String();
-      } else if (status == 'in_progress') {
-        updateData['started_at'] = DateTime.now().toUtc().toIso8601String();
-      } else if (status == 'completed') {
-        updateData['completed_at'] = DateTime.now().toUtc().toIso8601String();
-      } else if (status == 'cancelled') {
-        updateData['cancelled_at'] = DateTime.now().toUtc().toIso8601String();
-        updateData['cancel_reason'] = cancelReason;
-      }
-
-      debugPrint('Direct update data: $updateData for ride $rideId');
-      final result = await client.from('rides').update(updateData).eq('id', rideId).select();
-      debugPrint('Direct update result: $result');
+    if (result != null && result['success'] == false) {
+      throw Exception(result['error'] ?? 'Failed to update ride status');
     }
   }
 
@@ -485,31 +463,19 @@ class SupabaseService {
 
     debugPrint('completeRide: rideId=$rideId, driverId=$driverId');
 
-    try {
-      final result = await client.rpc('update_ride_status', params: {
-        'p_ride_id': rideId,
-        'p_caller_id': driverId,
-        'p_caller_type': 'driver',
-        'p_new_status': 'completed',
-        'p_distance_km': distanceKm,
-        'p_duration_minutes': durationMinutes,
-      });
+    final result = await client.rpc('update_ride_status', params: {
+      'p_ride_id': rideId,
+      'p_caller_id': driverId,
+      'p_caller_type': 'driver',
+      'p_new_status': 'completed',
+      'p_distance_km': distanceKm,
+      'p_duration_minutes': durationMinutes,
+    });
 
-      debugPrint('completeRide RPC result: $result');
+    debugPrint('completeRide RPC result: $result');
 
-      if (result != null && result['success'] == false) {
-        throw Exception(result['error'] ?? 'Failed to complete ride');
-      }
-    } catch (e) {
-      debugPrint('completeRide RPC failed, using direct update: $e');
-      // Fallback: direct update if RPC fails
-      final result = await client.from('rides').update({
-        'status': 'completed',
-        'completed_at': DateTime.now().toUtc().toIso8601String(),
-        'distance_km': distanceKm,
-        'duration_minutes': durationMinutes,
-      }).eq('id', rideId).select();
-      debugPrint('completeRide direct update result: $result');
+    if (result != null && result['success'] == false) {
+      throw Exception(result['error'] ?? 'Failed to complete ride');
     }
   }
 

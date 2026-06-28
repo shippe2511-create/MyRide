@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:provider/provider.dart';
 import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../widgets/app_snackbar.dart';
+
+const String _supabaseUrl = 'https://lwkndyyfmmrzazdvrsnk.supabase.co';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -26,10 +30,20 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  bool _isValidMaldivesPhone(String phone) {
+    final cleaned = phone.replaceAll(RegExp(r'\D'), '');
+    if (cleaned.startsWith('960')) {
+      final local = cleaned.substring(3);
+      return local.length == 7 && (local.startsWith('7') || local.startsWith('9'));
+    }
+    return cleaned.length == 7 && (cleaned.startsWith('7') || cleaned.startsWith('9'));
+  }
+
   Future<void> _sendOTP() async {
     final phone = _phoneController.text.trim();
-    if (phone.isEmpty || phone.length < 7) {
-      _showError('Please enter a valid phone number');
+
+    if (!_isValidMaldivesPhone(phone)) {
+      _showError('Please enter a valid Maldives phone number (7 digits starting with 7 or 9)');
       return;
     }
 
@@ -37,14 +51,31 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await Future.delayed(const Duration(seconds: 1));
-      setState(() => _otpSent = true);
+      final response = await http.post(
+        Uri.parse('$_supabaseUrl/functions/v1/send-otp'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${SupabaseService.client.auth.currentSession?.accessToken ?? ''}',
+        },
+        body: jsonEncode({
+          'phone': phone,
+          'action': 'send',
+        }),
+      );
 
-      if (mounted) {
-        AppSnackbar.success(context, 'OTP sent to your phone');
+      final result = jsonDecode(response.body);
+
+      if (result['success'] == true) {
+        setState(() => _otpSent = true);
+        if (mounted) {
+          AppSnackbar.success(context, 'OTP sent to your phone');
+        }
+      } else {
+        if (mounted) _showError(result['error'] ?? 'Failed to send OTP');
       }
     } catch (e) {
-      if (mounted) _showError('Failed to send OTP');
+      debugPrint('Send OTP error: $e');
+      if (mounted) _showError('Failed to send OTP. Please try again.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -52,8 +83,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _verifyOTP() async {
     final otp = _otpController.text.trim();
-    if (otp.isEmpty || otp.length < 4) {
-      _showError('Please enter the OTP');
+    if (otp.length != 6) {
+      _showError('Please enter the 6-digit code');
       return;
     }
 
@@ -64,6 +95,24 @@ class _LoginScreenState extends State<LoginScreen> {
       final phone = _phoneController.text.trim();
       final fullPhone = phone.startsWith('+') ? phone : '+960$phone';
 
+      // Verify OTP with server
+      final verifyResponse = await http.post(
+        Uri.parse('$_supabaseUrl/functions/v1/verify-otp'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'phone': phone,
+          'code': otp,
+        }),
+      );
+
+      final verifyResult = jsonDecode(verifyResponse.body);
+      if (verifyResult['success'] != true) {
+        if (mounted) _showError(verifyResult['error'] ?? 'Invalid code');
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // OTP verified - now check if user exists
       final existingUser = await SupabaseService.checkPhoneExists(fullPhone);
 
       if (existingUser != null) {

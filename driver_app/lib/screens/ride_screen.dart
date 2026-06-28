@@ -981,35 +981,34 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
 
                     const Spacer(),
 
-                    // Seats indicator
-                    if (state.hasAvailableSeats)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.7),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppColors.success.withValues(alpha: 0.5)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.event_seat, color: AppColors.success, size: 14),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${state.availableSeats}',
-                              style: const TextStyle(
-                                color: AppColors.success,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
+                    // Seats booked indicator
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.yellow.withValues(alpha: 0.5)),
                       ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.event_seat, color: AppColors.yellow, size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${state.seatsBooked}',
+                            style: const TextStyle(
+                              color: AppColors.yellow,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
-                    // New ride button
-                    if (state.incomingRequests.isNotEmpty && state.hasAvailableSeats)
+                    // New ride button (for pooling - hidden for now)
+                    if (false && state.incomingRequests.isNotEmpty && state.hasAvailableSeats)
                       GestureDetector(
                         onTap: () => _showNewRequestSheet(state, state.incomingRequests.first),
                         child: Container(

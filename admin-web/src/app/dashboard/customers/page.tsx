@@ -23,7 +23,7 @@ function useCustomersData(search?: string, status?: string, page: number = 1) {
       let query = supabase
         .from("profiles")
         .select("*", { count: "exact" })
-        .in("role", ["customer", "super-admin", "admin", "operator", "support", "viewer"])
+        .in("role", ["customer", "super-admin", "admin"])
         .order("created_at", { ascending: false })
 
       if (search) {
@@ -38,10 +38,10 @@ function useCustomersData(search?: string, status?: string, page: number = 1) {
 
       const [{ data: customers, count }, totalRes, approvedRes, pendingRes, suspendedRes] = await Promise.all([
         query,
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer"),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer").eq("status", "approved"),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer").eq("status", "pending"),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer").eq("status", "suspended"),
+        supabase.from("profiles").select("*", { count: "exact", head: true }).in("role", ["customer", "super-admin", "admin"]),
+        supabase.from("profiles").select("*", { count: "exact", head: true }).in("role", ["customer", "super-admin", "admin"]).eq("status", "approved"),
+        supabase.from("profiles").select("*", { count: "exact", head: true }).in("role", ["customer", "super-admin", "admin"]).eq("status", "pending"),
+        supabase.from("profiles").select("*", { count: "exact", head: true }).in("role", ["customer", "super-admin", "admin"]).eq("status", "suspended"),
       ])
 
       return {

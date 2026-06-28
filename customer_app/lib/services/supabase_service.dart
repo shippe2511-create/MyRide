@@ -76,11 +76,8 @@ class SupabaseService {
       data['email'] = email;
     }
 
-    // Use upsert to handle existing records - update if phone or employee_id exists
-    final response = await client.from('profiles').upsert(
-      data,
-      onConflict: 'employee_id',
-    ).select().single();
+    // Insert new profile
+    final response = await client.from('profiles').insert(data).select().single();
     return response;
   }
 
@@ -197,7 +194,8 @@ class SupabaseService {
     String? pickupLocationId,
     String? dropoffLocationId,
     DateTime? scheduledTime,
-    String? customerId, // Can be passed from AppState.profileId
+    String? customerId,
+    int seatsBooked = 1,
   }) async {
     // Priority: passed customerId > auth user > lookup by stored profile
     String? finalCustomerId = customerId ?? currentUser?.id;
@@ -223,6 +221,7 @@ class SupabaseService {
       'pickup_location_id': pickupLocationId,
       'dropoff_location_id': dropoffLocationId,
       'scheduled_time': scheduledTime?.toIso8601String(),
+      'seats_booked': seatsBooked,
       'status': 'pending',
     }).select().single();
     return response;
@@ -1888,134 +1887,4 @@ class SupabaseService {
     }
   }
 
-  // =====================================================
-  // POOL RIDE METHODS
-  // =====================================================
-
-  /// Get available pool vehicles with seats
-  static Future<List<Map<String, dynamic>>> getAvailablePoolVehicles() async {
-    try {
-      final result = await client.rpc('get_available_pool_vehicles');
-      return List<Map<String, dynamic>>.from(result);
-    } catch (e) {
-      debugPrint('Error getting pool vehicles: $e');
-      return [];
-    }
-  }
-
-  /// Find best vehicle for a pool ride
-  static Future<Map<String, dynamic>> findBestPoolVehicle({
-    required double pickupLat,
-    required double pickupLng,
-    required double dropoffLat,
-    required double dropoffLng,
-    required int seatsNeeded,
-  }) async {
-    try {
-      final result = await client.rpc('find_best_vehicle', params: {
-        'p_pickup_lat': pickupLat,
-        'p_pickup_lng': pickupLng,
-        'p_dropoff_lat': dropoffLat,
-        'p_dropoff_lng': dropoffLng,
-        'p_seats_needed': seatsNeeded,
-      });
-      return Map<String, dynamic>.from(result);
-    } catch (e) {
-      debugPrint('Error finding best vehicle: $e');
-      return {'success': false, 'error': e.toString()};
-    }
-  }
-
-  /// Book seats on a pool trip
-  static Future<Map<String, dynamic>> bookPoolSeats({
-    required String tripId,
-    required int seats,
-    required double pickupLat,
-    required double pickupLng,
-    required String pickupName,
-    required double dropoffLat,
-    required double dropoffLng,
-    required String dropoffName,
-  }) async {
-    final customerId = userId;
-    if (customerId == null) {
-      return {'success': false, 'error': 'Not logged in'};
-    }
-
-    try {
-      final result = await client.rpc('book_pool_seats', params: {
-        'p_trip_id': tripId,
-        'p_customer_id': customerId,
-        'p_seats': seats,
-        'p_pickup_lat': pickupLat,
-        'p_pickup_lng': pickupLng,
-        'p_pickup_name': pickupName,
-        'p_dropoff_lat': dropoffLat,
-        'p_dropoff_lng': dropoffLng,
-        'p_dropoff_name': dropoffName,
-      });
-      return Map<String, dynamic>.from(result);
-    } catch (e) {
-      debugPrint('Error booking pool seats: $e');
-      return {'success': false, 'error': e.toString()};
-    }
-  }
-
-  /// Cancel a pool booking
-  static Future<Map<String, dynamic>> cancelPoolBooking(String bookingId) async {
-    try {
-      final result = await client.rpc('cancel_pool_booking', params: {
-        'p_booking_id': bookingId,
-      });
-      return Map<String, dynamic>.from(result);
-    } catch (e) {
-      debugPrint('Error cancelling pool booking: $e');
-      return {'success': false, 'error': e.toString()};
-    }
-  }
-
-  /// Get customer's active pool bookings
-  static Future<List<Map<String, dynamic>>> getMyPoolBookings() async {
-    final customerId = userId;
-    if (customerId == null) return [];
-
-    try {
-      final result = await client
-          .from('pool_bookings')
-          .select('''
-            *,
-            trip:pooled_trips!pool_bookings_trip_id_fkey(
-              id, total_seats, available_seats, status,
-              vehicle:vehicles!pooled_trips_vehicle_id_fkey(vehicle_number, vehicle_model),
-              driver:drivers!pooled_trips_driver_id_fkey(
-                profile:profiles!drivers_profile_id_fkey(full_name, phone)
-              )
-            )
-          ''')
-          .eq('customer_id', customerId)
-          .neq('status', 'dropped')
-          .neq('status', 'cancelled')
-          .order('created_at', ascending: false);
-
-      return List<Map<String, dynamic>>.from(result);
-    } catch (e) {
-      debugPrint('Error getting pool bookings: $e');
-      return [];
-    }
-  }
-
-  /// Subscribe to pool vehicle updates
-  static RealtimeChannel subscribeToPoolVehicles(Function(Map<String, dynamic>) onUpdate) {
-    return client
-        .channel('pool_vehicles_live')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'pooled_trips',
-          callback: (payload) {
-            onUpdate(payload.newRecord);
-          },
-        )
-        .subscribe();
-  }
 }

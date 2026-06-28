@@ -20,6 +20,7 @@ class RideRequest {
   final int estimatedDuration;
   final double? fare;
   final RideStatus status;
+  final int seatsBooked;
 
   RideRequest({
     required this.id,
@@ -43,11 +44,12 @@ class RideRequest {
     required this.estimatedDuration,
     this.fare,
     this.status = RideStatus.pending,
+    this.seatsBooked = 1,
   });
 
   bool get isScheduled => scheduledTime != null;
 
-  RideRequest copyWith({RideStatus? status, double? customerRating, int? tripsTogether}) {
+  RideRequest copyWith({RideStatus? status, double? customerRating, int? tripsTogether, int? seatsBooked}) {
     return RideRequest(
       id: id,
       customerId: customerId,
@@ -70,6 +72,7 @@ class RideRequest {
       estimatedDuration: estimatedDuration,
       fare: fare,
       status: status ?? this.status,
+      seatsBooked: seatsBooked ?? this.seatsBooked,
     );
   }
 }

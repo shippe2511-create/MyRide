@@ -11,13 +11,12 @@ import '../widgets/status_toggle.dart';
 import '../widgets/ride_request_popup.dart';
 import '../widgets/break_timer.dart';
 import '../widgets/app_snackbar.dart';
-import '../services/supabase_service.dart';
 import 'vehicle_checklist_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
 import 'ride_screen.dart';
 import 'chat_screen.dart';
-import 'pool_trip_screen.dart';
+import '../services/supabase_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -91,22 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _checkForActiveRide() {
-    if (!mounted) return;
-    final state = context.read<DriverState>();
-    debugPrint('Checking for active ride: hasActiveRide=${state.hasActiveRide}, currentRide=${state.currentRide?.id}');
-    // Auto-navigate to ride screen if there's an active ride
-    if (state.hasActiveRide && !_hasNavigatedToActiveRide) {
-      _hasNavigatedToActiveRide = true;
-      debugPrint('Auto-navigating to RideScreen for active ride');
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const RideScreen()),
-          );
-        }
-      });
-    }
+    // Driver accepts rides via popup - no auto-navigation needed
   }
 
   void _onTabChanged(int index) {
@@ -655,105 +639,52 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
-        // Pool Ride Mode card
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-          child: GestureDetector(
-            onTap: () => _startPoolMode(context, state),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [const Color(0xFF22C55E).withValues(alpha: 0.15), const Color(0xFF22C55E).withValues(alpha: 0.05)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+        // Waiting for rides view
+        ...[
+          const SizedBox(height: 24),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(
+                    Icons.search,
+                    size: 32,
+                    color: AppColors.success,
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF22C55E).withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF22C55E),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(Icons.event_seat, color: Colors.white, size: 26),
+                const SizedBox(height: 12),
+                Text(
+                  'Looking for Rides',
+                  style: TextStyle(
+                    color: context.textColor,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Start Pool Mode',
-                          style: TextStyle(
-                            color: context.textColor,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Pick up multiple passengers along your route',
-                          style: TextStyle(color: context.mutedColor, fontSize: 12),
-                        ),
-                      ],
+                ),
+                const SizedBox(height: 4),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  child: Text(
+                    'You\'ll be notified when a staff member requests a ride',
+                    style: TextStyle(
+                      color: context.mutedColor,
+                      fontSize: 13,
                     ),
+                    textAlign: TextAlign.center,
                   ),
-                  Icon(Icons.arrow_forward_ios, color: context.mutedColor, size: 16),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ),
-
-        // Waiting view - centered
-        const SizedBox(height: 24),
-        Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: AppColors.success.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  Icons.search,
-                  size: 32,
-                  color: AppColors.success,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Looking for Rides',
-                style: TextStyle(
-                  color: context.textColor,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
-                child: Text(
-                  'You\'ll be notified when a staff member requests a ride',
-                  style: TextStyle(
-                    color: context.mutedColor,
-                    fontSize: 13,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
+          const SizedBox(height: 24),
+        ],
 
         // End Shift Button
         Padding(
@@ -1013,7 +944,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Container(width: 1, height: 40, color: context.borderColor),
                     _buildShiftStat('Hours', '${(state.todayTrips * 0.5).toStringAsFixed(1)}', AppColors.info),
                     Container(width: 1, height: 40, color: context.borderColor),
-                    _buildShiftStat('Rating', '${state.rating}', AppColors.warning),
+                    _buildShiftStat('Rating', state.rating.toStringAsFixed(1), AppColors.warning),
                   ],
                 ),
               ),
@@ -1390,70 +1321,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
-  }
-
-  Future<void> _startPoolMode(BuildContext context, DriverState state) async {
-    final driverId = state.driverId;
-
-    if (driverId.isEmpty) {
-      AppSnackbar.error(context, 'Driver info missing');
-      return;
-    }
-
-    // Get vehicle ID from database
-    final vehicleData = await SupabaseService.client
-        .from('vehicles')
-        .select('id')
-        .eq('driver_id', driverId)
-        .maybeSingle();
-
-    final vehicleId = vehicleData?['id'] as String?;
-    if (vehicleId == null) {
-      AppSnackbar.error(context, 'No vehicle assigned');
-      return;
-    }
-
-    // Check for existing active pool trip
-    final existingTrip = await SupabaseService.getActivePoolTrip(driverId);
-    if (existingTrip != null) {
-      // Navigate to existing trip
-      if (!mounted) return;
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PoolTripScreen(
-            tripId: existingTrip['id'],
-            vehicleNumber: existingTrip['vehicle']?['vehicle_number'] ?? 'Vehicle',
-          ),
-        ),
-      );
-      return;
-    }
-
-    // Start new pool trip
-    HapticFeedback.heavyImpact();
-    final result = await SupabaseService.startPoolTrip(vehicleId, driverId);
-
-    if (result['success'] == true) {
-      final tripId = result['trip_id'];
-      final totalSeats = result['total_seats'];
-
-      if (!mounted) return;
-      AppSnackbar.success(context, 'Pool trip started with $totalSeats seats');
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PoolTripScreen(
-            tripId: tripId,
-            vehicleNumber: state.vehicleNumber,
-          ),
-        ),
-      );
-    } else {
-      if (!mounted) return;
-      AppSnackbar.error(context, result['error'] ?? 'Failed to start pool trip');
-    }
   }
 
   void _showSOSDialog(BuildContext context) {

@@ -87,7 +87,6 @@ const navigationSections: NavSection[] = [
     permission: "rides:view",
     items: [
       { name: "Rides", href: "/dashboard/rides", icon: MapPin, permission: "rides:view" },
-      { name: "Pool Rides", href: "/dashboard/pool-rides", icon: Armchair, permission: "rides:view" },
       { name: "Live Tracking", href: "/dashboard/tracking", icon: Radio, permission: "tracking:view" },
       { name: "Push to Talk", href: "/dashboard/push-to-talk", icon: Mic, permission: "settings:view" },
       { name: "Schedules", href: "/dashboard/scheduling", icon: Calendar, permission: "schedules:view" },

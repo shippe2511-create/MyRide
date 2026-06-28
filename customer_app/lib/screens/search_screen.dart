@@ -14,6 +14,7 @@ import '../widgets/app_snackbar.dart';
 import '../services/supabase_service.dart';
 import '../services/location_service.dart';
 import 'driver_matching_screen.dart';
+import 'ride_confirm_screen.dart';
 
 const String _googleApiKey = 'AIzaSyBZ7HVy2dUvTCC5SZkz0MaFCBON2QorFbI';
 
@@ -508,10 +509,9 @@ class _SearchScreenState extends State<SearchScreen> {
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
-                                              builder: (_) => DriverMatchingScreen(
+                                              builder: (_) => RideConfirmScreen(
                                                 pickup: _pickupName,
                                                 dropoff: details['name'],
-                                                rideType: 'Standard',
                                                 pickupLat: pickupLat,
                                                 pickupLng: pickupLng,
                                                 dropoffLat: details['lat'],
@@ -522,11 +522,18 @@ class _SearchScreenState extends State<SearchScreen> {
                                         }
                                       }
                                     } else {
+                                      // Non-place result - use current location
+                                      final freshLoc = await LocationService.getCurrentLocation();
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (_) => NearbyScreen(
-                                            destination: '${result['title']} · ${result['subtitle']}',
+                                          builder: (_) => RideConfirmScreen(
+                                            pickup: 'Current location',
+                                            dropoff: '${result['title']} · ${result['subtitle']}',
+                                            pickupLat: freshLoc.latitude,
+                                            pickupLng: freshLoc.longitude,
+                                            dropoffLat: 4.1755,
+                                            dropoffLng: 73.5093,
                                           ),
                                         ),
                                       );
@@ -732,11 +739,19 @@ class _SearchScreenState extends State<SearchScreen> {
                       const SizedBox(height: 16),
                       PrimaryButton(
                         text: 'Confirm location',
-                        onPressed: () {
+                        onPressed: () async {
                           Navigator.pop(ctx);
+                          final freshLoc = await LocationService.getCurrentLocation();
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => NearbyScreen(destination: locationName)),
+                            MaterialPageRoute(builder: (_) => RideConfirmScreen(
+                              pickup: 'Current location',
+                              dropoff: locationName,
+                              pickupLat: freshLoc.latitude,
+                              pickupLng: freshLoc.longitude,
+                              dropoffLat: selectedLocation.latitude,
+                              dropoffLng: selectedLocation.longitude,
+                            )),
                           );
                         },
                       ),
@@ -1118,12 +1133,20 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildSavedPlaceCard(Map<String, dynamic> place, int index, bool isDark) {
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
         HapticFeedback.mediumImpact();
+        final freshLoc = await LocationService.getCurrentLocation();
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => NearbyScreen(destination: place['address']),
+            builder: (context) => RideConfirmScreen(
+              pickup: 'Current location',
+              dropoff: place['address'],
+              pickupLat: freshLoc.latitude,
+              pickupLng: freshLoc.longitude,
+              dropoffLat: place['lat'] ?? 4.1755,
+              dropoffLng: place['lng'] ?? 73.5093,
+            ),
           ),
         );
       },
@@ -1324,12 +1347,20 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildRecentPlaceItem(Map<String, dynamic> place, bool isDark, {bool isLast = false}) {
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
         HapticFeedback.lightImpact();
+        final freshLoc = await LocationService.getCurrentLocation();
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => NearbyScreen(destination: place['address']),
+            builder: (context) => RideConfirmScreen(
+              pickup: 'Current location',
+              dropoff: place['address'],
+              pickupLat: freshLoc.latitude,
+              pickupLng: freshLoc.longitude,
+              dropoffLat: place['lat'] ?? 4.1755,
+              dropoffLng: place['lng'] ?? 73.5093,
+            ),
           ),
         );
       },
@@ -2095,383 +2126,6 @@ class _SearchScreenState extends State<SearchScreen> {
           );
         },
       ),
-    );
-  }
-}
-
-class NearbyScreen extends StatefulWidget {
-  final String destination;
-
-  const NearbyScreen({super.key, this.destination = 'International Airport · T3'});
-
-  @override
-  State<NearbyScreen> createState() => _NearbyScreenState();
-}
-
-class _NearbyScreenState extends State<NearbyScreen> with SingleTickerProviderStateMixin {
-  GoogleMapController? _mapController;
-  LatLng _currentLocation = const LatLng(4.1755, 73.5093);
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
-
-  List<LatLng> _vehicleLocations = [];
-  bool _loadingDrivers = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadCurrentLocation();
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    )..repeat(reverse: true);
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 2.5).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-    _loadNearbyDrivers();
-  }
-
-  Future<void> _loadCurrentLocation() async {
-    final loc = await LocationService.getCurrentLocation();
-    if (mounted) setState(() => _currentLocation = LatLng(loc.latitude, loc.longitude));
-  }
-
-  Future<void> _loadNearbyDrivers() async {
-    try {
-      final drivers = await SupabaseService.getOnlineDriverLocations();
-      if (mounted) {
-        setState(() {
-          _vehicleLocations = drivers
-              .map((d) => LatLng(d['lat'] as double, d['lng'] as double))
-              .toList();
-          _loadingDrivers = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading nearby drivers: $e');
-      if (mounted) setState(() => _loadingDrivers = false);
-    }
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = context.isDark;
-
-    return Scaffold(
-      backgroundColor: context.bgColor,
-      body: Stack(
-        children: [
-          GoogleMap(
-            initialCameraPosition: CameraPosition(target: _currentLocation, zoom: 15),
-            onMapCreated: (controller) => _mapController = controller,
-            markers: {
-              Marker(
-                markerId: const MarkerId('user'),
-                position: _currentLocation,
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
-              ),
-              ..._vehicleLocations.asMap().entries.map((entry) => Marker(
-                markerId: MarkerId('vehicle_${entry.key}'),
-                position: entry.value,
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-              )),
-            },
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: false,
-            mapToolbarEnabled: false,
-            style: isDark ? _darkMapStyle : null,
-          ),
-          _buildHeader(context, isDark),
-          _buildCountPill(isDark),
-          _buildBottomSheet(context, isDark),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context, bool isDark) {
-    return Positioned(
-      top: 56,
-      left: 16,
-      right: 16,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _buildRoundButton(Icons.arrow_back_ios_new, isDark, context, onTap: () => Navigator.pop(context)),
-          _buildRoundButton(Icons.shield_outlined, isDark, context, color: AppColors.yellow, onTap: () => _showSafetyInfo(context, isDark)),
-        ],
-      ),
-    );
-  }
-
-  void _showSafetyInfo(BuildContext context, bool isDark) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: context.surfaceColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.yellowSoft,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Icon(Icons.shield, color: AppColors.yellow, size: 32),
-            ),
-            const SizedBox(height: 16),
-            Text('Safety Features', style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 16),
-            _buildSafetyItem(context, Icons.share_location, 'Share trip with contacts'),
-            _buildSafetyItem(context, Icons.phone, 'Emergency call button'),
-            _buildSafetyItem(context, Icons.verified_user, 'Verified drivers only'),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSafetyItem(BuildContext context, IconData icon, String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.yellow, size: 24),
-          const SizedBox(width: 16),
-          Text(text, style: TextStyle(color: context.textColor, fontSize: 15)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCountPill(bool isDark) {
-    return Positioned(
-      top: 120,
-      left: 0,
-      right: 0,
-      child: Center(
-        child: GlassContainer(
-          borderRadius: BorderRadius.circular(99),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-          backgroundColor: isDark ? const Color(0xB8141416) : const Color(0xE8FFFFFF),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: AppColors.yellow,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Builder(
-                builder: (context) => Text(
-                  '${_vehicleLocations.length} vehicle${_vehicleLocations.length == 1 ? '' : 's'} near you',
-                  style: TextStyle(
-                    color: context.textColor,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRoundButton(IconData icon, bool isDark, BuildContext context, {Color? color, VoidCallback? onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xB8141416) : const Color(0xB8FFFFFF),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1)),
-        ),
-        child: Icon(icon, color: color ?? context.textColor, size: 20),
-      ),
-    );
-  }
-
-  Widget _buildBottomSheet(BuildContext context, bool isDark) {
-    return Positioned(
-      left: 8,
-      right: 8,
-      bottom: 8,
-      child: GlassContainer(
-        borderRadius: BorderRadius.circular(32),
-        backgroundColor: isDark ? const Color(0xB8141416) : const Color(0xE8FFFFFF),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(99),
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'Vehicles near you',
-              style: TextStyle(
-                color: context.textColor,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.4,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'No need to pick — request and we\'ll assign the nearest available vehicle.',
-              style: TextStyle(color: context.mutedColor, fontSize: 13, height: 1.45),
-            ),
-            const SizedBox(height: 14),
-            _buildTripSummary(isDark, context),
-            const SizedBox(height: 12),
-            _buildStaffRow(isDark, context),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              height: 58,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => DriverMatchingScreen(
-                        pickup: 'Current location',
-                        dropoff: widget.destination,
-                        rideType: 'Staff Car',
-                        pickupLat: _currentLocation.latitude,
-                        pickupLng: _currentLocation.longitude,
-                        dropoffLat: 4.1755, // Default destination
-                        dropoffLng: 73.5093,
-                      ),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.yellow,
-                  foregroundColor: AppColors.bgDark,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                ),
-                child: Text(
-                  'Request nearest ride',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTripSummary(bool isDark, BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.03),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.07)),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: AppColors.yellow,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Current location',
-                style: TextStyle(color: context.textColor, fontSize: 13.5, fontWeight: FontWeight.w500),
-              ),
-            ],
-          ),
-          Container(
-            width: 2,
-            height: 14,
-            margin: const EdgeInsets.only(left: 4, top: 2, bottom: 2),
-            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.14),
-          ),
-          Row(
-            children: [
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: context.textColor,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  widget.destination,
-                  style: TextStyle(color: context.textColor, fontSize: 13.5, fontWeight: FontWeight.w500),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStaffRow(bool isDark, BuildContext context) {
-    final appState = Provider.of<AppState>(context);
-    return Row(
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(11),
-          ),
-          child: Icon(Icons.shield_outlined, color: AppColors.yellow, size: 18),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          'Staff trip',
-          style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600),
-        ),
-        const Spacer(),
-        Text('Staff ID · ${appState.staffId}', style: TextStyle(color: context.mutedColor, fontSize: 13)),
-      ],
     );
   }
 }

@@ -112,6 +112,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (!mounted) return;
       try {
         final appState = Provider.of<AppState>(context, listen: false);
+        if (appState.profileId == null) return;
+
         final rides = await SupabaseService.getMyScheduledRides(appState.profileId);
 
         if (rides.isEmpty) {

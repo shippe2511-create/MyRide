@@ -62,11 +62,11 @@ class DriverState extends ChangeNotifier {
   List<Map<String, dynamic>> get dutyRoster => _dutyRoster;
   List<Map<String, dynamic>> get weekShifts => _weekShifts;
 
-  // Seat management for shared rides
-  int _totalSeats = 8; // Van capacity
+  // Seat management for rides
+  int _totalSeats = 6; // Vehicle capacity
   int get totalSeats => _totalSeats;
-  int get usedSeats => (_currentRide != null ? 1 : 0) + _queuedRequests.length;
-  int get availableSeats => _totalSeats - usedSeats;
+  int get seatsBooked => _currentRide?.seatsBooked ?? 1;
+  int get availableSeats => _totalSeats - seatsBooked;
   bool get hasAvailableSeats => availableSeats > 0;
 
   DriverState() {
@@ -550,20 +550,7 @@ class DriverState extends ChangeNotifier {
     }
     _startLocationTracking();
 
-    // Check for active ride FIRST before subscribing to new rides
-    await _checkForActiveRide();
-
-    // Only look for new rides if no active ride
-    debugPrint('hasActiveRide=$hasActiveRide, will subscribe=${!hasActiveRide}');
-    if (!hasActiveRide) {
-      _subscribeToRideRequests();
-      _loadPendingRides();
-      _startRidePolling();
-    } else {
-      debugPrint('Skipping ride subscription - has active ride');
-    }
-
-    debugPrint('goOnline complete: hasActiveRide=$hasActiveRide, currentRide=${_currentRide?.id}');
+    debugPrint('goOnline: Unified pool system active');
     notifyListeners();
 
     // Update Supabase
@@ -573,6 +560,12 @@ class DriverState extends ChangeNotifier {
         isOnline: true,
         isOnBreak: false,
       );
+
+      // Subscribe to ride requests
+      _subscribeToRideRequests();
+
+      // Start polling for pending rides
+      _startRidePolling();
     }
   }
 
@@ -624,6 +617,7 @@ class DriverState extends ChangeNotifier {
                   status == 'arrived' ? RideStatus.arrivedAtPickup :
                   status == 'in_progress' ? RideStatus.inProgress : RideStatus.accepted,
           requestTime: DateTime.tryParse(activeRide['created_at'] ?? '') ?? DateTime.now(),
+          seatsBooked: (activeRide['seats_booked'] as num?)?.toInt() ?? 1,
         );
 
         debugPrint('Restored active ride: ${_currentRide?.id}');
@@ -1066,6 +1060,7 @@ class DriverState extends ChangeNotifier {
         estimatedDistance: (ride['distance_km'] as num?)?.toDouble() ?? 5.0,
         estimatedDuration: (ride['duration_minutes'] as num?)?.toInt() ?? 15,
         status: status,
+        seatsBooked: (ride['seats_booked'] as num?)?.toInt() ?? 1,
       );
     } catch (e) {
       debugPrint('Error converting ride: $e');

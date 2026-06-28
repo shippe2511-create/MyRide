@@ -36,6 +36,7 @@ class DriverMatchingScreen extends StatefulWidget {
   final double pickupLng;
   final double dropoffLat;
   final double dropoffLng;
+  final int seatsBooked;
 
   const DriverMatchingScreen({
     super.key,
@@ -46,6 +47,7 @@ class DriverMatchingScreen extends StatefulWidget {
     required this.pickupLng,
     required this.dropoffLat,
     required this.dropoffLng,
+    this.seatsBooked = 1,
   });
 
   @override
@@ -241,28 +243,25 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
         }
       }
 
-      final ride = await SupabaseService.createRide(
+      // Create ride request in database
+      final rideData = await SupabaseService.createRide(
+        customerId: customerId,
         pickupName: widget.pickup,
-        dropoffName: widget.dropoff,
         pickupLat: validPickupLat,
         pickupLng: validPickupLng,
+        dropoffName: widget.dropoff,
         dropoffLat: widget.dropoffLat,
         dropoffLng: widget.dropoffLng,
-        customerId: customerId,
       );
-      _rideId = ride['id'];
-      debugPrint('Ride created: $_rideId');
 
-      // Subscribe to chat notifications for this ride
-      if (customerId != null) {
-        NotificationService.subscribeToChatMessages(_rideId!, customerId);
+      if (rideData != null) {
+        _rideId = rideData['id'];
+        debugPrint('Ride request created: $_rideId');
+        _startStatusPolling();
+      } else {
+        debugPrint('Failed to create ride');
+        if (mounted) Navigator.pop(context);
       }
-
-      // Subscribe to ride status updates
-      _subscribeToRideUpdates();
-
-      // Also poll as backup (realtime may not work without auth)
-      _startStatusPolling();
     } catch (e) {
       debugPrint('Error creating ride: $e');
     }

@@ -532,10 +532,8 @@ class _RideRequestPopupState extends State<RideRequestPopup>
           _buildStatCard(Icons.timer_rounded, '${widget.request.estimatedDuration}', 'MIN'),
           const SizedBox(width: 12),
           _buildStatCard(Icons.straighten_rounded, '${widget.request.estimatedDistance}', 'KM'),
-          if (widget.request.fare != null) ...[
-            const SizedBox(width: 12),
-            _buildStatCard(Icons.payments_rounded, '\$${widget.request.fare!.toStringAsFixed(0)}', 'FARE'),
-          ],
+          const SizedBox(width: 12),
+          _buildStatCard(Icons.event_seat_rounded, '${widget.request.seatsBooked}', 'SEATS'),
         ],
       ),
     );

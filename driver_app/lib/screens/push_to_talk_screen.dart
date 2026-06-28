@@ -52,6 +52,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
+    _service.initialize();
     _loadMessages();
     _subscribeToNewMessages();
     _startPolling();
@@ -79,7 +80,13 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
       setState(() {
         _messages.insert(0, message);
       });
-      HapticFeedback.mediumImpact();
+      HapticFeedback.heavyImpact();
+
+      // Show notification if message is from admin
+      final senderType = message['sender_type'] as String?;
+      if (senderType == 'admin' && mounted) {
+        AppSnackbar.info(context, 'New voice message from dispatch');
+      }
     });
 
     // Also listen for deleted messages

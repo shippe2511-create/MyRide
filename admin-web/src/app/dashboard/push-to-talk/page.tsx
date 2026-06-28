@@ -242,7 +242,7 @@ export default function PushToTalkPage() {
   }
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop()
       setIsRecording(false)
       if (recordingIntervalRef.current) {
@@ -607,24 +607,24 @@ export default function PushToTalkPage() {
                       }}
                       onMouseUp={(e) => {
                         e.preventDefault()
-                        if (isRecording) {
+                        if (mediaRecorderRef.current?.state === 'recording') {
                           stopRecording()
                         }
                       }}
                       onMouseLeave={() => {
-                        if (isRecording) {
+                        if (mediaRecorderRef.current?.state === 'recording') {
                           stopRecording()
                         }
                       }}
                       onTouchStart={(e) => {
                         e.preventDefault()
-                        if (settings?.feature_enabled && !isRecording) {
+                        if (settings?.feature_enabled && mediaRecorderRef.current?.state !== 'recording') {
                           startRecording()
                         }
                       }}
                       onTouchEnd={(e) => {
                         e.preventDefault()
-                        if (isRecording) {
+                        if (mediaRecorderRef.current?.state === 'recording') {
                           stopRecording()
                         }
                       }}

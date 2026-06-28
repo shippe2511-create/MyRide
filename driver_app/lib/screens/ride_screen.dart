@@ -14,6 +14,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/notification_service.dart';
 import '../services/realtime_service.dart';
 import '../widgets/app_snackbar.dart';
+import '../widgets/ride_request_popup.dart';
 import 'chat_screen.dart';
 
 const String _darkMapStyle = '''
@@ -1171,6 +1172,30 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                   ),
                 ),
               ),
+
+              // Show new ride request popup while on active trip
+              if (state.incomingRequests.isNotEmpty)
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black.withValues(alpha: 0.7),
+                    child: Center(
+                      child: RideRequestPopup(
+                        key: ValueKey(state.incomingRequests.first.id),
+                        request: state.incomingRequests.first,
+                        onAccept: () async {
+                          final request = state.incomingRequests.first;
+                          final result = await state.acceptRide(request);
+                          if (result['success'] != true && mounted) {
+                            AppSnackbar.warning(context, result['error'] ?? 'Ride was taken by another driver');
+                          }
+                        },
+                        onDecline: () {
+                          state.expireRide(state.incomingRequests.first);
+                        },
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         );

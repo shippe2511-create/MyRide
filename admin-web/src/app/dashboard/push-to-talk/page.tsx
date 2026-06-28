@@ -127,9 +127,23 @@ export default function PushToTalkPage() {
       fetchMessages()
     }, 5000)
 
+    // Global mouseup/touchend to catch release outside button
+    const handleGlobalRelease = () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop()
+        if (recordingIntervalRef.current) {
+          clearInterval(recordingIntervalRef.current)
+        }
+      }
+    }
+    window.addEventListener('mouseup', handleGlobalRelease)
+    window.addEventListener('touchend', handleGlobalRelease)
+
     return () => {
       supabase.removeChannel(channel)
       clearInterval(pollInterval)
+      window.removeEventListener('mouseup', handleGlobalRelease)
+      window.removeEventListener('touchend', handleGlobalRelease)
       if (audioRef.current) {
         audioRef.current.pause()
       }
@@ -155,7 +169,7 @@ export default function PushToTalkPage() {
       .from("voice_messages")
       .select(`
         *,
-        sender:profiles!voice_messages_sender_id_fkey(full_name)
+        sender:profiles!sender_id(full_name)
       `)
       .order("created_at", { ascending: false })
       .limit(50)
@@ -205,11 +219,12 @@ export default function PushToTalkPage() {
       }
 
       mediaRecorder.onstop = async () => {
+        console.log("Recording stopped, sending message...")
         stream.getTracks().forEach(track => track.stop())
         await sendVoiceMessage()
       }
 
-      mediaRecorder.start()
+      mediaRecorder.start(100) // Collect data every 100ms for immediate availability
       setIsRecording(true)
       setRecordingDuration(0)
 
@@ -240,7 +255,11 @@ export default function PushToTalkPage() {
   }
 
   const sendVoiceMessage = async () => {
-    if (audioChunksRef.current.length === 0) return
+    console.log("sendVoiceMessage called, chunks:", audioChunksRef.current.length)
+    if (audioChunksRef.current.length === 0) {
+      console.log("No audio chunks, skipping")
+      return
+    }
 
     const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" })
     const fileName = `voice_${Date.now()}.webm`

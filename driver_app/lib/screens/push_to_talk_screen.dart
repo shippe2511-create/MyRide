@@ -185,7 +185,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
         'duration_seconds': _recordingDuration,
       });
 
-      _showSnackBar('Message sent to dispatch');
+      // Message sent successfully
 
       // Clean up temp file
       await file.delete();
@@ -570,42 +570,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
       ),
     );
 
-    if (!isOwnMessage) return card;
-
-    return Dismissible(
-      key: Key(message['id']),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: Colors.red,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        child: const Icon(Icons.delete, color: Colors.white, size: 28),
-      ),
-      confirmDismiss: (direction) async {
-        return await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF1A1A2E),
-            title: const Text('Delete Message', style: TextStyle(color: Colors.white)),
-            content: const Text('Are you sure?', style: TextStyle(color: Colors.white70)),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
-                child: const Text('Delete'),
-              ),
-            ],
-          ),
-        ) ?? false;
-      },
-      onDismissed: (direction) => _deleteMessage(message['id']),
-      child: card,
-    );
+    return card;
   }
 
   Widget _buildRecordingArea() {

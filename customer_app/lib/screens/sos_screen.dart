@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
@@ -18,6 +19,7 @@ class SOSScreen extends StatefulWidget {
 class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   bool _sosActivated = false;
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   List<Map<String, dynamic>> _emergencyContacts = [
     {'name': 'Police', 'number': '119', 'icon': Icons.local_police_outlined},
@@ -65,7 +67,40 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
   @override
   void dispose() {
     _pulseController.dispose();
+    _audioPlayer.dispose();
     super.dispose();
+  }
+
+  Future<void> _playSOSSound() async {
+    try {
+      // Use URL source for a standard alarm tone
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      // Play system-like alarm using a publicly available alarm sound
+      await _audioPlayer.play(UrlSource('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3'));
+    } catch (e) {
+      debugPrint('Error playing SOS sound: $e');
+      // Fallback: continuous haptic feedback
+      _startHapticAlarm();
+    }
+  }
+
+  bool _hapticAlarmActive = false;
+
+  void _startHapticAlarm() async {
+    _hapticAlarmActive = true;
+    while (_hapticAlarmActive && _sosActivated) {
+      HapticFeedback.heavyImpact();
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+  }
+
+  Future<void> _stopSOSSound() async {
+    _hapticAlarmActive = false;
+    try {
+      await _audioPlayer.stop();
+    } catch (e) {
+      debugPrint('Error stopping SOS sound: $e');
+    }
   }
 
   @override
@@ -101,7 +136,10 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
     HapticFeedback.heavyImpact();
     setState(() => _sosActivated = true);
 
-    // Play SOS alert sound via notification
+    // Play SOS alarm sound
+    _playSOSSound();
+
+    // Show notification
     NotificationService.showNotification(
       title: '🚨 SOS ACTIVATED',
       body: 'Emergency services have been notified. Help is on the way.',
@@ -203,6 +241,7 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
           GestureDetector(
             onTap: () {
               HapticFeedback.mediumImpact();
+              _stopSOSSound();
               setState(() => _sosActivated = false);
             },
             child: Container(

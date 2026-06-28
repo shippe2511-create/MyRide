@@ -16,6 +16,7 @@ class RegistrationScreen extends StatefulWidget {
 class _RegistrationScreenState extends State<RegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _staffIdController = TextEditingController();
   final _emergencyPhoneController = TextEditingController();
@@ -37,6 +38,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   @override
   void dispose() {
     _fullNameController.dispose();
+    _phoneController.dispose();
     _emailController.dispose();
     _staffIdController.dispose();
     _emergencyPhoneController.dispose();
@@ -51,8 +53,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     HapticFeedback.mediumImpact();
 
     try {
+      final phoneNumber = '+960${_phoneController.text.trim()}';
       final response = await SupabaseService.signUpWithPhone(
-        phone: _phoneNumber,
+        phone: phoneNumber,
         fullName: _fullNameController.text.trim(),
         email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
         gender: _selectedGender,
@@ -75,7 +78,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         fullName: _fullNameController.text.trim(),
         staffId: _staffIdController.text.trim().toUpperCase(),
         department: 'Staff',
-        phone: _phoneNumber,
+        phone: phoneNumber,
       );
 
       HapticFeedback.lightImpact();
@@ -212,6 +215,44 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 20),
+
+                // Phone Number
+                _buildLabel('Phone Number *'),
+                Container(
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        child: Row(
+                          children: [
+                            Icon(Icons.phone_outlined, color: context.mutedColor, size: 20),
+                            const SizedBox(width: 6),
+                            Text('+960', style: TextStyle(color: context.textColor, fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _phoneController,
+                          keyboardType: TextInputType.phone,
+                          style: TextStyle(color: context.textColor),
+                          decoration: InputDecoration(
+                            hintText: '7XXXXXX',
+                            hintStyle: TextStyle(color: context.mutedColor),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                          ),
+                          validator: (v) => v?.isEmpty == true ? 'Phone is required' : null,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 20),
 

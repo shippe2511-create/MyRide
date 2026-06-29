@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
-import 'package:lottie/lottie.dart';
+import 'package:lottie/lottie.dart' hide Marker;
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';

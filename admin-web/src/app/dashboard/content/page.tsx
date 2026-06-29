@@ -86,16 +86,6 @@ export default function ContentPage() {
 
   useEffect(() => {
     loadData()
-
-    const channel = supabase
-      .channel('content_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => loadData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_corner' }, () => loadData())
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [])
 
   const loadData = async () => {
@@ -335,13 +325,18 @@ export default function ContentPage() {
   }
 
   const toggleBreakTipStatus = async (tip: any) => {
+    // Optimistic update first
+    const newValue = !tip.is_active
+    setBreakTips(prev => prev.map(t => t.id === tip.id ? { ...t, is_active: newValue } : t))
+
     const { error } = await supabase
       .from("break_tips")
-      .update({ is_active: !tip.is_active })
+      .update({ is_active: newValue })
       .eq("id", tip.id)
-    if (error) toast.error("Failed to update")
-    else {
-      setBreakTips(prev => prev.map(t => t.id === tip.id ? { ...t, is_active: !t.is_active } : t))
+    if (error) {
+      toast.error("Failed to update tip status")
+      // Revert on error
+      setBreakTips(prev => prev.map(t => t.id === tip.id ? { ...t, is_active: !newValue } : t))
     }
   }
 
@@ -362,48 +357,66 @@ export default function ContentPage() {
   }
 
   const togglePin = async (item: StaffCornerItem) => {
+    // Optimistic update first
+    const newValue = !item.is_pinned
+    setStaffCorner(prev => prev.map(s => s.id === item.id ? { ...s, is_pinned: newValue } : s))
+
     const { error } = await supabase
       .from("staff_corner")
-      .update({ is_pinned: !item.is_pinned })
+      .update({ is_pinned: newValue })
       .eq("id", item.id)
-    if (error) toast.error("Failed to update")
-    else {
-      toast.success(item.is_pinned ? "Unpinned" : "Pinned")
-      setStaffCorner(prev => prev.map(s => s.id === item.id ? { ...s, is_pinned: !s.is_pinned } : s))
+    if (error) {
+      toast.error("Failed to update pin status")
+      setStaffCorner(prev => prev.map(s => s.id === item.id ? { ...s, is_pinned: !newValue } : s))
+    } else {
+      toast.success(newValue ? "Pinned" : "Unpinned")
     }
   }
 
   const toggleStaffStatus = async (item: StaffCornerItem) => {
+    // Optimistic update first
+    const newValue = !item.is_active
+    setStaffCorner(prev => prev.map(s => s.id === item.id ? { ...s, is_active: newValue } : s))
+
     const { error } = await supabase
       .from("staff_corner")
-      .update({ is_active: !item.is_active })
+      .update({ is_active: newValue })
       .eq("id", item.id)
-    if (error) toast.error("Failed to update")
-    else {
-      setStaffCorner(prev => prev.map(s => s.id === item.id ? { ...s, is_active: !s.is_active } : s))
+    if (error) {
+      toast.error("Failed to update staff corner status")
+      setStaffCorner(prev => prev.map(s => s.id === item.id ? { ...s, is_active: !newValue } : s))
     }
   }
 
   const toggleAnnouncementPin = async (item: { id: string; is_pinned: boolean }) => {
+    // Optimistic update first
+    const newValue = !item.is_pinned
+    setAnnouncements(prev => prev.map(a => a.id === item.id ? { ...a, is_pinned: newValue } : a))
+
     const { error } = await supabase
       .from("announcements")
-      .update({ is_pinned: !item.is_pinned })
+      .update({ is_pinned: newValue })
       .eq("id", item.id)
-    if (error) toast.error("Failed to update")
-    else {
-      toast.success(item.is_pinned ? "Unpinned" : "Pinned")
-      setAnnouncements(prev => prev.map(a => a.id === item.id ? { ...a, is_pinned: !a.is_pinned } : a))
+    if (error) {
+      toast.error("Failed to update pin status")
+      setAnnouncements(prev => prev.map(a => a.id === item.id ? { ...a, is_pinned: !newValue } : a))
+    } else {
+      toast.success(newValue ? "Pinned" : "Unpinned")
     }
   }
 
   const toggleAnnouncementStatus = async (item: { id: string; is_active: boolean }) => {
+    // Optimistic update first
+    const newValue = !item.is_active
+    setAnnouncements(prev => prev.map(a => a.id === item.id ? { ...a, is_active: newValue } : a))
+
     const { error } = await supabase
       .from("announcements")
-      .update({ is_active: !item.is_active })
+      .update({ is_active: newValue })
       .eq("id", item.id)
-    if (error) toast.error("Failed to update")
-    else {
-      setAnnouncements(prev => prev.map(a => a.id === item.id ? { ...a, is_active: !a.is_active } : a))
+    if (error) {
+      toast.error("Failed to update announcement status")
+      setAnnouncements(prev => prev.map(a => a.id === item.id ? { ...a, is_active: !newValue } : a))
     }
   }
 

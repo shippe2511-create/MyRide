@@ -361,9 +361,24 @@ class _SearchScreenState extends State<SearchScreen> {
                             place['time'] ?? '',
                             style: TextStyle(color: context.mutedColor, fontSize: 11),
                           ),
-                          onTap: () {
+                          onTap: () async {
                             Navigator.pop(ctx);
-                            _selectPlace(place['name'] ?? '', place['lat'], place['lng']);
+                            final freshLoc = await LocationService.getCurrentLocation();
+                            if (mounted) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => RideConfirmScreen(
+                                    pickup: _pickupName,
+                                    dropoff: place['name'] ?? '',
+                                    pickupLat: _pickupLocation?.latitude ?? freshLoc.latitude,
+                                    pickupLng: _pickupLocation?.longitude ?? freshLoc.longitude,
+                                    dropoffLat: place['lat'] ?? 4.1755,
+                                    dropoffLng: place['lng'] ?? 73.5093,
+                                  ),
+                                ),
+                              );
+                            }
                           },
                         );
                       },

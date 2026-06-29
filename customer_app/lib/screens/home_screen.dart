@@ -91,7 +91,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           table: 'announcements',
           callback: (payload) {
             debugPrint('Home: Announcement update received');
-            _loadContent();
+            if (mounted) _loadContent();
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'staff_corner',
+          callback: (payload) {
+            debugPrint('Home: Staff corner update received');
+            if (mounted) _loadContent();
           },
         )
         .subscribe();

@@ -163,9 +163,10 @@ export default function ContentPage() {
       }
       const announcementPayload = {
         title: formData.title,
-        message: formData.subtitle || null,
+        message: formData.subtitle || '',
         category: formData.category || "general",
-        priority: formData.priority,
+        priority: formData.priority || 'normal',
+        target_audience: 'all',
         is_pinned: formData.is_pinned || false,
         is_active: formData.is_active,
         image_url: formData.image_url || null

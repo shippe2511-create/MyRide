@@ -945,19 +945,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 200,
-          child: _announcements.isEmpty
-              ? ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  physics: const BouncingScrollPhysics(),
-                  children: [
-                    _buildAnnouncementCard(context, title: 'Holiday Schedule Update', subtitle: 'Check the updated ferry timings for the upcoming public holiday.', imageUrl: '', date: 'Jun 3, 2026', isNew: true),
-                    _buildAnnouncementCard(context, title: 'New Route Added', subtitle: 'We have added a new express route to Velana International Airport.', imageUrl: '', date: 'Jun 1, 2026', isNew: false),
-                  ],
-                )
-              : ListView.builder(
+        if (_announcements.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
+            child: Center(
+              child: Text(
+                'No announcements',
+                style: TextStyle(color: context.mutedColor, fontSize: 14),
+              ),
+            ),
+          )
+        else
+          SizedBox(
+            height: 200,
+            child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   physics: const BouncingScrollPhysics(),
@@ -976,7 +977,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     );
                   },
                 ),
-        ),
+          ),
       ],
     );
   }
@@ -1107,35 +1108,36 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 210,
-          child: _staffPosts.isEmpty
-              ? ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  physics: const BouncingScrollPhysics(),
-                  children: [
-                    _buildStaffCard(context, title: 'Employee of the Month', subtitle: 'Congratulations to Ahmed for his outstanding performance!', imageUrl: '', category: 'Recognition', categoryColor: AppColors.success),
-                    _buildStaffCard(context, title: 'Team Building Event', subtitle: 'Join us for the annual team building event.', imageUrl: '', category: 'Events', categoryColor: AppColors.yellow),
-                  ],
-                )
-              : ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: _staffPosts.length,
-                  itemBuilder: (context, index) {
-                    final post = _staffPosts[index];
-                    return _buildStaffCard(
-                      context,
-                      title: post['title'] ?? '',
-                      subtitle: post['subtitle'] ?? '',
-                      imageUrl: post['image_url'] ?? '',
-                      category: post['category'] ?? 'General',
-                      categoryColor: _parseColor(post['category_color']),
-                    );
-                  },
-                ),
+        if (_staffPosts.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
+            child: Center(
+              child: Text(
+                'No staff posts',
+                style: TextStyle(color: context.mutedColor, fontSize: 14),
+              ),
+            ),
+          )
+        else
+          SizedBox(
+            height: 210,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              physics: const BouncingScrollPhysics(),
+              itemCount: _staffPosts.length,
+              itemBuilder: (context, index) {
+                final post = _staffPosts[index];
+                return _buildStaffCard(
+                  context,
+                  title: post['title'] ?? '',
+                  subtitle: post['subtitle'] ?? '',
+                  imageUrl: post['image_url'] ?? '',
+                  category: post['category'] ?? 'General',
+                  categoryColor: _parseColor(post['category_color']),
+                );
+              },
+            ),
         ),
       ],
     );

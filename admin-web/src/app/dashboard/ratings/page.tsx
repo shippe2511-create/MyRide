@@ -721,10 +721,35 @@ export default function RatingsPage() {
               <div className="mt-6 p-3 border rounded-lg bg-muted/30">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="text-sm font-medium">Recent Reviews</h4>
-                  <Checkbox
-                    checked={recentReviews.length > 0 && selectedIds.size === recentReviews.length}
-                    onCheckedChange={toggleSelectAll}
-                  />
+                  <div className="flex items-center gap-2">
+                    {selectedIds.size > 0 && (
+                      <>
+                        <span className="text-xs text-muted-foreground">({selectedIds.size} selected)</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={() => setSelectedIds(new Set())}
+                        >
+                          <X className="h-3 w-3 mr-1" />
+                          Clear
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={() => setBulkDeleteOpen(true)}
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" />
+                          Delete
+                        </Button>
+                      </>
+                    )}
+                    <Checkbox
+                      checked={recentReviews.length > 0 && selectedIds.size === recentReviews.length}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {recentReviews.slice(0, 10).map(review => (
@@ -746,31 +771,6 @@ export default function RatingsPage() {
                     </div>
                   ))}
                 </div>
-
-                {/* Bulk Action Bar - inside Recent Reviews section */}
-                {selectedIds.size > 0 && (
-                  <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t">
-                    <span className="text-sm font-medium">{selectedIds.size} rating(s) selected</span>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedIds(new Set())}
-                      >
-                        <X className="h-4 w-4 mr-1" />
-                        Clear
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => setBulkDeleteOpen(true)}
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </CardContent>

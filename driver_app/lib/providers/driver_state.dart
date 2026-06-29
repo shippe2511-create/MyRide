@@ -569,6 +569,58 @@ class DriverState extends ChangeNotifier {
     }
   }
 
+  Future<void> loadCompletedTrips() async {
+    try {
+      debugPrint('loadCompletedTrips: Starting to load for driverId=$_driverId');
+      if (_driverId.isEmpty) {
+        debugPrint('loadCompletedTrips: No driverId, skipping');
+        return;
+      }
+      final rides = await SupabaseService.getCompletedRides(driverId: _driverId);
+      debugPrint('loadCompletedTrips: Got ${rides.length} rides from DB');
+      _completedTrips.clear();
+      for (final ride in rides) {
+        debugPrint('loadCompletedTrips: Processing ride ${ride['id']}');
+        final customer = ride['customer'] as Map<String, dynamic>?;
+        final distanceVal = ride['distance_km'];
+        double distance = 0.0;
+        if (distanceVal is num) {
+          distance = distanceVal.toDouble();
+        } else if (distanceVal is String) {
+          distance = double.tryParse(distanceVal) ?? 0.0;
+        }
+
+        _completedTrips.add(CompletedTrip(
+          id: ride['id'] ?? '',
+          customerName: customer?['full_name'] ?? 'Customer',
+          pickupLocation: ride['pickup_name'] ?? '',
+          dropoffLocation: ride['dropoff_name'] ?? '',
+          tripDate: DateTime.tryParse(ride['created_at'] ?? '') ?? DateTime.now(),
+          durationMinutes: ride['duration_minutes'] ?? 0,
+          distanceKm: distance,
+          status: _parseStatus(ride['status']),
+        ));
+      }
+      notifyListeners();
+      debugPrint('Loaded ${_completedTrips.length} completed trips from database');
+    } catch (e) {
+      debugPrint('Error loading completed trips: $e');
+    }
+  }
+
+  TripStatus _parseStatus(String? status) {
+    switch (status) {
+      case 'completed':
+        return TripStatus.completed;
+      case 'cancelled':
+        return TripStatus.cancelled;
+      case 'rejected':
+        return TripStatus.rejected;
+      default:
+        return TripStatus.completed;
+    }
+  }
+
   Future<void> _checkForActiveRide() async {
     debugPrint('_checkForActiveRide called with driverId: $_driverId');
     if (_driverId.isEmpty) {

@@ -35,8 +35,8 @@ class _HomeScreenState extends State<HomeScreen> {
   double _lastScrollOffset = 0;
   List<Map<String, dynamic>> _breakTips = [];
   Map<String, dynamic>? _currentQuote;
-  dynamic _breakTipsSubscription;
-  dynamic _quotesSubscription;
+  RealtimeChannel? _breakTipsChannel;
+  RealtimeChannel? _quotesChannel;
 
   @override
   void initState() {
@@ -56,7 +56,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _checkForActiveRide();
 
       // If driver was online from previous session, re-initialize subscriptions
-      if (state.isOnline) {
+      // But don't call goOnline() if on break - that would end the break
+      if (state.isOnline && !state.isOnBreak) {
         debugPrint('Driver was online, re-initializing subscriptions...');
         state.goOnline();
       }
@@ -78,35 +79,42 @@ class _HomeScreenState extends State<HomeScreen> {
     final supabase = SupabaseService.client;
     debugPrint('Setting up break content realtime subscriptions...');
 
-    _breakTipsSubscription = supabase
-        .channel('break_tips_changes')
+    _breakTipsChannel = supabase.channel('break_tips_realtime');
+    _breakTipsChannel!
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'break_tips',
           callback: (payload) {
             debugPrint('Break tips changed: ${payload.eventType}');
-            _loadBreakContent();
+            if (mounted) _loadBreakContent();
           },
         )
-        .subscribe();
+        .subscribe((status, error) {
+          debugPrint('Break tips subscription status: $status, error: $error');
+        });
 
-    _quotesSubscription = supabase
-        .channel('quotes_changes')
+    _quotesChannel = supabase.channel('quotes_realtime');
+    _quotesChannel!
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'motivational_quotes',
-          callback: (payload) => _loadBreakContent(),
+          callback: (payload) {
+            debugPrint('Quotes changed: ${payload.eventType}');
+            if (mounted) _loadBreakContent();
+          },
         )
-        .subscribe();
+        .subscribe((status, error) {
+          debugPrint('Quotes subscription status: $status, error: $error');
+        });
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
-    _breakTipsSubscription?.unsubscribe();
-    _quotesSubscription?.unsubscribe();
+    SupabaseService.client.removeChannel(_breakTipsChannel!);
+    SupabaseService.client.removeChannel(_quotesChannel!);
     // Remove listener
     try {
       context.read<DriverState>().removeListener(_onDriverStateChanged);
@@ -234,42 +242,80 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
 
-        // For other states: use ScrollView as before
-        // Online view needs special handling to center the "Looking for Rides" block
+        // For online view: spaceBetween layout - top, middle (centered), bottom
         if (state.isOnline && !state.isOnBreak) {
+          final bottomNavHeight = MediaQuery.of(context).padding.bottom + 100;
           return Stack(
             children: [
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final bottomPadding = MediaQuery.of(context).padding.bottom + 120;
                   return SingleChildScrollView(
                     controller: _scrollController,
                     physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                     child: ConstrainedBox(
                       constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                      child: IntrinsicHeight(
-                        child: Column(
-                          children: [
-                            SizedBox(height: topPadding),
-                            _buildHeader(context, state),
-                            _buildOnlineView(context, state),
-                            // Centered waiting block fills remaining space
-                            Expanded(
-                              child: Center(
-                                child: Padding(
-                                  padding: EdgeInsets.only(bottom: bottomPadding),
-                                  child: _buildWaitingForRidesBlock(context, state),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // TOP GROUP
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(height: topPadding),
+                              _buildHeader(context, state),
+                              _buildOnlineView(context, state),
+                            ],
+                          ),
+                          // MIDDLE - waiting block (icon + text only)
+                          _buildLookingForRidesContent(context),
+                          // BOTTOM - End Shift button + nav clearance
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(height: 40),
+                              _buildEndShiftButton(context, state),
+                              SizedBox(height: bottomNavHeight),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   );
                 },
               ),
-              // Popup overlay handled below in shared code
+              // Show ride request popup when there's an incoming request
+              if (state.incomingRequests.isNotEmpty && !state.hasActiveRide && !_isPopupMinimized)
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black.withValues(alpha: 0.7),
+                    child: Center(
+                      child: RideRequestPopup(
+                        key: ValueKey(state.incomingRequests.first.id),
+                        request: state.incomingRequests.first,
+                        onAccept: () async {
+                          setState(() => _isPopupMinimized = false);
+                          final result = await state.acceptRide(state.incomingRequests.first);
+                          if (result['success'] == true) {
+                            if (mounted) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const RideScreen()),
+                              );
+                            }
+                          } else {
+                            if (mounted) {
+                              AppSnackbar.warning(context, result['error'] ?? 'This ride was taken by another driver');
+                            }
+                          }
+                        },
+                        onDecline: () {
+                          setState(() => _isPopupMinimized = false);
+                          state.expireRide(state.incomingRequests.first);
+                        },
+                      ),
+                    ),
+                  ),
+                ),
             ],
           );
         }
@@ -483,9 +529,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   state.driverName.isNotEmpty ? state.driverName : 'Driver',
                   style: TextStyle(
                     color: context.textColor,
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -688,7 +736,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // Quick Actions
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -763,7 +811,27 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildWaitingForRidesBlock(BuildContext context, DriverState state) {
+  Widget _buildEndShiftButton(BuildContext context, DriverState state) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: OutlinedButton.icon(
+          onPressed: () => _showEndShiftDialog(context, state),
+          icon: const Icon(Icons.logout_rounded, size: 20),
+          label: const Text('End Shift', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.error,
+            side: const BorderSide(color: AppColors.error, width: 1.5),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLookingForRidesContent(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -801,34 +869,13 @@ class _HomeScreenState extends State<HomeScreen> {
             textAlign: TextAlign.center,
           ),
         ),
-        const SizedBox(height: 24),
-        // End Shift Button
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: OutlinedButton.icon(
-              onPressed: () => _showEndShiftDialog(context, state),
-              icon: const Icon(Icons.logout_rounded, size: 20),
-              label: const Text('End Shift', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.error,
-                side: const BorderSide(color: AppColors.error, width: 1.5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }
 
   Widget _buildBreakView(BuildContext context, DriverState state) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 20),
-      child: Column(
-        children: [
+    return Column(
+      children: [
           // Stats card
           _buildStatsCard(context, state),
 
@@ -949,8 +996,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-        ],
-      ),
+      ],
     );
   }
 

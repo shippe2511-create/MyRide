@@ -39,6 +39,9 @@ class _LoginScreenState extends State<LoginScreen> {
     return cleaned.length == 7 && (cleaned.startsWith('7') || cleaned.startsWith('9'));
   }
 
+  // DEV MODE: Skip OTP for testing
+  static const bool _devSkipOtp = true;
+
   Future<void> _sendOTP() async {
     final phone = _phoneController.text.trim();
 
@@ -49,6 +52,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
     HapticFeedback.mediumImpact();
     setState(() => _isLoading = true);
+
+    // DEV MODE: Skip actual OTP send
+    if (_devSkipOtp) {
+      setState(() {
+        _otpSent = true;
+        _isLoading = false;
+      });
+      if (mounted) {
+        AppSnackbar.success(context, 'DEV MODE: Enter any 6 digits');
+      }
+      return;
+    }
 
     try {
       final response = await http.post(
@@ -95,24 +110,27 @@ class _LoginScreenState extends State<LoginScreen> {
       final phone = _phoneController.text.trim();
       final fullPhone = phone.startsWith('+') ? phone : '+960$phone';
 
-      // Verify OTP with server
-      final verifyResponse = await http.post(
-        Uri.parse('$_supabaseUrl/functions/v1/verify-otp'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'phone': phone,
-          'code': otp,
-        }),
-      );
+      // DEV MODE: Skip OTP verification
+      if (!_devSkipOtp) {
+        // Verify OTP with server
+        final verifyResponse = await http.post(
+          Uri.parse('$_supabaseUrl/functions/v1/verify-otp'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'phone': phone,
+            'code': otp,
+          }),
+        );
 
-      final verifyResult = jsonDecode(verifyResponse.body);
-      if (verifyResult['success'] != true) {
-        if (mounted) _showError(verifyResult['error'] ?? 'Invalid code');
-        setState(() => _isLoading = false);
-        return;
+        final verifyResult = jsonDecode(verifyResponse.body);
+        if (verifyResult['success'] != true) {
+          if (mounted) _showError(verifyResult['error'] ?? 'Invalid code');
+          setState(() => _isLoading = false);
+          return;
+        }
       }
 
-      // OTP verified - now check if user exists
+      // OTP verified (or skipped in dev mode) - now check if user exists
       final existingUser = await SupabaseService.checkPhoneExists(fullPhone);
 
       if (existingUser != null) {

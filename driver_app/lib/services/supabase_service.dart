@@ -479,17 +479,25 @@ class SupabaseService {
     }
   }
 
-  static Future<List<Map<String, dynamic>>> getCompletedRides() async {
-    final driver = await getDriverProfile();
-    if (driver == null) return [];
+  static Future<List<Map<String, dynamic>>> getCompletedRides({String? driverId}) async {
+    String? driverIdToUse = driverId;
 
+    if (driverIdToUse == null) {
+      final driver = await getDriverProfile();
+      debugPrint('getCompletedRides: driver = $driver');
+      if (driver == null) return [];
+      driverIdToUse = driver['id'];
+    }
+
+    debugPrint('getCompletedRides: querying for driver_id = $driverIdToUse');
     final response = await client
         .from('rides')
         .select('*, customer:profiles!customer_id(*), rating:ratings(*)')
-        .eq('driver_id', driver['id'])
+        .eq('driver_id', driverIdToUse!)
         .inFilter('status', ['completed', 'cancelled', 'rejected'])
         .order('created_at', ascending: false)
         .limit(50);
+    debugPrint('getCompletedRides: got ${response.length} rides');
     return List<Map<String, dynamic>>.from(response);
   }
 

@@ -24,7 +24,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
+    _loadTripsFromDatabase();
     _subscribeToCompletedRides();
+  }
+
+  Future<void> _loadTripsFromDatabase() async {
+    final driverState = Provider.of<DriverState>(context, listen: false);
+    await driverState.loadCompletedTrips();
   }
 
   @override

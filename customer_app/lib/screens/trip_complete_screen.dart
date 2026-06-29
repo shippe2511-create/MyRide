@@ -313,7 +313,7 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
           ),
           child: Center(
             child: Text(
-              'MK',
+              _driverInfo['initials'] ?? 'D',
               style: TextStyle(
                 color: context.textColor,
                 fontSize: 30,
@@ -334,7 +334,7 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          'with Marcus K. · MV 88',
+          'with ${_driverInfo['name']} · ${_driverInfo['vehicle']}',
           style: TextStyle(color: context.mutedColor, fontSize: 14),
         ),
         const SizedBox(height: 24),

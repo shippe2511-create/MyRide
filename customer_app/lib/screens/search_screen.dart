@@ -280,7 +280,100 @@ class _SearchScreenState extends State<SearchScreen> {
     {'title': 'Data Centre', 'subtitle': 'Hulhumalé Industrial Zone', 'highlight': false},
   ];
 
-  // initState moved to top of class (line 31)
+  void _showAllRecentPlaces() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.isDark ? const Color(0xFF1A1A1E) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, scrollController) => Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade400,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Text(
+                    'Recent Places',
+                    style: TextStyle(
+                      color: context.textColor,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: Icon(Icons.close, color: context.textColor),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _recentPlaces.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No recent places',
+                        style: TextStyle(color: context.mutedColor),
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: scrollController,
+                      itemCount: _recentPlaces.length,
+                      itemBuilder: (_, index) {
+                        final place = _recentPlaces[index];
+                        return ListTile(
+                          leading: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: AppColors.yellow.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.history, color: AppColors.yellow),
+                          ),
+                          title: Text(
+                            place['name'] ?? '',
+                            style: TextStyle(color: context.textColor, fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Text(
+                            place['address'] ?? '',
+                            style: TextStyle(color: context.mutedColor, fontSize: 12),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          trailing: Text(
+                            place['time'] ?? '',
+                            style: TextStyle(color: context.mutedColor, fontSize: 11),
+                          ),
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            _selectPlace(place['name'] ?? '', place['lat'], place['lng']);
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Future<void> _loadRecentPlaces() async {
     try {
@@ -1320,6 +1413,7 @@ class _SearchScreenState extends State<SearchScreen> {
               GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
+                  _showAllRecentPlaces();
                 },
                 child: Text('See All', style: TextStyle(color: AppColors.yellow, fontSize: 13, fontWeight: FontWeight.w600)),
               ),

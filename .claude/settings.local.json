@@ -151,7 +151,26 @@
       "Read(//Users/athifabdulla/**)",
       "Bash(grep -n \"^import {$\" /Users/athifabdulla/Downloads/MyRide/admin-web/src/app/dashboard/report-builder/page.tsx)",
       "Bash(node *)",
-      "Bash(tee /tmp/driver_console.log)"
+      "Bash(tee /tmp/driver_console.log)",
+      "Bash(tee /tmp/driver_log.txt)",
+      "Bash(sed -i '' \"s/DateTime.tryParse\\(msg\\\\['created_at'\\\\] ?? ''\\) ?? DateTime.now\\(\\)/\\\\\\(DateTime.tryParse\\(msg['created_at'] ?? ''\\) ?? DateTime.now\\(\\)\\\\\\).toLocal\\(\\)/g\" chat_screen.dart)",
+      "Bash(sed -i '' \"s/DateTime.tryParse\\(newMessage\\\\['created_at'\\\\] ?? ''\\) ?? DateTime.now\\(\\)/\\\\\\(DateTime.tryParse\\(newMessage['created_at'] ?? ''\\) ?? DateTime.now\\(\\)\\\\\\).toLocal\\(\\)/g\" chat_screen.dart)",
+      "Bash(sed -i '' \"s/DateTime.tryParse\\(msg\\\\['created_at'\\\\] ?? ''\\) ?? DateTime.now\\(\\)/\\\\\\(DateTime.tryParse\\(msg['created_at'] ?? ''\\) ?? DateTime.now\\(\\)\\\\\\).toLocal\\(\\)/g\" support_chat_screen.dart)",
+      "Bash(sed -i '' \"s/DateTime.tryParse\\(newMessage\\\\['created_at'\\\\] ?? ''\\) ?? DateTime.now\\(\\)/\\\\\\(DateTime.tryParse\\(newMessage['created_at'] ?? ''\\) ?? DateTime.now\\(\\)\\\\\\).toLocal\\(\\)/g\" support_chat_screen.dart)",
+      "Bash(sed -i '' \"s/DateTime.tryParse\\(ride\\\\['created_at'\\\\] ?? ''\\) ?? DateTime.now\\(\\)/\\\\\\(DateTime.tryParse\\(ride['created_at'] ?? ''\\) ?? DateTime.now\\(\\)\\\\\\).toLocal\\(\\)/g\" activity_screen.dart)",
+      "Bash(tee /tmp/customer_log.txt)",
+      "Bash(pkill -f \"flutter.*customer\")",
+      "Bash(pkill -f \"flutter.*driver\")",
+      "Bash(pkill -f \"flutter.*iPhone.17.Pro[^M]\")",
+      "Bash(rm -rf ~/Library/Developer/Xcode/DerivedData/*)",
+      "Bash(rm -rf /tmp/flutter_tools.*)",
+      "Bash(rm -rf /var/folders/h1/*/T/flutter_tools.*)",
+      "Bash(rm -rf ~/Library/Caches/CocoaPods/*)",
+      "Bash(rm -rf /private/tmp/claude-501/*)",
+      "Bash(grep -n \"^\\\\s*],\\\\s*$\" /Users/athifabdulla/Downloads/MyRide/driver_app/lib/screens/ride_screen.dart)",
+      "Bash(xcrun simctl *)",
+      "Bash(rm -rf ios/Pods ios/Podfile.lock)",
+      "Bash(grep -E \"\\\\.dart$\")"
     ],
     "additionalDirectories": [
       "/tmp"

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
+import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
@@ -592,17 +593,23 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
 
-                  // Animated searching indicator
-                  AnimatedBuilder(
-                    animation: _pulseController,
-                    builder: (context, child) {
-                      return Text(
-                        _statusText,
-                        style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w600),
-                      );
-                    },
+                  // Searching animation - simple spinning loader
+                  SizedBox(
+                    height: 60,
+                    width: 60,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 4,
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.yellow),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Status text
+                  Text(
+                    _statusText,
+                    style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 16),
 

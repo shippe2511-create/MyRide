@@ -77,16 +77,17 @@ class _RideRequestPopupState extends State<RideRequestPopup>
 
   void _startCountdown() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       if (_remainingSeconds > 0) {
         setState(() {
           _remainingSeconds--;
-          if (_remainingSeconds == 0) {
-            timer.cancel();
-            Future.microtask(() {
-              if (mounted) widget.onDecline();
-            });
-          }
         });
+      } else {
+        timer.cancel();
+        widget.onDecline();
       }
     });
   }

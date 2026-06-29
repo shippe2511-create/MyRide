@@ -615,29 +615,6 @@ export default function RatingsPage() {
         </Card>
       </div>
 
-      {/* Bulk Action Bar */}
-      {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-muted rounded-lg border">
-          <span className="text-sm font-medium">{selectedIds.size} rating(s) selected</span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setSelectedIds(new Set())}
-          >
-            <X className="h-4 w-4 mr-1" />
-            Clear
-          </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => setBulkDeleteOpen(true)}
-          >
-            <Trash2 className="h-4 w-4 mr-1" />
-            Delete Selected
-          </Button>
-        </div>
-      )}
-
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -669,39 +646,6 @@ export default function RatingsPage() {
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Recent Reviews with Selection */}
-            {recentReviews.length > 0 && (
-              <div className="mb-4 p-3 border rounded-lg bg-muted/30">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-sm font-medium">Recent Reviews</h4>
-                  <Checkbox
-                    checked={recentReviews.length > 0 && selectedIds.size === recentReviews.length}
-                    onCheckedChange={toggleSelectAll}
-                  />
-                </div>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {recentReviews.slice(0, 10).map(review => (
-                    <div key={review.id} className={`flex items-center gap-2 p-2 rounded border text-sm ${selectedIds.has(review.id) ? 'bg-muted border-primary' : 'bg-background'}`}>
-                      <Checkbox
-                        checked={selectedIds.has(review.id)}
-                        onCheckedChange={() => toggleSelect(review.id)}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <span className="font-medium truncate">{review.customer_name}</span>
-                        <span className="text-muted-foreground mx-1">rated</span>
-                        <span className="font-medium truncate">{review.driver_name}</span>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {[1, 2, 3, 4, 5].map((s) => (
-                          <Star key={s} className={`h-3 w-3 ${s <= review.rating ? "fill-yellow-400 text-yellow-400" : "text-muted"}`} />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             <Table>
               <TableHeader>
@@ -771,6 +715,64 @@ export default function RatingsPage() {
                 )}
               </TableBody>
             </Table>
+
+            {/* Recent Reviews with Selection - moved below table */}
+            {recentReviews.length > 0 && (
+              <div className="mt-6 p-3 border rounded-lg bg-muted/30">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-medium">Recent Reviews</h4>
+                  <Checkbox
+                    checked={recentReviews.length > 0 && selectedIds.size === recentReviews.length}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </div>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {recentReviews.slice(0, 10).map(review => (
+                    <div key={review.id} className={`flex items-center gap-2 p-2 rounded border text-sm ${selectedIds.has(review.id) ? 'bg-muted border-primary' : 'bg-background'}`}>
+                      <Checkbox
+                        checked={selectedIds.has(review.id)}
+                        onCheckedChange={() => toggleSelect(review.id)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium truncate">{review.customer_name}</span>
+                        <span className="text-muted-foreground mx-1">rated</span>
+                        <span className="font-medium truncate">{review.driver_name}</span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Star key={s} className={`h-3 w-3 ${s <= review.rating ? "fill-yellow-400 text-yellow-400" : "text-muted"}`} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Bulk Action Bar - inside Recent Reviews section */}
+                {selectedIds.size > 0 && (
+                  <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t">
+                    <span className="text-sm font-medium">{selectedIds.size} rating(s) selected</span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedIds(new Set())}
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Clear
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setBulkDeleteOpen(true)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 

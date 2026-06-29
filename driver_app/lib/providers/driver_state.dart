@@ -1410,10 +1410,6 @@ class DriverState extends ChangeNotifier {
   void cancelTrip() {
     _currentRide = null;
     notifyListeners();
-
-    if (_isOnline) {
-
-    }
   }
 
   void cancelTripWithReason(String reason) {
@@ -1433,21 +1429,12 @@ class DriverState extends ChangeNotifier {
     }
     _currentRide = null;
     notifyListeners();
-
-    if (_isOnline) {
-
-    }
   }
 
   void addToQueue(RideRequest request) {
     _queuedRequests.add(request.copyWith(status: RideStatus.queued));
     _incomingRequests.removeWhere((r) => r.id == request.id);
     notifyListeners();
-
-    // Simulate next request if seats still available
-    if (_currentRide != null && hasAvailableSeats && _incomingRequests.isEmpty) {
-
-    }
   }
 
   void removeFromQueue(String requestId) {

@@ -1593,7 +1593,7 @@ class SupabaseService {
           .from('motivational_quotes')
           .select()
           .eq('is_active', true)
-          .order('created_at', ascending: true);
+          .order('sort_order', ascending: true);
       debugPrint('getAllActiveQuotes: got ${response.length} quotes');
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {

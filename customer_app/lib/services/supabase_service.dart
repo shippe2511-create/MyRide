@@ -836,8 +836,8 @@ class SupabaseService {
       final response = await client
           .from('announcements')
           .select()
-          .or('is_active.is.null,is_active.eq.true')
-          .order('created_at', ascending: false)
+          .eq('is_active', true)
+          .order('sort_order', ascending: true)
           .limit(10);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
@@ -852,7 +852,7 @@ class SupabaseService {
           .from('staff_corner')
           .select()
           .eq('is_active', true)
-          .order('created_at', ascending: false)
+          .order('sort_order', ascending: true)
           .limit(10);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {

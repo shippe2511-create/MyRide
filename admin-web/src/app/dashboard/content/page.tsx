@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core"
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -25,7 +28,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { ImagePicker } from "@/components/ui/image-picker"
 import { ComboboxInput } from "@/components/ui/combobox-input"
-import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Bell, Pin, Users, FileText, Megaphone, Calendar, Download, Coffee, Quote } from "lucide-react"
+import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Bell, Pin, Users, FileText, Megaphone, Calendar, Download, Coffee, Quote, GripVertical } from "lucide-react"
 import { SkeletonTable } from "@/components/ui/skeleton-card"
 
 const STAFF_CATEGORIES = [
@@ -40,6 +43,150 @@ const STAFF_CATEGORIES = [
   { value: "safety", label: "Safety" },
   { value: "hr", label: "HR" },
 ]
+
+// Sortable table row component for announcements
+function SortableAnnouncementRow({ ann, onEdit, onDelete, onToggleStatus, formatDate }: any) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ann.id })
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
+
+  return (
+    <TableRow ref={setNodeRef} style={style} className="group hover:bg-muted/50 transition-colors">
+      <TableCell className="w-8">
+        <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1">
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </div>
+      </TableCell>
+      <TableCell className="w-16">
+        {ann.image_url ? (
+          <img src={ann.image_url} alt="" className="w-12 h-12 rounded object-cover" />
+        ) : (
+          <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
+            <Megaphone className="h-5 w-5 text-muted-foreground" />
+          </div>
+        )}
+      </TableCell>
+      <TableCell>
+        <div>
+          <p className="font-medium">{ann.title}</p>
+          {ann.message && <p className="text-sm text-muted-foreground truncate max-w-[250px]">{ann.message}</p>}
+        </div>
+      </TableCell>
+      <TableCell><Badge variant="outline" className="capitalize">{ann.category || "general"}</Badge></TableCell>
+      <TableCell><Badge variant={ann.priority === "high" ? "destructive" : "secondary"}>{ann.priority}</Badge></TableCell>
+      <TableCell><Switch checked={ann.is_active} onCheckedChange={() => onToggleStatus(ann)} /></TableCell>
+      <TableCell>{formatDate(ann.created_at)}</TableCell>
+      <TableCell>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(ann)}><Edit className="h-4 w-4" /></Button>
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => onEdit(ann)}><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive" onSelect={() => onDelete(ann.id)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </TableCell>
+    </TableRow>
+  )
+}
+
+// Sortable row for Staff Corner
+function SortableStaffRow({ item, onEdit, onDelete, onToggleStatus, getCategoryIcon, formatDate }: any) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
+
+  return (
+    <TableRow ref={setNodeRef} style={style} className="group hover:bg-muted/50 transition-colors">
+      <TableCell className="w-8">
+        <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1">
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </div>
+      </TableCell>
+      <TableCell className="w-16">
+        {item.image_url ? <img src={item.image_url} alt="" className="w-12 h-12 rounded object-cover" /> : <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">{getCategoryIcon(item.category)}</div>}
+      </TableCell>
+      <TableCell>
+        <div><p className="font-medium">{item.title}</p>{item.subtitle && <p className="text-sm text-muted-foreground truncate max-w-[200px]">{item.subtitle}</p>}</div>
+      </TableCell>
+      <TableCell><div className="flex items-center gap-2">{getCategoryIcon(item.category)}<span className="capitalize">{item.category}</span></div></TableCell>
+      <TableCell><Badge variant={item.priority === "high" ? "destructive" : "secondary"}>{item.priority || "normal"}</Badge></TableCell>
+      <TableCell><Switch checked={item.is_active} onCheckedChange={() => onToggleStatus(item)} /></TableCell>
+      <TableCell>{item.published_at ? formatDate(item.published_at) : "-"}</TableCell>
+      <TableCell>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(item)}><Edit className="h-4 w-4" /></Button>
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => onEdit(item)}><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive" onSelect={() => onDelete(item.id)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </TableCell>
+    </TableRow>
+  )
+}
+
+// Sortable row for Break Tips
+function SortableBreakTipRow({ tip, onEdit, onDelete, onToggleStatus }: any) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tip.id })
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
+  const icons: Record<string, string> = { eye: "👁️", water: "💧", stretch: "🧘", walk: "🚶", breathe: "🌬️", music: "🎵" }
+
+  return (
+    <TableRow ref={setNodeRef} style={style} className="group hover:bg-muted/50 transition-colors">
+      <TableCell className="w-8">
+        <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1">
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </div>
+      </TableCell>
+      <TableCell className="text-2xl">{icons[tip.icon] || "💡"}</TableCell>
+      <TableCell><p className="font-medium">{tip.title}</p><p className="text-sm text-muted-foreground">{tip.description}</p></TableCell>
+      <TableCell><Switch checked={tip.is_active} onCheckedChange={() => onToggleStatus(tip)} /></TableCell>
+      <TableCell>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(tip)}><Edit className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(tip.id)}><Trash2 className="h-4 w-4" /></Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  )
+}
+
+// Sortable row for Quotes
+function SortableQuoteRow({ quote, onEdit, onDelete, onToggleStatus }: any) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: quote.id })
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
+
+  return (
+    <TableRow ref={setNodeRef} style={style} className="group hover:bg-muted/50 transition-colors">
+      <TableCell className="w-8">
+        <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1">
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </div>
+      </TableCell>
+      <TableCell className="max-w-md"><p className="italic">&ldquo;{quote.quote}&rdquo;</p></TableCell>
+      <TableCell className="text-muted-foreground">{quote.author || "-"}</TableCell>
+      <TableCell><Switch checked={quote.is_active} onCheckedChange={() => onToggleStatus(quote)} /></TableCell>
+      <TableCell>
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => onEdit(quote)}><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive" onSelect={() => onDelete(quote.id)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+    </TableRow>
+  )
+}
 
 const ANNOUNCEMENT_CATEGORIES = [
   { value: "general", label: "General" },
@@ -84,17 +231,72 @@ export default function ContentPage() {
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState<any>({})
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
+
+  const handleAnnouncementDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = announcements.findIndex(a => a.id === active.id)
+    const newIndex = announcements.findIndex(a => a.id === over.id)
+
+    const newAnnouncements = arrayMove(announcements, oldIndex, newIndex)
+    setAnnouncements(newAnnouncements)
+
+    // Update sort_order in database
+    const updates = newAnnouncements.map((ann, i) =>
+      supabase.from("announcements").update({ sort_order: i }).eq("id", ann.id)
+    )
+    await Promise.all(updates)
+  }
+
+  const handleStaffCornerDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = staffCorner.findIndex(s => s.id === active.id)
+    const newIndex = staffCorner.findIndex(s => s.id === over.id)
+    const newItems = arrayMove(staffCorner, oldIndex, newIndex)
+    setStaffCorner(newItems)
+    const updates = newItems.map((item, i) => supabase.from("staff_corner").update({ sort_order: i }).eq("id", item.id))
+    await Promise.all(updates)
+  }
+
+  const handleBreakTipsDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = breakTips.findIndex(t => t.id === active.id)
+    const newIndex = breakTips.findIndex(t => t.id === over.id)
+    const newItems = arrayMove(breakTips, oldIndex, newIndex)
+    setBreakTips(newItems)
+    const updates = newItems.map((item, i) => supabase.from("break_tips").update({ sort_order: i }).eq("id", item.id))
+    await Promise.all(updates)
+  }
+
+  const handleQuotesDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = quotes.findIndex(q => q.id === active.id)
+    const newIndex = quotes.findIndex(q => q.id === over.id)
+    const newItems = arrayMove(quotes, oldIndex, newIndex)
+    setQuotes(newItems)
+    const updates = newItems.map((item, i) => supabase.from("motivational_quotes").update({ sort_order: i }).eq("id", item.id))
+    await Promise.all(updates)
+  }
+
   useEffect(() => {
     loadData()
   }, [])
 
   const loadData = async () => {
     const [announcementsRes, notificationsRes, staffCornerRes, breakTipsRes, quotesRes] = await Promise.all([
-      supabase.from("announcements").select("*").order("created_at", { ascending: false }),
+      supabase.from("announcements").select("*").order("sort_order", { ascending: true }),
       supabase.from("push_notification_logs").select("*").order("sent_at", { ascending: false }).limit(20),
-      supabase.from("staff_corner").select("*").order("is_pinned", { ascending: false }).order("created_at", { ascending: false }),
+      supabase.from("staff_corner").select("*").order("sort_order", { ascending: true }),
       supabase.from("break_tips").select("*").order("sort_order", { ascending: true }),
-      supabase.from("motivational_quotes").select("*").order("created_at", { ascending: false }),
+      supabase.from("motivational_quotes").select("*").order("sort_order", { ascending: true }),
     ])
     setAnnouncements(announcementsRes.data || [])
     setNotifications(notificationsRes.data || [])
@@ -280,7 +482,7 @@ export default function ContentPage() {
           setAnnouncements(prev => prev.map(a => a.id === selectedItem.id ? { ...a, ...formData, message: formData.subtitle } : a))
         } else {
           // Reload only announcements for new items
-          const { data } = await supabase.from("announcements").select("*").order("created_at", { ascending: false })
+          const { data } = await supabase.from("announcements").select("*").order("sort_order", { ascending: true })
           if (data) setAnnouncements(data)
         }
       } else if (dialogType === "staff") {
@@ -514,84 +716,31 @@ export default function ContentPage() {
                     <TableHead className="w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {staffCorner.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                        No staff corner content yet
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    staffCorner.map((item) => (
-                      <TableRow key={item.id} className="group hover:bg-muted/50 transition-colors">
-                        <TableCell className="w-8">
-                          {item.is_pinned && <Pin className="h-4 w-4 text-primary" />}
-                        </TableCell>
-                        <TableCell className="w-16">
-                          {item.image_url ? (
-                            <img src={item.image_url} alt="" className="w-12 h-12 rounded object-cover" />
-                          ) : (
-                            <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
-                              <FileText className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{item.title}</p>
-                            {item.subtitle && (
-                              <p className="text-sm text-muted-foreground truncate max-w-[250px]">{item.subtitle}</p>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {getCategoryIcon(item.category)}
-                            <span className="capitalize">{item.category}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>{getPriorityBadge(item.priority)}</TableCell>
-                        <TableCell>
-                          <Switch
-                            checked={item.is_active}
-                            onCheckedChange={() => toggleStaffStatus(item)}
-                          />
-                        </TableCell>
-                        <TableCell>{item.published_at ? formatDate(item.published_at) : "-"}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => openDialog("staff", item)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <DropdownMenu modal={false}>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onSelect={() => openDialog("staff", item)}>
-                                  <Edit className="mr-2 h-4 w-4" />Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => togglePin(item)}>
-                                  <Pin className="mr-2 h-4 w-4" />
-                                  {item.is_pinned ? "Unpin" : "Pin to Top"}
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete("staff", item.id)}>
-                                  <Trash2 className="mr-2 h-4 w-4" />Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleStaffCornerDragEnd}>
+                  <TableBody>
+                    {staffCorner.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                          No staff corner content yet
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
+                    ) : (
+                      <SortableContext items={staffCorner.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                        {staffCorner.map((item) => (
+                          <SortableStaffRow
+                            key={item.id}
+                            item={item}
+                            onEdit={(i: any) => openDialog("staff", i)}
+                            onDelete={(id: string) => handleDelete("staff", id)}
+                            onToggleStatus={toggleStaffStatus}
+                            getCategoryIcon={getCategoryIcon}
+                            formatDate={formatDate}
+                          />
+                        ))}
+                      </SortableContext>
+                    )}
+                  </TableBody>
+                </DndContext>
               </Table>
             </CardContent>
           </Card>
@@ -620,83 +769,30 @@ export default function ContentPage() {
                     <TableHead className="w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {announcements.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                        No announcements yet
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    announcements.map((ann) => (
-                      <TableRow key={ann.id} className="group hover:bg-muted/50 transition-colors">
-                        <TableCell className="w-8">
-                          {ann.is_pinned && <Pin className="h-4 w-4 text-primary" />}
-                        </TableCell>
-                        <TableCell className="w-16">
-                          {ann.image_url ? (
-                            <img src={ann.image_url} alt="" className="w-12 h-12 rounded object-cover" />
-                          ) : (
-                            <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
-                              <Megaphone className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{ann.title}</p>
-                            {ann.message && (
-                              <p className="text-sm text-muted-foreground truncate max-w-[250px]">{ann.message}</p>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell><Badge variant="outline" className="capitalize">{ann.category || "general"}</Badge></TableCell>
-                        <TableCell>
-                          <Badge variant={ann.priority === "high" ? "destructive" : "secondary"}>
-                            {ann.priority}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Switch
-                            checked={ann.is_active}
-                            onCheckedChange={() => toggleAnnouncementStatus(ann)}
-                          />
-                        </TableCell>
-                        <TableCell>{formatDate(ann.created_at)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => openDialog("announcement", ann)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <DropdownMenu modal={false}>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onSelect={() => openDialog("announcement", ann)}>
-                                  <Edit className="mr-2 h-4 w-4" />Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => toggleAnnouncementPin(ann)}>
-                                  <Pin className="mr-2 h-4 w-4" />
-                                  {ann.is_pinned ? "Unpin" : "Pin to Top"}
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete("announcement", ann.id)}>
-                                  <Trash2 className="mr-2 h-4 w-4" />Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleAnnouncementDragEnd}>
+                  <TableBody>
+                    {announcements.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                          No announcements yet
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
+                    ) : (
+                      <SortableContext items={announcements.map(a => a.id)} strategy={verticalListSortingStrategy}>
+                        {announcements.map((ann) => (
+                          <SortableAnnouncementRow
+                            key={ann.id}
+                            ann={ann}
+                            onEdit={(a: any) => openDialog("announcement", a)}
+                            onDelete={(id: string) => handleDelete("announcement", id)}
+                            onToggleStatus={toggleAnnouncementStatus}
+                            formatDate={formatDate}
+                          />
+                        ))}
+                      </SortableContext>
+                    )}
+                  </TableBody>
+                </DndContext>
               </Table>
             </CardContent>
           </Card>
@@ -787,48 +883,29 @@ export default function ContentPage() {
                     <TableHead className="w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {breakTips.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        No break tips yet
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    breakTips.map((tip) => (
-                      <TableRow key={tip.id}>
-                        <TableCell>
-                          <Badge variant="outline">{tip.icon}</Badge>
-                        </TableCell>
-                        <TableCell className="font-medium">{tip.title}</TableCell>
-                        <TableCell className="text-muted-foreground max-w-xs truncate">{tip.description}</TableCell>
-                        <TableCell>{tip.sort_order}</TableCell>
-                        <TableCell>
-                          <Switch
-                            checked={tip.is_active}
-                            onCheckedChange={() => toggleBreakTipStatus(tip)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu modal={false}>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onSelect={() => openDialog("break_tip", tip)}>
-                                <Edit className="mr-2 h-4 w-4" />Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete("break_tip", tip.id)}>
-                                <Trash2 className="mr-2 h-4 w-4" />Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleBreakTipsDragEnd}>
+                  <TableBody>
+                    {breakTips.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          No break tips yet
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
+                    ) : (
+                      <SortableContext items={breakTips.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                        {breakTips.map((tip) => (
+                          <SortableBreakTipRow
+                            key={tip.id}
+                            tip={tip}
+                            onEdit={(t: any) => openDialog("break_tip", t)}
+                            onDelete={(id: string) => handleDelete("break_tip", id)}
+                            onToggleStatus={toggleBreakTipStatus}
+                          />
+                        ))}
+                      </SortableContext>
+                    )}
+                  </TableBody>
+                </DndContext>
               </Table>
             </CardContent>
           </Card>
@@ -854,46 +931,29 @@ export default function ContentPage() {
                     <TableHead className="w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {quotes.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                        No quotes yet
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    quotes.map((quote) => (
-                      <TableRow key={quote.id}>
-                        <TableCell className="max-w-md">
-                          <p className="italic">&ldquo;{quote.quote}&rdquo;</p>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{quote.author || "-"}</TableCell>
-                        <TableCell>
-                          <Switch
-                            checked={quote.is_active}
-                            onCheckedChange={() => toggleQuoteStatus(quote)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu modal={false}>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onSelect={() => openDialog("quote", quote)}>
-                                <Edit className="mr-2 h-4 w-4" />Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete("quote", quote.id)}>
-                                <Trash2 className="mr-2 h-4 w-4" />Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleQuotesDragEnd}>
+                  <TableBody>
+                    {quotes.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                          No quotes yet
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
+                    ) : (
+                      <SortableContext items={quotes.map(q => q.id)} strategy={verticalListSortingStrategy}>
+                        {quotes.map((quote) => (
+                          <SortableQuoteRow
+                            key={quote.id}
+                            quote={quote}
+                            onEdit={(q: any) => openDialog("quote", q)}
+                            onDelete={(id: string) => handleDelete("quote", id)}
+                            onToggleStatus={toggleQuoteStatus}
+                          />
+                        ))}
+                      </SortableContext>
+                    )}
+                  </TableBody>
+                </DndContext>
               </Table>
             </CardContent>
           </Card>

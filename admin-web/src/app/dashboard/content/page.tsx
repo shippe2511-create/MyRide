@@ -22,9 +22,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
 import { ImagePicker } from "@/components/ui/image-picker"
 import { ComboboxInput } from "@/components/ui/combobox-input"
-import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Bell, Pin, Users, FileText, Megaphone, Calendar, Download } from "lucide-react"
+import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Bell, Pin, Users, FileText, Megaphone, Calendar, Download, Coffee, Quote } from "lucide-react"
 import { SkeletonTable } from "@/components/ui/skeleton-card"
 
 const STAFF_CATEGORIES = [
@@ -75,6 +76,8 @@ export default function ContentPage() {
   const [announcements, setAnnouncements] = useState<any[]>([])
   const [notifications, setNotifications] = useState<any[]>([])
   const [staffCorner, setStaffCorner] = useState<StaffCornerItem[]>([])
+  const [breakTips, setBreakTips] = useState<any[]>([])
+  const [quotes, setQuotes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogType, setDialogType] = useState<string | null>(null)
   const [selectedItem, setSelectedItem] = useState<any>(null)
@@ -96,14 +99,18 @@ export default function ContentPage() {
   }, [])
 
   const loadData = async () => {
-    const [announcementsRes, notificationsRes, staffCornerRes] = await Promise.all([
+    const [announcementsRes, notificationsRes, staffCornerRes, breakTipsRes, quotesRes] = await Promise.all([
       supabase.from("announcements").select("*").order("created_at", { ascending: false }),
       supabase.from("push_notification_logs").select("*").order("sent_at", { ascending: false }).limit(20),
       supabase.from("staff_corner").select("*").order("is_pinned", { ascending: false }).order("created_at", { ascending: false }),
+      supabase.from("break_tips").select("*").order("sort_order", { ascending: true }),
+      supabase.from("motivational_quotes").select("*").order("created_at", { ascending: false }),
     ])
     setAnnouncements(announcementsRes.data || [])
     setNotifications(notificationsRes.data || [])
     setStaffCorner(staffCornerRes.data || [])
+    setBreakTips(breakTipsRes.data || [])
+    setQuotes(quotesRes.data || [])
     setLoading(false)
   }
 
@@ -135,6 +142,20 @@ export default function ContentPage() {
         is_pinned: item?.is_pinned || false,
         is_active: item?.is_active ?? true,
         image_url: item?.image_url || ""
+      })
+    } else if (type === "break_tip") {
+      setFormData({
+        title: item?.title || "",
+        description: item?.description || "",
+        icon: item?.icon || "lightbulb",
+        sort_order: item?.sort_order || 0,
+        is_active: item?.is_active ?? true
+      })
+    } else if (type === "quote") {
+      setFormData({
+        quote: item?.quote || "",
+        author: item?.author || "",
+        is_active: item?.is_active ?? true
       })
     }
     setDialogType(type)
@@ -217,6 +238,45 @@ export default function ContentPage() {
         const res = await supabase.from("staff_corner").insert(payload)
         error = res.error
       }
+    } else if (dialogType === "break_tip") {
+      if (!formData.title.trim() || !formData.description.trim()) {
+        toast.error("Title and description are required")
+        setSaving(false)
+        return
+      }
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        icon: formData.icon,
+        sort_order: formData.sort_order || 0,
+        is_active: formData.is_active,
+        updated_at: new Date().toISOString()
+      }
+      if (selectedItem) {
+        const res = await supabase.from("break_tips").update(payload).eq("id", selectedItem.id)
+        error = res.error
+      } else {
+        const res = await supabase.from("break_tips").insert(payload)
+        error = res.error
+      }
+    } else if (dialogType === "quote") {
+      if (!formData.quote.trim()) {
+        toast.error("Quote text is required")
+        setSaving(false)
+        return
+      }
+      const payload = {
+        quote: formData.quote,
+        author: formData.author || null,
+        is_active: formData.is_active
+      }
+      if (selectedItem) {
+        const res = await supabase.from("motivational_quotes").update(payload).eq("id", selectedItem.id)
+        error = res.error
+      } else {
+        const res = await supabase.from("motivational_quotes").insert(payload)
+        error = res.error
+      }
     }
 
     if (error) {
@@ -239,6 +299,12 @@ export default function ContentPage() {
           const { data } = await supabase.from("staff_corner").select("*").order("is_pinned", { ascending: false }).order("created_at", { ascending: false })
           if (data) setStaffCorner(data)
         }
+      } else if (dialogType === "break_tip") {
+        const { data } = await supabase.from("break_tips").select("*").order("sort_order", { ascending: true })
+        if (data) setBreakTips(data)
+      } else if (dialogType === "quote") {
+        const { data } = await supabase.from("motivational_quotes").select("*").order("created_at", { ascending: false })
+        if (data) setQuotes(data)
       }
     }
     setSaving(false)
@@ -246,7 +312,12 @@ export default function ContentPage() {
   }
 
   const handleDelete = async (type: string, id: string) => {
-    const table = type === "staff" ? "staff_corner" : type === "push" ? "push_notification_logs" : "announcements"
+    let table = "announcements"
+    if (type === "staff") table = "staff_corner"
+    else if (type === "push") table = "push_notification_logs"
+    else if (type === "break_tip") table = "break_tips"
+    else if (type === "quote") table = "motivational_quotes"
+
     const { error } = await supabase.from(table).delete().eq("id", id)
     if (error) toast.error("Failed to delete")
     else {
@@ -255,7 +326,33 @@ export default function ContentPage() {
         setStaffCorner(prev => prev.filter(s => s.id !== id))
       } else if (type === "announcement") {
         setAnnouncements(prev => prev.filter(a => a.id !== id))
+      } else if (type === "break_tip") {
+        setBreakTips(prev => prev.filter(b => b.id !== id))
+      } else if (type === "quote") {
+        setQuotes(prev => prev.filter(q => q.id !== id))
       }
+    }
+  }
+
+  const toggleBreakTipStatus = async (tip: any) => {
+    const { error } = await supabase
+      .from("break_tips")
+      .update({ is_active: !tip.is_active })
+      .eq("id", tip.id)
+    if (error) toast.error("Failed to update")
+    else {
+      setBreakTips(prev => prev.map(t => t.id === tip.id ? { ...t, is_active: !t.is_active } : t))
+    }
+  }
+
+  const toggleQuoteStatus = async (quote: any) => {
+    const { error } = await supabase
+      .from("motivational_quotes")
+      .update({ is_active: !quote.is_active })
+      .eq("id", quote.id)
+    if (error) toast.error("Failed to update")
+    else {
+      setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, is_active: !q.is_active } : q))
     }
   }
 
@@ -271,6 +368,17 @@ export default function ContentPage() {
     }
   }
 
+  const toggleStaffStatus = async (item: StaffCornerItem) => {
+    const { error } = await supabase
+      .from("staff_corner")
+      .update({ is_active: !item.is_active })
+      .eq("id", item.id)
+    if (error) toast.error("Failed to update")
+    else {
+      setStaffCorner(prev => prev.map(s => s.id === item.id ? { ...s, is_active: !s.is_active } : s))
+    }
+  }
+
   const toggleAnnouncementPin = async (item: { id: string; is_pinned: boolean }) => {
     const { error } = await supabase
       .from("announcements")
@@ -280,6 +388,17 @@ export default function ContentPage() {
     else {
       toast.success(item.is_pinned ? "Unpinned" : "Pinned")
       setAnnouncements(prev => prev.map(a => a.id === item.id ? { ...a, is_pinned: !a.is_pinned } : a))
+    }
+  }
+
+  const toggleAnnouncementStatus = async (item: { id: string; is_active: boolean }) => {
+    const { error } = await supabase
+      .from("announcements")
+      .update({ is_active: !item.is_active })
+      .eq("id", item.id)
+    if (error) toast.error("Failed to update")
+    else {
+      setAnnouncements(prev => prev.map(a => a.id === item.id ? { ...a, is_active: !a.is_active } : a))
     }
   }
 
@@ -343,6 +462,14 @@ export default function ContentPage() {
           </TabsTrigger>
           <TabsTrigger value="announcements">Announcements</TabsTrigger>
           <TabsTrigger value="notifications">Push Notifications</TabsTrigger>
+          <TabsTrigger value="break_tips" className="flex items-center gap-2">
+            <Coffee className="h-4 w-4" />
+            Break Tips
+          </TabsTrigger>
+          <TabsTrigger value="quotes" className="flex items-center gap-2">
+            <Quote className="h-4 w-4" />
+            Quotes
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="staff">
@@ -406,9 +533,10 @@ export default function ContentPage() {
                         </TableCell>
                         <TableCell>{getPriorityBadge(item.priority)}</TableCell>
                         <TableCell>
-                          <Badge variant={item.is_active ? "success" : "secondary"}>
-                            {item.is_active ? "Active" : "Draft"}
-                          </Badge>
+                          <Switch
+                            checked={item.is_active}
+                            onCheckedChange={() => toggleStaffStatus(item)}
+                          />
                         </TableCell>
                         <TableCell>{item.published_at ? formatDate(item.published_at) : "-"}</TableCell>
                         <TableCell>
@@ -510,9 +638,10 @@ export default function ContentPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={ann.is_active ? "success" : "secondary"}>
-                            {ann.is_active ? "Active" : "Inactive"}
-                          </Badge>
+                          <Switch
+                            checked={ann.is_active}
+                            onCheckedChange={() => toggleAnnouncementStatus(ann)}
+                          />
                         </TableCell>
                         <TableCell>{formatDate(ann.created_at)}</TableCell>
                         <TableCell>
@@ -603,6 +732,140 @@ export default function ContentPage() {
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete("push", notif.id)}>
+                                <Trash2 className="mr-2 h-4 w-4" />Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Break Tips Tab */}
+        <TabsContent value="break_tips">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Break Tips</CardTitle>
+              <Button size="sm" onClick={() => openDialog("break_tip")}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Tip
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Icon</TableHead>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Order</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="w-12"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {breakTips.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        No break tips yet
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    breakTips.map((tip) => (
+                      <TableRow key={tip.id}>
+                        <TableCell>
+                          <Badge variant="outline">{tip.icon}</Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">{tip.title}</TableCell>
+                        <TableCell className="text-muted-foreground max-w-xs truncate">{tip.description}</TableCell>
+                        <TableCell>{tip.sort_order}</TableCell>
+                        <TableCell>
+                          <Switch
+                            checked={tip.is_active}
+                            onCheckedChange={() => toggleBreakTipStatus(tip)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onSelect={() => openDialog("break_tip", tip)}>
+                                <Edit className="mr-2 h-4 w-4" />Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete("break_tip", tip.id)}>
+                                <Trash2 className="mr-2 h-4 w-4" />Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Quotes Tab */}
+        <TabsContent value="quotes">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Motivational Quotes</CardTitle>
+              <Button size="sm" onClick={() => openDialog("quote")}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Quote
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Quote</TableHead>
+                    <TableHead>Author</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="w-12"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {quotes.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                        No quotes yet
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    quotes.map((quote) => (
+                      <TableRow key={quote.id}>
+                        <TableCell className="max-w-md">
+                          <p className="italic">&ldquo;{quote.quote}&rdquo;</p>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{quote.author || "-"}</TableCell>
+                        <TableCell>
+                          <Switch
+                            checked={quote.is_active}
+                            onCheckedChange={() => toggleQuoteStatus(quote)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onSelect={() => openDialog("quote", quote)}>
+                                <Edit className="mr-2 h-4 w-4" />Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete("quote", quote.id)}>
                                 <Trash2 className="mr-2 h-4 w-4" />Delete
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -809,6 +1072,122 @@ export default function ContentPage() {
             <Button variant="outline" onClick={() => setDialogType(null)}>Cancel</Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? "Saving..." : selectedItem ? "Update" : "Send Notification"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Break Tip Dialog */}
+      <Dialog open={dialogType === "break_tip"} onOpenChange={() => setDialogType(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedItem ? "Edit Break Tip" : "Add Break Tip"}</DialogTitle>
+            <DialogDescription>
+              Tips shown to drivers during their break
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Title</label>
+              <Input
+                placeholder="e.g., Stretch your legs"
+                value={formData.title || ""}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Description</label>
+              <Input
+                placeholder="e.g., Take a short walk to refresh"
+                value={formData.description || ""}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Icon</label>
+                <Select value={formData.icon || "lightbulb"} onValueChange={(v) => setFormData({ ...formData, icon: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="directions_walk">Walk</SelectItem>
+                    <SelectItem value="water_drop">Water</SelectItem>
+                    <SelectItem value="visibility">Eyes</SelectItem>
+                    <SelectItem value="restaurant">Food</SelectItem>
+                    <SelectItem value="self_improvement">Relax</SelectItem>
+                    <SelectItem value="lightbulb">Idea</SelectItem>
+                    <SelectItem value="favorite">Heart</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Sort Order</label>
+                <Input
+                  type="number"
+                  value={formData.sort_order || 0}
+                  onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="tip_active"
+                checked={formData.is_active}
+                onCheckedChange={(c) => setFormData({ ...formData, is_active: !!c })}
+              />
+              <label htmlFor="tip_active" className="text-sm">Active</label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogType(null)}>Cancel</Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Saving..." : selectedItem ? "Update" : "Add Tip"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quote Dialog */}
+      <Dialog open={dialogType === "quote"} onOpenChange={() => setDialogType(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedItem ? "Edit Quote" : "Add Quote"}</DialogTitle>
+            <DialogDescription>
+              Motivational quotes shown to drivers during breaks
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Quote</label>
+              <Textarea
+                placeholder="A moment of rest today leads to safer journeys tomorrow."
+                value={formData.quote || ""}
+                onChange={(e) => setFormData({ ...formData, quote: e.target.value })}
+                rows={3}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Author (optional)</label>
+              <Input
+                placeholder="e.g., Anonymous"
+                value={formData.author || ""}
+                onChange={(e) => setFormData({ ...formData, author: e.target.value })}
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="quote_active"
+                checked={formData.is_active}
+                onCheckedChange={(c) => setFormData({ ...formData, is_active: !!c })}
+              />
+              <label htmlFor="quote_active" className="text-sm">Active</label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogType(null)}>Cancel</Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Saving..." : selectedItem ? "Update" : "Add Quote"}
             </Button>
           </DialogFooter>
         </DialogContent>

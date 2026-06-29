@@ -17,6 +17,7 @@ import 'profile_screen.dart';
 import 'ride_screen.dart';
 import 'chat_screen.dart';
 import '../services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -32,11 +33,17 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isNavVisible = true;
   final ScrollController _scrollController = ScrollController();
   double _lastScrollOffset = 0;
+  List<Map<String, dynamic>> _breakTips = [];
+  Map<String, dynamic>? _currentQuote;
+  dynamic _breakTipsSubscription;
+  dynamic _quotesSubscription;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    _loadBreakContent();
+    _subscribeToBreakContent();
     // Mark that we're on home screen and listen for active ride
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final state = context.read<DriverState>();
@@ -56,9 +63,50 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Future<void> _loadBreakContent() async {
+    final tips = await SupabaseService.getBreakTips();
+    final quote = await SupabaseService.getRandomQuote();
+    if (mounted) {
+      setState(() {
+        _breakTips = tips;
+        _currentQuote = quote;
+      });
+    }
+  }
+
+  void _subscribeToBreakContent() {
+    final supabase = SupabaseService.client;
+    debugPrint('Setting up break content realtime subscriptions...');
+
+    _breakTipsSubscription = supabase
+        .channel('break_tips_changes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'break_tips',
+          callback: (payload) {
+            debugPrint('Break tips changed: ${payload.eventType}');
+            _loadBreakContent();
+          },
+        )
+        .subscribe();
+
+    _quotesSubscription = supabase
+        .channel('quotes_changes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'motivational_quotes',
+          callback: (payload) => _loadBreakContent(),
+        )
+        .subscribe();
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
+    _breakTipsSubscription?.unsubscribe();
+    _quotesSubscription?.unsubscribe();
     // Remove listener
     try {
       context.read<DriverState>().removeListener(_onDriverStateChanged);
@@ -187,6 +235,45 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         // For other states: use ScrollView as before
+        // Online view needs special handling to center the "Looking for Rides" block
+        if (state.isOnline && !state.isOnBreak) {
+          return Stack(
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final bottomPadding = MediaQuery.of(context).padding.bottom + 120;
+                  return SingleChildScrollView(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                      child: IntrinsicHeight(
+                        child: Column(
+                          children: [
+                            SizedBox(height: topPadding),
+                            _buildHeader(context, state),
+                            _buildOnlineView(context, state),
+                            // Centered waiting block fills remaining space
+                            Expanded(
+                              child: Center(
+                                child: Padding(
+                                  padding: EdgeInsets.only(bottom: bottomPadding),
+                                  child: _buildWaitingForRidesBlock(context, state),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              // Popup overlay handled below in shared code
+            ],
+          );
+        }
+
         return Stack(
           children: [
             SingleChildScrollView(
@@ -199,8 +286,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   if (state.isOnBreak)
                     _buildBreakView(context, state)
-                  else if (state.isOnline)
-                    _buildOnlineView(context, state)
                   else
                     _buildOfflineView(context, state),
 
@@ -674,56 +759,52 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
-        // Waiting for rides view
-        ...[
-          const SizedBox(height: 24),
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: AppColors.success.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(
-                    Icons.search,
-                    size: 32,
-                    color: AppColors.success,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Looking for Rides',
-                  style: TextStyle(
-                    color: context.textColor,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40),
-                  child: Text(
-                    'You\'ll be notified when a staff member requests a ride',
-                    style: TextStyle(
-                      color: context.mutedColor,
-                      fontSize: 13,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
+      ],
+    );
+  }
 
+  Widget _buildWaitingForRidesBlock(BuildContext context, DriverState state) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            color: AppColors.success.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Icon(
+            Icons.search,
+            size: 32,
+            color: AppColors.success,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Looking for Rides',
+          style: TextStyle(
+            color: context.textColor,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 40),
+          child: Text(
+            'You\'ll be notified when a staff member requests a ride',
+            style: TextStyle(
+              color: context.mutedColor,
+              fontSize: 13,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        const SizedBox(height: 24),
         // End Shift Button
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: SizedBox(
             width: double.infinity,
             height: 52,
@@ -793,65 +874,81 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
 
           // Break Tips Section
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Break Tips',
-                  style: TextStyle(
-                    color: context.textColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _buildBreakTip(context, Icons.directions_walk_rounded, 'Stretch your legs', 'Take a short walk to refresh'),
-                const SizedBox(height: 10),
-                _buildBreakTip(context, Icons.water_drop_rounded, 'Stay hydrated', 'Drink water to stay alert'),
-                const SizedBox(height: 10),
-                _buildBreakTip(context, Icons.visibility_rounded, 'Rest your eyes', 'Look away from screen for a moment'),
-              ],
-            ),
-          ),
-
-          // Motivational Quote
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    AppColors.warning.withValues(alpha: 0.1),
-                    AppColors.warning.withValues(alpha: 0.05),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.warning.withValues(alpha: 0.2)),
-              ),
+          if (_breakTips.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.format_quote_rounded, color: AppColors.warning, size: 28),
-                  const SizedBox(height: 12),
                   Text(
-                    '"A moment of rest today leads to safer journeys tomorrow."',
+                    'Break Tips',
                     style: TextStyle(
                       color: context.textColor,
-                      fontSize: 15,
-                      fontStyle: FontStyle.italic,
-                      height: 1.5,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                     ),
-                    textAlign: TextAlign.center,
                   ),
+                  const SizedBox(height: 12),
+                  ..._breakTips.map((tip) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _buildBreakTip(
+                      context,
+                      _getIconForName(tip['icon'] ?? 'lightbulb'),
+                      tip['title'] ?? '',
+                      tip['description'] ?? '',
+                    ),
+                  )),
                 ],
               ),
             ),
-          ),
+
+          // Motivational Quote
+          if (_currentQuote != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.warning.withValues(alpha: 0.1),
+                      AppColors.warning.withValues(alpha: 0.05),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.warning.withValues(alpha: 0.2)),
+                ),
+                child: Column(
+                  children: [
+                    Icon(Icons.format_quote_rounded, color: AppColors.warning, size: 28),
+                    const SizedBox(height: 12),
+                    Text(
+                      '"${_currentQuote!['quote']}"',
+                      style: TextStyle(
+                        color: context.textColor,
+                        fontSize: 15,
+                        fontStyle: FontStyle.italic,
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    if (_currentQuote!['author'] != null && _currentQuote!['author'].toString().isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        '— ${_currentQuote!['author']}',
+                        style: TextStyle(
+                          color: context.mutedColor,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -903,6 +1000,26 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  IconData _getIconForName(String name) {
+    switch (name) {
+      case 'directions_walk':
+        return Icons.directions_walk_rounded;
+      case 'water_drop':
+        return Icons.water_drop_rounded;
+      case 'visibility':
+        return Icons.visibility_rounded;
+      case 'restaurant':
+        return Icons.restaurant_rounded;
+      case 'self_improvement':
+        return Icons.self_improvement_rounded;
+      case 'favorite':
+        return Icons.favorite_rounded;
+      case 'lightbulb':
+      default:
+        return Icons.lightbulb_rounded;
+    }
   }
 
   void _showEndShiftDialog(BuildContext context, DriverState state) {

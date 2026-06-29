@@ -17,6 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
 import {
   Plus, Bus, Ship, Loader2, Clock, MapPin, RefreshCw, MoreHorizontal, Pencil, Trash2, X, Upload, Image, FileText, GripVertical, Download
 } from "lucide-react"
@@ -175,6 +176,17 @@ export default function SchedulingPage() {
     } else {
       toast.success("Route deleted")
       setRoutes(prev => prev.filter(r => r.id !== idToDelete))
+    }
+  }
+
+  const toggleRouteStatus = async (route: TransportRoute) => {
+    const { error } = await supabase
+      .from("transport_routes")
+      .update({ is_active: !route.is_active })
+      .eq("id", route.id)
+    if (error) toast.error("Failed to update")
+    else {
+      setRoutes(prev => prev.map(r => r.id === route.id ? { ...r, is_active: !r.is_active } : r))
     }
   }
 
@@ -591,9 +603,10 @@ export default function SchedulingPage() {
                         {route.schedules?.length || 0} times
                       </TableCell>
                       <TableCell>
-                        <Badge className={route.is_active ? "bg-green-500" : "bg-gray-500"}>
-                          {route.is_active ? "Active" : "Inactive"}
-                        </Badge>
+                        <Switch
+                          checked={route.is_active}
+                          onCheckedChange={() => toggleRouteStatus(route)}
+                        />
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

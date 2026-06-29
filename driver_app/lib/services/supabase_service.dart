@@ -1545,4 +1545,36 @@ class SupabaseService {
         )
         .subscribe();
   }
+
+  /// Get active break tips from database
+  static Future<List<Map<String, dynamic>>> getBreakTips() async {
+    try {
+      final response = await client
+          .from('break_tips')
+          .select()
+          .eq('is_active', true)
+          .order('sort_order', ascending: true);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error fetching break tips: $e');
+      return [];
+    }
+  }
+
+  /// Get random active motivational quote
+  static Future<Map<String, dynamic>?> getRandomQuote() async {
+    try {
+      final response = await client
+          .from('motivational_quotes')
+          .select()
+          .eq('is_active', true);
+      final quotes = List<Map<String, dynamic>>.from(response);
+      if (quotes.isEmpty) return null;
+      quotes.shuffle();
+      return quotes.first;
+    } catch (e) {
+      debugPrint('Error fetching quote: $e');
+      return null;
+    }
+  }
 }

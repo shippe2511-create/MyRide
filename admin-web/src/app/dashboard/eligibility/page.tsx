@@ -18,6 +18,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Zap, Calendar, Clock, Download } from "lucide-react"
 import { formatDate } from "@/lib/utils"
 import { toast } from "sonner"
@@ -323,9 +324,10 @@ export default function EligibilityPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={campaign.is_active ? "success" : "secondary"}>
-                        {campaign.is_active ? "Active" : "Inactive"}
-                      </Badge>
+                      <Switch
+                        checked={campaign.is_active}
+                        onCheckedChange={() => toggleActive(campaign)}
+                      />
                     </TableCell>
                     <TableCell>{formatDate(campaign.created_at)}</TableCell>
                     <TableCell>

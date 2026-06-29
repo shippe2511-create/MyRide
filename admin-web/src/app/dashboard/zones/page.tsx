@@ -18,6 +18,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Map, Download } from "lucide-react"
 import { formatDate } from "@/lib/utils"
 import { toast } from "sonner"
@@ -220,6 +221,28 @@ export default function ZonesPage() {
     setDialogType(null)
   }
 
+  const toggleZoneStatus = async (zone: Zone) => {
+    const { error } = await supabase
+      .from("service_zones")
+      .update({ is_active: !zone.is_active })
+      .eq("id", zone.id)
+    if (error) toast.error("Failed to update")
+    else {
+      setZones(prev => prev.map(z => z.id === zone.id ? { ...z, is_active: !z.is_active } : z))
+    }
+  }
+
+  const toggleLocationStatus = async (loc: Location) => {
+    const { error } = await supabase
+      .from("locations")
+      .update({ is_active: !loc.is_active })
+      .eq("id", loc.id)
+    if (error) toast.error("Failed to update")
+    else {
+      setLocations(prev => prev.map(l => l.id === loc.id ? { ...l, is_active: !l.is_active } : l))
+    }
+  }
+
   const handleDeleteZone = async (e?: React.MouseEvent) => {
     e?.preventDefault()
     if (!selectedItem) return
@@ -404,9 +427,10 @@ export default function ZonesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={zone.is_active ? "success" : "secondary"}>
-                          {zone.is_active ? "Active" : "Inactive"}
-                        </Badge>
+                        <Switch
+                          checked={zone.is_active}
+                          onCheckedChange={() => toggleZoneStatus(zone)}
+                        />
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -475,9 +499,10 @@ export default function ZonesPage() {
                       <TableCell className="font-medium">{loc.name}</TableCell>
                       <TableCell><Badge variant="secondary">{loc.location_type}</Badge></TableCell>
                       <TableCell>
-                        <Badge variant={loc.is_active ? "success" : "secondary"}>
-                          {loc.is_active ? "Active" : "Inactive"}
-                        </Badge>
+                        <Switch
+                          checked={loc.is_active}
+                          onCheckedChange={() => toggleLocationStatus(loc)}
+                        />
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

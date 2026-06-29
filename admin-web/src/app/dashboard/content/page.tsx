@@ -346,13 +346,18 @@ export default function ContentPage() {
   }
 
   const toggleQuoteStatus = async (quote: any) => {
+    // Optimistic update first
+    const newValue = !quote.is_active
+    setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, is_active: newValue } : q))
+
     const { error } = await supabase
       .from("motivational_quotes")
-      .update({ is_active: !quote.is_active })
+      .update({ is_active: newValue })
       .eq("id", quote.id)
-    if (error) toast.error("Failed to update")
-    else {
-      setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, is_active: !q.is_active } : q))
+    if (error) {
+      toast.error("Failed to update quote status")
+      // Revert on error
+      setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, is_active: !newValue } : q))
     }
   }
 

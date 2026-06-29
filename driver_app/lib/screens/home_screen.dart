@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -34,7 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
   double _lastScrollOffset = 0;
   List<Map<String, dynamic>> _breakTips = [];
-  Map<String, dynamic>? _currentQuote;
+  List<Map<String, dynamic>> _quotes = [];
   RealtimeChannel? _breakTipsChannel;
   RealtimeChannel? _quotesChannel;
 
@@ -65,12 +66,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadBreakContent() async {
+    debugPrint('_loadBreakContent: loading...');
     final tips = await SupabaseService.getBreakTips();
-    final quote = await SupabaseService.getRandomQuote();
+    final quotes = await SupabaseService.getAllActiveQuotes();
+    debugPrint('_loadBreakContent: got ${tips.length} tips, ${quotes.length} quotes');
     if (mounted) {
       setState(() {
         _breakTips = tips;
-        _currentQuote = quote;
+        _quotes = quotes;
       });
     }
   }
@@ -79,7 +82,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final supabase = SupabaseService.client;
     debugPrint('Setting up break content realtime subscriptions...');
 
-    _breakTipsChannel = supabase.channel('break_tips_realtime');
+    _breakTipsChannel = supabase.channel('break_tips_changes');
     _breakTipsChannel!
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
@@ -91,10 +94,10 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         )
         .subscribe((status, error) {
-          debugPrint('Break tips subscription status: $status, error: $error');
+          debugPrint('Break tips subscription: $status, error: $error');
         });
 
-    _quotesChannel = supabase.channel('quotes_realtime');
+    _quotesChannel = supabase.channel('quotes_changes');
     _quotesChannel!
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
@@ -106,8 +109,14 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         )
         .subscribe((status, error) {
-          debugPrint('Quotes subscription status: $status, error: $error');
+          debugPrint('Quotes subscription: $status, error: $error');
         });
+  }
+
+  void _onBreakStateChanged(bool isOnBreak) {
+    if (isOnBreak) {
+      _loadBreakContent();
+    }
   }
 
   @override
@@ -138,11 +147,19 @@ class _HomeScreenState extends State<HomeScreen> {
     _lastScrollOffset = currentOffset;
   }
 
+  bool _wasOnBreak = false;
+
   void _onDriverStateChanged() {
     if (!mounted) return;
     final state = context.read<DriverState>();
     debugPrint('Driver state changed: hasActiveRide=${state.hasActiveRide}, hasNavigated=$_hasNavigatedToActiveRide');
     _checkForActiveRide();
+
+    // Reload break content when entering break
+    if (state.isOnBreak && !_wasOnBreak) {
+      _loadBreakContent();
+    }
+    _wasOnBreak = state.isOnBreak;
   }
 
   void _checkForActiveRide() {
@@ -322,21 +339,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
         return Stack(
           children: [
-            SingleChildScrollView(
-              controller: _scrollController,
-              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-              child: Column(
-                children: [
-                  SizedBox(height: topPadding),
-                  _buildHeader(context, state),
+            RefreshIndicator(
+              onRefresh: _loadBreakContent,
+              color: AppColors.yellow,
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                child: Column(
+                  children: [
+                    SizedBox(height: topPadding),
+                    _buildHeader(context, state),
 
-                  if (state.isOnBreak)
-                    _buildBreakView(context, state)
-                  else
-                    _buildOfflineView(context, state),
+                    if (state.isOnBreak)
+                      _buildBreakView(context, state)
+                    else
+                      _buildOfflineView(context, state),
 
-                  SizedBox(height: MediaQuery.of(context).padding.bottom + 120),
-                ],
+                    SizedBox(height: MediaQuery.of(context).padding.bottom + 120),
+                  ],
+                ),
               ),
             ),
 
@@ -949,51 +970,68 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-          // Motivational Quote
-          if (_currentQuote != null)
+          // Motivational Quotes
+          if (_quotes.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppColors.warning.withValues(alpha: 0.1),
-                      AppColors.warning.withValues(alpha: 0.05),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.warning.withValues(alpha: 0.2)),
-                ),
-                child: Column(
-                  children: [
-                    Icon(Icons.format_quote_rounded, color: AppColors.warning, size: 28),
-                    const SizedBox(height: 12),
-                    Text(
-                      '"${_currentQuote!['quote']}"',
-                      style: TextStyle(
-                        color: context.textColor,
-                        fontSize: 15,
-                        fontStyle: FontStyle.italic,
-                        height: 1.5,
-                      ),
-                      textAlign: TextAlign.center,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Motivational Quotes',
+                    style: TextStyle(
+                      color: context.textColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                     ),
-                    if (_currentQuote!['author'] != null && _currentQuote!['author'].toString().isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        '— ${_currentQuote!['author']}',
-                        style: TextStyle(
-                          color: context.mutedColor,
-                          fontSize: 13,
+                  ),
+                  const SizedBox(height: 12),
+                  ..._quotes.map((quote) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.warning.withValues(alpha: 0.1),
+                            AppColors.warning.withValues(alpha: 0.05),
+                          ],
                         ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.warning.withValues(alpha: 0.2)),
                       ),
-                    ],
-                  ],
-                ),
+                      child: Column(
+                        children: [
+                          Icon(Icons.format_quote_rounded, color: AppColors.warning, size: 24),
+                          const SizedBox(height: 8),
+                          Text(
+                            '"${quote['quote']}"',
+                            style: TextStyle(
+                              color: context.textColor,
+                              fontSize: 14,
+                              fontStyle: FontStyle.italic,
+                              height: 1.4,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          if (quote['author'] != null && quote['author'].toString().isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              '— ${quote['author']}',
+                              style: TextStyle(
+                                color: context.mutedColor,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  )),
+                ],
               ),
             ),
       ],

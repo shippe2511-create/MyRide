@@ -1585,4 +1585,20 @@ class SupabaseService {
       return null;
     }
   }
+
+  static Future<List<Map<String, dynamic>>> getAllActiveQuotes() async {
+    try {
+      debugPrint('getAllActiveQuotes: fetching...');
+      final response = await client
+          .from('motivational_quotes')
+          .select()
+          .eq('is_active', true)
+          .order('created_at', ascending: true);
+      debugPrint('getAllActiveQuotes: got ${response.length} quotes');
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error fetching quotes: $e');
+      return [];
+    }
+  }
 }

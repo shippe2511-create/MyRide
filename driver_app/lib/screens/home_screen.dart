@@ -148,6 +148,45 @@ class _HomeScreenState extends State<HomeScreen> {
     final topPadding = MediaQuery.of(context).padding.top;
     return Consumer<DriverState>(
       builder: (context, state, _) {
+        // For active ride: use flex layout (no ScrollView) so Center works
+        if (state.hasActiveRide) {
+          return Stack(
+            children: [
+              Column(
+                children: [
+                  SizedBox(height: topPadding),
+                  _buildHeader(context, state),
+                  Expanded(
+                    child: _buildActiveRideView(context, state),
+                  ),
+                  SizedBox(height: 100), // Space for nav bar
+                ],
+              ),
+              // Ride request popup during active ride
+              if (state.incomingRequests.isNotEmpty)
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black.withValues(alpha: 0.7),
+                    child: Center(
+                      child: RideRequestPopup(
+                        key: ValueKey(state.incomingRequests.first.id),
+                        request: state.incomingRequests.first,
+                        onAccept: () async {
+                          final result = await state.acceptRide(state.incomingRequests.first);
+                          if (result['success'] != true && mounted) {
+                            AppSnackbar.warning(context, result['error'] ?? 'Ride was taken');
+                          }
+                        },
+                        onDecline: () => state.expireRide(state.incomingRequests.first),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        }
+
+        // For other states: use ScrollView as before
         return Stack(
           children: [
             SingleChildScrollView(
@@ -156,19 +195,15 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 children: [
                   SizedBox(height: topPadding),
-                  // Header
                   _buildHeader(context, state),
 
-                  // Main content - no fixed height, let it flow naturally
-                  state.hasActiveRide
-                      ? _buildActiveRideView(context, state)
-                      : state.isOnBreak
-                          ? _buildBreakView(context, state)
-                          : state.isOnline
-                              ? _buildOnlineView(context, state)
-                              : _buildOfflineView(context, state),
+                  if (state.isOnBreak)
+                    _buildBreakView(context, state)
+                  else if (state.isOnline)
+                    _buildOnlineView(context, state)
+                  else
+                    _buildOfflineView(context, state),
 
-                  // Extra padding so content can scroll behind nav bar
                   SizedBox(height: MediaQuery.of(context).padding.bottom + 120),
                 ],
               ),
@@ -1136,10 +1171,16 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildActiveRideView(BuildContext context, DriverState state) {
     final ride = state.currentRide!;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
           // Tap to open full ride screen
           GestureDetector(
             onTap: () => Navigator.push(
@@ -1284,7 +1325,11 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildIncomingDuringTrip(context, state),
           ],
         ],
-      ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

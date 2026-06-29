@@ -170,7 +170,9 @@
       "Bash(grep -n \"^\\\\s*],\\\\s*$\" /Users/athifabdulla/Downloads/MyRide/driver_app/lib/screens/ride_screen.dart)",
       "Bash(xcrun simctl *)",
       "Bash(rm -rf ios/Pods ios/Podfile.lock)",
-      "Bash(grep -E \"\\\\.dart$\")"
+      "Bash(grep -E \"\\\\.dart$\")",
+      "Bash(rm -rf /tmp/claude-*)",
+      "Bash(flutter clean *)"
     ],
     "additionalDirectories": [
       "/tmp"

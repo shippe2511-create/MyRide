@@ -982,32 +982,6 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
 
                     const Spacer(),
 
-                    // Seats booked indicator
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      margin: const EdgeInsets.only(right: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.7),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.yellow.withValues(alpha: 0.5)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.event_seat, color: AppColors.yellow, size: 14),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${state.seatsBooked}',
-                            style: const TextStyle(
-                              color: AppColors.yellow,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
                     // New ride button (for pooling - hidden for now)
                     if (false && state.incomingRequests.isNotEmpty && state.hasAvailableSeats)
                       GestureDetector(
@@ -1063,16 +1037,13 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
               ),
 
               // Toggle Bottom Panel
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOutCubic,
+              Positioned(
                 left: 0,
                 right: 0,
                 bottom: 0,
-                height: _isPanelExpanded
-                    ? MediaQuery.of(context).size.height * 0.57
-                    : 200 + MediaQuery.of(context).padding.bottom,
-                child: Container(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOutCubic,
                   decoration: BoxDecoration(
                     color: context.cardColor,
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
@@ -1084,91 +1055,91 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                       ),
                     ],
                   ),
-                  child: Column(
-                    children: [
-                      // Tap Handle to toggle
-                      GestureDetector(
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          setState(() => _isPanelExpanded = !_isPanelExpanded);
-                        },
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          color: Colors.transparent,
-                          child: Column(
-                            children: [
-                              Container(
-                                width: 50,
-                                height: 5,
-                                decoration: BoxDecoration(
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewPadding.bottom + 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Tap Handle to toggle
+                        GestureDetector(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            setState(() => _isPanelExpanded = !_isPanelExpanded);
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            color: Colors.transparent,
+                            child: Column(
+                              children: [
+                                Container(
+                                  width: 50,
+                                  height: 5,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white38,
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Icon(
+                                  _isPanelExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
                                   color: Colors.white38,
-                                  borderRadius: BorderRadius.circular(3),
+                                  size: 20,
                                 ),
-                              ),
-                              const SizedBox(height: 6),
-                              Icon(
-                                _isPanelExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
-                                color: Colors.white38,
-                                size: 20,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // Scrollable content (when expanded)
-                      Expanded(
-                        child: _isPanelExpanded
-                            ? SingleChildScrollView(
-                                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                                child: Column(
-                                  children: [
-                                    _buildCustomerCard(ride, state),
-                                    const SizedBox(height: 12),
-                                    _buildRouteCard(ride),
-                                    if (state.queuedRequests.isNotEmpty) ...[
-                                      const SizedBox(height: 16),
-                                      _buildQueueCard(state),
-                                    ],
-                                  ],
-                                ),
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-
-                      // Cancel button (show when waiting for customer) - always visible
-                      if (ride.status == RideStatus.arrivedAtPickup)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-                          child: GestureDetector(
-                            onTap: () => _showCancelOptions(state, ride),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                color: AppColors.error.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
-                              ),
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.cancel_outlined, color: AppColors.error, size: 20),
-                                  SizedBox(width: 8),
-                                  Text('Cancel Ride', style: TextStyle(color: AppColors.error, fontSize: 14, fontWeight: FontWeight.w600)),
-                                ],
-                              ),
+                              ],
                             ),
                           ),
                         ),
 
-                      // Always show swipe action at bottom
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(context).padding.bottom + 12),
-                        child: _buildSwipeAction(state, ride),
-                      ),
-                    ],
+                        // Content (when expanded)
+                        if (_isPanelExpanded) ...[
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                            child: Column(
+                              children: [
+                                _buildCustomerCard(ride, state),
+                                const SizedBox(height: 12),
+                                _buildRouteCard(ride),
+                                if (state.queuedRequests.isNotEmpty) ...[
+                                  const SizedBox(height: 12),
+                                  _buildQueueCard(state),
+                                ],
+                                // Cancel button (show when waiting for customer)
+                                if (ride.status == RideStatus.arrivedAtPickup) ...[
+                                  const SizedBox(height: 12),
+                                  GestureDetector(
+                                    onTap: () => _showCancelOptions(state, ride),
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.error.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                                      ),
+                                      child: const Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.cancel_outlined, color: AppColors.error, size: 20),
+                                          SizedBox(width: 8),
+                                          Text('Cancel Ride', style: TextStyle(color: AppColors.error, fontSize: 14, fontWeight: FontWeight.w600)),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        // Swipe action always at bottom
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                          child: _buildSwipeAction(state, ride),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -1538,7 +1509,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                           style: TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.w700),
                         ),
                         Text(
-                          '${state.queuedRequests.length} waiting • ${state.availableSeats} seats left',
+                          '${state.queuedRequests.length} waiting',
                           style: TextStyle(color: context.mutedColor, fontSize: 12),
                         ),
                       ],

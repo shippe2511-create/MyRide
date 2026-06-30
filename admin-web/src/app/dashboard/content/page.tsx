@@ -523,6 +523,8 @@ export default function ContentPage() {
         setBreakTips(prev => prev.filter(b => b.id !== id))
       } else if (type === "quote") {
         setQuotes(prev => prev.filter(q => q.id !== id))
+      } else if (type === "push") {
+        setNotifications(prev => prev.filter(n => n.id !== id))
       }
     }
   }

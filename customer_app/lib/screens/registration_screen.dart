@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
@@ -651,8 +652,53 @@ class RejectedScreen extends StatelessWidget {
   }
 }
 
-class SuspendedScreen extends StatelessWidget {
+class SuspendedScreen extends StatefulWidget {
   const SuspendedScreen({super.key});
+
+  @override
+  State<SuspendedScreen> createState() => _SuspendedScreenState();
+}
+
+class _SuspendedScreenState extends State<SuspendedScreen> {
+  RealtimeChannel? _subscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscribeToStatusChanges();
+  }
+
+  @override
+  void dispose() {
+    _subscription?.unsubscribe();
+    super.dispose();
+  }
+
+  void _subscribeToStatusChanges() {
+    final appState = Provider.of<AppState>(context, listen: false);
+    final profileId = appState.profileId;
+    if (profileId == null) return;
+
+    _subscription = SupabaseService.client
+        .channel('suspended_status_$profileId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'profiles',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: profileId,
+          ),
+          callback: (payload) {
+            final status = payload.newRecord['status'] as String?;
+            if (status == 'approved' && mounted) {
+              Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+            }
+          },
+        )
+        .subscribe();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -677,22 +723,6 @@ class SuspendedScreen extends StatelessWidget {
                 'Your account has been suspended. Please contact support for assistance.',
                 style: TextStyle(color: context.mutedColor, fontSize: 15, height: 1.5),
                 textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.red.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.red.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.support_agent, color: AppColors.red, size: 20),
-                    const SizedBox(width: 12),
-                    Expanded(child: Text('Contact IT helpdesk for more information', style: TextStyle(color: context.textColor, fontSize: 13, height: 1.4))),
-                  ],
-                ),
               ),
               const Spacer(),
               SizedBox(

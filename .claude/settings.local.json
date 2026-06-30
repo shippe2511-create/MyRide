@@ -172,7 +172,17 @@
       "Bash(rm -rf ios/Pods ios/Podfile.lock)",
       "Bash(grep -E \"\\\\.dart$\")",
       "Bash(rm -rf /tmp/claude-*)",
-      "Bash(flutter clean *)"
+      "Bash(flutter clean *)",
+      "Bash(rm -rf /tmp/flutter*)",
+      "Bash(tee /tmp/flutter_log.txt)",
+      "Bash(xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Debug -sdk iphonesimulator -arch arm64 build)",
+      "Bash(rm -rf /tmp/*)",
+      "Bash(rm -rf ~/.pub-cache/hosted/pub.dev/*/)",
+      "Bash(rm -rf ~/Library/Developer/Xcode/Archives/*)",
+      "Bash(rm -rf ~/Library/Developer/CoreSimulator/Caches/*)",
+      "Bash(rm -rf ~/Library/Caches/com.apple.dt.Xcode/*)",
+      "Bash(rm -rf /var/folders/h1/qnt22wls0v3d8sc4rbn_m1cw0000gn/T/flutter_tools*)",
+      "Bash(rm -rf ~/Downloads/MyRide/*/build)"
     ],
     "additionalDirectories": [
       "/tmp"

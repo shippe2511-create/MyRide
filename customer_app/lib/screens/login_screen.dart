@@ -144,11 +144,20 @@ class _LoginScreenState extends State<LoginScreen> {
 
         // Check status - admins/super-admins bypass pending check
         final isAdmin = role == 'admin' || role == 'super-admin';
-        if (!isAdmin && existingUser['status'] == 'pending') {
+        final status = existingUser['status'] ?? 'pending';
+
+        if (!isAdmin && status == 'pending') {
           Navigator.pushReplacementNamed(context, '/pending');
           return;
-        } else if (existingUser['status'] == 'rejected') {
+        } else if (status == 'rejected') {
           Navigator.pushReplacementNamed(context, '/rejected');
+          return;
+        } else if (status == 'suspended') {
+          Navigator.pushReplacementNamed(context, '/suspended');
+          return;
+        } else if (status != 'approved' && !isAdmin) {
+          // Block any non-approved status
+          Navigator.pushReplacementNamed(context, '/suspended');
           return;
         }
 

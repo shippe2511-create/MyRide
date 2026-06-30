@@ -95,13 +95,23 @@ class _SplashScreenState extends State<SplashScreen>
         final dbUser = await SupabaseService.checkPhoneExists(savedPhone);
         if (dbUser != null) {
           final status = dbUser['status'] as String?;
-          if (status == 'pending') {
+          final role = dbUser['role'] as String? ?? 'customer';
+          final isAdmin = role == 'admin' || role == 'super-admin';
+
+          if (status == 'pending' && !isAdmin) {
             Navigator.pushReplacementNamed(context, '/pending');
             return;
           } else if (status == 'rejected') {
             Navigator.pushReplacementNamed(context, '/rejected');
             return;
-          } else if (status == 'approved' || status == 'active') {
+          } else if (status == 'suspended') {
+            Navigator.pushReplacementNamed(context, '/suspended');
+            return;
+          } else if (status != 'approved' && !isAdmin) {
+            // Not approved, go to welcome
+            Navigator.pushReplacementNamed(context, '/welcome');
+            return;
+          } else if (status == 'approved' || isAdmin) {
             // Store profile ID and update local state
             if (dbUser['id'] != null) {
               appState.setProfileId(dbUser['id']);
@@ -115,10 +125,18 @@ class _SplashScreenState extends State<SplashScreen>
             appState.simulateApproval();
             // Continue to Face ID check below
           }
+        } else {
+          // User not found in DB, go to welcome
+          Navigator.pushReplacementNamed(context, '/welcome');
+          return;
         }
       } catch (e) {
         // Fall back to local state
       }
+    } else {
+      // No saved phone, go to welcome/login
+      Navigator.pushReplacementNamed(context, '/welcome');
+      return;
     }
 
     // Check local registration status as fallback

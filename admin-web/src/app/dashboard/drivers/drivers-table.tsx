@@ -811,7 +811,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                       </Avatar>
                       <div>
                         <span className="font-medium">{driver.full_name}</span>
-                        <p className="text-xs text-muted-foreground">{driver.phone || driver.employee_id || "-"}</p>
+                        <p className="text-xs text-muted-foreground select-text">{driver.phone || driver.employee_id || "-"}</p>
                       </div>
                     </div>
                   </TableCell>

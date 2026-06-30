@@ -92,7 +92,7 @@ export default function DriversPage() {
 
   const { data, isLoading } = useDriversData(search, status, page)
 
-  // Realtime subscription for profile updates
+  // Realtime subscription for profile, driver, and vehicle updates
   useEffect(() => {
     const channel = supabase
       .channel('drivers_realtime')
@@ -100,6 +100,9 @@ export default function DriversPage() {
         queryClient.invalidateQueries({ queryKey: ["drivers-page"] })
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => {
+        queryClient.invalidateQueries({ queryKey: ["drivers-page"] })
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_types' }, () => {
         queryClient.invalidateQueries({ queryKey: ["drivers-page"] })
       })
       .subscribe()

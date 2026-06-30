@@ -462,8 +462,10 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
             console.error("Driver update error:", driverError)
             if (driverError.code === "23505") {
               toast.error("This vehicle is already assigned to another driver")
+              return
             } else {
               toast.error("Failed to assign vehicle: " + driverError.message)
+              return
             }
           } else {
             toast.success("Driver updated")
@@ -482,15 +484,29 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
             console.error("Driver insert error:", driverError)
             if (driverError.code === "23505") {
               toast.error("This vehicle is already assigned to another driver")
+              return
             } else {
               toast.error("Failed to assign vehicle: " + driverError.message)
+              return
             }
           } else {
             toast.success("Driver updated")
             logActivity({ action: 'update', entityType: 'driver', entityId: selectedDriver.id, details: { name: formData.full_name } })
           }
         }
-        setDrivers(prev => prev.map(d => d.id === selectedDriver.id ? { ...d, ...formData, full_name: formData.full_name, status: formData.status } as Driver : d))
+        // Get updated vehicle info for local state
+        const selectedVehicle = vehicles.find(v => v.id === vehicleId)
+        setDrivers(prev => prev.map(d => d.id === selectedDriver.id ? {
+          ...d,
+          ...formData,
+          full_name: formData.full_name,
+          status: formData.status,
+          driver_record: {
+            ...d.driver_record,
+            vehicle_id: vehicleId,
+            vehicle: selectedVehicle ? { id: selectedVehicle.id, display_name: selectedVehicle.display_name, plate_no: selectedVehicle.plate_no } : null
+          }
+        } as Driver : d))
         setDialogType(null)
       }
     } else if (dialogType === "add") {

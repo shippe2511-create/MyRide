@@ -477,7 +477,7 @@ export default function AdminsPage() {
               <TableHead>User</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>Active</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead></TableHead>
             </TableRow>

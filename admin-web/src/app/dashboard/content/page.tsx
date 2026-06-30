@@ -714,7 +714,7 @@ export default function ContentPage() {
                       <TableHead>Title</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead>Priority</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Active</TableHead>
                       <TableHead>Published</TableHead>
                       <TableHead className="w-12"></TableHead>
                     </TableRow>
@@ -767,7 +767,7 @@ export default function ContentPage() {
                       <TableHead>Title</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead>Priority</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Active</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead className="w-12"></TableHead>
                     </TableRow>
@@ -881,7 +881,7 @@ export default function ContentPage() {
                       <TableHead></TableHead>
                       <TableHead>Icon</TableHead>
                       <TableHead>Title & Description</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Active</TableHead>
                       <TableHead className="w-12"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -930,7 +930,7 @@ export default function ContentPage() {
                       <TableHead></TableHead>
                       <TableHead>Quote</TableHead>
                       <TableHead>Author</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Active</TableHead>
                       <TableHead className="w-12"></TableHead>
                     </TableRow>
                   </TableHeader>

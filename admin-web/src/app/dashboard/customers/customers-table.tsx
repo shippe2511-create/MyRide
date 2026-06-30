@@ -141,7 +141,11 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
         } else if (payload.eventType === 'INSERT' && payload.new) {
           const newCustomer = payload.new as Customer
           if (['customer', 'super-admin', 'admin', 'operator', 'support', 'viewer'].includes(newCustomer.role)) {
-            setCustomers(prev => [newCustomer, ...prev].slice(0, pageSize))
+            setCustomers(prev => {
+              // Check if already exists to prevent duplicates
+              if (prev.some(c => c.id === newCustomer.id)) return prev
+              return [newCustomer, ...prev].slice(0, pageSize)
+            })
             setTotalCount(prev => prev + 1)
           }
         }

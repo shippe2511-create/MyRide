@@ -83,7 +83,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       );
 
       HapticFeedback.lightImpact();
-      Navigator.pushReplacementNamed(context, '/pending');
+
+      // Check if user was auto-approved
+      final status = response['status'] as String?;
+      if (status == 'approved') {
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        Navigator.pushReplacementNamed(context, '/pending');
+      }
     } catch (e) {
       if (mounted) {
         HapticFeedback.heavyImpact();

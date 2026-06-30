@@ -62,6 +62,17 @@ class SupabaseService {
     String? staffId,
     List<Map<String, dynamic>>? emergencyContacts,
   }) async {
+    // Check if auto-approve is enabled
+    String status = 'pending';
+    try {
+      final settings = await client.from('app_settings').select('require_customer_approval').limit(1).maybeSingle();
+      if (settings != null && settings['require_customer_approval'] == false) {
+        status = 'approved';
+      }
+    } catch (e) {
+      debugPrint('Error checking app settings: $e');
+    }
+
     final data = <String, dynamic>{
       'phone': phone,
       'full_name': fullName,
@@ -69,7 +80,7 @@ class SupabaseService {
       'employee_id': staffId,
       'emergency_contacts': emergencyContacts,
       'role': 'customer',
-      'status': 'pending',
+      'status': status,
     };
 
     if (email != null && email.isNotEmpty) {

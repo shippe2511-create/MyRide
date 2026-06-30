@@ -460,7 +460,11 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
 
           if (driverError) {
             console.error("Driver update error:", driverError)
-            toast.error("Failed to assign vehicle: " + driverError.message)
+            if (driverError.code === "23505") {
+              toast.error("This vehicle is already assigned to another driver")
+            } else {
+              toast.error("Failed to assign vehicle: " + driverError.message)
+            }
           } else {
             toast.success("Driver updated")
             logActivity({ action: 'update', entityType: 'driver', entityId: selectedDriver.id, details: { name: formData.full_name } })
@@ -476,7 +480,11 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
 
           if (driverError) {
             console.error("Driver insert error:", driverError)
-            toast.error("Failed to assign vehicle: " + driverError.message)
+            if (driverError.code === "23505") {
+              toast.error("This vehicle is already assigned to another driver")
+            } else {
+              toast.error("Failed to assign vehicle: " + driverError.message)
+            }
           } else {
             toast.success("Driver updated")
             logActivity({ action: 'update', entityType: 'driver', entityId: selectedDriver.id, details: { name: formData.full_name } })

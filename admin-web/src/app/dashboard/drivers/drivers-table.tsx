@@ -48,6 +48,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Switch } from "@/components/ui/switch"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Search,
@@ -654,6 +655,26 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
 
   const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
 
+  const toggleDriverStatus = async (driver: Driver) => {
+    const newStatus = driver.status === "approved" ? "suspended" : "approved"
+    // Optimistic update
+    setDrivers(prev => prev.map(d => d.id === driver.id ? { ...d, status: newStatus } : d))
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ status: newStatus })
+      .eq("id", driver.id)
+
+    if (error) {
+      toast.error("Failed to update status")
+      // Revert on error
+      setDrivers(prev => prev.map(d => d.id === driver.id ? { ...d, status: driver.status } : d))
+    } else {
+      toast.success(`Driver ${newStatus === "approved" ? "activated" : "suspended"}`)
+      logActivity({ action: 'update', entityType: 'driver', entityId: driver.id, details: { status: newStatus } })
+    }
+  }
+
   const statusBadge = (status: string) => {
     switch (status) {
       case "approved": return <Badge variant="success">Active</Badge>
@@ -837,21 +858,23 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      {statusBadge(driver.status)}
-                      {driver.status === "pending" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-green-500 border-green-500 hover:bg-green-500 hover:text-white"
-                          onClick={() => handleApprove(driver)}
-                          disabled={loading}
-                        >
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Approve
-                        </Button>
-                      )}
-                    </div>
+                    {driver.status === "pending" ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-green-500 border-green-500 hover:bg-green-500 hover:text-white"
+                        onClick={() => handleApprove(driver)}
+                        disabled={loading}
+                      >
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Approve
+                      </Button>
+                    ) : (
+                      <Switch
+                        checked={driver.status === "approved"}
+                        onCheckedChange={() => toggleDriverStatus(driver)}
+                      />
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

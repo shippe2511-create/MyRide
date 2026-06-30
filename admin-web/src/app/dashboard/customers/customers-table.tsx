@@ -587,7 +587,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
               <TableHead>Contact</TableHead>
               <TableHead>Employee ID</TableHead>
               <TableHead>Department</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>Active</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead className="w-12"></TableHead>
             </TableRow>

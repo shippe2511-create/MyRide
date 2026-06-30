@@ -763,7 +763,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
               <TableHead className="text-center">Trips</TableHead>
               <TableHead className="text-center">Rating</TableHead>
               <TableHead className="text-center">Favorites</TableHead>
-              <TableHead>Account</TableHead>
+              <TableHead>Active</TableHead>
               <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>

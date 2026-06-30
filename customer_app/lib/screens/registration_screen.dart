@@ -650,3 +650,75 @@ class RejectedScreen extends StatelessWidget {
     );
   }
 }
+
+class SuspendedScreen extends StatelessWidget {
+  const SuspendedScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: context.bgColor,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Spacer(),
+              Container(
+                width: 120, height: 120,
+                decoration: BoxDecoration(color: AppColors.red.withValues(alpha: 0.15), shape: BoxShape.circle),
+                child: Icon(Icons.block, color: AppColors.red, size: 56),
+              ),
+              const SizedBox(height: 32),
+              Text('Account Suspended', style: TextStyle(color: context.textColor, fontSize: 28, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              Text(
+                'Your account has been suspended. Please contact support for assistance.',
+                style: TextStyle(color: context.mutedColor, fontSize: 15, height: 1.5),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.red.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.support_agent, color: AppColors.red, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text('Contact IT helpdesk for more information', style: TextStyle(color: context.textColor, fontSize: 13, height: 1.4))),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final appState = Provider.of<AppState>(context, listen: false);
+                    await appState.logout();
+                    if (context.mounted) {
+                      Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.yellow,
+                    foregroundColor: AppColors.bgDark,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 0,
+                  ),
+                  child: Text('Sign Out', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

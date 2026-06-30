@@ -80,6 +80,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _checkForScheduledRides();
     _initNotifications();
     _subscribeToAnnouncements();
+
+    // Listen for account suspension
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final appState = Provider.of<AppState>(context, listen: false);
+      appState.addListener(_checkSuspended);
+    });
+  }
+
+  void _checkSuspended() {
+    if (!mounted) return;
+    final appState = Provider.of<AppState>(context, listen: false);
+    if (appState.isSuspended) {
+      Navigator.pushNamedAndRemoveUntil(context, '/suspended', (route) => false);
+    }
   }
 
   void _subscribeToAnnouncements() {

@@ -69,6 +69,7 @@ import {
   Phone,
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
 import { formatDate } from "@/lib/utils"
 import { logActivity } from "@/lib/activity-logger"
 
@@ -194,6 +195,26 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
       setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, status: newStatus } : c))
     }
     setLoading(false)
+  }
+
+  const toggleCustomerStatus = async (customer: Customer) => {
+    const newStatus = customer.status === "approved" ? "suspended" : "approved"
+    // Optimistic update
+    setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, status: newStatus } : c))
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ status: newStatus })
+      .eq("id", customer.id)
+
+    if (error) {
+      toast.error("Failed to update status")
+      // Revert on error
+      setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, status: customer.status } : c))
+    } else {
+      toast.success(`Customer ${newStatus === "approved" ? "activated" : "suspended"}`)
+      logActivity({ action: 'update', entityType: 'customer', entityId: customer.id, details: { status: newStatus, name: customer.full_name } })
+    }
   }
 
   const handleApprove = async (customer: Customer) => {
@@ -637,9 +658,12 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      {statusBadge(customer.status)}
-                      {customer.status === "pending" && (
+                    {customer.status === "pending" ? (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="warning" className="gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
+                          Pending
+                        </Badge>
                         <Button
                           size="sm"
                           variant="outline"
@@ -650,8 +674,13 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Approve
                         </Button>
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <Switch
+                        checked={customer.status === "approved"}
+                        onCheckedChange={() => toggleCustomerStatus(customer)}
+                      />
+                    )}
                   </TableCell>
                   <TableCell>
                     <span className="text-sm" title={formatDate(customer.created_at)}>

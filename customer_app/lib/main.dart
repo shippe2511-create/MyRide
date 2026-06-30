@@ -136,7 +136,7 @@ class MyRideApp extends StatelessWidget {
           navigatorKey: navigatorKey,
           debugShowCheckedModeBanner: false,
           theme: appState.isDarkMode ? AppTheme.darkTheme : AppTheme.lightTheme,
-          home: const SplashScreen(),
+          home: appState.isSuspended ? const SuspendedScreen() : const SplashScreen(),
           builder: (context, child) {
             return OfflineBanner(child: child!);
           },
@@ -163,6 +163,9 @@ class MyRideApp extends StatelessWidget {
                 break;
               case '/rejected':
                 page = const RejectedScreen();
+                break;
+              case '/suspended':
+                page = const SuspendedScreen();
                 break;
               case '/home':
                 page = const HomeScreen();

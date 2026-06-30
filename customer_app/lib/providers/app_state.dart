@@ -223,6 +223,7 @@ class AppState extends ChangeNotifier {
   String? _profileId; // Supabase profile UUID
   String? _avatarUrl; // Cloud avatar URL
   int _avatarCacheKey = 0; // Cache buster for avatar
+  bool _isSuspended = false; // Account suspended flag
 
   String get userName => _userName;
   String get userInitials => _userInitials;
@@ -235,6 +236,7 @@ class AppState extends ChangeNotifier {
   String? get profileId => _profileId;
   String? get avatarUrl => _avatarUrl;
   int get avatarCacheKey => _avatarCacheKey;
+  bool get isSuspended => _isSuspended;
 
   void updateAvatarUrl(String? url) async {
     _avatarUrl = url;
@@ -316,6 +318,12 @@ class AppState extends ChangeNotifier {
     }
     if (_profileId != null) {
       SupabaseService.setProfileId(_profileId);
+      // Check if account is suspended
+      await _checkAccountStatus();
+      if (_isSuspended) {
+        notifyListeners();
+        return;
+      }
       loadEmergencyContactsFromProfile();
       loadBlockedUsersFromProfile();
       loadTripHistory();
@@ -327,6 +335,22 @@ class AppState extends ChangeNotifier {
       _subscribeToProfileUpdates();
     }
     notifyListeners();
+  }
+
+  Future<void> _checkAccountStatus() async {
+    if (_profileId == null) return;
+    try {
+      final profile = await SupabaseService.getProfile();
+      if (profile != null) {
+        final status = profile['status'] as String?;
+        if (status != null && status != 'approved') {
+          _isSuspended = true;
+          debugPrint('Account is suspended/not approved: $status');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking account status: $e');
+    }
   }
 
   void _subscribeToProfileUpdates() {
@@ -353,8 +377,10 @@ class AppState extends ChangeNotifier {
               _saveAvatarUrl();
             }
             final status = newRecord['status'] as String?;
-            if (status != null) {
-              debugPrint('Profile status changed to: $status');
+            if (status != null && status != 'approved') {
+              debugPrint('Profile suspended/deactivated, forcing logout');
+              _isSuspended = true;
+              notifyListeners();
             }
             notifyListeners();
           },
@@ -936,6 +962,33 @@ class AppState extends ChangeNotifier {
     _rejectionReason = null;
     _registrationDate = null;
     _saveUserRegistration();
+    notifyListeners();
+  }
+
+  Future<void> logout() async {
+    try {
+      await SupabaseService.signOut();
+    } catch (e) {
+      debugPrint('Error signing out: $e');
+    }
+    _profileId = null;
+    _userName = '';
+    _userInitials = '';
+    _userPhone = '';
+    _userEmail = '';
+    _staffId = '';
+    _avatarUrl = null;
+    _isSuspended = false;
+    _profileSubscription?.unsubscribe();
+    _profileSubscription = null;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('profile_id');
+    await prefs.remove('user_name');
+    await prefs.remove('user_phone');
+    await prefs.remove('user_email');
+    await prefs.remove('avatar_url');
+
     notifyListeners();
   }
 

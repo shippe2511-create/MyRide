@@ -703,20 +703,20 @@ export default function ContentPage() {
               </Button>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead></TableHead>
-                    <TableHead>Image</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Published</TableHead>
-                    <TableHead className="w-12"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleStaffCornerDragEnd}>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleStaffCornerDragEnd}>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead></TableHead>
+                      <TableHead>Image</TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Published</TableHead>
+                      <TableHead className="w-12"></TableHead>
+                    </TableRow>
+                  </TableHeader>
                   <TableBody>
                     {staffCorner.length === 0 ? (
                       <TableRow>
@@ -740,8 +740,8 @@ export default function ContentPage() {
                       </SortableContext>
                     )}
                   </TableBody>
-                </DndContext>
-              </Table>
+                </Table>
+              </DndContext>
             </CardContent>
           </Card>
         </TabsContent>
@@ -756,20 +756,20 @@ export default function ContentPage() {
               </Button>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead></TableHead>
-                    <TableHead>Image</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="w-12"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleAnnouncementDragEnd}>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleAnnouncementDragEnd}>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead></TableHead>
+                      <TableHead>Image</TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="w-12"></TableHead>
+                    </TableRow>
+                  </TableHeader>
                   <TableBody>
                     {announcements.length === 0 ? (
                       <TableRow>
@@ -792,8 +792,8 @@ export default function ContentPage() {
                       </SortableContext>
                     )}
                   </TableBody>
-                </DndContext>
-              </Table>
+                </Table>
+              </DndContext>
             </CardContent>
           </Card>
         </TabsContent>
@@ -872,22 +872,21 @@ export default function ContentPage() {
               </Button>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Icon</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Order</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-12"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleBreakTipsDragEnd}>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleBreakTipsDragEnd}>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead></TableHead>
+                      <TableHead>Icon</TableHead>
+                      <TableHead>Title & Description</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="w-12"></TableHead>
+                    </TableRow>
+                  </TableHeader>
                   <TableBody>
                     {breakTips.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                           No break tips yet
                         </TableCell>
                       </TableRow>
@@ -905,8 +904,8 @@ export default function ContentPage() {
                       </SortableContext>
                     )}
                   </TableBody>
-                </DndContext>
-              </Table>
+                </Table>
+              </DndContext>
             </CardContent>
           </Card>
         </TabsContent>
@@ -922,16 +921,17 @@ export default function ContentPage() {
               </Button>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Quote</TableHead>
-                    <TableHead>Author</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-12"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleQuotesDragEnd}>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleQuotesDragEnd}>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead></TableHead>
+                      <TableHead>Quote</TableHead>
+                      <TableHead>Author</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="w-12"></TableHead>
+                    </TableRow>
+                  </TableHeader>
                   <TableBody>
                     {quotes.length === 0 ? (
                       <TableRow>
@@ -953,8 +953,8 @@ export default function ContentPage() {
                       </SortableContext>
                     )}
                   </TableBody>
-                </DndContext>
-              </Table>
+                </Table>
+              </DndContext>
             </CardContent>
           </Card>
         </TabsContent>

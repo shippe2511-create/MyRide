@@ -244,9 +244,24 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
+      <PermissionGate permission="settings:view">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                <Settings className="h-6 w-6" />
+                Settings
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Configure application settings and preferences
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center justify-center h-96">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        </div>
+      </PermissionGate>
     )
   }
 

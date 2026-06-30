@@ -287,6 +287,8 @@ class AppState extends ChangeNotifier {
       loadEmergencyContactsFromProfile();
       loadBlockedUsersFromProfile();
       loadTripHistory();
+      // Subscribe to profile updates for suspension detection
+      _subscribeToProfileUpdates();
     }
     notifyListeners();
   }

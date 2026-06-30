@@ -94,8 +94,15 @@ function LoginContent() {
           return
         }
 
-        if (!["admin", "super-admin"].includes(profile.role)) {
+        if (!["admin", "super-admin", "operator", "support", "viewer"].includes(profile.role)) {
           toast.error("Access denied. Admin privileges required.")
+          await supabase.auth.signOut()
+          setLoading(false)
+          return
+        }
+
+        if (profile.status === "suspended") {
+          toast.error("Your account has been disabled. Contact administrator.")
           await supabase.auth.signOut()
           setLoading(false)
           return

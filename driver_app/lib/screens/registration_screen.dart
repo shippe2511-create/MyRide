@@ -52,7 +52,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     HapticFeedback.mediumImpact();
 
     try {
-      await SupabaseService.signUpWithPhone(
+      final response = await SupabaseService.signUpWithPhone(
         phone: _phoneNumber,
         fullName: _fullNameController.text.trim(),
         email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
@@ -67,7 +67,49 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       if (!mounted) return;
 
       HapticFeedback.lightImpact();
-      _showPendingDialog();
+
+      // Check if auto-approved
+      final status = response['status'] as String?;
+      if (status == 'approved') {
+        // Auto-approved - set driver data and go to home
+        final driverState = Provider.of<DriverState>(context, listen: false);
+
+        // Get driver record
+        final driverProfile = await SupabaseService.getDriverByProfileId(response['id']);
+
+        if (driverProfile != null) {
+          String vehicleNumber = '';
+          String vehicleModel = '';
+          final vehicle = driverProfile['vehicle'];
+          if (vehicle is List && vehicle.isNotEmpty) {
+            vehicleNumber = vehicle[0]['plate_no'] ?? '';
+            vehicleModel = vehicle[0]['display_name'] ?? '';
+          } else if (vehicle is Map) {
+            vehicleNumber = vehicle['plate_no'] ?? '';
+            vehicleModel = vehicle['display_name'] ?? '';
+          }
+
+          await driverState.setDriverData(
+            name: _fullNameController.text.trim(),
+            id: driverProfile['id'],
+            profileId: response['id'],
+            vehicleNumber: vehicleNumber,
+            vehicleModel: vehicleModel,
+            phone: _phoneNumber,
+            rating: (driverProfile['rating'] ?? 5.0).toDouble(),
+            avatarUrl: response['avatar_url'] ?? '',
+            employeeId: _staffIdController.text.trim().toUpperCase(),
+          );
+
+          Navigator.pushReplacementNamed(context, '/home');
+        } else {
+          // Driver record not created yet - send to login
+          AppSnackbar.success(context, 'Registration successful! Please login.');
+          Navigator.pushReplacementNamed(context, '/login');
+        }
+      } else {
+        _showPendingDialog();
+      }
     } catch (e) {
       if (mounted) {
         HapticFeedback.heavyImpact();

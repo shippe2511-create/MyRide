@@ -70,6 +70,20 @@ class SupabaseService {
     List<Map<String, dynamic>>? emergencyContacts,
     bool isDriver = true,
   }) async {
+    // Check if auto-approve is enabled using RPC
+    String status = 'pending';
+    try {
+      final autoApprove = await client.rpc('get_driver_auto_approve');
+      debugPrint('Driver auto-approve setting: $autoApprove');
+      if (autoApprove == true) {
+        status = 'approved';
+      }
+    } catch (e) {
+      debugPrint('Error checking driver auto-approve: $e');
+    }
+
+    debugPrint('Registering driver with status: $status');
+
     final data = <String, dynamic>{
       'phone': phone,
       'full_name': fullName,
@@ -77,7 +91,7 @@ class SupabaseService {
       'employee_id': staffId,
       'emergency_contacts': emergencyContacts,
       'role': 'driver',
-      'status': 'pending',
+      'status': status,
     };
 
     if (email != null && email.isNotEmpty) {
@@ -89,6 +103,22 @@ class SupabaseService {
       data,
       onConflict: 'employee_id',
     ).select().single();
+
+    // If auto-approved, also create driver record
+    if (status == 'approved' && response['id'] != null) {
+      try {
+        await client.from('drivers').insert({
+          'profile_id': response['id'],
+          'rating': 5.0,
+          'total_trips': 0,
+          'is_online': false,
+        });
+        debugPrint('Created driver record for auto-approved driver');
+      } catch (e) {
+        debugPrint('Error creating driver record: $e');
+      }
+    }
+
     return response;
   }
 

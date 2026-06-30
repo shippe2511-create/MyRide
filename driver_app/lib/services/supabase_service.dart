@@ -201,6 +201,23 @@ class SupabaseService {
     });
   }
 
+  /// Get driver's assigned vehicle info
+  static Future<Map<String, dynamic>?> getDriverVehicle(String driverId) async {
+    try {
+      final driver = await client
+          .from('drivers')
+          .select('vehicle:vehicle_types(id, plate_no, display_name, name, is_active)')
+          .eq('id', driverId)
+          .maybeSingle();
+
+      if (driver == null) return null;
+      return driver['vehicle'] as Map<String, dynamic>?;
+    } catch (e) {
+      debugPrint('Error getting driver vehicle: $e');
+      return null;
+    }
+  }
+
   /// Check if the driver's assigned vehicle is active
   static Future<bool> isDriverVehicleActive(String driverId) async {
     try {

@@ -230,6 +230,8 @@ class DriverState extends ChangeNotifier {
         loadShifts();
         // Load actual stats from database
         loadDriverStats();
+        // Refresh vehicle info from database
+        refreshVehicleInfo();
         // Check for active ride on app start
         _checkForActiveRide();
       }
@@ -947,6 +949,10 @@ class DriverState extends ChangeNotifier {
               // Also refresh today's count since total changed
               refreshStats();
             }
+            // Check if vehicle_id changed and refresh vehicle info
+            final newVehicleId = newRecord['vehicle_id'] as String?;
+            debugPrint('Checking vehicle_id change: $newVehicleId');
+            refreshVehicleInfo();
             notifyListeners();
           },
         )
@@ -1274,6 +1280,27 @@ class DriverState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     prefs.setBool('loggedIn', false);
     notifyListeners();
+  }
+
+  /// Refresh vehicle info from database
+  Future<void> refreshVehicleInfo() async {
+    if (_driverId.isEmpty) return;
+    try {
+      final vehicle = await SupabaseService.getDriverVehicle(_driverId);
+      if (vehicle != null) {
+        _vehicleNumber = vehicle['plate_no'] ?? '';
+        _vehicleModel = vehicle['display_name'] ?? '';
+      } else {
+        _vehicleNumber = '';
+        _vehicleModel = '';
+      }
+      final prefs = await SharedPreferences.getInstance();
+      prefs.setString('vehicleNumber', _vehicleNumber);
+      prefs.setString('vehicleModel', _vehicleModel);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error refreshing vehicle info: $e');
+    }
   }
 
   Future<Map<String, dynamic>> acceptRide(RideRequest request) async {

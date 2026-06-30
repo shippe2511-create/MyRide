@@ -219,6 +219,7 @@ class SupabaseService {
   }
 
   /// Check if the driver's assigned vehicle is active
+  /// Returns false if: no vehicle assigned, vehicle is inactive, or driver not found
   static Future<bool> isDriverVehicleActive(String driverId) async {
     try {
       final driver = await client
@@ -228,15 +229,15 @@ class SupabaseService {
           .maybeSingle();
 
       if (driver == null) return false;
-      if (driver['vehicle_id'] == null) return true; // No vehicle assigned, allow
+      if (driver['vehicle_id'] == null) return false; // No vehicle assigned - block
 
       final vehicle = driver['vehicle'] as Map<String, dynamic>?;
-      if (vehicle == null) return true;
+      if (vehicle == null) return false;
 
       return vehicle['is_active'] == true;
     } catch (e) {
       debugPrint('Error checking vehicle status: $e');
-      return true; // Allow on error to not block drivers
+      return false; // Block on error to be safe
     }
   }
 

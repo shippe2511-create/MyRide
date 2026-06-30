@@ -234,6 +234,8 @@ class DriverState extends ChangeNotifier {
         refreshVehicleInfo();
         // Check for active ride on app start
         _checkForActiveRide();
+        // Start profile subscription for realtime updates (even when offline)
+        _subscribeToDriverProfile();
       }
 
       // Fetch employee_id from database if not set but logged in
@@ -537,16 +539,23 @@ class DriverState extends ChangeNotifier {
   String? get vehicleInactiveReason => _vehicleInactiveReason;
 
   Future<bool> goOnline() async {
-    // Check if vehicle is active before going online
+    // Check if vehicle is assigned and active before going online
     if (_driverId.isNotEmpty) {
-      final vehicleActive = await SupabaseService.isDriverVehicleActive(_driverId);
-      if (!vehicleActive) {
-        _vehicleInactiveReason = 'Your vehicle is currently disabled. Please contact admin.';
+      final vehicle = await SupabaseService.getDriverVehicle(_driverId);
+      if (vehicle == null) {
+        _vehicleInactiveReason = 'No vehicle assigned. Please contact admin.';
         _isOnline = false;
-        // Clear saved online state
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('isOnline', false);
-        // Update Supabase to show offline
+        await SupabaseService.updateDriverStatus(driverId: _driverId, isOnline: false);
+        notifyListeners();
+        return false;
+      }
+      if (vehicle['is_active'] != true) {
+        _vehicleInactiveReason = 'Your vehicle is disabled. Please contact admin.';
+        _isOnline = false;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('isOnline', false);
         await SupabaseService.updateDriverStatus(driverId: _driverId, isOnline: false);
         notifyListeners();
         return false;
@@ -885,6 +894,37 @@ class DriverState extends ChangeNotifier {
 
     // Subscribe to rides changes for stats refresh
     _subscribeToRidesChanges();
+
+    // Subscribe to vehicle status changes
+    _subscribeToVehicleStatus();
+  }
+
+  RealtimeChannel? _vehicleStatusSubscription;
+
+  void _subscribeToVehicleStatus() {
+    _vehicleStatusSubscription?.unsubscribe();
+    _vehicleStatusSubscription = Supabase.instance.client
+        .channel('vehicle_status')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'vehicle_types',
+          callback: (payload) async {
+            debugPrint('Vehicle status update received: ${payload.newRecord}');
+            // Check if this is our vehicle and if it was disabled
+            final vehicleActive = await SupabaseService.isDriverVehicleActive(_driverId);
+            if (!vehicleActive && _isOnline) {
+              debugPrint('Vehicle disabled - forcing driver offline');
+              _vehicleInactiveReason = 'Your vehicle has been disabled. Please contact admin.';
+              _isOnline = false;
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('isOnline', false);
+              await SupabaseService.updateDriverStatus(driverId: _driverId, isOnline: false);
+              notifyListeners();
+            }
+          },
+        )
+        .subscribe();
   }
 
   RealtimeChannel? _ridesStatsSubscription;
@@ -928,7 +968,7 @@ class DriverState extends ChangeNotifier {
             column: 'id',
             value: _driverId,
           ),
-          callback: (payload) {
+          callback: (payload) async {
             debugPrint('Driver profile update received: ${payload.newRecord}');
             final newRecord = payload.newRecord;
             final status = newRecord['status'] as String?;
@@ -952,7 +992,7 @@ class DriverState extends ChangeNotifier {
             // Check if vehicle_id changed and refresh vehicle info
             final newVehicleId = newRecord['vehicle_id'] as String?;
             debugPrint('Checking vehicle_id change: $newVehicleId');
-            refreshVehicleInfo();
+            await refreshVehicleInfo();
             notifyListeners();
           },
         )

@@ -313,6 +313,14 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
       toast.error("Name is required")
       return
     }
+    if (!formData.phone?.trim()) {
+      toast.error("Phone is required")
+      return
+    }
+    if (!formData.employee_id?.trim()) {
+      toast.error("Employee ID is required")
+      return
+    }
     setLoading(true)
 
     if (dialogType === "edit" && selectedCustomer) {
@@ -890,21 +898,23 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                 />
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium">Phone</label>
+                <label className="text-sm font-medium">Phone <span className="text-red-500">*</span></label>
                 <Input
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="+1234567890"
+                  placeholder="7XXXXXX"
+                  required
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <label className="text-sm font-medium">Employee ID</label>
+                <label className="text-sm font-medium">Employee ID <span className="text-red-500">*</span></label>
                 <Input
                   value={formData.employee_id}
                   onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
                   placeholder="EMP001"
+                  required
                 />
               </div>
               <div className="grid gap-2">

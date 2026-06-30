@@ -540,6 +540,12 @@ class DriverState extends ChangeNotifier {
       final vehicleActive = await SupabaseService.isDriverVehicleActive(_driverId);
       if (!vehicleActive) {
         _vehicleInactiveReason = 'Your vehicle is currently disabled. Please contact admin.';
+        _isOnline = false;
+        // Clear saved online state
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('isOnline', false);
+        // Update Supabase to show offline
+        await SupabaseService.updateDriverStatus(driverId: _driverId, isOnline: false);
         notifyListeners();
         return false;
       }

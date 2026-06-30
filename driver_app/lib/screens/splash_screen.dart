@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import '../providers/driver_state.dart';
+import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -85,7 +86,7 @@ class _SplashScreenState extends State<SplashScreen>
     }
   }
 
-  void _navigate() {
+  Future<void> _navigate() async {
     if (!mounted) return;
     final state = Provider.of<DriverState>(context, listen: false);
 
@@ -94,6 +95,23 @@ class _SplashScreenState extends State<SplashScreen>
     } else if (!state.isLoggedIn) {
       Navigator.pushReplacementNamed(context, '/login');
     } else {
+      // Check account status before allowing access
+      final phone = state.phoneNumber;
+      if (phone.isNotEmpty) {
+        try {
+          final fullPhone = phone.startsWith('+') ? phone : '+960$phone';
+          final profile = await SupabaseService.checkPhoneExists(fullPhone);
+          if (profile != null) {
+            final status = profile['status'] as String?;
+            if (status == 'suspended' || (status != null && status != 'approved')) {
+              Navigator.pushReplacementNamed(context, '/suspended');
+              return;
+            }
+          }
+        } catch (e) {
+          debugPrint('Error checking status: $e');
+        }
+      }
       Navigator.pushReplacementNamed(context, '/home');
     }
   }

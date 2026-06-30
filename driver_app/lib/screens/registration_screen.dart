@@ -389,3 +389,55 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 }
+
+class SuspendedScreen extends StatelessWidget {
+  const SuspendedScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: context.bgColor,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Spacer(),
+              Container(
+                width: 120, height: 120,
+                decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.15), shape: BoxShape.circle),
+                child: Icon(Icons.block, color: AppColors.error, size: 56),
+              ),
+              const SizedBox(height: 32),
+              Text('Account Suspended', style: TextStyle(color: context.textColor, fontSize: 28, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              Text(
+                'Your driver account has been suspended. Please contact admin for assistance.',
+                style: TextStyle(color: context.mutedColor, fontSize: 15, height: 1.5),
+                textAlign: TextAlign.center,
+              ),
+              const Spacer(),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.yellow,
+                    foregroundColor: AppColors.darkBg,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 0,
+                  ),
+                  child: Text('Sign Out', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

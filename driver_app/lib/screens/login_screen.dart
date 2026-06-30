@@ -140,12 +140,21 @@ class _LoginScreenState extends State<LoginScreen> {
           return;
         }
 
-        if (existingUser['status'] == 'pending') {
+        final status = existingUser['status'] ?? 'pending';
+        if (status == 'pending') {
           _showPendingDialog();
           setState(() => _isLoading = false);
           return;
-        } else if (existingUser['status'] == 'rejected') {
+        } else if (status == 'rejected') {
           _showRejectedDialog();
+          setState(() => _isLoading = false);
+          return;
+        } else if (status == 'suspended') {
+          _showSuspendedDialog();
+          setState(() => _isLoading = false);
+          return;
+        } else if (status != 'approved') {
+          _showSuspendedDialog();
           setState(() => _isLoading = false);
           return;
         }
@@ -249,6 +258,34 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         content: Text(
           'Your driver registration was not approved. Please contact admin for more information.',
+          style: TextStyle(color: context.mutedColor),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK', style: TextStyle(color: AppColors.yellow)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuspendedDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.block, color: AppColors.error, size: 28),
+            const SizedBox(width: 12),
+            Text('Account Suspended', style: TextStyle(color: context.textColor)),
+          ],
+        ),
+        content: Text(
+          'Your account has been suspended. Please contact admin for assistance.',
           style: TextStyle(color: context.mutedColor),
         ),
         actions: [

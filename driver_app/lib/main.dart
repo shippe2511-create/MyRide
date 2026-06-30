@@ -139,6 +139,7 @@ class DriverApp extends StatelessWidget {
             '/onboarding': (_) => const OnboardingScreen(),
             '/login': (_) => const LoginScreen(),
             '/register': (_) => const RegistrationScreen(),
+            '/suspended': (_) => const SuspendedScreen(),
             '/home': (_) => const HomeScreen(),
             '/history': (_) => const HistoryScreen(),
             '/profile': (_) => const ProfileScreen(),

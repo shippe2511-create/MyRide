@@ -566,7 +566,7 @@ export default function SchedulingPage() {
                   <TableHead>Code</TableHead>
                   <TableHead>Direction</TableHead>
                   <TableHead>Schedules</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Active</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>

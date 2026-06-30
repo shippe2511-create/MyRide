@@ -120,8 +120,22 @@ export default function AdminsPage() {
 
     const channel = supabase
       .channel('admins_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-        loadAdmins()
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload) => {
+        const updated = payload.new as AdminUser
+        // Only update if it's an admin role
+        if (['super-admin', 'admin', 'operator', 'support', 'viewer'].includes(updated.role)) {
+          setAdmins(prev => prev.map(a => a.id === updated.id ? { ...a, ...updated } : a))
+        }
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, (payload) => {
+        const inserted = payload.new as AdminUser
+        if (['super-admin', 'admin', 'operator', 'support', 'viewer'].includes(inserted.role)) {
+          setAdmins(prev => [...prev, inserted])
+        }
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'profiles' }, (payload) => {
+        const deleted = payload.old as { id: string }
+        setAdmins(prev => prev.filter(a => a.id !== deleted.id))
       })
       .subscribe()
 

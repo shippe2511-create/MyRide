@@ -62,16 +62,19 @@ class SupabaseService {
     String? staffId,
     List<Map<String, dynamic>>? emergencyContacts,
   }) async {
-    // Check if auto-approve is enabled
+    // Check if auto-approve is enabled using RPC
     String status = 'pending';
     try {
-      final settings = await client.from('app_settings').select('require_customer_approval').limit(1).maybeSingle();
-      if (settings != null && settings['require_customer_approval'] == false) {
+      final autoApprove = await client.rpc('get_customer_auto_approve');
+      debugPrint('Auto-approve setting: $autoApprove');
+      if (autoApprove == true) {
         status = 'approved';
       }
     } catch (e) {
-      debugPrint('Error checking app settings: $e');
+      debugPrint('Error checking auto-approve: $e');
     }
+
+    debugPrint('Registering customer with status: $status');
 
     final data = <String, dynamic>{
       'phone': phone,

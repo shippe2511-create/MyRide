@@ -365,6 +365,9 @@ class DriverState extends ChangeNotifier {
     // Load actual stats from database
     await loadDriverStats();
 
+    // Subscribe to profile updates for suspension detection
+    _subscribeToDriverProfile();
+
     notifyListeners();
   }
 

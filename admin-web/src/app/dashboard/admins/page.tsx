@@ -202,6 +202,25 @@ export default function AdminsPage() {
     setDialogOpen(true)
   }
 
+  const toggleAdminStatus = async (admin: AdminUser) => {
+    const newStatus = admin.status === "approved" ? "suspended" : "approved"
+    // Optimistic update
+    setAdmins(prev => prev.map(a => a.id === admin.id ? { ...a, status: newStatus } : a))
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ status: newStatus })
+      .eq("id", admin.id)
+
+    if (error) {
+      toast.error("Failed to update status")
+      // Revert on error
+      setAdmins(prev => prev.map(a => a.id === admin.id ? { ...a, status: admin.status } : a))
+    } else {
+      toast.success(`Admin ${newStatus === "approved" ? "activated" : "suspended"}`)
+    }
+  }
+
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault()
     if (!deleteId) return
@@ -519,9 +538,10 @@ export default function AdminsPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge className={admin.status === "approved" ? "bg-green-500" : "bg-yellow-500"}>
-                      {admin.status}
-                    </Badge>
+                    <Switch
+                      checked={admin.status === "approved"}
+                      onCheckedChange={() => toggleAdminStatus(admin)}
+                    />
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatDate(admin.created_at)}

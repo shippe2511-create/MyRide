@@ -722,7 +722,14 @@ class SupabaseService {
           .select('*, profile:profiles(*), vehicle:vehicle_types(*)')
           .eq('is_online', true)
           .eq('is_on_break', false);
-      return List<Map<String, dynamic>>.from(response);
+
+      // Filter out drivers with inactive vehicles
+      final drivers = List<Map<String, dynamic>>.from(response);
+      return drivers.where((d) {
+        final vehicle = d['vehicle'] as Map<String, dynamic>?;
+        if (vehicle == null) return true; // No vehicle assigned, allow
+        return vehicle['is_active'] == true;
+      }).toList();
     } catch (e) {
       debugPrint('Error getting available drivers: $e');
       return [];

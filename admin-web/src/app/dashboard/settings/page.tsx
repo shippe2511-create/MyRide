@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -76,18 +76,20 @@ export default function SettingsPage() {
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([])
   const [savingContacts, setSavingContacts] = useState(false)
 
+  const isSavingRef = useRef(false)
+
   useEffect(() => {
     loadSettings()
     loadEmergencyContacts()
 
-    // Realtime subscription
+    // Realtime subscription - skip if we're currently saving
     const channel = supabase
       .channel('settings_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => {
-        loadSettings()
+        if (!isSavingRef.current) loadSettings()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'emergency_contacts' }, () => {
-        loadEmergencyContacts()
+        if (!isSavingRef.current) loadEmergencyContacts()
       })
       .subscribe()
 
@@ -116,6 +118,7 @@ export default function SettingsPage() {
 
   const saveSettings = async () => {
     setSaving(true)
+    isSavingRef.current = true
     try {
       const { error } = await supabase
         .from("app_settings")
@@ -146,6 +149,7 @@ export default function SettingsPage() {
       toast.error("Failed to save settings")
     }
     setSaving(false)
+    setTimeout(() => { isSavingRef.current = false }, 500)
   }
 
   const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
@@ -162,6 +166,7 @@ export default function SettingsPage() {
 
   const saveEmergencyContacts = async () => {
     setSavingContacts(true)
+    isSavingRef.current = true
     try {
       for (const contact of emergencyContacts) {
         const { error } = await supabase.from("emergency_contacts").upsert({
@@ -177,11 +182,11 @@ export default function SettingsPage() {
       }
       toast.success("Emergency contacts saved")
       logActivity({ action: 'update', entityType: 'settings', entityId: 'emergency-contacts', details: { count: emergencyContacts.length } })
-      await loadEmergencyContacts()
     } catch {
       toast.error("Failed to save contacts")
     }
     setSavingContacts(false)
+    setTimeout(() => { isSavingRef.current = false }, 500)
   }
 
   const addEmergencyContact = () => {

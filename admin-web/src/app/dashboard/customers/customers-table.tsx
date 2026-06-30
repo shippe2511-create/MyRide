@@ -316,12 +316,18 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
     setLoading(true)
 
     if (dialogType === "edit" && selectedCustomer) {
+      // Format phone with country code
+      let phone = formData.phone || null
+      if (phone && !phone.startsWith('+')) {
+        phone = `+960${phone}`
+      }
+
       const { error } = await supabase
         .from("profiles")
         .update({
           full_name: formData.full_name,
           email: formData.email || null,
-          phone: formData.phone || null,
+          phone: phone,
           employee_id: formData.employee_id || null,
           department: formData.department || null,
           gender: formData.gender || null,
@@ -339,12 +345,18 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
         setDialogType(null)
       }
     } else if (dialogType === "add") {
+      // Format phone with country code
+      let phone = formData.phone || null
+      if (phone && !phone.startsWith('+')) {
+        phone = `+960${phone}`
+      }
+
       const { data, error } = await supabase
         .from("profiles")
         .insert({
           full_name: formData.full_name,
           email: formData.email || null,
-          phone: formData.phone || null,
+          phone: phone,
           employee_id: formData.employee_id || null,
           department: formData.department || null,
           gender: formData.gender || null,

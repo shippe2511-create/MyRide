@@ -28,11 +28,23 @@ class SupabaseService {
   // Check if phone exists in system
   static Future<Map<String, dynamic>?> checkPhoneExists(String phone) async {
     try {
-      final response = await client
+      // Try with full phone number first
+      var response = await client
           .from('profiles')
           .select()
           .eq('phone', phone)
           .maybeSingle();
+
+      // If not found and phone has country code, try without it
+      if (response == null && phone.startsWith('+960')) {
+        final localPhone = phone.substring(4); // Remove +960
+        response = await client
+            .from('profiles')
+            .select()
+            .eq('phone', localPhone)
+            .maybeSingle();
+      }
+
       return response;
     } catch (e) {
       return null;

@@ -554,7 +554,7 @@ export default function AdminsPage() {
                       </Avatar>
                       <div>
                         <p className="font-medium">{admin.full_name}</p>
-                        <p className="text-xs text-muted-foreground">{admin.phone || "-"}</p>
+                        <p className="text-xs text-muted-foreground select-text">{admin.phone || "-"}</p>
                       </div>
                     </div>
                   </TableCell>

@@ -654,7 +654,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                         <p className="text-sm text-muted-foreground">-</p>
                       )}
                       {customer.phone ? (
-                        <p className="text-sm flex items-center gap-1.5 text-muted-foreground">
+                        <p className="text-sm flex items-center gap-1.5 text-muted-foreground select-text">
                           <Phone className="h-3 w-3" />
                           {customer.phone}
                         </p>

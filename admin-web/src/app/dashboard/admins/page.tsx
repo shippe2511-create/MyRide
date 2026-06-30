@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -122,6 +122,8 @@ export default function AdminsPage() {
       .channel('admins_realtime')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload) => {
         const updated = payload.new as AdminUser
+        // Skip if we're currently updating this admin locally
+        if (updatingIdsRef.current.has(updated.id)) return
         // Only update if it's an admin role
         if (['super-admin', 'admin', 'operator', 'support', 'viewer'].includes(updated.role)) {
           setAdmins(prev => prev.map(a => a.id === updated.id ? { ...a, ...updated } : a))
@@ -216,8 +218,14 @@ export default function AdminsPage() {
     setDialogOpen(true)
   }
 
+  const updatingIdsRef = useRef<Set<string>>(new Set())
+
   const toggleAdminStatus = async (admin: AdminUser) => {
     const newStatus = admin.status === "approved" ? "suspended" : "approved"
+
+    // Mark as updating to skip realtime updates
+    updatingIdsRef.current.add(admin.id)
+
     // Optimistic update
     setAdmins(prev => prev.map(a => a.id === admin.id ? { ...a, status: newStatus } : a))
 
@@ -225,6 +233,11 @@ export default function AdminsPage() {
       .from("profiles")
       .update({ status: newStatus })
       .eq("id", admin.id)
+
+    // Clear updating flag after a short delay
+    setTimeout(() => {
+      updatingIdsRef.current.delete(admin.id)
+    }, 500)
 
     if (error) {
       toast.error("Failed to update status")

@@ -109,7 +109,7 @@ class SupabaseService {
       try {
         await client.from('drivers').insert({
           'profile_id': response['id'],
-          'rating': 5.0,
+          'rating': 0.0,
           'total_trips': 0,
           'is_online': false,
         });

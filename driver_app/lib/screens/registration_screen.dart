@@ -96,7 +96,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             vehicleNumber: vehicleNumber,
             vehicleModel: vehicleModel,
             phone: _phoneNumber,
-            rating: (driverProfile['rating'] ?? 5.0).toDouble(),
+            rating: (driverProfile['rating'] ?? 0.0).toDouble(),
             avatarUrl: response['avatar_url'] ?? '',
             employeeId: _staffIdController.text.trim().toUpperCase(),
           );

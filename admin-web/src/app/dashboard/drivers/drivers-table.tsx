@@ -426,13 +426,13 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
     setLoading(true)
 
     if (dialogType === "edit" && selectedDriver) {
-      const { error } = await supabase
       // Format phone with country code
       let phone = formData.phone || null
       if (phone && !phone.startsWith('+')) {
         phone = `+960${phone}`
       }
 
+      const { error } = await supabase
         .from("profiles")
         .update({
           full_name: formData.full_name,

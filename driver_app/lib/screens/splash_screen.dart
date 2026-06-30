@@ -101,12 +101,18 @@ class _SplashScreenState extends State<SplashScreen>
         try {
           final fullPhone = phone.startsWith('+') ? phone : '+960$phone';
           final profile = await SupabaseService.checkPhoneExists(fullPhone);
-          if (profile != null) {
-            final status = profile['status'] as String?;
-            if (status == 'suspended' || (status != null && status != 'approved')) {
-              Navigator.pushReplacementNamed(context, '/suspended');
-              return;
-            }
+          if (profile == null) {
+            // Profile deleted - clear local data and go to login
+            debugPrint('Profile not found in database, clearing local data');
+            state.logout();
+            if (!mounted) return;
+            Navigator.pushReplacementNamed(context, '/login');
+            return;
+          }
+          final status = profile['status'] as String?;
+          if (status == 'suspended' || (status != null && status != 'approved')) {
+            Navigator.pushReplacementNamed(context, '/suspended');
+            return;
           }
         } catch (e) {
           debugPrint('Error checking status: $e');

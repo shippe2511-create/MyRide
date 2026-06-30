@@ -201,6 +201,28 @@ class SupabaseService {
     });
   }
 
+  /// Check if the driver's assigned vehicle is active
+  static Future<bool> isDriverVehicleActive(String driverId) async {
+    try {
+      final driver = await client
+          .from('drivers')
+          .select('vehicle_id, vehicle:vehicle_types(is_active)')
+          .eq('id', driverId)
+          .maybeSingle();
+
+      if (driver == null) return false;
+      if (driver['vehicle_id'] == null) return true; // No vehicle assigned, allow
+
+      final vehicle = driver['vehicle'] as Map<String, dynamic>?;
+      if (vehicle == null) return true;
+
+      return vehicle['is_active'] == true;
+    } catch (e) {
+      debugPrint('Error checking vehicle status: $e');
+      return true; // Allow on error to not block drivers
+    }
+  }
+
   static Future<void> updateDriverStatus({
     required String driverId,
     bool? isOnline,

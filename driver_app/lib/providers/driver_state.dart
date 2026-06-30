@@ -531,11 +531,25 @@ class DriverState extends ChangeNotifier {
 
   Timer? _ridePollingTimer;
 
-  void goOnline() async {
+  String? _vehicleInactiveReason;
+  String? get vehicleInactiveReason => _vehicleInactiveReason;
+
+  Future<bool> goOnline() async {
+    // Check if vehicle is active before going online
+    if (_driverId.isNotEmpty) {
+      final vehicleActive = await SupabaseService.isDriverVehicleActive(_driverId);
+      if (!vehicleActive) {
+        _vehicleInactiveReason = 'Your vehicle is currently disabled. Please contact admin.';
+        notifyListeners();
+        return false;
+      }
+    }
+
     _isOnline = true;
     _isOnBreak = false;
     _breakType = '';
     _breakStartTime = null;
+    _vehicleInactiveReason = null;
     _incomingRequests.clear(); // Clear any stale requests
 
     // Save online state
@@ -567,6 +581,7 @@ class DriverState extends ChangeNotifier {
       // Start polling for pending rides
       _startRidePolling();
     }
+    return true;
   }
 
   Future<void> loadCompletedTrips() async {

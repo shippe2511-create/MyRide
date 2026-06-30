@@ -60,7 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // But don't call goOnline() if on break - that would end the break
       if (state.isOnline && !state.isOnBreak) {
         debugPrint('Driver was online, re-initializing subscriptions...');
-        state.goOnline();
+        _tryGoOnline(state);
       }
     });
   }
@@ -193,10 +193,23 @@ class _HomeScreenState extends State<HomeScreen> {
         final hasIssues = result['hasIssues'] ?? false;
         final issues = result['issues'] as Map<String, String>? ?? {};
         state.completeChecklist(hasIssues: hasIssues, issues: issues);
-        state.goOnline();
+        await _tryGoOnline(state);
       }
     } else {
-      state.goOnline();
+      await _tryGoOnline(state);
+    }
+  }
+
+  Future<void> _tryGoOnline(DriverState state) async {
+    final success = await state.goOnline();
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(state.vehicleInactiveReason ?? 'Unable to go online'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 

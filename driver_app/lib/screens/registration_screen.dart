@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../widgets/app_snackbar.dart';
@@ -390,8 +393,53 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 }
 
-class SuspendedScreen extends StatelessWidget {
+class SuspendedScreen extends StatefulWidget {
   const SuspendedScreen({super.key});
+
+  @override
+  State<SuspendedScreen> createState() => _SuspendedScreenState();
+}
+
+class _SuspendedScreenState extends State<SuspendedScreen> {
+  RealtimeChannel? _subscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscribeToStatusChanges();
+  }
+
+  @override
+  void dispose() {
+    _subscription?.unsubscribe();
+    super.dispose();
+  }
+
+  void _subscribeToStatusChanges() {
+    final state = Provider.of<DriverState>(context, listen: false);
+    final profileId = state.profileId;
+    if (profileId.isEmpty) return;
+
+    _subscription = SupabaseService.client
+        .channel('driver_suspended_status_$profileId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'profiles',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: profileId,
+          ),
+          callback: (payload) {
+            final status = payload.newRecord['status'] as String?;
+            if (status == 'approved' && mounted) {
+              Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+            }
+          },
+        )
+        .subscribe();
+  }
 
   @override
   Widget build(BuildContext context) {

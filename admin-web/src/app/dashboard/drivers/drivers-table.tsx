@@ -427,11 +427,17 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
 
     if (dialogType === "edit" && selectedDriver) {
       const { error } = await supabase
+      // Format phone with country code
+      let phone = formData.phone || null
+      if (phone && !phone.startsWith('+')) {
+        phone = `+960${phone}`
+      }
+
         .from("profiles")
         .update({
           full_name: formData.full_name,
           email: formData.email || null,
-          phone: formData.phone || null,
+          phone: phone,
           employee_id: formData.employee_id || null,
           department: formData.department || null,
           gender: formData.gender || null,
@@ -511,12 +517,18 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
         setDialogType(null)
       }
     } else if (dialogType === "add") {
+      // Format phone with country code
+      let addPhone = formData.phone || null
+      if (addPhone && !addPhone.startsWith('+')) {
+        addPhone = `+960${addPhone}`
+      }
+
       const { data: newProfile, error } = await supabase
         .from("profiles")
         .insert({
           full_name: formData.full_name,
           email: formData.email || null,
-          phone: formData.phone || null,
+          phone: addPhone,
           employee_id: formData.employee_id || null,
           department: formData.department || null,
           gender: formData.gender || null,

@@ -153,6 +153,13 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     final state = context.read<DriverState>();
     debugPrint('Driver state changed: hasActiveRide=${state.hasActiveRide}, hasNavigated=$_hasNavigatedToActiveRide');
+
+    // Check for suspension
+    if (state.isSuspended) {
+      Navigator.pushNamedAndRemoveUntil(context, '/suspended', (route) => false);
+      return;
+    }
+
     _checkForActiveRide();
 
     // Reload break content when entering break

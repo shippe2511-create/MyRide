@@ -953,6 +953,11 @@ class DriverState extends ChangeNotifier {
         .subscribe();
   }
 
+  bool _isSuspended = false;
+  bool get isSuspended => _isSuspended;
+
+  RealtimeChannel? _profileStatusSubscription;
+
   void _subscribeToDriverProfile() {
     if (_driverId.isEmpty) return;
 
@@ -971,10 +976,6 @@ class DriverState extends ChangeNotifier {
           callback: (payload) async {
             debugPrint('Driver profile update received: ${payload.newRecord}');
             final newRecord = payload.newRecord;
-            final status = newRecord['status'] as String?;
-            if (status != null && status != 'approved') {
-              debugPrint('Driver status changed to: $status');
-            }
             // Update rating if changed
             final newRating = (newRecord['rating'] as num?)?.toDouble();
             if (newRating != null && newRating != _rating) {
@@ -997,6 +998,37 @@ class DriverState extends ChangeNotifier {
           },
         )
         .subscribe();
+
+    // Also subscribe to profile status changes (suspension)
+    if (_profileId.isNotEmpty) {
+      _profileStatusSubscription?.unsubscribe();
+      _profileStatusSubscription = Supabase.instance.client
+          .channel('profile_status_$_profileId')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.update,
+            schema: 'public',
+            table: 'profiles',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'id',
+              value: _profileId,
+            ),
+            callback: (payload) {
+              debugPrint('Profile status update received: ${payload.newRecord}');
+              final status = payload.newRecord['status'] as String?;
+              if (status != null && status != 'approved') {
+                debugPrint('Driver suspended! Status: $status');
+                _isSuspended = true;
+                _isOnline = false;
+                notifyListeners();
+              } else if (status == 'approved') {
+                _isSuspended = false;
+                notifyListeners();
+              }
+            },
+          )
+          .subscribe();
+    }
   }
 
   Future<void> refreshStats() async {

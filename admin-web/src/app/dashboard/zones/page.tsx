@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -60,13 +60,19 @@ export default function ZonesPage() {
   const [drawingMode, setDrawingMode] = useState(false)
   const [pendingCoords, setPendingCoords] = useState<number[][] | null>(null)
 
+  const isSavingRef = useRef(false)
+
   useEffect(() => {
     loadData()
 
     const channel = supabase
       .channel('zones_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'service_zones' }, () => loadData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'service_zones' }, () => {
+        if (!isSavingRef.current) loadData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, () => {
+        if (!isSavingRef.current) loadData()
+      })
       .subscribe()
 
     return () => {
@@ -222,25 +228,39 @@ export default function ZonesPage() {
   }
 
   const toggleZoneStatus = async (zone: Zone) => {
+    isSavingRef.current = true
+    // Optimistic update
+    setZones(prev => prev.map(z => z.id === zone.id ? { ...z, is_active: !z.is_active } : z))
+
     const { error } = await supabase
       .from("service_zones")
       .update({ is_active: !zone.is_active })
       .eq("id", zone.id)
-    if (error) toast.error("Failed to update")
-    else {
-      setZones(prev => prev.map(z => z.id === zone.id ? { ...z, is_active: !z.is_active } : z))
+
+    if (error) {
+      toast.error("Failed to update")
+      // Revert on error
+      setZones(prev => prev.map(z => z.id === zone.id ? { ...z, is_active: zone.is_active } : z))
     }
+    setTimeout(() => { isSavingRef.current = false }, 500)
   }
 
   const toggleLocationStatus = async (loc: Location) => {
+    isSavingRef.current = true
+    // Optimistic update
+    setLocations(prev => prev.map(l => l.id === loc.id ? { ...l, is_active: !l.is_active } : l))
+
     const { error } = await supabase
       .from("locations")
       .update({ is_active: !loc.is_active })
       .eq("id", loc.id)
-    if (error) toast.error("Failed to update")
-    else {
-      setLocations(prev => prev.map(l => l.id === loc.id ? { ...l, is_active: !l.is_active } : l))
+
+    if (error) {
+      toast.error("Failed to update")
+      // Revert on error
+      setLocations(prev => prev.map(l => l.id === loc.id ? { ...l, is_active: loc.is_active } : l))
     }
+    setTimeout(() => { isSavingRef.current = false }, 500)
   }
 
   const handleDeleteZone = async (e?: React.MouseEvent) => {

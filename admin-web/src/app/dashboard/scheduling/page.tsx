@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -89,13 +89,19 @@ export default function SchedulingPage() {
   const [importSaving, setImportSaving] = useState(false)
   const [draggedStopIndex, setDraggedStopIndex] = useState<number | null>(null)
 
+  const isSavingRef = useRef(false)
+
   useEffect(() => {
     loadRoutes()
 
     const channel = supabase
       .channel('scheduling_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'transport_routes' }, () => loadRoutes(false))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'route_schedules' }, () => loadRoutes(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transport_routes' }, () => {
+        if (!isSavingRef.current) loadRoutes(false)
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'route_schedules' }, () => {
+        if (!isSavingRef.current) loadRoutes(false)
+      })
       .subscribe()
 
     return () => {
@@ -180,14 +186,21 @@ export default function SchedulingPage() {
   }
 
   const toggleRouteStatus = async (route: TransportRoute) => {
+    isSavingRef.current = true
+    // Optimistic update
+    setRoutes(prev => prev.map(r => r.id === route.id ? { ...r, is_active: !r.is_active } : r))
+
     const { error } = await supabase
       .from("transport_routes")
       .update({ is_active: !route.is_active })
       .eq("id", route.id)
-    if (error) toast.error("Failed to update")
-    else {
-      setRoutes(prev => prev.map(r => r.id === route.id ? { ...r, is_active: !r.is_active } : r))
+
+    if (error) {
+      toast.error("Failed to update")
+      // Revert on error
+      setRoutes(prev => prev.map(r => r.id === route.id ? { ...r, is_active: route.is_active } : r))
     }
+    setTimeout(() => { isSavingRef.current = false }, 500)
   }
 
   const handleBulkDelete = async () => {

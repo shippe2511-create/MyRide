@@ -801,10 +801,13 @@ class DriverState extends ChangeNotifier {
   Future<void> _sendLocationUpdate() async {
     if (_driverId.isEmpty) return;
     try {
-      // Get real GPS location
+      // Get real GPS location with shorter timeout for emulator compatibility
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
+        desiredAccuracy: LocationAccuracy.medium,
+        timeLimit: const Duration(seconds: 5),
+      ).timeout(
+        const Duration(seconds: 6),
+        onTimeout: () => throw TimeoutException('Location timeout'),
       );
 
       double lat = position.latitude;
@@ -841,6 +844,15 @@ class DriverState extends ChangeNotifier {
       );
     } catch (e) {
       debugPrint('Location update error: $e');
+      // On timeout, use last known or simulated location
+      if (_currentLat == 0 && _currentLng == 0) {
+        _currentLat = 4.1755;
+        _currentLng = 73.5093;
+      }
+      // Still try to update with fallback coordinates
+      try {
+        await SupabaseService.updateLocation(_driverId, _currentLat, _currentLng);
+      } catch (_) {}
     }
   }
 

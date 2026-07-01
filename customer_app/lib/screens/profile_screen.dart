@@ -15,6 +15,7 @@ import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../widgets/app_snackbar.dart';
+import '../config/app_config.dart';
 import 'chat_screen.dart';
 import 'support_chat_screen.dart';
 
@@ -2930,8 +2931,6 @@ class _AddressPickerScreenState extends State<_AddressPickerScreen> {
   List<Map<String, dynamic>> _searchResults = [];
   Timer? _debounce;
 
-  static const String _googleApiKey = 'AIzaSyBZ7HVy2dUvTCC5SZkz0MaFCBON2QorFbI';
-
   static const String _darkMapStyle = '''
 [
   {"elementType": "geometry", "stylers": [{"color": "#212121"}]},
@@ -3016,7 +3015,7 @@ class _AddressPickerScreenState extends State<_AddressPickerScreen> {
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/place/autocomplete/json'
         '?input=${Uri.encodeComponent(query)}'
-        '&key=$_googleApiKey'
+        '&key=$AppConfig.googleMapsApiKey'
         '&components=country:mv'
         '&location=4.1755,73.5093'
         '&radius=50000'
@@ -3061,7 +3060,7 @@ class _AddressPickerScreenState extends State<_AddressPickerScreen> {
         'https://maps.googleapis.com/maps/api/place/details/json'
         '?place_id=$placeId'
         '&fields=geometry,formatted_address'
-        '&key=$_googleApiKey'
+        '&key=$AppConfig.googleMapsApiKey'
       );
 
       final response = await http.get(url);
@@ -3122,7 +3121,7 @@ class _AddressPickerScreenState extends State<_AddressPickerScreen> {
               // Reverse geocode to get address
               try {
                 final url = Uri.parse(
-                  'https://maps.googleapis.com/maps/api/geocode/json?latlng=${point.latitude},${point.longitude}&key=$_googleApiKey'
+                  'https://maps.googleapis.com/maps/api/geocode/json?latlng=${point.latitude},${point.longitude}&key=$AppConfig.googleMapsApiKey'
                 );
                 final response = await http.get(url);
                 if (response.statusCode == 200) {

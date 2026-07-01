@@ -13,8 +13,7 @@ import '../services/notification_service.dart';
 import '../services/realtime_service.dart';
 import '../providers/app_state.dart';
 import 'trip_tracking_screen.dart';
-
-const String _googleApiKey = 'AIzaSyBZ7HVy2dUvTCC5SZkz0MaFCBON2QorFbI';
+import '../config/app_config.dart';
 
 const String _darkMapStyle = '''
 [
@@ -139,7 +138,7 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
         '?origin=$origin'
         '&destination=$destination'
         '&mode=driving'
-        '&key=$_googleApiKey'
+        '&key=$AppConfig.googleMapsApiKey'
       );
 
       final response = await http.get(url);

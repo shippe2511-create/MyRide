@@ -15,8 +15,7 @@ import '../services/supabase_service.dart';
 import '../services/location_service.dart';
 import 'driver_matching_screen.dart';
 import 'ride_confirm_screen.dart';
-
-const String _googleApiKey = 'AIzaSyBZ7HVy2dUvTCC5SZkz0MaFCBON2QorFbI';
+import '../config/app_config.dart';
 
 const String _darkMapStyle = '''
 [
@@ -91,7 +90,7 @@ class _SearchScreenState extends State<SearchScreen> {
         '&radius=100000'
         '&strictbounds=true'
         '&components=country:mv'
-        '&key=$_googleApiKey'
+        '&key=$AppConfig.googleMapsApiKey'
       );
 
       final response = await http.get(url);
@@ -151,7 +150,7 @@ class _SearchScreenState extends State<SearchScreen> {
         '&radius=100000'
         '&strictbounds=true'
         '&components=country:mv'
-        '&key=$_googleApiKey'
+        '&key=$AppConfig.googleMapsApiKey'
       );
 
       debugPrint('Places API URL: $url');
@@ -199,7 +198,7 @@ class _SearchScreenState extends State<SearchScreen> {
         'https://maps.googleapis.com/maps/api/place/details/json'
         '?place_id=$placeId'
         '&fields=geometry,formatted_address,name'
-        '&key=$_googleApiKey'
+        '&key=$AppConfig.googleMapsApiKey'
       );
 
       final response = await http.get(url);

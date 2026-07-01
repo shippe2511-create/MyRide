@@ -271,8 +271,9 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A),
+      backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
       body: SafeArea(
         child: Column(
           children: [
@@ -298,11 +299,17 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
   }
 
   Widget _buildHeader() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black;
+    final subtitleColor = isDark ? Colors.white54 : Colors.black54;
+    final bgColor = isDark ? const Color(0xFF0A0A0A) : Colors.white;
+    final buttonBgColor = isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF0A0A0A),
-        border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.1))),
+        color: bgColor,
+        border: Border(bottom: BorderSide(color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1))),
       ),
       child: Row(
         children: [
@@ -311,10 +318,10 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
+                color: buttonBgColor,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
+              child: Icon(Icons.arrow_back_ios_new, color: textColor, size: 18),
             ),
           ),
           const SizedBox(width: 16),
@@ -329,14 +336,14 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
             child: const Icon(Icons.mic, color: Colors.black, size: 20),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Push to Talk',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: textColor,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -344,7 +351,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
                 Text(
                   'Voice messages with dispatch',
                   style: TextStyle(
-                    color: Colors.white54,
+                    color: subtitleColor,
                     fontSize: 12,
                   ),
                 ),
@@ -356,10 +363,10 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
+                color: buttonBgColor,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.refresh, color: Colors.white, size: 20),
+              child: Icon(Icons.refresh, color: textColor, size: 20),
             ),
           ),
         ],
@@ -368,6 +375,10 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
   }
 
   Widget _buildEmptyState() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black;
+    final subtitleColor = isDark ? Colors.white.withOpacity(0.5) : Colors.black.withOpacity(0.5);
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -385,10 +396,10 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
+          Text(
             'No messages yet',
             style: TextStyle(
-              color: Colors.white,
+              color: textColor,
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
@@ -398,7 +409,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
             'Hold the mic button to send\na message to dispatch',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.5),
+              color: subtitleColor,
               fontSize: 14,
             ),
           ),

@@ -76,7 +76,9 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     setState(() => _isLoading = true);
     try {
       final driverState = Provider.of<DriverState>(context, listen: false);
+      debugPrint('Loading documents for driverId: ${driverState.driverId}');
       final docs = await SupabaseService.getMyDocuments(driverId: driverState.driverId);
+      debugPrint('Loaded ${docs.length} documents from DB');
 
       // Map Supabase documents to local format
       _documents = docs.map((doc) {

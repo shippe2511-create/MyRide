@@ -98,14 +98,15 @@ export function DocumentsTable() {
   const [updating, setUpdating] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
   useEffect(() => {
-    loadDocuments()
+    loadDocuments(true)
 
     const channel = supabase
       .channel('documents-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
-        loadDocuments()
+        loadDocuments(false)
       })
       .subscribe()
 
@@ -114,8 +115,8 @@ export function DocumentsTable() {
     }
   }, [])
 
-  const loadDocuments = async () => {
-    setLoading(true)
+  const loadDocuments = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
     const { data, error } = await supabase
       .from("documents")
       .select(`
@@ -135,7 +136,7 @@ export function DocumentsTable() {
     if (!error && data) {
       setDocuments(data)
     }
-    setLoading(false)
+    if (showLoading) setLoading(false)
   }
 
   const filteredDocuments = documents.filter(doc => {
@@ -254,7 +255,6 @@ export function DocumentsTable() {
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return
-    if (!window.confirm(`Are you sure you want to delete ${selectedIds.size} documents?`)) return
     setBulkLoading(true)
     const ids = Array.from(selectedIds)
     const { error } = await supabase
@@ -270,6 +270,7 @@ export function DocumentsTable() {
       setSelectedIds(new Set())
     }
     setBulkLoading(false)
+    setBulkDeleteOpen(false)
   }
 
   const getInitials = (name: string) => {
@@ -397,7 +398,7 @@ export function DocumentsTable() {
               <Ban className="mr-2 h-4 w-4" />
               Reject
             </Button>
-            <Button size="sm" variant="destructive" onClick={handleBulkDelete} disabled={bulkLoading}>
+            <Button size="sm" variant="destructive" onClick={() => setBulkDeleteOpen(true)} disabled={bulkLoading}>
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </Button>
@@ -679,6 +680,30 @@ export function DocumentsTable() {
               disabled={updating}
             >
               {updating ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <Dialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {selectedIds.size} Documents</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {selectedIds.size} document{selectedIds.size > 1 ? "s" : ""}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleBulkDelete}
+              disabled={bulkLoading}
+            >
+              {bulkLoading ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -91,13 +91,13 @@ export default function HelpContentPage() {
   })
 
   useEffect(() => {
-    loadContent()
+    loadContent(true)
 
     // Realtime subscription
     const channel = supabase
       .channel('help_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'help_content' }, () => {
-        loadContent()
+        loadContent(false)
       })
       .subscribe()
 
@@ -106,8 +106,8 @@ export default function HelpContentPage() {
     }
   }, [appType])
 
-  const loadContent = async () => {
-    setLoading(true)
+  const loadContent = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
     const { data, error } = await supabase
       .from("help_content")
       .select("*")
@@ -120,7 +120,7 @@ export default function HelpContentPage() {
     } else {
       setContent(data || [])
     }
-    setLoading(false)
+    if (showLoading) setLoading(false)
   }
 
   const openAddDialog = (contentType: string) => {

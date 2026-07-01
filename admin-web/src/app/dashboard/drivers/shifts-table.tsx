@@ -110,13 +110,13 @@ export function ShiftsTable() {
   const weekEnd = weekDates[6]
 
   useEffect(() => {
-    loadData()
+    loadData(true)
 
     // Realtime subscription for shifts updates
     const channel = supabase
       .channel('shifts_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shifts' }, () => {
-        loadData()
+        loadData(false)
       })
       .subscribe()
 
@@ -125,8 +125,8 @@ export function ShiftsTable() {
     }
   }, [weekOffset])
 
-  const loadData = async () => {
-    setLoading(true)
+  const loadData = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
 
     const startStr = weekStart.toISOString().split("T")[0]
     const endStr = weekEnd.toISOString().split("T")[0]
@@ -153,7 +153,7 @@ export function ShiftsTable() {
 
     setShifts(shiftsRes.data || [])
     setDrivers(driversRes.data || [])
-    setLoading(false)
+    if (showLoading) setLoading(false)
   }
 
   const generateDatesFromRange = () => {

@@ -612,12 +612,17 @@ class SupabaseService {
   // Documents methods
   static Future<List<Map<String, dynamic>>> getMyDocuments({String? driverId}) async {
     final id = driverId ?? _driverId;
-    if (id == null || id.isEmpty) return [];
+    debugPrint('getMyDocuments called with driverId param: $driverId, _driverId: $_driverId, using: $id');
+    if (id == null || id.isEmpty) {
+      debugPrint('getMyDocuments: id is null or empty, returning []');
+      return [];
+    }
 
     // Use RPC to bypass RLS (phone login doesn't set auth.uid())
     final response = await client.rpc('get_driver_documents', params: {
       'p_driver_id': id,
     });
+    debugPrint('getMyDocuments response: $response');
     return List<Map<String, dynamic>>.from(response);
   }
 
@@ -648,12 +653,15 @@ class SupabaseService {
   }) async {
     if (driverId.isEmpty || documentId.isEmpty) return false;
     try {
-      await client
-          .from('documents')
-          .delete()
-          .eq('id', documentId)
-          .eq('driver_id', driverId);
-      return true;
+      final result = await client.rpc('delete_driver_document', params: {
+        'p_driver_id': driverId,
+        'p_document_id': documentId,
+      });
+      debugPrint('Delete document result: $result');
+      if (result is Map && result['success'] == true) {
+        return true;
+      }
+      return false;
     } catch (e) {
       debugPrint('Error deleting document: $e');
       return false;

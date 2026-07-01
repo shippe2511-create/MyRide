@@ -79,14 +79,14 @@ export default function SettingsPage() {
   const isSavingRef = useRef(false)
 
   useEffect(() => {
-    loadSettings()
+    loadSettings(true)
     loadEmergencyContacts()
 
     // Realtime subscription - skip if we're currently saving
     const channel = supabase
       .channel('settings_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => {
-        if (!isSavingRef.current) loadSettings()
+        if (!isSavingRef.current) loadSettings(false)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'emergency_contacts' }, () => {
         if (!isSavingRef.current) loadEmergencyContacts()
@@ -98,8 +98,8 @@ export default function SettingsPage() {
     }
   }, [])
 
-  const loadSettings = async () => {
-    setLoading(true)
+  const loadSettings = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
     try {
       const { data } = await supabase
         .from("app_settings")
@@ -113,7 +113,7 @@ export default function SettingsPage() {
     } catch {
       // Use defaults if no settings exist
     }
-    setLoading(false)
+    if (showLoading) setLoading(false)
   }
 
   const saveSettings = async () => {

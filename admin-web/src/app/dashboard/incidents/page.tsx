@@ -99,12 +99,12 @@ export default function IncidentsPage() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
   useEffect(() => {
-    loadIncidents()
+    loadIncidents(true)
 
     const channel = supabase
       .channel('incidents_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, () => {
-        loadIncidents()
+        loadIncidents(false)
       })
       .subscribe()
 
@@ -113,8 +113,8 @@ export default function IncidentsPage() {
     }
   }, [statusFilter, severityFilter])
 
-  const loadIncidents = async () => {
-    setLoading(true)
+  const loadIncidents = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
     let query = supabase
       .from("incidents")
       .select(`
@@ -137,7 +137,7 @@ export default function IncidentsPage() {
     } else {
       setIncidents(data || [])
     }
-    setLoading(false)
+    if (showLoading) setLoading(false)
   }
 
   const filteredIncidents = incidents.filter(i =>

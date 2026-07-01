@@ -187,7 +187,8 @@
       "Bash(rm -rf ~/.gradle/wrapper/dists/*)",
       "Bash(rm -rf ~/Library/Caches/Homebrew/*)",
       "Bash(adb devices *)",
-      "Bash(adb shell *)"
+      "Bash(adb shell *)",
+      "Bash(adb logcat *)"
     ],
     "additionalDirectories": [
       "/tmp"

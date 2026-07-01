@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../providers/driver_state.dart';
@@ -20,6 +22,8 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = true;
   List<Map<String, dynamic>> _documents = [];
+  RealtimeChannel? _documentsChannel;
+  Timer? _pollingTimer;
 
   // Document types with icons
   final Map<String, IconData> _documentIcons = {
@@ -47,12 +51,26 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadDocuments();
+    _setupRealtimeSubscription();
+    _startPolling();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _documentsChannel?.unsubscribe();
+    _pollingTimer?.cancel();
     super.dispose();
+  }
+
+  void _startPolling() {
+    debugPrint('Starting documents polling timer...');
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      debugPrint('Polling timer fired, mounted=$mounted');
+      if (mounted) {
+        _loadDocuments(showLoading: false);
+      }
+    });
   }
 
   @override
@@ -60,6 +78,37 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
     if (state == AppLifecycleState.resumed) {
       _loadDocuments(showLoading: false);
     }
+  }
+
+  void _setupRealtimeSubscription() {
+    final driverState = Provider.of<DriverState>(context, listen: false);
+    if (driverState.driverId.isEmpty) return;
+
+    final driverId = driverState.driverId;
+    debugPrint('Setting up documents realtime for driver: $driverId');
+
+    // Subscribe without filter - filter in callback instead
+    _documentsChannel = Supabase.instance.client
+        .channel('documents_realtime_$driverId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'documents',
+          callback: (payload) {
+            debugPrint('Documents realtime event: ${payload.eventType}');
+            debugPrint('Documents payload: ${payload.newRecord}');
+            // Filter by driver_id in callback
+            final newDriverId = payload.newRecord['driver_id'] as String?;
+            final oldDriverId = payload.oldRecord['driver_id'] as String?;
+            if (newDriverId == driverId || oldDriverId == driverId) {
+              debugPrint('Documents update matches driver, reloading...');
+              _loadDocuments(showLoading: false);
+            }
+          },
+        )
+        .subscribe((status, error) {
+          debugPrint('Documents subscription status: $status, error: $error');
+        });
   }
 
   Future<void> _loadDocuments({bool showLoading = true}) async {
@@ -102,6 +151,14 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
           });
         }
       }
+
+      // Sort documents in consistent order
+      final typeOrder = {'license': 0, 'vehicle_reg': 1, 'insurance': 2, 'id_card': 3};
+      _documents.sort((a, b) {
+        final orderA = typeOrder[a['type']] ?? 99;
+        final orderB = typeOrder[b['type']] ?? 99;
+        return orderA.compareTo(orderB);
+      });
     } catch (e) {
       debugPrint('Error loading documents: $e');
       // Use default documents if error
@@ -112,7 +169,9 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
         {'id': 'id_card', 'type': 'id_card', 'title': 'National ID Card', 'icon': Icons.credit_card_outlined, 'status': 'not_uploaded', 'expiry': null, 'uploaded': false},
       ];
     }
-    if (showLoading) setState(() => _isLoading = false);
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
   }
 
   List<Map<String, dynamic>> get _expiringDocuments {

@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -6,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
-import '../services/realtime_service.dart';
 import '../providers/driver_state.dart';
 import '../widgets/shimmer_loading.dart';
 import '../widgets/app_snackbar.dart';
@@ -18,11 +16,10 @@ class DocumentsScreen extends StatefulWidget {
   State<DocumentsScreen> createState() => _DocumentsScreenState();
 }
 
-class _DocumentsScreenState extends State<DocumentsScreen> {
+class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingObserver {
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = true;
   List<Map<String, dynamic>> _documents = [];
-  StreamSubscription<Map<String, dynamic>>? _documentsSubscription;
 
   // Document types with icons
   final Map<String, IconData> _documentIcons = {
@@ -48,32 +45,25 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadDocuments();
-    _subscribeToDocumentUpdates();
   }
 
   @override
   void dispose() {
-    _documentsSubscription?.cancel();
-    final driverState = Provider.of<DriverState>(context, listen: false);
-    if (driverState.driverId.isNotEmpty) {
-      RealtimeService().unsubscribeFromDocuments(driverState.driverId);
-    }
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
-  void _subscribeToDocumentUpdates() {
-    final driverState = Provider.of<DriverState>(context, listen: false);
-    if (driverState.driverId.isEmpty) return;
-
-    _documentsSubscription = RealtimeService().subscribeToDocuments(driverState.driverId).listen((data) {
-      debugPrint('Document realtime update: ${data['event']}');
-      _loadDocuments();
-    });
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadDocuments(showLoading: false);
+    }
   }
 
-  Future<void> _loadDocuments() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadDocuments({bool showLoading = true}) async {
+    if (showLoading) setState(() => _isLoading = true);
     try {
       final driverState = Provider.of<DriverState>(context, listen: false);
       debugPrint('Loading documents for driverId: ${driverState.driverId}');
@@ -122,7 +112,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         {'id': 'id_card', 'type': 'id_card', 'title': 'National ID Card', 'icon': Icons.credit_card_outlined, 'status': 'not_uploaded', 'expiry': null, 'uploaded': false},
       ];
     }
-    setState(() => _isLoading = false);
+    if (showLoading) setState(() => _isLoading = false);
   }
 
   List<Map<String, dynamic>> get _expiringDocuments {
@@ -787,7 +777,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
 
       if (mounted) {
         AppSnackbar.success(context, 'Document uploaded!', subtitle: 'Pending review');
-        _loadDocuments();
+        _loadDocuments(showLoading: false);
       }
     } catch (e) {
       if (mounted) {
@@ -905,7 +895,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     if (mounted) {
       if (success) {
         AppSnackbar.success(context, 'Document removed');
-        _loadDocuments();
+        _loadDocuments(showLoading: false);
       } else {
         AppSnackbar.error(context, 'Failed to remove document');
       }

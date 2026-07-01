@@ -240,20 +240,24 @@ class RealtimeService {
     final key = 'documents_$driverId';
     final controller = _getController(key);
 
+    debugPrint('RealtimeService: subscribeToDocuments called for driverId=$driverId, key=$key');
+
     if (!_channels.containsKey(key)) {
+      debugPrint('RealtimeService: Creating new documents channel for $key');
       final channel = _client
           .channel(key)
           .onPostgresChanges(
             event: PostgresChangeEvent.all,
             schema: 'public',
-            table: 'driver_documents',
+            table: 'documents',
             filter: PostgresChangeFilter(
               type: PostgresChangeFilterType.eq,
               column: 'driver_id',
               value: driverId,
             ),
             callback: (payload) {
-              debugPrint('RealtimeService: Document update - ${payload.eventType}');
+              debugPrint('RealtimeService: Document update received - ${payload.eventType}');
+              debugPrint('RealtimeService: Document payload: ${payload.newRecord}');
               controller.add({
                 'event': payload.eventType.name,
                 'new': payload.newRecord,
@@ -261,9 +265,13 @@ class RealtimeService {
               });
             },
           )
-          .subscribe();
+          .subscribe((status, error) {
+            debugPrint('RealtimeService: Documents subscription status=$status, error=$error');
+          });
 
       _channels[key] = channel;
+    } else {
+      debugPrint('RealtimeService: Documents channel already exists for $key');
     }
 
     return controller.stream;

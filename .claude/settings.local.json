@@ -182,7 +182,12 @@
       "Bash(rm -rf ~/Library/Developer/CoreSimulator/Caches/*)",
       "Bash(rm -rf ~/Library/Caches/com.apple.dt.Xcode/*)",
       "Bash(rm -rf /var/folders/h1/qnt22wls0v3d8sc4rbn_m1cw0000gn/T/flutter_tools*)",
-      "Bash(rm -rf ~/Downloads/MyRide/*/build)"
+      "Bash(rm -rf ~/Downloads/MyRide/*/build)",
+      "Bash(rm -rf ~/.gradle/caches/*)",
+      "Bash(rm -rf ~/.gradle/wrapper/dists/*)",
+      "Bash(rm -rf ~/Library/Caches/Homebrew/*)",
+      "Bash(adb devices *)",
+      "Bash(adb shell *)"
     ],
     "additionalDirectories": [
       "/tmp"

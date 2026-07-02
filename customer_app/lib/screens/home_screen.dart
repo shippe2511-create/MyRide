@@ -157,9 +157,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             _rideStatusSubscription = null;
             _subscribedRideId = null;
           }
-          // Clear ongoing trip if no active rides
-          if (_ongoingTrip != null) {
-            setState(() => _ongoingTrip = null);
+          // Clear ongoing trip and scheduled time if no active rides
+          if (_ongoingTrip != null || _scheduledTime != null) {
+            setState(() {
+              _ongoingTrip = null;
+              _scheduledTime = null;
+            });
           }
           return;
         }
@@ -167,8 +170,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         final ride = rides.first;
         final status = ride['status'] as String?;
         final rideId = ride['id'] as String?;
+        final scheduledTimeStr = ride['scheduled_time'] as String?;
 
-        debugPrint('Checking ride $rideId status: $status');
+        debugPrint('Checking ride $rideId status: $status, scheduledTime: $scheduledTimeStr');
+
+        // Restore scheduled time badge and pickup/dropoff for scheduled/pending rides
+        if ((status == 'scheduled' || status == 'pending') && scheduledTimeStr != null) {
+          try {
+            final scheduledTime = DateTime.parse(scheduledTimeStr).toLocal();
+            if (_scheduledTime != scheduledTime) {
+              setState(() => _scheduledTime = scheduledTime);
+            }
+            // Also restore pickup/dropoff addresses for the schedule dialog
+            final pickupName = ride['pickup_name'] as String?;
+            final dropoffName = ride['dropoff_name'] as String?;
+            if (pickupName != null && _lastPickupAddress.isEmpty) {
+              _lastPickupAddress = pickupName;
+              _lastPickupLat = (ride['pickup_lat'] as num?)?.toDouble();
+              _lastPickupLng = (ride['pickup_lng'] as num?)?.toDouble();
+            }
+            if (dropoffName != null && _lastDropoffAddress.isEmpty) {
+              _lastDropoffAddress = dropoffName;
+              _lastDropoffLat = (ride['dropoff_lat'] as num?)?.toDouble();
+              _lastDropoffLng = (ride['dropoff_lng'] as num?)?.toDouble();
+            }
+          } catch (e) {
+            debugPrint('Error parsing scheduled time: $e');
+          }
+        }
 
         // Subscribe to realtime updates for this ride
         if (rideId != null && _subscribedRideId != rideId) {

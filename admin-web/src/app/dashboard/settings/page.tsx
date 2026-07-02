@@ -44,6 +44,16 @@ interface EmergencyContact {
   is_active: boolean
 }
 
+interface DocumentType {
+  id: string
+  name: string
+  label: string
+  icon: string
+  is_required: boolean
+  is_active: boolean
+  sort_order: number
+}
+
 const defaultSettings: AppSettings = {
   id: "default",
   company_name: "MyRide",
@@ -75,12 +85,17 @@ export default function SettingsPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([])
   const [savingContacts, setSavingContacts] = useState(false)
+  const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([])
+  const [savingDocTypes, setSavingDocTypes] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   const isSavingRef = useRef(false)
 
   useEffect(() => {
+    setMounted(true)
     loadSettings(true)
     loadEmergencyContacts()
+    loadDocumentTypes()
 
     // Realtime subscription - skip if we're currently saving
     const channel = supabase
@@ -90,6 +105,9 @@ export default function SettingsPage() {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'emergency_contacts' }, () => {
         if (!isSavingRef.current) loadEmergencyContacts()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'document_types' }, () => {
+        if (!isSavingRef.current) loadDocumentTypes()
       })
       .subscribe()
 
@@ -213,6 +231,65 @@ export default function SettingsPage() {
     toast.success("Contact deleted")
   }
 
+  // Document Types functions
+  const loadDocumentTypes = async () => {
+    const { data } = await supabase
+      .from("document_types")
+      .select("*")
+      .order("sort_order")
+    if (data) setDocumentTypes(data)
+  }
+
+  const saveDocumentTypes = async () => {
+    setSavingDocTypes(true)
+    isSavingRef.current = true
+    try {
+      for (const dt of documentTypes) {
+        const { error } = await supabase.from("document_types").upsert({
+          id: dt.id,
+          name: dt.name,
+          label: dt.label,
+          icon: dt.icon,
+          is_required: dt.is_required,
+          is_active: dt.is_active,
+          sort_order: dt.sort_order,
+        })
+        if (error) throw error
+      }
+      toast.success("Document types saved")
+      logActivity({ action: 'update', entityType: 'settings', entityId: 'document-types', details: { count: documentTypes.length } })
+    } catch {
+      toast.error("Failed to save document types")
+    }
+    setSavingDocTypes(false)
+    setTimeout(() => { isSavingRef.current = false }, 500)
+  }
+
+  const addDocumentType = () => {
+    const newType: DocumentType = {
+      id: crypto.randomUUID(),
+      name: "",
+      label: "",
+      icon: "description",
+      is_required: true,
+      is_active: true,
+      sort_order: documentTypes.length
+    }
+    setDocumentTypes([...documentTypes, newType])
+  }
+
+  const updateDocType = (id: string, field: keyof DocumentType, value: string | number | boolean) => {
+    setDocumentTypes(types =>
+      types.map(t => t.id === id ? { ...t, [field]: value } : t)
+    )
+  }
+
+  const deleteDocType = async (id: string) => {
+    await supabase.from("document_types").delete().eq("id", id)
+    setDocumentTypes(types => types.filter(t => t.id !== id))
+    toast.success("Document type deleted")
+  }
+
   const handleChangePassword = async () => {
     if (newPassword.length < 6) {
       toast.error("Password must be at least 6 characters")
@@ -242,24 +319,11 @@ export default function SettingsPage() {
     setChangingPassword(false)
   }
 
-  if (loading) {
+  if (!mounted) {
     return (
       <PermissionGate permission="settings:view">
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2">
-                <Settings className="h-6 w-6" />
-                Settings
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Configure application settings and preferences
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center justify-center h-96">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       </PermissionGate>
     )
@@ -278,7 +342,7 @@ export default function SettingsPage() {
             Configure application settings and preferences
           </p>
         </div>
-        <Button onClick={saveSettings} disabled={saving}>
+        {!loading && <Button onClick={saveSettings} disabled={saving}>
           {saving ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -290,7 +354,7 @@ export default function SettingsPage() {
               Save Changes
             </>
           )}
-        </Button>
+        </Button>}
       </div>
 
       <Tabs defaultValue="general">
@@ -298,6 +362,7 @@ export default function SettingsPage() {
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="rides">Rides</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
 
@@ -513,6 +578,88 @@ export default function SettingsPage() {
                     />
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="documents" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="h-5 w-5" />
+                Required Documents
+              </CardTitle>
+              <CardDescription>Configure document types that drivers must upload</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <div className="grid grid-cols-[1fr_120px_80px_80px_40px] gap-2 px-2 py-1 text-sm font-medium text-muted-foreground">
+                  <span>Document Name</span>
+                  <span>Icon</span>
+                  <span className="text-center">Required</span>
+                  <span className="text-center">Active</span>
+                  <span></span>
+                </div>
+                {documentTypes.map((dt) => (
+                  <div key={dt.id} className="grid grid-cols-[1fr_120px_80px_80px_40px] gap-2 items-center p-2 rounded-lg border bg-card">
+                    <Input
+                      value={dt.label}
+                      onChange={(e) => {
+                        const label = e.target.value
+                        const name = label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+                        updateDocType(dt.id, "label", label)
+                        updateDocType(dt.id, "name", name)
+                      }}
+                      placeholder="Driving License"
+                      className="h-9"
+                    />
+                    <Select value={dt.icon} onValueChange={(v) => updateDocType(dt.id, "icon", v)}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="badge">Badge</SelectItem>
+                        <SelectItem value="directions_car">Car</SelectItem>
+                        <SelectItem value="security">Security</SelectItem>
+                        <SelectItem value="credit_card">Card</SelectItem>
+                        <SelectItem value="person">Person</SelectItem>
+                        <SelectItem value="verified_user">Verified</SelectItem>
+                        <SelectItem value="description">Document</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="flex justify-center">
+                      <Switch
+                        checked={dt.is_required}
+                        onCheckedChange={(checked) => updateDocType(dt.id, "is_required", checked)}
+                      />
+                    </div>
+                    <div className="flex justify-center">
+                      <Switch
+                        checked={dt.is_active}
+                        onCheckedChange={(checked) => updateDocType(dt.id, "is_active", checked)}
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => deleteDocType(dt.id)}
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={addDocumentType}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Document Type
+                </Button>
+                <Button onClick={saveDocumentTypes} disabled={savingDocTypes}>
+                  {savingDocTypes ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  Save
+                </Button>
               </div>
             </CardContent>
           </Card>

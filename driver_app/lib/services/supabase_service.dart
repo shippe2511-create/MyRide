@@ -679,6 +679,11 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(response);
   }
 
+  static Future<List<Map<String, dynamic>>> getDocumentTypes() async {
+    final response = await client.rpc('get_document_types');
+    return List<Map<String, dynamic>>.from(response);
+  }
+
   static Future<void> uploadDocument({
     required String documentType,
     required String fileUrl,

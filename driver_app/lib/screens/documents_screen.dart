@@ -22,43 +22,58 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = true;
   List<Map<String, dynamic>> _documents = [];
+  List<Map<String, dynamic>> _documentTypes = [];
   RealtimeChannel? _documentsChannel;
+  RealtimeChannel? _documentTypesChannel;
   Timer? _pollingTimer;
 
-  // Document types with icons
-  final Map<String, IconData> _documentIcons = {
-    'license': Icons.badge_outlined,
-    'driving_license': Icons.badge_outlined,
-    'vehicle_reg': Icons.directions_car_outlined,
-    'insurance': Icons.security_outlined,
-    'id_card': Icons.credit_card_outlined,
-    'profile_photo': Icons.person_outline,
-    'police_clearance': Icons.verified_user_outlined,
-  };
-
-  final Map<String, String> _documentTitles = {
-    'license': 'Driving License',
-    'driving_license': 'Driving License',
-    'vehicle_reg': 'Vehicle Registration',
-    'insurance': 'Insurance Certificate',
-    'id_card': 'National ID Card',
-    'profile_photo': 'Profile Photo',
-    'police_clearance': 'Police Clearance',
-  };
+  // Icon mapping from database icon names to Flutter icons
+  IconData _getIconForType(String? iconName, String typeName) {
+    switch (iconName ?? typeName) {
+      case 'badge':
+      case 'license':
+      case 'driving_license':
+        return Icons.badge_outlined;
+      case 'directions_car':
+      case 'vehicle_reg':
+        return Icons.directions_car_outlined;
+      case 'security':
+      case 'insurance':
+        return Icons.security_outlined;
+      case 'credit_card':
+      case 'id_card':
+        return Icons.credit_card_outlined;
+      case 'person':
+      case 'profile_photo':
+        return Icons.person_outline;
+      case 'verified_user':
+      case 'police_clearance':
+        return Icons.verified_user_outlined;
+      default:
+        return Icons.description_outlined;
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _loadDocuments();
+    _initializeDocuments();
     _setupRealtimeSubscription();
+    _setupDocumentTypesSubscription();
     _startPolling();
+  }
+
+  Future<void> _initializeDocuments() async {
+    await _loadDocumentTypes();
+    await _loadDocuments();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _documentsChannel?.unsubscribe();
+    _documentTypesChannel?.unsubscribe();
     _pollingTimer?.cancel();
     super.dispose();
   }
@@ -68,6 +83,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
     _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       debugPrint('Polling timer fired, mounted=$mounted');
       if (mounted) {
+        _loadDocumentTypes();
         _loadDocuments(showLoading: false);
       }
     });
@@ -111,22 +127,63 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
         });
   }
 
+  void _setupDocumentTypesSubscription() {
+    debugPrint('Setting up document_types realtime subscription');
+    _documentTypesChannel = Supabase.instance.client
+        .channel('document_types_realtime')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'document_types',
+          callback: (payload) {
+            debugPrint('Document types realtime event: ${payload.eventType}');
+            _loadDocumentTypes();
+            _loadDocuments(showLoading: false);
+          },
+        )
+        .subscribe((status, error) {
+          debugPrint('Document types subscription status: $status, error: $error');
+        });
+  }
+
+  Future<void> _loadDocumentTypes() async {
+    try {
+      final types = await SupabaseService.getDocumentTypes();
+      if (mounted) {
+        setState(() => _documentTypes = types);
+      }
+    } catch (e) {
+      debugPrint('Error loading document types: $e');
+    }
+  }
+
   Future<void> _loadDocuments({bool showLoading = true}) async {
-    if (showLoading) setState(() => _isLoading = true);
+    if (showLoading && mounted) setState(() => _isLoading = true);
     try {
       final driverState = Provider.of<DriverState>(context, listen: false);
       debugPrint('Loading documents for driverId: ${driverState.driverId}');
       final docs = await SupabaseService.getMyDocuments(driverId: driverState.driverId);
       debugPrint('Loaded ${docs.length} documents from DB');
 
+      // Build type lookup from database document types
+      final typeLabels = <String, String>{};
+      final typeIcons = <String, String>{};
+      final typeOrders = <String, int>{};
+      for (final dt in _documentTypes) {
+        final name = dt['name'] as String;
+        typeLabels[name] = dt['label'] as String? ?? name;
+        typeIcons[name] = dt['icon'] as String? ?? 'description';
+        typeOrders[name] = dt['sort_order'] as int? ?? 99;
+      }
+
       // Map Supabase documents to local format
-      _documents = docs.map((doc) {
+      final newDocuments = docs.map((doc) {
         final docType = doc['document_type'] as String? ?? 'other';
         return {
           'id': doc['id'],
           'type': docType,
-          'title': _documentTitles[docType] ?? docType.replaceAll('_', ' ').toUpperCase(),
-          'icon': _documentIcons[docType] ?? Icons.description_outlined,
+          'title': typeLabels[docType] ?? docType.replaceAll('_', ' ').toUpperCase(),
+          'icon': _getIconForType(typeIcons[docType], docType),
           'status': doc['status'] ?? 'pending',
           'expiry': doc['expiry_date'],
           'uploaded': true,
@@ -134,17 +191,26 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
         };
       }).toList();
 
-      // Add missing required documents
-      final uploadedTypes = _documents.map((d) => d['type']).toSet();
-      final requiredTypes = ['license', 'vehicle_reg', 'insurance', 'id_card'];
+      // Add missing required documents from database document types
+      final uploadedTypes = newDocuments.map((d) => d['type']).toSet();
 
-      for (final type in requiredTypes) {
-        if (!uploadedTypes.contains(type)) {
-          _documents.add({
-            'id': type,
-            'type': type,
-            'title': _documentTitles[type] ?? type,
-            'icon': _documentIcons[type] ?? Icons.description_outlined,
+      // Use database types if available, else use defaults
+      final typesToCheck = _documentTypes.isNotEmpty ? _documentTypes : [
+        {'name': 'license', 'label': 'Driving License', 'icon': 'badge', 'is_required': true, 'sort_order': 0},
+        {'name': 'vehicle_reg', 'label': 'Vehicle Registration', 'icon': 'directions_car', 'is_required': true, 'sort_order': 1},
+        {'name': 'insurance', 'label': 'Insurance Certificate', 'icon': 'security', 'is_required': true, 'sort_order': 2},
+        {'name': 'id_card', 'label': 'National ID Card', 'icon': 'credit_card', 'is_required': true, 'sort_order': 3},
+      ];
+
+      for (final dt in typesToCheck) {
+        final typeName = dt['name'] as String;
+        final isRequired = dt['is_required'] as bool? ?? true;
+        if (isRequired && !uploadedTypes.contains(typeName)) {
+          newDocuments.add({
+            'id': typeName,
+            'type': typeName,
+            'title': dt['label'] as String? ?? typeName,
+            'icon': _getIconForType(dt['icon'] as String?, typeName),
             'status': 'not_uploaded',
             'expiry': null,
             'uploaded': false,
@@ -152,25 +218,33 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
         }
       }
 
-      // Sort documents in consistent order
-      final typeOrder = {'license': 0, 'vehicle_reg': 1, 'insurance': 2, 'id_card': 3};
-      _documents.sort((a, b) {
-        final orderA = typeOrder[a['type']] ?? 99;
-        final orderB = typeOrder[b['type']] ?? 99;
+      // Sort documents by database sort_order (with fallback defaults)
+      final defaultOrders = {'license': 0, 'vehicle_reg': 1, 'insurance': 2, 'id_card': 3};
+      newDocuments.sort((a, b) {
+        final orderA = typeOrders[a['type']] ?? defaultOrders[a['type']] ?? 99;
+        final orderB = typeOrders[b['type']] ?? defaultOrders[b['type']] ?? 99;
         return orderA.compareTo(orderB);
       });
+
+      if (mounted) {
+        setState(() {
+          _documents = newDocuments;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       debugPrint('Error loading documents: $e');
-      // Use default documents if error
-      _documents = [
-        {'id': 'license', 'type': 'license', 'title': 'Driving License', 'icon': Icons.badge_outlined, 'status': 'not_uploaded', 'expiry': null, 'uploaded': false},
-        {'id': 'vehicle_reg', 'type': 'vehicle_reg', 'title': 'Vehicle Registration', 'icon': Icons.directions_car_outlined, 'status': 'not_uploaded', 'expiry': null, 'uploaded': false},
-        {'id': 'insurance', 'type': 'insurance', 'title': 'Insurance Certificate', 'icon': Icons.security_outlined, 'status': 'not_uploaded', 'expiry': null, 'uploaded': false},
-        {'id': 'id_card', 'type': 'id_card', 'title': 'National ID Card', 'icon': Icons.credit_card_outlined, 'status': 'not_uploaded', 'expiry': null, 'uploaded': false},
-      ];
-    }
-    if (mounted) {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _documents = [
+            {'id': 'license', 'type': 'license', 'title': 'Driving License', 'icon': Icons.badge_outlined, 'status': 'not_uploaded', 'expiry': null, 'uploaded': false},
+            {'id': 'vehicle_reg', 'type': 'vehicle_reg', 'title': 'Vehicle Registration', 'icon': Icons.directions_car_outlined, 'status': 'not_uploaded', 'expiry': null, 'uploaded': false},
+            {'id': 'insurance', 'type': 'insurance', 'title': 'Insurance Certificate', 'icon': Icons.security_outlined, 'status': 'not_uploaded', 'expiry': null, 'uploaded': false},
+            {'id': 'id_card', 'type': 'id_card', 'title': 'National ID Card', 'icon': Icons.credit_card_outlined, 'status': 'not_uploaded', 'expiry': null, 'uploaded': false},
+          ];
+          _isLoading = false;
+        });
+      }
     }
   }
 

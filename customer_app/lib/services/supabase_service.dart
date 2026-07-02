@@ -1450,21 +1450,19 @@ class SupabaseService {
     }
   }
 
-  // Get upcoming scheduled rides
+  // Get scheduled rides (including those waiting for driver)
   static Future<List<Map<String, dynamic>>> getScheduledRides(String? customerId) async {
     final userId = customerId ?? currentUser?.id;
     if (userId == null) return [];
 
     try {
-      final now = DateTime.now().toUtc().toIso8601String();
       final response = await client
           .from('rides')
           .select('*, driver:drivers(*, profile:profiles(*))')
           .eq('customer_id', userId)
-          .inFilter('status', ['scheduled', 'pending'])
+          .inFilter('status', ['scheduled', 'pending', 'accepted'])
           .not('scheduled_time', 'is', null)
-          .gte('scheduled_time', now)
-          .order('scheduled_time', ascending: true)
+          .order('scheduled_time', ascending: false)
           .limit(10);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {

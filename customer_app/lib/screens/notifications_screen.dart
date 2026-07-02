@@ -74,39 +74,61 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     return Scaffold(
       backgroundColor: context.bgColor,
-      appBar: AppBar(
-        backgroundColor: context.bgColor,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: context.textColor),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text('Notifications', style: TextStyle(color: context.textColor)),
-        actions: [
-          if (unreadCount > 0)
-            TextButton(
-              onPressed: _markAllAsRead,
-              child: Text('Mark all read', style: TextStyle(color: AppColors.yellow)),
-            ),
-        ],
-      ),
       body: _isLoading
           ? const ShimmerList(itemCount: 5)
           : RefreshIndicator(
               onRefresh: _loadNotifications,
               color: AppColors.yellow,
               child: _notifications.isEmpty
-                  ? ListView(
+                  ? CustomScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      children: [_buildEmptyState(context)],
+                      slivers: [
+                        SliverAppBar(
+                          backgroundColor: context.bgColor,
+                          floating: true,
+                          snap: true,
+                          leading: IconButton(
+                            icon: Icon(Icons.arrow_back, color: context.textColor),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                          title: Text('Notifications', style: TextStyle(color: context.textColor)),
+                        ),
+                        SliverFillRemaining(child: _buildEmptyState(context)),
+                      ],
                     )
-                  : ListView.builder(
+                  : CustomScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: _notifications.length,
-                      itemBuilder: (context, index) {
-                        final notification = _notifications[index];
-                        return _buildNotificationCard(context, notification, index);
-                      },
+                      slivers: [
+                        SliverAppBar(
+                          backgroundColor: context.bgColor,
+                          floating: true,
+                          snap: true,
+                          leading: IconButton(
+                            icon: Icon(Icons.arrow_back, color: context.textColor),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                          title: Text('Notifications', style: TextStyle(color: context.textColor)),
+                          actions: [
+                            if (unreadCount > 0)
+                              TextButton(
+                                onPressed: _markAllAsRead,
+                                child: Text('Mark all read', style: TextStyle(color: AppColors.yellow)),
+                              ),
+                          ],
+                        ),
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                final notification = _notifications[index];
+                                return _buildNotificationCard(context, notification, index);
+                              },
+                              childCount: _notifications.length,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
             ),
     );

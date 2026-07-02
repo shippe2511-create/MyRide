@@ -119,34 +119,38 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.bgColor,
-      appBar: AppBar(
-        backgroundColor: context.bgColor,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: context.textColor),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text('Shift Schedule', style: TextStyle(color: context.textColor)),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.calendar_month, color: context.textColor),
-            onPressed: () => _showMonthView(context),
-          ),
-        ],
-      ),
       body: _isLoading
           ? const ShimmerList(itemCount: 4)
           : RefreshIndicator(
               onRefresh: _loadShifts,
               color: AppColors.yellow,
-              child: SingleChildScrollView(
+              child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  children: [
-                    _buildWeekSummary(context),
-                    _buildDaySelector(context),
-                    _buildDaySchedule(context),
-                  ],
-                ),
+                slivers: [
+                  SliverAppBar(
+                    backgroundColor: context.bgColor,
+                    floating: true,
+                    snap: true,
+                    leading: IconButton(
+                      icon: Icon(Icons.arrow_back, color: context.textColor),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    title: Text('Shift Schedule', style: TextStyle(color: context.textColor)),
+                    actions: [
+                      IconButton(
+                        icon: Icon(Icons.calendar_month, color: context.textColor),
+                        onPressed: () => _showMonthView(context),
+                      ),
+                    ],
+                  ),
+                  SliverList(
+                    delegate: SliverChildListDelegate([
+                      _buildWeekSummary(context),
+                      _buildDaySelector(context),
+                      _buildDaySchedule(context),
+                    ]),
+                  ),
+                ],
               ),
             ),
     );

@@ -107,27 +107,33 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.bgColor,
-      appBar: AppBar(
-        backgroundColor: context.bgColor,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: context.textColor),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text('Emergency SOS', style: TextStyle(color: context.textColor)),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            _buildSOSButton(context),
-            const SizedBox(height: 32),
-            _buildQuickActions(context),
-            const SizedBox(height: 24),
-            _buildEmergencyContacts(context),
-            const SizedBox(height: 24),
-            _buildSafetyTips(context),
-          ],
-        ),
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            backgroundColor: context.bgColor,
+            floating: true,
+            snap: true,
+            leading: IconButton(
+              icon: Icon(Icons.arrow_back, color: context.textColor),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: Text('Emergency SOS', style: TextStyle(color: context.textColor)),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.all(20),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                _buildSOSButton(context),
+                const SizedBox(height: 32),
+                _buildQuickActions(context),
+                const SizedBox(height: 24),
+                _buildEmergencyContacts(context),
+                const SizedBox(height: 24),
+                _buildSafetyTips(context),
+              ]),
+            ),
+          ),
+        ],
       ),
     );
   }

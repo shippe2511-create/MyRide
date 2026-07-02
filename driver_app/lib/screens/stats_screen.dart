@@ -49,56 +49,60 @@ class _DriverStatsScreenState extends State<DriverStatsScreen> {
 
     return Scaffold(
       backgroundColor: bgColor,
-      appBar: AppBar(
-        backgroundColor: bgColor,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: textColor),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'My Stats',
-          style: TextStyle(color: textColor, fontWeight: FontWeight.w700),
-        ),
-      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.yellow))
           : RefreshIndicator(
               onRefresh: _loadStats,
               color: AppColors.yellow,
-              child: SingleChildScrollView(
+              child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildPeriodSelector(isDark, textColor),
-                    const SizedBox(height: 20),
-                    _buildStatsCard(isDark, textColor, mutedColor),
-                    const SizedBox(height: 20),
-                    _buildStatsGrid(isDark, textColor, mutedColor),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Recent Rides',
-                      style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w700),
+                slivers: [
+                  SliverAppBar(
+                    backgroundColor: bgColor,
+                    floating: true,
+                    snap: true,
+                    leading: IconButton(
+                      icon: Icon(Icons.arrow_back, color: textColor),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                    const SizedBox(height: 12),
-                    ..._recentRides.map((ride) => _buildRideItem(ride, isDark, textColor, mutedColor)),
-                    if (_recentRides.isEmpty)
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(32),
-                          child: Column(
-                            children: [
-                              Icon(Icons.directions_car_outlined, size: 48, color: mutedColor),
-                              const SizedBox(height: 12),
-                              Text('No rides in this period', style: TextStyle(color: mutedColor)),
-                            ],
-                          ),
+                    title: Text(
+                      'My Stats',
+                      style: TextStyle(color: textColor, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.all(16),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        _buildPeriodSelector(isDark, textColor),
+                        const SizedBox(height: 20),
+                        _buildStatsCard(isDark, textColor, mutedColor),
+                        const SizedBox(height: 20),
+                        _buildStatsGrid(isDark, textColor, mutedColor),
+                        const SizedBox(height: 24),
+                        Text(
+                          'Recent Rides',
+                          style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w700),
                         ),
-                      ),
-                  ],
-                ),
+                        const SizedBox(height: 12),
+                        ..._recentRides.map((ride) => _buildRideItem(ride, isDark, textColor, mutedColor)),
+                        if (_recentRides.isEmpty)
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(32),
+                              child: Column(
+                                children: [
+                                  Icon(Icons.directions_car_outlined, size: 48, color: mutedColor),
+                                  const SizedBox(height: 12),
+                                  Text('No rides in this period', style: TextStyle(color: mutedColor)),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ]),
+                    ),
+                  ),
+                ],
               ),
             ),
     );

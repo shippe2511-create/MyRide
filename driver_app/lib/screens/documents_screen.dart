@@ -283,71 +283,76 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
 
     return Scaffold(
       backgroundColor: context.bgColor,
-      appBar: AppBar(
-        backgroundColor: context.bgColor,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: context.textColor),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text('Documents', style: TextStyle(color: context.textColor)),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh, color: context.textColor),
-            onPressed: _loadDocuments,
-          ),
-        ],
-      ),
       body: _isLoading
           ? const ShimmerList(itemCount: 5)
           : RefreshIndicator(
               onRefresh: _loadDocuments,
               color: AppColors.yellow,
-              child: SingleChildScrollView(
+              child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Status card
-                    _buildStatusCard(context, verifiedCount, totalCount),
-
-                    // Expiry alerts
-                    if (_expiredDocuments.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      _buildExpiryAlert(
-                        context,
-                        title: 'Expired Documents',
-                        subtitle: '${_expiredDocuments.length} document(s) have expired',
-                        color: AppColors.error,
-                        icon: Icons.error_outline,
-                      ),
-                    ],
-                    if (_expiringDocuments.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      _buildExpiryAlert(
-                        context,
-                        title: 'Expiring Soon',
-                        subtitle: '${_expiringDocuments.length} document(s) expiring within 30 days',
-                        color: AppColors.warning,
-                        icon: Icons.warning_amber_outlined,
-                      ),
-                    ],
-
-                    const SizedBox(height: 24),
-
-                    // Documents list
-                    Text(
-                      'Your Documents',
-                      style: TextStyle(
-                        color: context.textColor,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+                slivers: [
+                  SliverAppBar(
+                    backgroundColor: context.bgColor,
+                    floating: true,
+                    snap: true,
+                    leading: IconButton(
+                      icon: Icon(Icons.arrow_back, color: context.textColor),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                    const SizedBox(height: 16),
-                    ..._documents.map((doc) => _buildDocumentCard(context, doc)),
-                  ],
-                ),
+                    title: Text('Documents', style: TextStyle(color: context.textColor)),
+                    actions: [
+                      IconButton(
+                        icon: Icon(Icons.refresh, color: context.textColor),
+                        onPressed: _loadDocuments,
+                      ),
+                    ],
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.all(20),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        // Status card
+                        _buildStatusCard(context, verifiedCount, totalCount),
+
+                        // Expiry alerts
+                        if (_expiredDocuments.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          _buildExpiryAlert(
+                            context,
+                            title: 'Expired Documents',
+                            subtitle: '${_expiredDocuments.length} document(s) have expired',
+                            color: AppColors.error,
+                            icon: Icons.error_outline,
+                          ),
+                        ],
+                        if (_expiringDocuments.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          _buildExpiryAlert(
+                            context,
+                            title: 'Expiring Soon',
+                            subtitle: '${_expiringDocuments.length} document(s) expiring within 30 days',
+                            color: AppColors.warning,
+                            icon: Icons.warning_amber_outlined,
+                          ),
+                        ],
+
+                        const SizedBox(height: 24),
+
+                        // Documents list
+                        Text(
+                          'Your Documents',
+                          style: TextStyle(
+                            color: context.textColor,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ..._documents.map((doc) => _buildDocumentCard(context, doc)),
+                      ]),
+                    ),
+                  ),
+                ],
               ),
             ),
     );

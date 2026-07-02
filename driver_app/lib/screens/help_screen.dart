@@ -55,22 +55,27 @@ class _HelpScreenState extends State<HelpScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.bgColor,
-      appBar: AppBar(
-        backgroundColor: context.bgColor,
-        title: Text(
-          'Help Center',
-          style: TextStyle(color: context.textColor),
-        ),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: context.textColor),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
       body: _loading
           ? const ShimmerList(itemCount: 5)
-          : ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
+          : CustomScrollView(
+              slivers: [
+                SliverAppBar(
+                  backgroundColor: context.bgColor,
+                  floating: true,
+                  snap: true,
+                  title: Text(
+                    'Help Center',
+                    style: TextStyle(color: context.textColor),
+                  ),
+                  leading: IconButton(
+                    icon: Icon(Icons.arrow_back, color: context.textColor),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.all(20),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
                 if (_contacts.isNotEmpty) ...[
                   _buildSection(context, 'Contact Support', [
                     for (final contact in _contacts)
@@ -158,6 +163,9 @@ class _HelpScreenState extends State<HelpScreen> {
                     ),
                   ),
                 const SizedBox(height: 40),
+                    ]),
+                  ),
+                ),
               ],
             ),
     );

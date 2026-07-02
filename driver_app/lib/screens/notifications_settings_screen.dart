@@ -47,22 +47,27 @@ class _NotificationsSettingsScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.bgColor,
-      appBar: AppBar(
-        backgroundColor: context.bgColor,
-        title: Text(
-          'Notifications',
-          style: TextStyle(color: context.textColor),
-        ),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: context.textColor),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: AppColors.yellow))
-          : ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
+          : CustomScrollView(
+              slivers: [
+                SliverAppBar(
+                  backgroundColor: context.bgColor,
+                  floating: true,
+                  snap: true,
+                  title: Text(
+                    'Notifications',
+                    style: TextStyle(color: context.textColor),
+                  ),
+                  leading: IconButton(
+                    icon: Icon(Icons.arrow_back, color: context.textColor),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.all(20),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
                 _buildSection(context, 'Push Notifications', [
                   _buildSwitchTile(
                     context,
@@ -115,21 +120,24 @@ class _NotificationsSettingsScreenState
                       _saveSetting('notif_sounds', v);
                     },
                   ),
-                  _buildSwitchTile(
-                    context,
-                    icon: Icons.vibration,
-                    title: 'Vibration',
-                    subtitle: 'Vibrate for notifications',
-                    value: _vibration,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      setState(() => _vibration = v);
-                      _saveSetting('notif_vibration', v);
-                    },
-                  ),
-                ]),
-              ],
-            ),
+                      _buildSwitchTile(
+                        context,
+                        icon: Icons.vibration,
+                        title: 'Vibration',
+                        subtitle: 'Vibrate for notifications',
+                        value: _vibration,
+                        onChanged: (v) {
+                          HapticFeedback.selectionClick();
+                          setState(() => _vibration = v);
+                          _saveSetting('notif_vibration', v);
+                        },
+                      ),
+                    ]),
+                  ]),
+                ),
+              ),
+            ],
+          ),
     );
   }
 

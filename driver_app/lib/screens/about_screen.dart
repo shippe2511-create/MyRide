@@ -10,21 +10,25 @@ class AboutScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.bgColor,
-      appBar: AppBar(
-        backgroundColor: context.bgColor,
-        title: Text(
-          'About',
-          style: TextStyle(color: context.textColor),
-        ),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: context.textColor),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            backgroundColor: context.bgColor,
+            floating: true,
+            snap: true,
+            title: Text(
+              'About',
+              style: TextStyle(color: context.textColor),
+            ),
+            leading: IconButton(
+              icon: Icon(Icons.arrow_back, color: context.textColor),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.all(20),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
             const SizedBox(height: 20),
 
             // App logo
@@ -166,8 +170,10 @@ class AboutScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 40),
-          ],
-        ),
+              ]),
+            ),
+          ),
+        ],
       ),
     );
   }

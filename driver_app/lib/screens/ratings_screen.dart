@@ -57,14 +57,6 @@ class _RatingsScreenState extends State<RatingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.bgColor,
-      appBar: AppBar(
-        backgroundColor: context.bgColor,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: context.textColor),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text('Ratings & Feedback', style: TextStyle(color: context.textColor)),
-      ),
       body: _isLoading
           ? const ShimmerList(itemCount: 5)
           : RefreshIndicator(
@@ -72,18 +64,32 @@ class _RatingsScreenState extends State<RatingsScreen> {
               color: AppColors.yellow,
               child: Consumer<DriverState>(
                 builder: (context, state, _) {
-                  return SingleChildScrollView(
+                  return CustomScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        _buildOverallRating(context, state),
-                        const SizedBox(height: 20),
-                        _buildRatingBreakdown(context),
-                        const SizedBox(height: 20),
-                        _buildRecentFeedback(context),
-                      ],
-                    ),
+                    slivers: [
+                      SliverAppBar(
+                        backgroundColor: context.bgColor,
+                        floating: true,
+                        snap: true,
+                        leading: IconButton(
+                          icon: Icon(Icons.arrow_back, color: context.textColor),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        title: Text('Ratings & Feedback', style: TextStyle(color: context.textColor)),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.all(20),
+                        sliver: SliverList(
+                          delegate: SliverChildListDelegate([
+                            _buildOverallRating(context, state),
+                            const SizedBox(height: 20),
+                            _buildRatingBreakdown(context),
+                            const SizedBox(height: 20),
+                            _buildRecentFeedback(context),
+                          ]),
+                        ),
+                      ),
+                    ],
                   );
                 },
               ),

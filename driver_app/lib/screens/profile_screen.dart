@@ -244,6 +244,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         activeColor: AppColors.yellow,
                       ),
                     ),
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.face,
+                      title: 'Face ID',
+                      trailing: Switch(
+                        value: state.faceIdEnabled,
+                        onChanged: (value) {
+                          HapticFeedback.selectionClick();
+                          state.toggleFaceId(value);
+                        },
+                        activeColor: AppColors.yellow,
+                      ),
+                    ),
                   _buildSettingTile(
                     context,
                     icon: Icons.notifications_outlined,

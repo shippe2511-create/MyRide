@@ -266,11 +266,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildSettingItem(Icons.notifications_outlined, 'Notifications', () => _showNotificationSettings(context), showDivider: true),
               _buildSettingItem(Icons.shield_outlined, 'Privacy & Safety', () => _showPrivacySettings(context), showDivider: true),
               _buildSettingItem(Icons.language, 'Language', () => _showLanguageSettings(context), trailing: 'English', showDivider: true),
+              _buildFaceIdToggle(context, appState),
               _buildAppearanceToggle(context, appState),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildFaceIdToggle(BuildContext context, AppState appState) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: context.borderColor)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: context.isDark ? AppColors.bgDark : const Color(0xFFF0F0F0),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.face,
+              color: appState.faceIdEnabled ? AppColors.yellow : context.mutedColor,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Face ID',
+                  style: TextStyle(color: context.textColor, fontSize: 15, fontWeight: FontWeight.w500),
+                ),
+                Text(
+                  appState.faceIdEnabled ? 'On' : 'Off',
+                  style: TextStyle(color: context.mutedColor, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.mediumImpact();
+              appState.toggleFaceId(!appState.faceIdEnabled);
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              width: 52,
+              height: 30,
+              decoration: BoxDecoration(
+                color: appState.faceIdEnabled ? AppColors.yellow : (context.isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: AnimatedAlign(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutCubic,
+                alignment: appState.faceIdEnabled ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  margin: const EdgeInsets.all(3),
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: appState.faceIdEnabled ? AppColors.bgDark : Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

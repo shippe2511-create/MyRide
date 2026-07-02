@@ -44,6 +44,8 @@
 	<string>MyRide Driver needs photo library access to select photos</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>MyRide Driver needs microphone access for voice messages</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Use Face ID to quickly and securely sign in to MyRide Driver.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

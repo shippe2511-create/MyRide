@@ -10,6 +10,8 @@
 	<string>MyRide needs your location to track your ride and provide accurate pickup.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>MyRide needs your location to track your ride in the background.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Use Face ID to quickly and securely sign in to MyRide.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

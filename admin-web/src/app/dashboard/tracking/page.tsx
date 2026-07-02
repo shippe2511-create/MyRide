@@ -64,6 +64,18 @@ export default function TrackingPage() {
     refetchInterval: 5000,
   })
 
+  // Realtime updates for driver locations
+  useEffect(() => {
+    const channel = supabase.channel('tracking_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_locations' }, () => refetch())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => refetch())
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [refetch])
+
   const stats = {
     online: driverLocations.filter(d => d.is_online).length,
     total: driverLocations.length,

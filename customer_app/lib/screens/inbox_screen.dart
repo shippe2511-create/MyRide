@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../widgets/shimmer_loading.dart';
@@ -58,23 +59,70 @@ class InboxScreen extends StatefulWidget {
 class _InboxScreenState extends State<InboxScreen> {
   List<InboxMessage> _messages = [];
   bool _isLoading = true;
+  RealtimeChannel? _subscription;
 
   @override
   void initState() {
     super.initState();
     _loadMessages();
+    _subscribeToNotifications();
+  }
+
+  @override
+  void dispose() {
+    _subscription?.unsubscribe();
+    super.dispose();
+  }
+
+  void _subscribeToNotifications() {
+    final userId = SupabaseService.userId;
+    if (userId == null) return;
+
+    _subscription = SupabaseService.client
+        .channel('inbox_notifications_$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'notifications',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: userId,
+          ),
+          callback: (payload) {
+            debugPrint('Inbox: Notification update received');
+            _loadMessages();
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _loadMessages() async {
-    setState(() => _isLoading = true);
-    try {
-      final messages = await SupabaseService.getInboxMessages();
-      setState(() {
-        _messages = messages.map((m) => InboxMessage.fromJson(m)).toList();
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
+    if (_isLoading == false) {
+      // Silent refresh for realtime updates
+      try {
+        final messages = await SupabaseService.getInboxMessages();
+        if (mounted) {
+          setState(() {
+            _messages = messages.map((m) => InboxMessage.fromJson(m)).toList();
+          });
+        }
+      } catch (e) {
+        debugPrint('Error loading messages: $e');
+      }
+    } else {
+      // Initial load with loading state
+      try {
+        final messages = await SupabaseService.getInboxMessages();
+        if (mounted) {
+          setState(() {
+            _messages = messages.map((m) => InboxMessage.fromJson(m)).toList();
+            _isLoading = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) setState(() => _isLoading = false);
+      }
     }
   }
 

@@ -1,16 +1,26 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 
 export function SOSAlertListener() {
   const supabase = createClient()
+  const audioContextRef = useRef<AudioContext | null>(null)
 
   const playAlarmSound = () => {
     try {
-      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-      const audioContext = new AudioContextClass()
+      // Create or resume audio context (required after user interaction)
+      if (!audioContextRef.current) {
+        const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+        audioContextRef.current = new AudioContextClass()
+      }
+
+      const audioContext = audioContextRef.current
+      if (audioContext.state === 'suspended') {
+        audioContext.resume()
+      }
+
       const oscillator = audioContext.createOscillator()
       const gainNode = audioContext.createGain()
 
@@ -37,23 +47,39 @@ export function SOSAlertListener() {
   }
 
   useEffect(() => {
+    console.log('SOSAlertListener: Setting up realtime subscription...')
+
     const channel = supabase
-      .channel('global_sos_alerts')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sos_alerts' }, (payload) => {
-        if (payload.new && payload.new.status === 'active') {
-          playAlarmSound()
-          toast.error("🚨 NEW SOS ALERT! Check SOS Alerts page immediately!", {
-            duration: 15000,
-            action: {
-              label: "View",
-              onClick: () => window.location.href = "/dashboard/sos"
-            }
-          })
+      .channel('sos_alerts_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'sos_alerts'
+        },
+        (payload) => {
+          console.log('SOSAlertListener: Received SOS alert:', payload)
+          const newAlert = payload.new as { status?: string; user_id?: string }
+          if (newAlert && newAlert.status === 'active') {
+            console.log('SOSAlertListener: Active SOS - showing alert!')
+            playAlarmSound()
+            toast.error("🚨 NEW SOS ALERT! Check SOS Alerts page immediately!", {
+              duration: 15000,
+              action: {
+                label: "View",
+                onClick: () => window.location.href = "/dashboard/sos"
+              }
+            })
+          }
         }
+      )
+      .subscribe((status, err) => {
+        console.log('SOSAlertListener: Subscription status:', status, err)
       })
-      .subscribe()
 
     return () => {
+      console.log('SOSAlertListener: Cleaning up subscription')
       supabase.removeChannel(channel)
     }
   }, [])

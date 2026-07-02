@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -466,11 +467,11 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
 
           // Bottom sheet - Uber style
           DraggableScrollableSheet(
-            initialChildSize: 0.42,
+            initialChildSize: 0.36,
             minChildSize: 0.25,
-            maxChildSize: 0.55,
+            maxChildSize: 0.50,
             snap: true,
-            snapSizes: const [0.42],
+            snapSizes: const [0.36],
             builder: (context, scrollController) {
               final statusColor = _rideStatus == 'in_progress' ? AppColors.success
                   : (_rideStatus == 'arrived' ? const Color(0xFF2196F3) : AppColors.yellow);
@@ -609,7 +610,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
 
                     // Route Card - Simplified
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -1680,7 +1681,13 @@ Location: https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocati
               // Send SMS to each contact
               for (final contact in contacts) {
                 final phone = contact['phone']?.replaceAll(' ', '') ?? '';
-                final Uri smsUri = Uri(scheme: 'sms', path: phone, queryParameters: {'body': message});
+                // iOS uses & separator, Android uses ?
+                // Using Uri.encodeComponent properly encodes spaces as %20
+                final encodedMessage = Uri.encodeComponent(message);
+                final smsUrl = Platform.isIOS
+                    ? 'sms:$phone&body=$encodedMessage'
+                    : 'sms:$phone?body=$encodedMessage';
+                final Uri smsUri = Uri.parse(smsUrl);
                 try {
                   await launchUrl(smsUri);
                 } catch (e) {

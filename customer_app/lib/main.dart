@@ -117,8 +117,33 @@ void main() async {
   );
 }
 
-class MyRideApp extends StatelessWidget {
+class MyRideApp extends StatefulWidget {
   const MyRideApp({super.key});
+
+  @override
+  State<MyRideApp> createState() => _MyRideAppState();
+}
+
+class _MyRideAppState extends State<MyRideApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    NotificationService.setAppInForeground(true);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Track app foreground/background state for smart notifications
+    final isInForeground = state == AppLifecycleState.resumed;
+    NotificationService.setAppInForeground(isInForeground);
+  }
 
   @override
   Widget build(BuildContext context) {

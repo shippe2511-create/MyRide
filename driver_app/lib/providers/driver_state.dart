@@ -1417,8 +1417,8 @@ class DriverState extends ChangeNotifier {
         HapticFeedback.mediumImpact();
         VoiceService().announceRideAccepted();
 
-        // Subscribe to chat notifications for this ride
-        NotificationService.subscribeToChatMessages(request.id, _driverId);
+        // Subscribe to chat notifications for this ride (use profileId - chat messages use profile IDs)
+        NotificationService.subscribeToChatMessages(request.id, _profileId);
 
         notifyListeners();
         return result;

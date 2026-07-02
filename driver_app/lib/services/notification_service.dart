@@ -141,66 +141,81 @@ class NotificationService {
     debugPrint('Notification tapped: ${response.payload}');
   }
 
+  // Track if app is in foreground
+  static bool _isAppInForeground = true;
+
+  static void setAppInForeground(bool inForeground) {
+    _isAppInForeground = inForeground;
+    debugPrint('NotificationService: App in foreground = $inForeground');
+  }
+
   static Future<void> showNotification({
     required String title,
     required String body,
     String? payload,
   }) async {
-    debugPrint('NotificationService.showNotification called: title=$title, body=$body');
+    debugPrint('NotificationService.showNotification called: title=$title, body=$body, inForeground=$_isAppInForeground');
 
-    const androidDetails = AndroidNotificationDetails(
-      'driver_channel',
-      'Driver Notifications',
-      channelDescription: 'New ride requests and updates',
-      importance: Importance.high,
-      priority: Priority.high,
-      showWhen: true,
-    );
-
-    const iosDetails = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-      interruptionLevel: InterruptionLevel.timeSensitive,
-    );
-
-    const details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
-
-    try {
-      final notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      debugPrint('NotificationService: Showing notification with ID $notificationId');
-      await _notifications.show(
-        notificationId,
-        title,
-        body,
-        details,
-        payload: payload,
-      );
-      debugPrint('NotificationService: Notification shown successfully');
-
-      // Show modern in-app banner
-      NotificationType bannerType = NotificationType.info;
-      if (title.toLowerCase().contains('error') || title.toLowerCase().contains('cancelled')) {
-        bannerType = NotificationType.error;
-      } else if (title.toLowerCase().contains('completed') || title.toLowerCase().contains('accepted')) {
-        bannerType = NotificationType.success;
-      } else if (title.toLowerCase().contains('new ride') || title.toLowerCase().contains('request')) {
-        bannerType = NotificationType.warning;
-      } else if (title.toLowerCase().contains('arrived') || title.toLowerCase().contains('started')) {
-        bannerType = NotificationType.success;
-      }
-      showAppNotification(title: title, message: body, type: bannerType);
-
-      // Legacy callback
-      final isChat = payload?.startsWith('chat_') ?? false;
-      final rideId = isChat ? payload!.replaceFirst('chat_', '') : null;
-      onShowInAppMessage?.call(title, body, rideId);
-    } catch (e) {
-      debugPrint('NotificationService: ERROR showing notification: $e');
+    // Determine notification type for in-app banner
+    NotificationType bannerType = NotificationType.info;
+    if (title.toLowerCase().contains('error') || title.toLowerCase().contains('cancelled')) {
+      bannerType = NotificationType.error;
+    } else if (title.toLowerCase().contains('completed') || title.toLowerCase().contains('accepted')) {
+      bannerType = NotificationType.success;
+    } else if (title.toLowerCase().contains('new ride') || title.toLowerCase().contains('request')) {
+      bannerType = NotificationType.warning;
+    } else if (title.toLowerCase().contains('arrived') || title.toLowerCase().contains('started')) {
+      bannerType = NotificationType.success;
     }
+
+    if (_isAppInForeground) {
+      // App is in foreground - show only in-app banner (less intrusive)
+      debugPrint('NotificationService: Showing in-app banner only (foreground)');
+      showAppNotification(title: title, message: body, type: bannerType);
+    } else {
+      // App is in background - show system notification
+      debugPrint('NotificationService: Showing system notification (background)');
+
+      const androidDetails = AndroidNotificationDetails(
+        'driver_channel',
+        'Driver Notifications',
+        channelDescription: 'New ride requests and updates',
+        importance: Importance.high,
+        priority: Priority.high,
+        showWhen: true,
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+        interruptionLevel: InterruptionLevel.timeSensitive,
+      );
+
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      try {
+        final notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+        await _notifications.show(
+          notificationId,
+          title,
+          body,
+          details,
+          payload: payload,
+        );
+        debugPrint('NotificationService: System notification shown');
+      } catch (e) {
+        debugPrint('NotificationService: ERROR showing notification: $e');
+      }
+    }
+
+    // Legacy callback
+    final isChat = payload?.startsWith('chat_') ?? false;
+    final rideId = isChat ? payload!.replaceFirst('chat_', '') : null;
+    onShowInAppMessage?.call(title, body, rideId);
   }
 
   static void subscribeToNewRides(void Function(Map<String, dynamic>) onNewRide) {

@@ -175,14 +175,17 @@ function SortableQuoteRow({ quote, onEdit, onDelete, onToggleStatus }: any) {
       <TableCell className="text-muted-foreground">{quote.author || "-"}</TableCell>
       <TableCell><Switch checked={quote.is_active} onCheckedChange={() => onToggleStatus(quote)} /></TableCell>
       <TableCell>
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => onEdit(quote)}><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" onSelect={() => onDelete(quote.id)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(quote)}><Edit className="h-4 w-4" /></Button>
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => onEdit(quote)}><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive" onSelect={() => onDelete(quote.id)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </TableCell>
     </TableRow>
   )
@@ -288,6 +291,29 @@ export default function ContentPage() {
 
   useEffect(() => {
     loadData()
+
+    // Realtime subscriptions for all content tables
+    const channels = [
+      supabase.channel('content_announcements').on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
+        supabase.from("announcements").select("*").order("sort_order", { ascending: true }).then(({ data }) => data && setAnnouncements(data))
+      }).subscribe(),
+      supabase.channel('content_push').on('postgres_changes', { event: '*', schema: 'public', table: 'push_notification_logs' }, () => {
+        supabase.from("push_notification_logs").select("*").order("sent_at", { ascending: false }).limit(20).then(({ data }) => data && setNotifications(data))
+      }).subscribe(),
+      supabase.channel('content_staff').on('postgres_changes', { event: '*', schema: 'public', table: 'staff_corner' }, () => {
+        supabase.from("staff_corner").select("*").order("sort_order", { ascending: true }).then(({ data }) => data && setStaffCorner(data))
+      }).subscribe(),
+      supabase.channel('content_tips').on('postgres_changes', { event: '*', schema: 'public', table: 'break_tips' }, () => {
+        supabase.from("break_tips").select("*").order("sort_order", { ascending: true }).then(({ data }) => data && setBreakTips(data))
+      }).subscribe(),
+      supabase.channel('content_quotes').on('postgres_changes', { event: '*', schema: 'public', table: 'motivational_quotes' }, () => {
+        supabase.from("motivational_quotes").select("*").order("sort_order", { ascending: true }).then(({ data }) => data && setQuotes(data))
+      }).subscribe(),
+    ]
+
+    return () => {
+      channels.forEach(ch => supabase.removeChannel(ch))
+    }
   }, [])
 
   const loadData = async () => {
@@ -395,6 +421,7 @@ export default function ContentPage() {
         error = res.error
         if (!error) toast.success("Push notification updated")
       } else {
+        // Log the push notification
         const res = await supabase.from("push_notification_logs").insert({
           title: formData.title,
           body: formData.body,
@@ -404,7 +431,51 @@ export default function ContentPage() {
           success_count: 0
         })
         error = res.error
-        if (!error) toast.success("Push notification logged (actual sending requires FCM setup)")
+
+        // Also create notifications for users so they appear in Inbox
+        if (!error) {
+          try {
+            // Get target users based on target_type
+            let userIds: string[] = []
+            if (formData.target_type === "all") {
+              const { data: profiles } = await supabase
+                .from("profiles")
+                .select("id")
+                .in("role", ["customer", "driver"])
+              userIds = profiles?.map(p => p.id) || []
+            } else if (formData.target_type === "customers") {
+              const { data: profiles } = await supabase
+                .from("profiles")
+                .select("id")
+                .eq("role", "customer")
+              userIds = profiles?.map(p => p.id) || []
+            } else if (formData.target_type === "drivers") {
+              const { data: profiles } = await supabase
+                .from("profiles")
+                .select("id")
+                .eq("role", "driver")
+              userIds = profiles?.map(p => p.id) || []
+            }
+
+            // Insert notifications for each user
+            if (userIds.length > 0) {
+              const notifications = userIds.map(userId => ({
+                user_id: userId,
+                title: formData.title,
+                message: formData.body,
+                notification_type: "announcement",
+                is_read: false,
+                created_at: new Date().toISOString()
+              }))
+              await supabase.from("notifications").insert(notifications)
+            }
+
+            toast.success(`Notification sent to ${userIds.length} users`)
+          } catch (e) {
+            console.error("Error creating user notifications:", e)
+            toast.success("Push notification logged (notification delivery pending)")
+          }
+        }
       }
     } else if (dialogType === "staff") {
       if (!formData.title.trim()) {
@@ -498,6 +569,9 @@ export default function ContentPage() {
       } else if (dialogType === "quote") {
         const { data } = await supabase.from("motivational_quotes").select("*").order("created_at", { ascending: false })
         if (data) setQuotes(data)
+      } else if (dialogType === "push") {
+        const { data } = await supabase.from("push_notification_logs").select("*").order("sent_at", { ascending: false }).limit(20)
+        if (data) setNotifications(data)
       }
     }
     setSaving(false)
@@ -831,7 +905,7 @@ export default function ContentPage() {
                     </TableRow>
                   ) : (
                     notifications.map((notif) => (
-                      <TableRow key={notif.id}>
+                      <TableRow key={notif.id} className="group hover:bg-muted/50 transition-colors">
                         <TableCell className="font-medium">{notif.title}</TableCell>
                         <TableCell className="max-w-[200px] truncate text-muted-foreground">{notif.body}</TableCell>
                         <TableCell><Badge variant="secondary">{notif.target_type}</Badge></TableCell>
@@ -839,20 +913,23 @@ export default function ContentPage() {
                         <TableCell className="text-green-500">{notif.success_count}</TableCell>
                         <TableCell>{formatDate(notif.sent_at)}</TableCell>
                         <TableCell>
-                          <DropdownMenu modal={false}>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onSelect={() => openDialog("push", notif)}>
-                                <Edit className="mr-2 h-4 w-4" />Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete("push", notif.id)}>
-                                <Trash2 className="mr-2 h-4 w-4" />Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDialog("push", notif)}><Edit className="h-4 w-4" /></Button>
+                            <DropdownMenu modal={false}>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => openDialog("push", notif)}>
+                                  <Edit className="mr-2 h-4 w-4" />Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete("push", notif.id)}>
+                                  <Trash2 className="mr-2 h-4 w-4" />Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))

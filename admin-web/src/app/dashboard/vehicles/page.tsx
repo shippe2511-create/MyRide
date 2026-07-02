@@ -129,7 +129,7 @@ export default function VehiclesPage() {
     const channel = supabase
       .channel('vehicles_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_types' }, () => {
-        queryClient.invalidateQueries({ queryKey: ["vehicles-page"] })
+        queryClient.invalidateQueries({ queryKey: ["vehicles-page"], exact: false })
       })
       .subscribe()
 

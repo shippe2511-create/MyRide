@@ -75,7 +75,8 @@ export default function CustomersPage() {
     const channel = supabase
       .channel('customers_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-        queryClient.invalidateQueries({ queryKey: ["customers-page"] })
+        // Invalidate all queries starting with "customers-page" regardless of filters
+        queryClient.invalidateQueries({ queryKey: ["customers-page"], exact: false })
       })
       .subscribe()
 

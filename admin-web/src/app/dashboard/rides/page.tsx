@@ -285,7 +285,7 @@ export default function RidesPage() {
     const channel = supabase
       .channel('rides_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rides' }, () => {
-        queryClient.invalidateQueries({ queryKey: ["rides-page"] })
+        queryClient.invalidateQueries({ queryKey: ["rides-page"], exact: false })
       })
       .subscribe()
 

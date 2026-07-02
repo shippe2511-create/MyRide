@@ -656,12 +656,13 @@ export default function RatingsPage() {
                   <TableHead className="text-center">5★</TableHead>
                   <TableHead className="text-center">≤2★</TableHead>
                   <TableHead className="text-center">Trend</TableHead>
+                  <TableHead className="w-20"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredDrivers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No drivers found
                     </TableCell>
                   </TableRow>
@@ -669,7 +670,7 @@ export default function RatingsPage() {
                   filteredDrivers.map((driver) => (
                     <TableRow
                       key={driver.id}
-                      className="cursor-pointer hover:bg-muted/50"
+                      className="group cursor-pointer hover:bg-muted/50"
                       onClick={() => loadDriverDetails(driver.id, driver.driver_id)}
                     >
                       <TableCell>
@@ -709,6 +710,19 @@ export default function RatingsPage() {
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            loadDriverDetails(driver.id, driver.driver_id)
+                          }}
+                        >
+                          View
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
@@ -753,7 +767,7 @@ export default function RatingsPage() {
                 </div>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {recentReviews.slice(0, 10).map(review => (
-                    <div key={review.id} className={`flex items-center gap-2 p-2 rounded border text-sm ${selectedIds.has(review.id) ? 'bg-muted border-primary' : 'bg-background'}`}>
+                    <div key={review.id} className={`group flex items-center gap-2 p-2 rounded border text-sm transition-colors hover:bg-muted/50 ${selectedIds.has(review.id) ? 'bg-muted border-primary' : 'bg-background'}`}>
                       <Checkbox
                         checked={selectedIds.has(review.id)}
                         onCheckedChange={() => toggleSelect(review.id)}
@@ -768,6 +782,23 @@ export default function RatingsPage() {
                           <Star key={s} className={`h-3 w-3 ${s <= review.rating ? "fill-yellow-400 text-yellow-400" : "text-muted"}`} />
                         ))}
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          const { error } = await supabase.from("ratings").delete().eq("id", review.id)
+                          if (error) {
+                            toast.error("Failed to delete rating")
+                          } else {
+                            toast.success("Rating deleted")
+                            loadData()
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
                     </div>
                   ))}
                 </div>

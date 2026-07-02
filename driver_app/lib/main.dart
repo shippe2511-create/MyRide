@@ -121,8 +121,33 @@ void main() async {
   );
 }
 
-class DriverApp extends StatelessWidget {
+class DriverApp extends StatefulWidget {
   const DriverApp({super.key});
+
+  @override
+  State<DriverApp> createState() => _DriverAppState();
+}
+
+class _DriverAppState extends State<DriverApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    NotificationService.setAppInForeground(true);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Track app foreground/background state for smart notifications
+    final isInForeground = state == AppLifecycleState.resumed;
+    NotificationService.setAppInForeground(isInForeground);
+  }
 
   @override
   Widget build(BuildContext context) {

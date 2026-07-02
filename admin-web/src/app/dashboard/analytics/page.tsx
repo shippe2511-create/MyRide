@@ -75,6 +75,17 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     loadAnalytics()
+
+    // Realtime updates for analytics
+    const channel = supabase.channel('analytics_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rides' }, () => loadAnalytics())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => loadAnalytics())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => loadAnalytics())
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [period])
 
   const loadAnalytics = async () => {

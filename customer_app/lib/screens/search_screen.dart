@@ -90,7 +90,7 @@ class _SearchScreenState extends State<SearchScreen> {
         '&radius=100000'
         '&strictbounds=true'
         '&components=country:mv'
-        '&key=$AppConfig.googleMapsApiKey'
+        '&key=${AppConfig.googleMapsApiKey}'
       );
 
       final response = await http.get(url);
@@ -150,7 +150,7 @@ class _SearchScreenState extends State<SearchScreen> {
         '&radius=100000'
         '&strictbounds=true'
         '&components=country:mv'
-        '&key=$AppConfig.googleMapsApiKey'
+        '&key=${AppConfig.googleMapsApiKey}'
       );
 
       debugPrint('Places API URL: $url');
@@ -198,7 +198,7 @@ class _SearchScreenState extends State<SearchScreen> {
         'https://maps.googleapis.com/maps/api/place/details/json'
         '?place_id=$placeId'
         '&fields=geometry,formatted_address,name'
-        '&key=$AppConfig.googleMapsApiKey'
+        '&key=${AppConfig.googleMapsApiKey}'
       );
 
       final response = await http.get(url);

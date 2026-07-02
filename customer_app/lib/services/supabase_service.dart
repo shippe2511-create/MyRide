@@ -190,13 +190,67 @@ class SupabaseService {
     }
   }
 
-  static Future<void> updateProfile(Map<String, dynamic> data) async {
+  // Fields that require admin approval before updating
+  static const _fieldsRequiringApproval = ['phone', 'employee_id'];
+
+  static Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
     final id = userId;
-    if (id == null) return;
-    await client
-        .from('profiles')
-        .update(data)
-        .eq('id', id);
+    if (id == null) return {'success': false, 'pending': []};
+
+    // Separate fields that need approval vs instant update
+    final Map<String, dynamic> instantUpdate = {};
+    final List<String> pendingFields = [];
+
+    // Get current profile to compare
+    final currentProfile = await client.from('profiles').select().eq('id', id).single();
+
+    for (final entry in data.entries) {
+      if (_fieldsRequiringApproval.contains(entry.key)) {
+        final oldValue = currentProfile[entry.key]?.toString();
+        final newValue = entry.value?.toString();
+
+        // Only submit if value actually changed
+        if (oldValue != newValue && newValue != null && newValue.isNotEmpty) {
+          // Submit for approval
+          await client.from('pending_profile_changes').insert({
+            'user_id': id,
+            'field_name': entry.key,
+            'old_value': oldValue,
+            'new_value': newValue,
+            'status': 'pending',
+          });
+          pendingFields.add(entry.key);
+        }
+      } else {
+        // Instant update allowed
+        instantUpdate[entry.key] = entry.value;
+      }
+    }
+
+    // Apply instant updates
+    if (instantUpdate.isNotEmpty) {
+      await client.from('profiles').update(instantUpdate).eq('id', id);
+    }
+
+    return {
+      'success': true,
+      'pending': pendingFields,
+    };
+  }
+
+  // Check if user has pending profile changes
+  static Future<List<Map<String, dynamic>>> getPendingProfileChanges() async {
+    final id = userId;
+    if (id == null) return [];
+
+    final response = await client
+        .from('pending_profile_changes')
+        .select()
+        .eq('user_id', id)
+        .eq('status', 'pending')
+        .order('submitted_at', ascending: false);
+
+    return List<Map<String, dynamic>>.from(response);
   }
 
   // Locations methods
@@ -279,7 +333,7 @@ class SupabaseService {
             )
           ''')
           .eq('customer_id', customerId)
-          .inFilter('status', ['pending', 'accepted', 'arrived', 'in_progress'])
+          .inFilter('status', ['scheduled', 'pending', 'accepted', 'arrived', 'in_progress'])
           .order('created_at', ascending: false)
           .limit(5);
       debugPrint('Found ${response.length} active rides for customer');
@@ -426,7 +480,12 @@ class SupabaseService {
       if (ratingsResult.isNotEmpty) {
         final ratings = List<Map<String, dynamic>>.from(ratingsResult);
         final totalRatings = ratings.length;
-        final sumRatings = ratings.fold<int>(0, (sum, r) => sum + (r['rating'] as int));
+        final sumRatings = ratings.fold<num>(0, (sum, r) {
+          final ratingValue = r['rating'];
+          if (ratingValue is int) return sum + ratingValue;
+          if (ratingValue is double) return sum + ratingValue;
+          return sum;
+        });
         final avgRating = sumRatings / totalRatings;
 
         // Update driver's rating in drivers table
@@ -1335,7 +1394,12 @@ class SupabaseService {
       if (ratingsResult.isNotEmpty) {
         final ratings = List<Map<String, dynamic>>.from(ratingsResult);
         final totalRatings = ratings.length;
-        final sumRatings = ratings.fold<int>(0, (sum, r) => sum + (r['rating'] as int));
+        final sumRatings = ratings.fold<num>(0, (sum, r) {
+          final ratingValue = r['rating'];
+          if (ratingValue is int) return sum + ratingValue;
+          if (ratingValue is double) return sum + ratingValue;
+          return sum;
+        });
         final avgRating = sumRatings / totalRatings;
 
         await client

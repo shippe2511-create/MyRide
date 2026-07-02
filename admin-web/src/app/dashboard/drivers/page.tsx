@@ -97,13 +97,13 @@ export default function DriversPage() {
     const channel = supabase
       .channel('drivers_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-        queryClient.invalidateQueries({ queryKey: ["drivers-page"] })
+        queryClient.invalidateQueries({ queryKey: ["drivers-page"], exact: false })
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => {
-        queryClient.invalidateQueries({ queryKey: ["drivers-page"] })
+        queryClient.invalidateQueries({ queryKey: ["drivers-page"], exact: false })
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_types' }, () => {
-        queryClient.invalidateQueries({ queryKey: ["drivers-page"] })
+        queryClient.invalidateQueries({ queryKey: ["drivers-page"], exact: false })
       })
       .subscribe()
 

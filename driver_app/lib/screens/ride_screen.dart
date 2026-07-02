@@ -99,12 +99,12 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
       if (mounted) _startDestinationChangePolling();
     });
 
-    // Subscribe to chat notifications
+    // Subscribe to chat notifications (use profileId, not driverId - chat messages use profile IDs)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final driverState = Provider.of<DriverState>(context, listen: false);
       final rideId = driverState.currentRide?.id;
-      if (rideId != null && driverState.driverId.isNotEmpty) {
-        NotificationService.subscribeToChatMessages(rideId, driverState.driverId);
+      if (rideId != null && driverState.profileId.isNotEmpty) {
+        NotificationService.subscribeToChatMessages(rideId, driverState.profileId);
       }
     });
   }

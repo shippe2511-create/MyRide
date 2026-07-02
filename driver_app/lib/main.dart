@@ -207,6 +207,9 @@ class _GlobalRideRequestOverlayState extends State<_GlobalRideRequestOverlay> {
     final state = context.read<DriverState>();
     state.setOnHomeScreen(true);
 
+    // Switch to home tab if already on home screen
+    HomeScreen.switchToHomeTab();
+
     // Use root navigator to go to home
     Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil('/home', (route) => false);
   }
@@ -288,6 +291,7 @@ class _RideRequestBanner extends StatelessWidget {
                       color: Colors.black,
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
+                      decoration: TextDecoration.none,
                     ),
                   ),
                   Text(
@@ -295,6 +299,7 @@ class _RideRequestBanner extends StatelessWidget {
                     style: TextStyle(
                       color: Colors.black.withValues(alpha: 0.7),
                       fontSize: 13,
+                      decoration: TextDecoration.none,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -315,6 +320,7 @@ class _RideRequestBanner extends StatelessWidget {
                   color: Color(0xFFFFD60A),
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
+                  decoration: TextDecoration.none,
                 ),
               ),
             ),

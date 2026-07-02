@@ -206,7 +206,6 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
   int _rating = 5;
   final _ratingLabels = ['', 'Poor', 'Okay', 'Good', 'Great', 'Excellent!'];
   Set<String> _selectedFeedback = {};
-  bool _addToFavorites = false;
   bool _isSubmitting = false;
 
   Map<String, dynamic> get _driverInfo => {
@@ -242,10 +241,6 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
               _buildFeedbackSection(isDark),
               const SizedBox(height: 24),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: _buildFavoriteToggle(context.isDark),
-              ),
-              Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
                 child: PrimaryButton(
                   text: _isSubmitting ? 'Submitting...' : 'Submit rating',
@@ -254,7 +249,11 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
 
                     try {
                       final appState = Provider.of<AppState>(context, listen: false);
-                      appState.rateDriver(_rating, _selectedFeedback.join(', '));
+
+                      // Build comment from feedback chips
+                      final fullComment = _selectedFeedback.isNotEmpty ? _selectedFeedback.join(', ') : null;
+
+                      appState.rateDriver(_rating, fullComment ?? '');
 
                       // Submit rating to database
                       debugPrint('Rating submit: rideId=${widget.rideId}, driverId=${widget.driverId}');
@@ -263,22 +262,15 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
                           rideId: widget.rideId!,
                           driverId: widget.driverId!,
                           rating: _rating,
-                          comment: _selectedFeedback.isNotEmpty ? _selectedFeedback.join(', ') : null,
+                          comment: fullComment,
                         );
-                      }
-
-                      if (_addToFavorites && widget.driverId != null) {
-                        await SupabaseService.addFavoriteDriver(widget.driverId!);
-                        appState.addFavoriteDriver(_driverInfo);
                       }
 
                       if (!mounted) return;
                       Navigator.of(context).popUntil((route) => route.isFirst);
                       Navigator.pushReplacementNamed(context, '/home');
 
-                      AppSnackbar.info(context, _addToFavorites
-                          ? 'Thanks! ${_driverInfo['name']} added to favorites'
-                          : 'Thanks for your feedback!');
+                      AppSnackbar.info(context, 'Thanks for your feedback!');
                     } catch (e) {
                       debugPrint('Error submitting rating: $e');
                       if (mounted) {
@@ -443,93 +435,6 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
             }).toList(),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildFavoriteToggle(bool isDark) {
-    final appState = Provider.of<AppState>(context);
-    final isAlreadyFavorite = appState.isDriverFavorite(_driverInfo['id'] as String);
-
-    if (isAlreadyFavorite) {
-      return Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.yellow.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.yellow.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.star_rounded, color: AppColors.yellow, size: 22),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                '${_driverInfo['name']} is in your favorites',
-                style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        setState(() => _addToFavorites = !_addToFavorites);
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: _addToFavorites
-            ? AppColors.yellow.withValues(alpha: 0.1)
-            : (isDark ? Colors.white : Colors.black).withValues(alpha: 0.03),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: _addToFavorites
-              ? AppColors.yellow
-              : (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
-          ),
-        ),
-        child: Row(
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: _addToFavorites ? AppColors.yellow : Colors.transparent,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: _addToFavorites ? AppColors.yellow : context.mutedColor,
-                  width: 2,
-                ),
-              ),
-              child: _addToFavorites
-                ? Icon(Icons.check, color: context.isDark ? AppColors.bgDark : Colors.white, size: 16)
-                : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Add to favorite drivers',
-                    style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600),
-                  ),
-                  Text(
-                    'Request ${_driverInfo['name']} for future rides',
-                    style: TextStyle(color: context.mutedColor, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.star_outline_rounded, color: _addToFavorites ? AppColors.yellow : context.mutedColor, size: 24),
-          ],
-        ),
       ),
     );
   }

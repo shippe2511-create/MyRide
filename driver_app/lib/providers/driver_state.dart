@@ -11,6 +11,7 @@ import '../services/voice_service.dart';
 
 class DriverState extends ChangeNotifier {
   bool _isDarkMode = true;
+  bool _faceIdEnabled = false;
   bool _isOnline = false;
   bool _isOnBreak = false;
   String _breakType = '';
@@ -80,6 +81,7 @@ class DriverState extends ChangeNotifier {
 
   // Getters
   bool get isDarkMode => _isDarkMode;
+  bool get faceIdEnabled => _faceIdEnabled;
   bool get isOnline => _isOnline;
   bool get isOnBreak => _isOnBreak;
   String get breakType => _breakType;
@@ -215,6 +217,7 @@ class DriverState extends ChangeNotifier {
 
       // Load user preferences
       _isDarkMode = prefs.getBool('darkMode') ?? true;
+      _faceIdEnabled = prefs.getBool('faceIdEnabled') ?? false;
       _hasCompletedOnboarding = prefs.getBool('onboarding') ?? false;
       _isLoggedIn = prefs.getBool('loggedIn') ?? false;
       _driverName = prefs.getString('driverName') ?? '';
@@ -468,6 +471,19 @@ class DriverState extends ChangeNotifier {
     _isDarkMode = !_isDarkMode;
     final prefs = await SharedPreferences.getInstance();
     prefs.setBool('darkMode', _isDarkMode);
+    notifyListeners();
+  }
+
+  Future<void> loadFaceIdSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    _faceIdEnabled = prefs.getBool('faceIdEnabled') ?? false;
+    notifyListeners();
+  }
+
+  Future<void> toggleFaceId(bool value) async {
+    _faceIdEnabled = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('faceIdEnabled', value);
     notifyListeners();
   }
 

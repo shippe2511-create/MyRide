@@ -23,11 +23,19 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
+  static void switchToHomeTab() {
+    _HomeScreenState._instance?.setState(() {
+      _HomeScreenState._instance?._selectedTab = 0;
+      _HomeScreenState._instance?._isPopupMinimized = false;
+    });
+  }
+
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static _HomeScreenState? _instance;
   int _selectedTab = 0;
   bool _isPopupMinimized = false;
   bool _hasNavigatedToActiveRide = false;
@@ -46,10 +54,19 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadBreakContent();
     _subscribeToBreakContent();
     // Mark that we're on home screen and listen for active ride
+    _instance = this;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final state = context.read<DriverState>();
       state.setOnHomeScreen(true);
       state.addListener(_onDriverStateChanged);
+
+      // If there are incoming requests, switch to home tab
+      if (state.incomingRequests.isNotEmpty && _selectedTab != 0) {
+        setState(() {
+          _selectedTab = 0;
+          _isPopupMinimized = false;
+        });
+      }
 
       // Load today's checklist from DB (may have been completed earlier)
       await state.loadTodayChecklist();

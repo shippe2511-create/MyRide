@@ -219,7 +219,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                  const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
                   // Profile header with photo
                   _buildProfileHeader(context, state),
@@ -471,11 +471,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 16),
 
                 // Version
-                Text(
-                  'MyRide Driver v1.0.0',
-                  style: TextStyle(
-                    color: context.mutedColor,
-                    fontSize: 13,
+                Center(
+                  child: Text(
+                    'MyRide Driver v1.0.0',
+                    style: TextStyle(
+                      color: context.mutedColor,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
                 SizedBox(height: MediaQuery.of(context).padding.bottom + 100),

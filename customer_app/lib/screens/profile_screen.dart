@@ -263,7 +263,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               _buildSettingItem(Icons.person_outline, 'Personal Information', () => _showPersonalInfo(context)),
-              _buildSettingItem(Icons.repeat, 'Recurring Rides', () => Navigator.pushNamed(context, '/recurring-rides'), showDivider: true),
               _buildSettingItem(Icons.notifications_outlined, 'Notifications', () => _showNotificationSettings(context), showDivider: true),
               _buildSettingItem(Icons.shield_outlined, 'Privacy & Safety', () => _showPrivacySettings(context), showDivider: true),
               _buildSettingItem(Icons.language, 'Language', () => _showLanguageSettings(context), trailing: 'English', showDivider: true),

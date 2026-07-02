@@ -24,6 +24,7 @@ class AppState extends ChangeNotifier {
       _loadTheme(),
       _loadProfileId(),
       _loadNotificationSettings(),
+      loadFaceIdSetting(),
     ]);
     _isInitialized = true;
     notifyListeners();
@@ -113,8 +114,16 @@ class AppState extends ChangeNotifier {
   bool _faceIdEnabled = false;
   bool get faceIdEnabled => _faceIdEnabled;
 
-  void toggleFaceId(bool value) {
+  Future<void> loadFaceIdSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    _faceIdEnabled = prefs.getBool('faceIdEnabled') ?? false;
+    notifyListeners();
+  }
+
+  Future<void> toggleFaceId(bool value) async {
     _faceIdEnabled = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('faceIdEnabled', value);
     notifyListeners();
   }
 

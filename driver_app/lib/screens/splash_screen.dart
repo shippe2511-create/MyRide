@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:local_auth/local_auth.dart';
 import '../providers/driver_state.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
@@ -14,6 +16,7 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
+  final _localAuth = LocalAuthentication();
   late AnimationController _controller;
   late AnimationController _logoController;
   late AnimationController _textController;
@@ -118,6 +121,30 @@ class _SplashScreenState extends State<SplashScreen>
           debugPrint('Error checking status: $e');
         }
       }
+
+      // Check Face ID if enabled
+      if (state.faceIdEnabled) {
+        try {
+          final canCheck = await _localAuth.canCheckBiometrics;
+          if (canCheck) {
+            final authenticated = await _localAuth.authenticate(
+              localizedReason: 'Sign in to MyRide Driver',
+              options: const AuthenticationOptions(
+                stickyAuth: true,
+                biometricOnly: true,
+              ),
+            );
+            if (authenticated && mounted) {
+              HapticFeedback.lightImpact();
+              Navigator.pushReplacementNamed(context, '/home');
+              return;
+            }
+          }
+        } catch (e) {
+          debugPrint('Face ID error: $e');
+        }
+      }
+
       Navigator.pushReplacementNamed(context, '/home');
     }
   }

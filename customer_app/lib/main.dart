@@ -16,7 +16,6 @@ import 'screens/trip_complete_screen.dart';
 import 'screens/sos_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/schedules_screen.dart';
-import 'screens/recurring_rides_screen.dart';
 import 'theme/app_theme.dart';
 import 'services/notification_service.dart';
 import 'services/cache_service.dart';
@@ -224,9 +223,6 @@ class _MyRideAppState extends State<MyRideApp> with WidgetsBindingObserver {
                 break;
               case '/schedules':
                 page = const SchedulesScreen();
-                break;
-              case '/recurring-rides':
-                page = const RecurringRidesScreen();
                 break;
               default:
                 page = const HomeScreen();

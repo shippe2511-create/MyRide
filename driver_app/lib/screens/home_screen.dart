@@ -303,17 +303,17 @@ class _HomeScreenState extends State<HomeScreen> {
                               _buildOnlineView(context, state),
                             ],
                           ),
-                          // MIDDLE - waiting block (icon + text only)
-                          _buildLookingForRidesContent(context),
-                          // BOTTOM - End Shift button + nav clearance
+                          // MIDDLE - waiting block (icon + text) + End Shift button
                           Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              _buildLookingForRidesContent(context),
                               const SizedBox(height: 40),
                               _buildEndShiftButton(context, state),
-                              SizedBox(height: bottomNavHeight),
                             ],
                           ),
+                          // BOTTOM - nav clearance only
+                          SizedBox(height: bottomNavHeight),
                         ],
                       ),
                     ),

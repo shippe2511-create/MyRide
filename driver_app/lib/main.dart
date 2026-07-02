@@ -203,6 +203,10 @@ class _GlobalRideRequestOverlayState extends State<_GlobalRideRequestOverlay> {
 
 
   void _navigateToHome() {
+    // Ensure popup is expanded when we navigate
+    final state = context.read<DriverState>();
+    state.setOnHomeScreen(true);
+
     // Use root navigator to go to home
     Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil('/home', (route) => false);
   }

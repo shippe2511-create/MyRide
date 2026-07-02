@@ -257,6 +257,19 @@ class DriverState extends ChangeNotifier {
       if (wasOnline && _driverId.isNotEmpty) {
         _isOnline = true;
         // Will re-initialize subscriptions in home_screen via goOnline check
+
+        // Restore shift start time
+        final shiftStartStr = prefs.getString('shiftStartTime');
+        if (shiftStartStr != null) {
+          _shiftStartTime = DateTime.tryParse(shiftStartStr);
+        }
+
+        // Restore today's distance (check if same day)
+        final savedDate = prefs.getString('todayDistanceDate');
+        final today = DateTime.now().toIso8601String().substring(0, 10);
+        if (savedDate == today) {
+          _todayDistance = prefs.getDouble('todayDistance') ?? 0;
+        }
       }
 
       // Load break state if saved
@@ -581,6 +594,8 @@ class DriverState extends ChangeNotifier {
     VoiceService().announceGoingOnline();
     if (_shiftStartTime == null) {
       _shiftStartTime = DateTime.now();
+      // Save shift start time
+      prefs.setString('shiftStartTime', _shiftStartTime!.toIso8601String());
     }
     _startLocationTracking();
 
@@ -757,6 +772,8 @@ class DriverState extends ChangeNotifier {
     await prefs.setBool('needsNewChecklist', true);  // Require checklist for next shift
     await prefs.remove('breakType');
     await prefs.remove('breakStartTime');
+    await prefs.remove('shiftStartTime');  // Clear shift time when going offline
+    _shiftStartTime = null;
 
     // Update Supabase
     if (_driverId.isNotEmpty) {
@@ -1559,6 +1576,12 @@ class DriverState extends ChangeNotifier {
       _todayTrips++;
       _totalTrips++;
       _todayDistance += distance;
+
+      // Save today's distance
+      final prefs = await SharedPreferences.getInstance();
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      await prefs.setDouble('todayDistance', _todayDistance);
+      await prefs.setString('todayDistanceDate', today);
 
       // Haptic and voice feedback
       HapticFeedback.heavyImpact();

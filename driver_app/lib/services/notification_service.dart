@@ -223,6 +223,7 @@ class NotificationService {
 
     _rideChannel = Supabase.instance.client
         .channel('new_rides_driver')
+        // Listen for new rides inserted with pending status
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
@@ -230,31 +231,48 @@ class NotificationService {
           callback: (payload) async {
             final ride = payload.newRecord;
             if (ride['status'] == 'pending') {
-              // Fetch full ride data
-              try {
-                final fullRide = await Supabase.instance.client
-                    .from('rides')
-                    .select('*, customer:profiles!customer_id(*)')
-                    .eq('id', ride['id'])
-                    .single();
-                
-                onNewRide(fullRide);
-                
-                final pickupName = fullRide['pickup_name'] ?? 'Unknown location';
-                showNotification(
-                  title: 'New Ride Request',
-                  body: 'Pickup from $pickupName',
-                  payload: ride['id'],
-                );
-              } catch (e) {
-                debugPrint('Error fetching ride details: $e');
-              }
+              await _handleNewPendingRide(ride, onNewRide);
+            }
+          },
+        )
+        // Also listen for scheduled rides that become pending
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'rides',
+          callback: (payload) async {
+            final oldRide = payload.oldRecord;
+            final newRide = payload.newRecord;
+            // Only notify if status changed TO pending (from scheduled)
+            if (oldRide['status'] != 'pending' && newRide['status'] == 'pending' && newRide['driver_id'] == null) {
+              await _handleNewPendingRide(newRide, onNewRide);
             }
           },
         )
         .subscribe();
 
-    debugPrint('Subscribed to new ride requests');
+    debugPrint('Subscribed to new ride requests (insert + update)');
+  }
+
+  static Future<void> _handleNewPendingRide(Map<String, dynamic> ride, void Function(Map<String, dynamic>) onNewRide) async {
+    try {
+      final fullRide = await Supabase.instance.client
+          .from('rides')
+          .select('*, customer:profiles!customer_id(*)')
+          .eq('id', ride['id'])
+          .single();
+
+      onNewRide(fullRide);
+
+      final pickupName = fullRide['pickup_name'] ?? 'Unknown location';
+      showNotification(
+        title: 'New Ride Request',
+        body: 'Pickup from $pickupName',
+        payload: ride['id'],
+      );
+    } catch (e) {
+      debugPrint('Error fetching ride details: $e');
+    }
   }
 
   static void subscribeToRideCancellations(String rideId, void Function() onCancelled) {

@@ -131,13 +131,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _checkForScheduledRides() {
+    // Also check immediately on first load
+    _doCheckScheduledRides();
+
     _scheduledRideTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+      _doCheckScheduledRides();
+    });
+  }
+
+  Future<void> _doCheckScheduledRides() async {
       if (!mounted) return;
       try {
         final appState = Provider.of<AppState>(context, listen: false);
-        if (appState.profileId == null) return;
+        final profileId = appState.profileId;
+        debugPrint('_doCheckScheduledRides: profileId=$profileId');
+        if (profileId == null) return;
 
-        final rides = await SupabaseService.getMyScheduledRides(appState.profileId);
+        final rides = await SupabaseService.getMyScheduledRides(profileId);
+        debugPrint('_doCheckScheduledRides: found ${rides.length} rides');
 
         if (rides.isEmpty) {
           // Unsubscribe from ride status updates
@@ -205,7 +216,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         }
 
         // Update ongoing trip for banner display
-        if (status == 'accepted' || status == 'arrived' || status == 'in_progress') {
+        // Include scheduled and pending rides so banner shows after restart
+        if (status == 'scheduled' || status == 'pending' || status == 'accepted' || status == 'arrived' || status == 'in_progress') {
           // Extract driver info from nested driver.profile and vehicle
           final driver = ride['driver'] as Map<String, dynamic>?;
           final driverProfile = driver?['profile'] as Map<String, dynamic>?;
@@ -230,11 +242,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               'dropoff_lat': ride['dropoff_lat'],
               'dropoff_lng': ride['dropoff_lng'],
               'driverId': ride['driver_id'],
+              'scheduled_time': ride['scheduled_time'],
             };
           });
 
           // Auto-navigate only once per ride, and only if we're the top route
-          if (_scheduledRideId != rideId) {
+          // Only navigate for active rides, not scheduled/pending
+          if (_scheduledRideId != rideId && (status == 'accepted' || status == 'arrived' || status == 'in_progress')) {
             _scheduledRideId = rideId;
 
             if (mounted && ModalRoute.of(context)?.isCurrent == true) {
@@ -251,7 +265,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       } catch (e) {
         debugPrint('Error checking scheduled rides: $e');
       }
-    });
   }
 
   Future<void> _loadContent() async {
@@ -774,9 +787,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildOngoingTripBanner(BuildContext context) {
     final status = _ongoingTrip!['status'] as String;
+    final isScheduled = status == 'scheduled' || status == 'pending';
     final isInProgress = status == 'in_progress';
     final isArrived = status == 'arrived';
-    final statusColor = isInProgress ? AppColors.success : (isArrived ? const Color(0xFF2196F3) : AppColors.yellow);
+    final statusColor = isScheduled ? AppColors.success : (isInProgress ? AppColors.success : (isArrived ? const Color(0xFF2196F3) : AppColors.yellow));
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
@@ -830,7 +844,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Icon(
-                        isInProgress ? Icons.navigation_rounded : (isArrived ? Icons.person_pin_circle_rounded : Icons.local_taxi_rounded),
+                        isScheduled ? Icons.schedule_rounded : (isInProgress ? Icons.navigation_rounded : (isArrived ? Icons.person_pin_circle_rounded : Icons.local_taxi_rounded)),
                         color: Colors.white,
                         size: 30,
                       ),
@@ -874,6 +888,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             ),
                             const SizedBox(width: 6),
                             Text(
+                              status == 'scheduled' ? 'Ride scheduled' :
+                              status == 'pending' ? 'Finding driver' :
                               status == 'accepted' ? 'Driver on the way' :
                               status == 'arrived' ? 'Driver arrived' :
                               'On trip',
@@ -884,7 +900,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'To ${_ongoingTrip!['dropoff']}',
+                        isScheduled && _ongoingTrip!['scheduled_time'] != null
+                            ? 'Ride scheduled for ${_formatScheduledTimeFromString(_ongoingTrip!['scheduled_time'])}'
+                            : 'To ${_ongoingTrip!['dropoff']}',
                         style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1355,6 +1373,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     } else {
       final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       return '${time.day} ${months[time.month - 1]} $hour:$minute';
+    }
+  }
+
+  String _formatScheduledTimeFromString(String? timeStr) {
+    if (timeStr == null) return '';
+    try {
+      final time = DateTime.parse(timeStr).toLocal();
+      return _formatScheduledTime(time);
+    } catch (e) {
+      return timeStr;
     }
   }
 

@@ -782,8 +782,16 @@ class AppState extends ChangeNotifier {
   }
 
   void addFavoriteDriver(Map<String, dynamic> driver) {
-    if (!isDriverFavorite(driver['id'])) {
-      _favoriteDrivers.add(driver);
+    final driverId = driver['id']?.toString();
+    if (driverId != null && !isDriverFavorite(driverId)) {
+      // Ensure all values are proper types
+      _favoriteDrivers.add({
+        'id': driverId,
+        'name': driver['name']?.toString() ?? '',
+        'initials': driver['initials']?.toString() ?? '',
+        'vehicle': driver['vehicle']?.toString() ?? '',
+        'rating': (driver['rating'] is num) ? driver['rating'] : 5.0,
+      });
       _saveFavoriteDrivers();
       notifyListeners();
     }
@@ -814,7 +822,12 @@ class AppState extends ChangeNotifier {
   Future<void> _saveFavoriteDrivers() async {
     final prefs = await SharedPreferences.getInstance();
     final data = _favoriteDrivers.map((d) {
-      return '${d['id']}|||${d['name']}|||${d['initials']}|||${d['vehicle']}|||${d['rating']}';
+      final id = d['id']?.toString() ?? '';
+      final name = d['name']?.toString() ?? '';
+      final initials = d['initials']?.toString() ?? '';
+      final vehicle = d['vehicle']?.toString() ?? '';
+      final rating = d['rating']?.toString() ?? '5.0';
+      return '$id|||$name|||$initials|||$vehicle|||$rating';
     }).toList();
     await prefs.setStringList('favorite_drivers', data);
   }

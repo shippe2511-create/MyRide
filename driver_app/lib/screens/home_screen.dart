@@ -711,77 +711,81 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
 
           // Go online prompt
-          Padding(
-            padding: const EdgeInsets.all(30),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: context.cardColor,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: context.borderColor, width: 2),
-                    ),
-                    child: Icon(
-                      Icons.power_settings_new,
-                      size: 48,
-                      color: context.mutedColor,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'You\'re Offline',
-                    style: TextStyle(
-                      color: context.textColor,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    state.checklistCompleted
-                        ? 'Tap below to start receiving ride requests'
-                        : 'Complete vehicle checklist to go online',
-                    style: TextStyle(
-                      color: context.mutedColor,
-                      fontSize: 15,
-                      height: 1.5,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      HapticFeedback.heavyImpact();
-                      _handleGoOnline(state);
-                    },
-                    icon: Icon(
-                      state.checklistCompleted
-                          ? Icons.wifi
-                          : Icons.checklist,
-                    ),
-                    label: Text(
-                      state.checklistCompleted
-                          ? 'Go Online'
-                          : 'Start Checklist',
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.success,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 16,
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(30),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: context.cardColor,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: context.borderColor, width: 2),
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                      child: Icon(
+                        Icons.power_settings_new,
+                        size: 48,
+                        color: context.mutedColor,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 24),
+                    Text(
+                      'You\'re Offline',
+                      style: TextStyle(
+                        color: context.textColor,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      state.checklistCompleted
+                          ? 'Tap below to start receiving ride requests'
+                          : 'Complete vehicle checklist to go online',
+                      style: TextStyle(
+                        color: context.mutedColor,
+                        fontSize: 15,
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 32),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        HapticFeedback.heavyImpact();
+                        _handleGoOnline(state);
+                      },
+                      icon: Icon(
+                        state.checklistCompleted
+                            ? Icons.wifi
+                            : Icons.checklist,
+                      ),
+                      label: Text(
+                        state.checklistCompleted
+                            ? 'Go Online'
+                            : 'Start Checklist',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 16,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
+          ),
           ],
         );
   }
@@ -2043,37 +2047,44 @@ class _HomeScreenState extends State<HomeScreen> {
             border: Border.all(color: context.borderColor),
           ),
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildStatItem(
-                context,
-                icon: Icons.today,
-                label: 'Today',
-                value: '${state.todayTrips}',
-                color: AppColors.yellow,
+              Expanded(
+                child: _buildStatItem(
+                  context,
+                  icon: Icons.today,
+                  label: 'Today',
+                  value: '${state.todayTrips}',
+                  color: AppColors.yellow,
+                ),
               ),
               Container(
                 width: 1,
                 height: 50,
                 color: context.borderColor,
               ),
-              _buildStatItem(
-                context,
-                icon: Icons.bar_chart,
-                label: 'Total',
-                value: '${state.totalTrips}',
-                color: AppColors.success,
+              Expanded(
+                child: _buildStatItem(
+                  context,
+                  icon: Icons.bar_chart,
+                  label: 'Total',
+                  value: '${state.totalTrips}',
+                  color: AppColors.success,
+                ),
               ),
               Container(
                 width: 1,
                 height: 50,
                 color: context.borderColor,
               ),
-              _buildStatItem(
-                context,
-                icon: Icons.star,
-                label: 'Rating',
-                value: state.rating.toStringAsFixed(1),
-                color: AppColors.warning,
+              Expanded(
+                child: _buildStatItem(
+                  context,
+                  icon: Icons.star,
+                  label: 'Rating',
+                  value: state.rating.toStringAsFixed(1),
+                  color: AppColors.warning,
+                ),
               ),
             ],
           ),
@@ -2141,28 +2152,26 @@ class _HomeScreenState extends State<HomeScreen> {
     required String value,
     required Color color,
   }) {
-    return Expanded(
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              color: context.textColor,
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-            ),
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 24),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: TextStyle(
+            color: context.textColor,
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
           ),
-          Text(
-            label,
-            style: TextStyle(
-              color: context.mutedColor,
-              fontSize: 12,
-            ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            color: context.mutedColor,
+            fontSize: 12,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

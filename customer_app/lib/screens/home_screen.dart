@@ -216,8 +216,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         }
 
         // Update ongoing trip for banner display
-        // Include scheduled and pending rides so banner shows after restart
-        if (status == 'scheduled' || status == 'pending' || status == 'accepted' || status == 'arrived' || status == 'in_progress') {
+        // Only show banner for active rides (driver assigned or in progress), not scheduled/pending
+        if (status == 'accepted' || status == 'arrived' || status == 'in_progress') {
           // Extract driver info from nested driver.profile and vehicle
           final driver = ride['driver'] as Map<String, dynamic>?;
           final driverProfile = driver?['profile'] as Map<String, dynamic>?;
@@ -787,10 +787,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildOngoingTripBanner(BuildContext context) {
     final status = _ongoingTrip!['status'] as String;
-    final isScheduled = status == 'scheduled' || status == 'pending';
     final isInProgress = status == 'in_progress';
     final isArrived = status == 'arrived';
-    final statusColor = isScheduled ? AppColors.success : (isInProgress ? AppColors.success : (isArrived ? const Color(0xFF2196F3) : AppColors.yellow));
+    final statusColor = isInProgress ? AppColors.success : (isArrived ? const Color(0xFF2196F3) : AppColors.yellow);
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
@@ -844,7 +843,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Icon(
-                        isScheduled ? Icons.schedule_rounded : (isInProgress ? Icons.navigation_rounded : (isArrived ? Icons.person_pin_circle_rounded : Icons.local_taxi_rounded)),
+                        isInProgress ? Icons.navigation_rounded : (isArrived ? Icons.person_pin_circle_rounded : Icons.local_taxi_rounded),
                         color: Colors.white,
                         size: 30,
                       ),
@@ -888,8 +887,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              status == 'scheduled' ? 'Ride scheduled' :
-                              status == 'pending' ? 'Finding driver' :
                               status == 'accepted' ? 'Driver on the way' :
                               status == 'arrived' ? 'Driver arrived' :
                               'On trip',
@@ -900,9 +897,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        isScheduled && _ongoingTrip!['scheduled_time'] != null
-                            ? 'Ride scheduled for ${_formatScheduledTimeFromString(_ongoingTrip!['scheduled_time'])}'
-                            : 'To ${_ongoingTrip!['dropoff']}',
+                        'To ${_ongoingTrip!['dropoff']}',
                         style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

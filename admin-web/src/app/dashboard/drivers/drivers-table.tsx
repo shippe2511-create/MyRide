@@ -124,10 +124,6 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
   const [loading, setLoading] = useState(false)
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
-  const [favoriteCounts, setFavoriteCounts] = useState<Record<string, number>>({})
-  const [favoritesDialogOpen, setFavoritesDialogOpen] = useState(false)
-  const [selectedDriverFavorites, setSelectedDriverFavorites] = useState<{driverId: string, driverName: string, favorites: {id: string, customer_name: string, customer_id: string, created_at: string}[]}>({driverId: '', driverName: '', favorites: []})
-  const [favoritesLoading, setFavoritesLoading] = useState(false)
 
   // Sync with server data when props change
   useEffect(() => {
@@ -168,97 +164,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
 
   useEffect(() => {
     loadVehicles()
-    loadFavoriteCounts()
   }, [])
-
-  const loadFavoriteCounts = async () => {
-    const { data, error } = await supabase
-      .from('favorite_drivers')
-      .select('driver_id')
-
-    if (!error && data) {
-      const counts: Record<string, number> = {}
-      data.forEach(row => {
-        counts[row.driver_id] = (counts[row.driver_id] || 0) + 1
-      })
-      setFavoriteCounts(counts)
-    }
-  }
-
-  const loadDriverFavorites = async (driverId: string, driverName: string) => {
-    setFavoritesLoading(true)
-    setFavoritesDialogOpen(true)
-
-    const { data, error } = await supabase
-      .from('favorite_drivers')
-      .select(`
-        id,
-        customer_id,
-        created_at,
-        profiles!favorite_drivers_customer_id_fkey(full_name)
-      `)
-      .eq('driver_id', driverId)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      toast.error('Failed to load favorites')
-      setFavoritesLoading(false)
-      return
-    }
-
-    setSelectedDriverFavorites({
-      driverId,
-      driverName,
-      favorites: (data || []).map(f => ({
-        id: f.id,
-        customer_id: f.customer_id,
-        customer_name: (f.profiles as unknown as { full_name: string } | null)?.full_name || 'Unknown',
-        created_at: f.created_at
-      }))
-    })
-    setFavoritesLoading(false)
-  }
-
-  const removeFavorite = async (favoriteId: string) => {
-    const { error } = await supabase
-      .from('favorite_drivers')
-      .delete()
-      .eq('id', favoriteId)
-
-    if (error) {
-      toast.error('Failed to remove favorite')
-      return
-    }
-
-    toast.success('Favorite removed')
-    setSelectedDriverFavorites(prev => ({
-      ...prev,
-      favorites: prev.favorites.filter(f => f.id !== favoriteId)
-    }))
-    setFavoriteCounts(prev => ({
-      ...prev,
-      [selectedDriverFavorites.driverId]: Math.max(0, (prev[selectedDriverFavorites.driverId] || 1) - 1)
-    }))
-  }
-
-  const removeAllFavorites = async () => {
-    const { error } = await supabase
-      .from('favorite_drivers')
-      .delete()
-      .eq('driver_id', selectedDriverFavorites.driverId)
-
-    if (error) {
-      toast.error('Failed to remove all favorites')
-      return
-    }
-
-    toast.success('All favorites removed')
-    setSelectedDriverFavorites(prev => ({ ...prev, favorites: [] }))
-    setFavoriteCounts(prev => ({
-      ...prev,
-      [selectedDriverFavorites.driverId]: 0
-    }))
-  }
 
   const loadVehicles = async () => {
     const { data, error } = await supabase
@@ -782,15 +688,14 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
               <TableHead>Vehicle</TableHead>
               <TableHead className="text-center">Trips</TableHead>
               <TableHead className="text-center">Rating</TableHead>
-              <TableHead className="text-center">Favorites</TableHead>
-              <TableHead>Active</TableHead>
+                            <TableHead>Active</TableHead>
               <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {drivers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   No drivers found
                 </TableCell>
               </TableRow>
@@ -862,22 +767,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                       <span className="font-medium">{driver.driver_record?.rating?.toFixed(1) || "0.0"}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex justify-center">
-                      {driver.driver_record?.id && favoriteCounts[driver.driver_record.id] ? (
-                        <button
-                          onClick={() => loadDriverFavorites(driver.driver_record!.id, driver.full_name)}
-                          className="flex items-center gap-1 hover:bg-muted px-2 py-1 rounded transition-colors cursor-pointer"
-                        >
-                          <span className="text-pink-500">♥</span>
-                          <span className="font-medium">{favoriteCounts[driver.driver_record.id]}</span>
-                        </button>
-                      ) : (
-                        <span className="text-muted-foreground">0</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
+                                    <TableCell>
                     {driver.status === "pending" ? (
                       <Button
                         size="sm"
@@ -1182,68 +1072,6 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Favorites Management Dialog */}
-      <Dialog open={favoritesDialogOpen} onOpenChange={setFavoritesDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <span className="text-pink-500">♥</span>
-              Favorites for {selectedDriverFavorites.driverName}
-            </DialogTitle>
-            <DialogDescription>
-              {selectedDriverFavorites.favorites.length} customer(s) have favorited this driver
-            </DialogDescription>
-          </DialogHeader>
-
-          {favoritesLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : selectedDriverFavorites.favorites.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No favorites yet
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-[300px] overflow-y-auto">
-              {selectedDriverFavorites.favorites.map((fav) => (
-                <div key={fav.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div>
-                    <p className="font-medium">{fav.customer_name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Added {formatDistanceToNow(new Date(fav.created_at), { addSuffix: true })}
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                    onClick={() => removeFavorite(fav.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            {selectedDriverFavorites.favorites.length > 0 && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={removeAllFavorites}
-                className="w-full sm:w-auto"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Remove All
-              </Button>
-            )}
-            <Button variant="outline" onClick={() => setFavoritesDialogOpen(false)} className="w-full sm:w-auto">
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+          </div>
   )
 }

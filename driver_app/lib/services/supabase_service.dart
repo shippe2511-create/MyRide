@@ -807,11 +807,11 @@ class SupabaseService {
     };
   }
 
-  static Future<List<Map<String, dynamic>>> getDriverRatings(String driverId) async {
+  static Future<List<Map<String, dynamic>>> getDriverRatings(String profileId) async {
     final response = await client
         .from('ratings')
         .select('*, from_user:profiles!ratings_from_user_id_fkey(full_name)')
-        .eq('to_user_id', visibleUserId ?? driverId)
+        .eq('to_user_id', profileId)
         .order('created_at', ascending: false)
         .limit(100);
     return List<Map<String, dynamic>>.from(response);
@@ -1735,6 +1735,47 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Error fetching quotes: $e');
       return [];
+    }
+  }
+
+  // Notification Settings
+  static Future<Map<String, dynamic>> getNotificationSettings(String profileId) async {
+    try {
+      final response = await client
+          .from('profiles')
+          .select('notification_settings')
+          .eq('id', profileId)
+          .single();
+
+      final settings = response['notification_settings'] as Map<String, dynamic>?;
+      return settings ?? {
+        'ride_requests': true,
+        'trip_updates': true,
+        'promotions': false,
+        'sounds': true,
+        'vibration': true,
+      };
+    } catch (e) {
+      debugPrint('Error getting notification settings: $e');
+      return {
+        'ride_requests': true,
+        'trip_updates': true,
+        'promotions': false,
+        'sounds': true,
+        'vibration': true,
+      };
+    }
+  }
+
+  static Future<void> updateNotificationSettings(String profileId, Map<String, dynamic> settings) async {
+    try {
+      await client
+          .from('profiles')
+          .update({'notification_settings': settings})
+          .eq('id', profileId);
+    } catch (e) {
+      debugPrint('Error updating notification settings: $e');
+      rethrow;
     }
   }
 }

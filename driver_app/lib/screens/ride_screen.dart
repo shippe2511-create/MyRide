@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../config/app_config.dart';
 import '../models/ride_request.dart';
 import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
@@ -54,6 +58,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   GoogleMapController? _mapController;
   late AnimationController _pulseController;
   late AnimationController _routeAnimController;
+  late AnimationController _markerAnimController;
 
   Timer? _timer;
   Timer? _etaTimer;
@@ -66,12 +71,27 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   double _driverLng = 73.5380;
   double _prevDriverLat = 4.2050;
   double _prevDriverLng = 73.5380;
+  double _animatedDriverLat = 4.2050;
+  double _animatedDriverLng = 73.5380;
+  double _driverHeading = 0;
+  double _driverSpeed = 0;
   List<LatLng> _routePoints = [];
+  List<LatLng> _tripRoutePoints = []; // Full trip route: pickup → dropoff
+  List<LatLng> _breadcrumbTrail = []; // Path already traveled
   int _currentRouteIndex = 0;
   bool _isQueueExpanded = false;
   bool _isPanelExpanded = true;
   bool _isNavigatingAway = false;
   String? _currentRideId;
+  bool _trafficEnabled = false;
+  bool _is3DMode = false;
+  bool _headingUpMode = false;
+  MapType _mapType = MapType.normal;
+  BitmapDescriptor? _carIcon;
+  BitmapDescriptor? _pickupIcon;
+  BitmapDescriptor? _dropoffIcon;
+  String? _nextTurnInstruction;
+  String? _nextTurnDistance;
 
   @override
   void initState() {
@@ -92,8 +112,24 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
       vsync: this,
     );
 
+    _markerAnimController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+
+    _loadCarIcon();
+    _loadPinIcons();
     _startDriverSimulation();
     _subscribeToRideUpdates();
+
+    // Fetch initial route after ride is loaded
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final driverState = Provider.of<DriverState>(context, listen: false);
+      final ride = driverState.currentRide;
+      if (ride != null) {
+        _generateRoute(ride);
+      }
+    });
 
     // Start polling after a short delay to ensure ride is loaded
     Future.delayed(const Duration(seconds: 2), () {
@@ -160,10 +196,177 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     });
   }
 
+  Future<void> _loadCarIcon() async {
+    _carIcon = await _createCarIcon();
+    if (mounted) setState(() {});
+  }
+
+  Future<BitmapDescriptor> _createCarIcon() async {
+    final pictureRecorder = ui.PictureRecorder();
+    final canvas = Canvas(pictureRecorder);
+    const size = Size(40, 64);
+
+    final bodyPaint = Paint()
+      ..color = AppColors.yellow
+      ..style = PaintingStyle.fill;
+
+    final windowPaint = Paint()
+      ..color = const Color(0xFF1A1A1A)
+      ..style = PaintingStyle.fill;
+
+    final wheelPaint = Paint()
+      ..color = const Color(0xFF333333)
+      ..style = PaintingStyle.fill;
+
+    // Main body - sleek pickup shape
+    final bodyPath = Path();
+    bodyPath.moveTo(size.width * 0.2, size.height * 0.15);
+    bodyPath.quadraticBezierTo(size.width * 0.5, size.height * 0.05, size.width * 0.8, size.height * 0.15);
+    bodyPath.lineTo(size.width * 0.85, size.height * 0.85);
+    bodyPath.quadraticBezierTo(size.width * 0.5, size.height * 0.92, size.width * 0.15, size.height * 0.85);
+    bodyPath.close();
+    canvas.drawPath(bodyPath, bodyPaint);
+
+    // Windshield (front)
+    final windshield = Path();
+    windshield.moveTo(size.width * 0.28, size.height * 0.18);
+    windshield.quadraticBezierTo(size.width * 0.5, size.height * 0.12, size.width * 0.72, size.height * 0.18);
+    windshield.lineTo(size.width * 0.68, size.height * 0.30);
+    windshield.lineTo(size.width * 0.32, size.height * 0.30);
+    windshield.close();
+    canvas.drawPath(windshield, windowPaint);
+
+    // Rear window
+    canvas.drawRRect(RRect.fromRectAndRadius(
+      Rect.fromLTWH(size.width * 0.30, size.height * 0.35, size.width * 0.40, size.height * 0.08),
+      const Radius.circular(2),
+    ), windowPaint);
+
+    // Truck bed (darker section)
+    final bedPaint = Paint()
+      ..color = const Color(0xFFB8960A)
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(RRect.fromRectAndRadius(
+      Rect.fromLTWH(size.width * 0.25, size.height * 0.48, size.width * 0.50, size.height * 0.32),
+      const Radius.circular(3),
+    ), bedPaint);
+
+    // Wheels
+    canvas.drawRRect(RRect.fromRectAndRadius(
+      Rect.fromLTWH(size.width * 0.08, size.height * 0.22, size.width * 0.12, size.height * 0.18),
+      const Radius.circular(2),
+    ), wheelPaint);
+    canvas.drawRRect(RRect.fromRectAndRadius(
+      Rect.fromLTWH(size.width * 0.80, size.height * 0.22, size.width * 0.12, size.height * 0.18),
+      const Radius.circular(2),
+    ), wheelPaint);
+    canvas.drawRRect(RRect.fromRectAndRadius(
+      Rect.fromLTWH(size.width * 0.08, size.height * 0.62, size.width * 0.12, size.height * 0.18),
+      const Radius.circular(2),
+    ), wheelPaint);
+    canvas.drawRRect(RRect.fromRectAndRadius(
+      Rect.fromLTWH(size.width * 0.80, size.height * 0.62, size.width * 0.12, size.height * 0.18),
+      const Radius.circular(2),
+    ), wheelPaint);
+
+    final picture = pictureRecorder.endRecording();
+    final image = await picture.toImage(size.width.toInt(), size.height.toInt());
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+
+    return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
+  }
+
+  Future<void> _loadPinIcons() async {
+    _pickupIcon = await _createPinIcon('A', const Color(0xFF22C55E));
+    _dropoffIcon = await _createPinIcon('B', AppColors.error);
+    if (mounted) setState(() {});
+  }
+
+  Future<BitmapDescriptor> _createPinIcon(String label, Color color) async {
+    final pictureRecorder = ui.PictureRecorder();
+    final canvas = Canvas(pictureRecorder);
+    const size = Size(40, 50);
+
+    final pinPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final pinPath = Path();
+    pinPath.addOval(Rect.fromCircle(center: Offset(size.width / 2, 15), radius: 14));
+    pinPath.moveTo(size.width / 2 - 10, 22);
+    pinPath.lineTo(size.width / 2, size.height - 5);
+    pinPath.lineTo(size.width / 2 + 10, 22);
+    pinPath.close();
+
+    canvas.drawPath(pinPath, pinPaint);
+
+    final whitePaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(size.width / 2, 15), 9, whitePaint);
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset(
+        (size.width - textPainter.width) / 2,
+        15 - textPainter.height / 2,
+      ),
+    );
+
+    final picture = pictureRecorder.endRecording();
+    final image = await picture.toImage(size.width.toInt(), size.height.toInt());
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+
+    return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
+  }
+
+  void _animateDriverPosition(double newLat, double newLng) {
+    final startLat = _animatedDriverLat;
+    final startLng = _animatedDriverLng;
+
+    _markerAnimController.reset();
+    _markerAnimController.addListener(() {
+      if (mounted) {
+        setState(() {
+          _animatedDriverLat = startLat + (_markerAnimController.value * (newLat - startLat));
+          _animatedDriverLng = startLng + (_markerAnimController.value * (newLng - startLng));
+        });
+      }
+    });
+    _markerAnimController.forward();
+  }
+
+  void _addToBreadcrumb(double lat, double lng) {
+    final point = LatLng(lat, lng);
+    if (_breadcrumbTrail.isEmpty ||
+        Geolocator.distanceBetween(
+          _breadcrumbTrail.last.latitude, _breadcrumbTrail.last.longitude,
+          lat, lng) > 10) {
+      _breadcrumbTrail.add(point);
+      // Keep only last 500 points
+      if (_breadcrumbTrail.length > 500) {
+        _breadcrumbTrail.removeAt(0);
+      }
+    }
+  }
+
   @override
   void dispose() {
     _pulseController.dispose();
     _routeAnimController.dispose();
+    _markerAnimController.dispose();
     _timer?.cancel();
     _etaTimer?.cancel();
     _destinationChangeTimer?.cancel();
@@ -445,28 +648,62 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
           timeLimit: const Duration(seconds: 10),
         );
         if (mounted) {
-          setState(() {
-            _prevDriverLat = _driverLat;
-            _prevDriverLng = _driverLng;
-            // Validate GPS coordinates are in Maldives
-            if (_isValidLat(position.latitude) && _isValidLng(position.longitude)) {
-              _driverLat = position.latitude;
-              _driverLng = position.longitude;
+          final ride = context.read<DriverState>().currentRide;
+
+          // Store previous position
+          _prevDriverLat = _driverLat;
+          _prevDriverLng = _driverLng;
+
+          // Validate GPS coordinates are in Maldives
+          if (_isValidLat(position.latitude) && _isValidLng(position.longitude)) {
+            _driverLat = position.latitude;
+            _driverLng = position.longitude;
+
+            // Calculate heading
+            if (_prevDriverLat != _driverLat || _prevDriverLng != _driverLng) {
+              _driverHeading = math.atan2(
+                _driverLng - _prevDriverLng,
+                _driverLat - _prevDriverLat,
+              ) * 180 / math.pi;
             }
-            // If invalid, keep previous valid location
-            if (_etaSeconds > 0) _etaSeconds -= 3;
-          });
-          _mapController?.animateCamera(CameraUpdate.newLatLng(LatLng(_driverLat, _driverLng)));
+
+            // Calculate speed
+            final distanceMeters = Geolocator.distanceBetween(
+              _prevDriverLat, _prevDriverLng, _driverLat, _driverLng);
+            _driverSpeed = (distanceMeters / 3) * 3.6; // m/s to km/h
+
+            // Add to breadcrumb trail
+            _addToBreadcrumb(_driverLat, _driverLng);
+
+            // Smooth animation to new position
+            _animateDriverPosition(_driverLat, _driverLng);
+          }
+
+          // Animate camera to follow driver (with heading if enabled)
+          if (_headingUpMode) {
+            _mapController?.animateCamera(CameraUpdate.newCameraPosition(
+              CameraPosition(
+                target: LatLng(_driverLat, _driverLng),
+                zoom: 17,
+                bearing: _driverHeading,
+                tilt: 45,
+              ),
+            ));
+          } else {
+            _mapController?.animateCamera(CameraUpdate.newLatLng(LatLng(_driverLat, _driverLng)));
+          }
+
           _sendLocationUpdate();
+
+          // Re-fetch route with updated driver position for realtime route updates
+          if (ride != null) {
+            final endLat = ride.status == RideStatus.inProgress ? ride.dropoffLat : ride.pickupLat;
+            final endLng = ride.status == RideStatus.inProgress ? ride.dropoffLng : ride.pickupLng;
+            _fetchRealRoute(LatLng(_driverLat, _driverLng), LatLng(endLat, endLng));
+          }
         }
       } catch (e) {
-        // GPS failed - just update ETA, don't simulate movement
         debugPrint('GPS error: $e');
-        if (mounted && _etaSeconds > 0) {
-          setState(() {
-            _etaSeconds -= 3;
-          });
-        }
       }
     });
   }
@@ -505,51 +742,182 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   }
 
   void _generateRoute(RideRequest ride) {
-    final startLat = ride.status == RideStatus.inProgress ? ride.pickupLat : _driverLat;
-    final startLng = ride.status == RideStatus.inProgress ? ride.pickupLng : _driverLng;
-    final endLat = ride.status == RideStatus.inProgress ? ride.dropoffLat : ride.pickupLat;
-    final endLng = ride.status == RideStatus.inProgress ? ride.dropoffLng : ride.pickupLng;
-
-    _routePoints = _generateCurvedRoute(
-      LatLng(startLat, startLng),
-      LatLng(endLat, endLng),
-    );
     _currentRouteIndex = 0;
     _etaSeconds = ride.estimatedDuration * 60;
+
+    // Always fetch both routes for full visualization
+    // Route 1: Current route (driver → pickup OR driver → dropoff based on status)
+    final startLat = ride.status == RideStatus.inProgress ? _driverLat : _driverLat;
+    final startLng = ride.status == RideStatus.inProgress ? _driverLng : _driverLng;
+    final endLat = ride.status == RideStatus.inProgress ? ride.dropoffLat : ride.pickupLat;
+    final endLng = ride.status == RideStatus.inProgress ? ride.dropoffLng : ride.pickupLng;
+    _fetchRealRoute(LatLng(startLat, startLng), LatLng(endLat, endLng));
+
+    // Route 2: Full trip route (pickup → dropoff) - always show this as preview
+    _fetchTripRoute(LatLng(ride.pickupLat, ride.pickupLng), LatLng(ride.dropoffLat, ride.dropoffLng));
   }
 
-  List<LatLng> _generateCurvedRoute(LatLng start, LatLng end) {
-    final points = <LatLng>[];
-    const steps = 20;
+  Future<void> _fetchRealRoute(LatLng start, LatLng end) async {
+    try {
+      final url = 'https://maps.googleapis.com/maps/api/directions/json'
+          '?origin=${start.latitude},${start.longitude}'
+          '&destination=${end.latitude},${end.longitude}'
+          '&key=${AppConfig.googleMapsApiKey}';
 
-    for (int i = 0; i <= steps; i++) {
-      final t = i / steps;
-      final lat = start.latitude + (end.latitude - start.latitude) * t;
-      final lng = start.longitude + (end.longitude - start.longitude) * t;
-      final curve = math.sin(t * math.pi) * 0.002;
-      points.add(LatLng(lat + curve, lng));
+      debugPrint('Fetching route: $url');
+      final response = await http.get(Uri.parse(url));
+      debugPrint('Route response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        debugPrint('Route API status: ${data['status']}');
+
+        if (data['status'] == 'OK' && data['routes'] != null && data['routes'].isNotEmpty) {
+          final route = data['routes'][0];
+          final polyline = route['overview_polyline']['points'];
+          final points = _decodePolyline(polyline);
+
+          final leg = route['legs'][0];
+          final durationValue = leg['duration']['value'] as int?;
+          final durationText = leg['duration']['text'] as String?;
+          debugPrint('Route duration: $durationText ($durationValue seconds)');
+
+          // Get turn-by-turn instructions
+          final steps = leg['steps'] as List?;
+          String? nextInstruction;
+          String? nextDistance;
+          if (steps != null && steps.isNotEmpty) {
+            final firstStep = steps[0];
+            nextInstruction = _stripHtmlTags(firstStep['html_instructions'] as String? ?? '');
+            nextDistance = firstStep['distance']['text'] as String?;
+          }
+
+          if (mounted) {
+            setState(() {
+              _routePoints = points;
+              _currentRouteIndex = points.length - 1;
+              _nextTurnInstruction = nextInstruction;
+              _nextTurnDistance = nextDistance;
+              if (durationValue != null && durationValue > 0) {
+                _etaSeconds = durationValue;
+              }
+            });
+          }
+        } else {
+          debugPrint('Route API error: ${data['status']} - ${data['error_message']}');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching route: $e');
+      if (mounted) {
+        setState(() {
+          _routePoints = [start, end];
+          _currentRouteIndex = 1;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchTripRoute(LatLng pickup, LatLng dropoff) async {
+    try {
+      final url = 'https://maps.googleapis.com/maps/api/directions/json'
+          '?origin=${pickup.latitude},${pickup.longitude}'
+          '&destination=${dropoff.latitude},${dropoff.longitude}'
+          '&key=${AppConfig.googleMapsApiKey}';
+
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'OK' && data['routes'] != null && data['routes'].isNotEmpty) {
+          final route = data['routes'][0];
+          final polyline = route['overview_polyline']['points'];
+          final points = _decodePolyline(polyline);
+
+          if (mounted) {
+            setState(() {
+              _tripRoutePoints = points;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching trip route: $e');
+    }
+  }
+
+  List<LatLng> _decodePolyline(String encoded) {
+    List<LatLng> points = [];
+    int index = 0;
+    int lat = 0;
+    int lng = 0;
+
+    while (index < encoded.length) {
+      int shift = 0;
+      int result = 0;
+      int b;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlat = (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlng = (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+      lng += dlng;
+
+      points.add(LatLng(lat / 1e5, lng / 1e5));
     }
     return points;
+  }
+
+  String _stripHtmlTags(String html) {
+    return html.replaceAll(RegExp(r'<[^>]*>'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  IconData _getTurnIcon(String? instruction) {
+    if (instruction == null) return Icons.straight;
+    final lower = instruction.toLowerCase();
+    if (lower.contains('left')) return Icons.turn_left;
+    if (lower.contains('right')) return Icons.turn_right;
+    if (lower.contains('u-turn')) return Icons.u_turn_left;
+    if (lower.contains('roundabout')) return Icons.roundabout_left;
+    if (lower.contains('merge')) return Icons.merge;
+    if (lower.contains('exit')) return Icons.exit_to_app;
+    return Icons.straight;
   }
 
   Set<Marker> _buildMarkers(RideRequest ride, DriverState state) {
     return {
       Marker(
         markerId: const MarkerId('driver'),
-        position: LatLng(_driverLat, _driverLng),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
-        infoWindow: const InfoWindow(title: 'You'),
+        position: LatLng(_animatedDriverLat, _animatedDriverLng),
+        icon: _carIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
+        rotation: _driverHeading,
+        anchor: const Offset(0.5, 0.5),
+        flat: true,
+        infoWindow: InfoWindow(
+          title: 'You',
+          snippet: _driverSpeed > 0 ? '${_driverSpeed.toStringAsFixed(0)} km/h' : null,
+        ),
       ),
       Marker(
         markerId: const MarkerId('pickup'),
         position: LatLng(ride.pickupLat, ride.pickupLng),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        icon: _pickupIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
         infoWindow: InfoWindow(title: 'Pickup', snippet: ride.pickupLocation),
       ),
       Marker(
         markerId: const MarkerId('dropoff'),
         position: LatLng(ride.dropoffLat, ride.dropoffLng),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        icon: _dropoffIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
         infoWindow: InfoWindow(title: 'Drop-off', snippet: ride.dropoffLocation),
       ),
       ...state.queuedRequests.asMap().entries.map((entry) {
@@ -565,22 +933,54 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     };
   }
 
-  Set<Polyline> _buildPolylines() {
-    if (_routePoints.isEmpty) return {};
-    return {
-      Polyline(
-        polylineId: const PolylineId('route_bg'),
-        points: _routePoints,
-        color: Colors.white24,
+  Set<Polyline> _buildPolylines(RideRequest? ride) {
+    final polylines = <Polyline>{};
+    final status = ride?.status;
+
+    // Breadcrumb trail (path already traveled) - with round caps
+    if (_breadcrumbTrail.length >= 2) {
+      polylines.add(Polyline(
+        polylineId: const PolylineId('breadcrumb'),
+        points: _breadcrumbTrail,
+        color: AppColors.yellow.withOpacity(0.5),
         width: 6,
-      ),
-      Polyline(
-        polylineId: const PolylineId('route'),
-        points: _routePoints.take(_currentRouteIndex + 1).toList(),
-        color: AppColors.yellow,
-        width: 5,
-      ),
-    };
+        startCap: Cap.roundCap,
+        endCap: Cap.roundCap,
+      ));
+    }
+
+    if (status == RideStatus.accepted) {
+      // Heading to pickup: show driver→pickup (solid) + trip preview (dashed)
+      if (_routePoints.isNotEmpty) {
+        polylines.add(Polyline(
+          polylineId: const PolylineId('route'),
+          points: _routePoints,
+          color: AppColors.yellow,
+          width: 5,
+        ));
+      }
+      if (_tripRoutePoints.isNotEmpty) {
+        polylines.add(Polyline(
+          polylineId: const PolylineId('trip_route'),
+          points: _tripRoutePoints,
+          color: AppColors.yellow.withOpacity(0.4),
+          width: 4,
+          patterns: [PatternItem.dash(20), PatternItem.gap(10)],
+        ));
+      }
+    } else if (status == RideStatus.arrivedAtPickup || status == RideStatus.inProgress) {
+      // Arrived or in progress: only show trip route (pickup → dropoff)
+      if (_tripRoutePoints.isNotEmpty) {
+        polylines.add(Polyline(
+          polylineId: const PolylineId('trip_route'),
+          points: _tripRoutePoints,
+          color: AppColors.yellow,
+          width: 5,
+        ));
+      }
+    }
+
+    return polylines;
   }
 
   void _startTimer() {
@@ -829,20 +1229,24 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                       _isValidLat(ride.pickupLat) ? ride.pickupLat : 4.2286,
                       _isValidLng(ride.pickupLng) ? ride.pickupLng : 73.5400,
                     ),
-                    zoom: 14,
+                    zoom: 16,
+                    tilt: _is3DMode ? 45 : 0,
                   ),
                   onMapCreated: (controller) {
                     _mapController = controller;
                     Future.delayed(const Duration(milliseconds: 500), () => _fitBounds(ride));
                   },
                   markers: _buildMarkers(ride, state),
-                  polylines: _buildPolylines(),
-                  myLocationEnabled: true,
+                  polylines: _buildPolylines(ride),
+                  mapType: _mapType,
+                  myLocationEnabled: false,
                   myLocationButtonEnabled: false,
                   zoomControlsEnabled: false,
                   mapToolbarEnabled: false,
-                  compassEnabled: false,
-                  style: context.isDark ? _darkMapStyle : null,
+                  compassEnabled: true,
+                  trafficEnabled: _trafficEnabled,
+                  buildingsEnabled: true,
+                  style: _mapType == MapType.normal && context.isDark ? _darkMapStyle : null,
                 ),
               ),
 
@@ -857,7 +1261,69 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                     const SizedBox(width: 12),
                     Expanded(child: _buildStatusChip(ride.status)),
                     const SizedBox(width: 12),
-                    _buildMapButton(Icons.my_location, () => _fitBounds(ride)),
+                    _buildMapButton(Icons.my_location, () {
+                      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(
+                        LatLng(_driverLat, _driverLng), 17,
+                      ));
+                    }),
+                  ],
+                ),
+              ),
+
+              // Map controls (right side)
+              Positioned(
+                right: 16,
+                top: MediaQuery.of(context).padding.top + 240,
+                child: Column(
+                  children: [
+                    // Map type toggle (satellite/normal)
+                    _buildMapControlButton(
+                      _mapType == MapType.satellite ? Icons.map : Icons.satellite,
+                      _mapType == MapType.satellite,
+                      () => setState(() => _mapType = _mapType == MapType.normal ? MapType.satellite : MapType.normal),
+                      'Satellite',
+                    ),
+                    const SizedBox(height: 8),
+                    // Traffic toggle
+                    _buildMapControlButton(
+                      Icons.traffic,
+                      _trafficEnabled,
+                      () => setState(() => _trafficEnabled = !_trafficEnabled),
+                      'Traffic',
+                    ),
+                    const SizedBox(height: 8),
+                    // 3D mode toggle
+                    _buildMapControlButton(
+                      Icons.view_in_ar,
+                      _is3DMode,
+                      () {
+                        setState(() => _is3DMode = !_is3DMode);
+                        _mapController?.animateCamera(CameraUpdate.newCameraPosition(
+                          CameraPosition(
+                            target: LatLng(_driverLat, _driverLng),
+                            zoom: 17,
+                            tilt: _is3DMode ? 45 : 0,
+                          ),
+                        ));
+                      },
+                      '3D',
+                    ),
+                    const SizedBox(height: 8),
+                    // Heading-up mode toggle
+                    _buildMapControlButton(
+                      Icons.navigation,
+                      _headingUpMode,
+                      () => setState(() => _headingUpMode = !_headingUpMode),
+                      'Heading',
+                    ),
+                    const SizedBox(height: 8),
+                    // Fit all markers
+                    _buildMapControlButton(
+                      Icons.zoom_out_map,
+                      false,
+                      () => _fitBounds(ride),
+                      'Fit All',
+                    ),
                   ],
                 ),
               ),
@@ -901,6 +1367,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                 left: 16,
                 right: 16,
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     // Navigation button
                     if (ride.status == RideStatus.accepted || ride.status == RideStatus.inProgress)
@@ -980,6 +1447,32 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                             Text('PTT', style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.w700)),
                           ],
                         ),
+                      ),
+                    ),
+
+                    // Speed indicator (same row as PTT)
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.yellow, width: 1.5),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.speed, color: AppColors.yellow, size: 16),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${_driverSpeed.toStringAsFixed(0)} km/h',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 
@@ -1189,6 +1682,32 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
           border: Border.all(color: Colors.white24),
         ),
         child: Icon(icon, color: Colors.white, size: 20),
+      ),
+    );
+  }
+
+  Widget _buildMapControlButton(IconData icon, bool isActive, VoidCallback onTap, String label) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.yellow : Colors.black.withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isActive ? AppColors.yellow : Colors.white24,
+            width: isActive ? 2 : 1,
+          ),
+        ),
+        child: Icon(
+          icon,
+          color: isActive ? Colors.black : Colors.white,
+          size: 20,
+        ),
       ),
     );
   }

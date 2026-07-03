@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
+import '../services/supabase_service.dart';
+import '../providers/driver_state.dart';
 
 class NotificationsSettingsScreen extends StatefulWidget {
   const NotificationsSettingsScreen({super.key});
@@ -27,20 +29,84 @@ class _NotificationsSettingsScreenState
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _rideRequests = prefs.getBool('notif_ride_requests') ?? true;
-      _tripUpdates = prefs.getBool('notif_trip_updates') ?? true;
-      _promotions = prefs.getBool('notif_promotions') ?? false;
-      _sounds = prefs.getBool('notif_sounds') ?? true;
-      _vibration = prefs.getBool('notif_vibration') ?? true;
-      _isLoading = false;
-    });
+    final driverState = Provider.of<DriverState>(context, listen: false);
+    final profileId = driverState.profileId;
+
+    if (profileId.isEmpty) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      final settings = await SupabaseService.getNotificationSettings(profileId);
+      setState(() {
+        _rideRequests = settings['ride_requests'] ?? true;
+        _tripUpdates = settings['trip_updates'] ?? true;
+        _promotions = settings['promotions'] ?? false;
+        _sounds = settings['sounds'] ?? true;
+        _vibration = settings['vibration'] ?? true;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading notification settings: $e');
+      setState(() => _isLoading = false);
+    }
   }
 
-  Future<void> _saveSetting(String key, bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(key, value);
+  Future<void> _saveSettings() async {
+    final driverState = Provider.of<DriverState>(context, listen: false);
+    final profileId = driverState.profileId;
+
+    debugPrint('Saving notification settings for profileId: $profileId');
+
+    if (profileId.isEmpty) {
+      debugPrint('ProfileId is empty, cannot save settings');
+      return;
+    }
+
+    try {
+      await SupabaseService.updateNotificationSettings(profileId, {
+        'ride_requests': _rideRequests,
+        'trip_updates': _tripUpdates,
+        'promotions': _promotions,
+        'sounds': _sounds,
+        'vibration': _vibration,
+      });
+    } catch (e) {
+      debugPrint('Error saving notification settings: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Failed to save settings'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  void _updateSetting(String key, bool value) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      switch (key) {
+        case 'ride_requests':
+          _rideRequests = value;
+          break;
+        case 'trip_updates':
+          _tripUpdates = value;
+          break;
+        case 'promotions':
+          _promotions = value;
+          break;
+        case 'sounds':
+          _sounds = value;
+          break;
+        case 'vibration':
+          _vibration = value;
+          break;
+      }
+    });
+    _saveSettings();
   }
 
   @override
@@ -50,94 +116,74 @@ class _NotificationsSettingsScreenState
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: AppColors.yellow))
           : CustomScrollView(
-              slivers: [
-                SliverAppBar(
-                  backgroundColor: context.bgColor,
-                  floating: true,
-                  snap: true,
-                  title: Text(
-                    'Notifications',
-                    style: TextStyle(color: context.textColor),
-                  ),
-                  leading: IconButton(
-                    icon: Icon(Icons.arrow_back, color: context.textColor),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.all(20),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                _buildSection(context, 'Push Notifications', [
-                  _buildSwitchTile(
-                    context,
-                    icon: Icons.local_taxi,
-                    title: 'Ride Requests',
-                    subtitle: 'Get notified when a new ride request comes in',
-                    value: _rideRequests,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      setState(() => _rideRequests = v);
-                      _saveSetting('notif_ride_requests', v);
-                    },
-                  ),
-                  _buildSwitchTile(
-                    context,
-                    icon: Icons.update,
-                    title: 'Trip Updates',
-                    subtitle: 'Updates about your ongoing trips',
-                    value: _tripUpdates,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      setState(() => _tripUpdates = v);
-                      _saveSetting('notif_trip_updates', v);
-                    },
-                  ),
-                  _buildSwitchTile(
-                    context,
-                    icon: Icons.campaign,
-                    title: 'Promotions',
-                    subtitle: 'News and special announcements',
-                    value: _promotions,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      setState(() => _promotions = v);
-                      _saveSetting('notif_promotions', v);
-                    },
-                  ),
-                ]),
-                const SizedBox(height: 24),
-                _buildSection(context, 'Alert Preferences', [
-                  _buildSwitchTile(
-                    context,
-                    icon: Icons.volume_up,
-                    title: 'Sounds',
-                    subtitle: 'Play sound for notifications',
-                    value: _sounds,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      setState(() => _sounds = v);
-                      _saveSetting('notif_sounds', v);
-                    },
-                  ),
-                      _buildSwitchTile(
-                        context,
-                        icon: Icons.vibration,
-                        title: 'Vibration',
-                        subtitle: 'Vibrate for notifications',
-                        value: _vibration,
-                        onChanged: (v) {
-                          HapticFeedback.selectionClick();
-                          setState(() => _vibration = v);
-                          _saveSetting('notif_vibration', v);
-                        },
+                  slivers: [
+                    SliverAppBar(
+                      backgroundColor: context.bgColor,
+                      floating: true,
+                      snap: true,
+                      title: Text(
+                        'Notifications',
+                        style: TextStyle(color: context.textColor),
                       ),
-                    ]),
-                  ]),
+                      leading: IconButton(
+                        icon: Icon(Icons.arrow_back, color: context.textColor),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.all(20),
+                      sliver: SliverList(
+                        delegate: SliverChildListDelegate([
+                          _buildSection(context, 'Push Notifications', [
+                            _buildSwitchTile(
+                              context,
+                              icon: Icons.local_taxi,
+                              title: 'Ride Requests',
+                              subtitle: 'Get notified when a new ride request comes in',
+                              value: _rideRequests,
+                              onChanged: (v) => _updateSetting('ride_requests', v),
+                            ),
+                            _buildSwitchTile(
+                              context,
+                              icon: Icons.update,
+                              title: 'Trip Updates',
+                              subtitle: 'Updates about your ongoing trips',
+                              value: _tripUpdates,
+                              onChanged: (v) => _updateSetting('trip_updates', v),
+                            ),
+                            _buildSwitchTile(
+                              context,
+                              icon: Icons.campaign,
+                              title: 'Promotions',
+                              subtitle: 'News and special announcements',
+                              value: _promotions,
+                              onChanged: (v) => _updateSetting('promotions', v),
+                            ),
+                          ]),
+                          const SizedBox(height: 24),
+                          _buildSection(context, 'Alert Preferences', [
+                            _buildSwitchTile(
+                              context,
+                              icon: Icons.volume_up,
+                              title: 'Sounds',
+                              subtitle: 'Play sound for notifications',
+                              value: _sounds,
+                              onChanged: (v) => _updateSetting('sounds', v),
+                            ),
+                            _buildSwitchTile(
+                              context,
+                              icon: Icons.vibration,
+                              title: 'Vibration',
+                              subtitle: 'Vibrate for notifications',
+                              value: _vibration,
+                              onChanged: (v) => _updateSetting('vibration', v),
+                            ),
+                          ]),
+                        ]),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
     );
   }
 
@@ -160,7 +206,6 @@ class _NotificationsSettingsScreenState
           decoration: BoxDecoration(
             color: context.cardColor,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: context.borderColor),
           ),
           child: Column(children: children),
         ),

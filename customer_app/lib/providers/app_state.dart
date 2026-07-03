@@ -78,6 +78,7 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('notificationsEnabled', value);
     notifyListeners();
+    _saveNotificationSettingsToSupabase();
   }
 
   Future<void> toggleRideUpdates(bool value) async {
@@ -85,6 +86,7 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('rideUpdatesEnabled', value);
     notifyListeners();
+    _saveNotificationSettingsToSupabase();
   }
 
   Future<void> togglePromotions(bool value) async {
@@ -92,6 +94,7 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('promotionsEnabled', value);
     notifyListeners();
+    _saveNotificationSettingsToSupabase();
   }
 
   Future<void> toggleEmailNotifications(bool value) async {
@@ -99,6 +102,21 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('emailNotificationsEnabled', value);
     notifyListeners();
+    _saveNotificationSettingsToSupabase();
+  }
+
+  Future<void> _saveNotificationSettingsToSupabase() async {
+    if (_profileId == null || _profileId!.isEmpty) return;
+    try {
+      await SupabaseService.updateNotificationSettings(_profileId!, {
+        'push_notifications': _notificationsEnabled,
+        'ride_updates': _rideUpdatesEnabled,
+        'promotions': _promotionsEnabled,
+        'email_notifications': _emailNotificationsEnabled,
+      });
+    } catch (e) {
+      debugPrint('Error saving notification settings to Supabase: $e');
+    }
   }
 
   // Location services

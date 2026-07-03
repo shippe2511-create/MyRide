@@ -229,6 +229,25 @@ class DriverState extends ChangeNotifier {
       // Sync driverId to SupabaseService
       if (_driverId.isNotEmpty) {
         SupabaseService.setDriverId(_driverId);
+
+        // Fetch profileId from database if not set
+        if (_profileId.isEmpty) {
+          try {
+            final driver = await SupabaseService.client
+                .from('drivers')
+                .select('profile_id')
+                .eq('id', _driverId)
+                .maybeSingle();
+            if (driver != null && driver['profile_id'] != null) {
+              _profileId = driver['profile_id'];
+              prefs.setString('profileId', _profileId);
+              debugPrint('Fetched and saved profileId: $_profileId');
+            }
+          } catch (e) {
+            debugPrint('Error fetching profileId: $e');
+          }
+        }
+
         // Load shifts for this week
         loadShifts();
         // Load actual stats from database

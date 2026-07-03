@@ -2018,4 +2018,45 @@ class SupabaseService {
     }
   }
 
+  // Notification Settings
+  static Future<Map<String, dynamic>> getNotificationSettings(String profileId) async {
+    try {
+      final response = await client
+          .from('profiles')
+          .select('notification_settings')
+          .eq('id', profileId)
+          .single();
+
+      final settings = response['notification_settings'] as Map<String, dynamic>?;
+      return settings ?? {
+        'ride_requests': true,
+        'trip_updates': true,
+        'promotions': false,
+        'sounds': true,
+        'vibration': true,
+      };
+    } catch (e) {
+      debugPrint('Error getting notification settings: $e');
+      return {
+        'ride_requests': true,
+        'trip_updates': true,
+        'promotions': false,
+        'sounds': true,
+        'vibration': true,
+      };
+    }
+  }
+
+  static Future<void> updateNotificationSettings(String profileId, Map<String, dynamic> settings) async {
+    try {
+      await client
+          .from('profiles')
+          .update({'notification_settings': settings})
+          .eq('id', profileId);
+    } catch (e) {
+      debugPrint('Error updating notification settings: $e');
+      rethrow;
+    }
+  }
+
 }

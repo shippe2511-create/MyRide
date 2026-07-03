@@ -27,13 +27,14 @@ class _RatingsScreenState extends State<RatingsScreen> {
   Future<void> _loadRatings() async {
     setState(() => _isLoading = true);
     try {
-      final driverId = SupabaseService.driverId;
-      if (driverId == null) {
+      final driverState = Provider.of<DriverState>(context, listen: false);
+      final profileId = driverState.profileId;
+      if (profileId.isEmpty) {
         setState(() => _isLoading = false);
         return;
       }
 
-      final ratings = await SupabaseService.getDriverRatings(driverId);
+      final ratings = await SupabaseService.getDriverRatings(profileId);
 
       // Calculate breakdown
       final breakdown = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0};
@@ -110,7 +111,6 @@ class _RatingsScreenState extends State<RatingsScreen> {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.yellow.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [

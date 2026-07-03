@@ -425,16 +425,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         )
                       : null,
                   borderRadius: BorderRadius.circular(16),
-                  border: (appState.profilePhotoPath != null || appState.avatarUrl != null)
-                      ? Border.all(color: AppColors.yellow, width: 2)
-                      : null,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.yellow.withValues(alpha: 0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
                 ),
                 child: _buildProfileAvatar(appState),
               ),
@@ -768,14 +758,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       decoration: BoxDecoration(
                         color: schedule['cardColor'] as Color,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: (schedule['color'] as Color).withValues(alpha: 0.4), width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: (schedule['color'] as Color).withValues(alpha: 0.15),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,

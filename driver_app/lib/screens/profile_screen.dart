@@ -545,12 +545,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 width: 110,
                 height: 110,
                 decoration: BoxDecoration(
-                  color: AppColors.yellow,
                   borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: AppColors.yellow,
-                    width: 3,
-                  ),
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(25),
@@ -565,16 +560,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: context.cardColor,
+                    color: AppColors.yellow,
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppColors.yellow,
-                      width: 2,
-                    ),
                   ),
                   child: const Icon(
                     Icons.camera_alt,
-                    color: AppColors.yellow,
+                    color: Colors.black,
                     size: 18,
                   ),
                 ),
@@ -983,24 +974,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: context.borderColor,
-                  borderRadius: BorderRadius.circular(2),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: context.textColor,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              title,
-              style: TextStyle(
-                color: context.textColor,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
+                GestureDetector(
+                  onTap: () => Navigator.pop(ctx),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: context.borderColor,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Icon(Icons.close, color: context.textColor, size: 20),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             Expanded(

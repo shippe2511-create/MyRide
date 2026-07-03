@@ -23,7 +23,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Fuel, Loader2, MoreVertical, Edit, Trash2, Plus, Wrench, Sparkles, Car, Filter, TrendingUp, TrendingDown, Calendar, DollarSign, Users, Download } from "lucide-react"
+import { Fuel, Loader2, MoreVertical, Edit, Trash2, Plus, Wrench, Sparkles, Car, Filter, TrendingUp, TrendingDown, Calendar, DollarSign, Users, Download, X, CheckSquare } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import { SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/skeleton-card"
@@ -67,6 +68,9 @@ export default function VehicleLogsPage() {
   const [filterType, setFilterType] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   const [formData, setFormData] = useState({
     log_type: "fuel",
@@ -272,6 +276,51 @@ export default function VehicleLogsPage() {
   const confirmDelete = (log: VehicleLog) => {
     setSelectedLog(log)
     setDeleteDialogOpen(true)
+  }
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === logs.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(logs.map(l => l.id)))
+    }
+  }
+
+  const clearSelection = () => {
+    setSelectedIds(new Set())
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    setBulkDeleting(true)
+
+    const { error } = await supabase
+      .from("vehicle_logs")
+      .delete()
+      .in("id", Array.from(selectedIds))
+
+    if (error) {
+      toast.error("Failed to delete logs")
+    } else {
+      toast.success(`${selectedIds.size} log(s) deleted`)
+      setLogs(prev => prev.filter(l => !selectedIds.has(l.id)))
+      setSelectedIds(new Set())
+    }
+
+    setBulkDeleting(false)
+    setBulkDeleteDialogOpen(false)
   }
 
   const formatDate = (date: string) => {
@@ -527,6 +576,27 @@ export default function VehicleLogsPage() {
         </Card>
       </div>
 
+      {/* Selection Bar */}
+      {selectedIds.size > 0 && (
+        <Card className="p-3 flex items-center gap-4 bg-muted/50 border-primary/20">
+          <div className="flex items-center gap-2 px-4 py-2 bg-background rounded-lg border">
+            <span className="font-semibold">{selectedIds.size} selected</span>
+          </div>
+          <Button variant="outline" size="sm" onClick={clearSelection}>
+            <X className="h-4 w-4 mr-2" />
+            Clear
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setBulkDeleteDialogOpen(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete Selected
+          </Button>
+        </Card>
+      )}
+
       <Card className="p-4">
         <div className="flex items-center gap-4 mb-4">
           <Filter className="h-4 w-4 text-muted-foreground" />
@@ -547,6 +617,12 @@ export default function VehicleLogsPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12">
+                <Checkbox
+                  checked={logs.length > 0 && selectedIds.size === logs.length}
+                  onCheckedChange={toggleSelectAll}
+                />
+              </TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Driver</TableHead>
               <TableHead>Amount</TableHead>
@@ -559,7 +635,7 @@ export default function VehicleLogsPage() {
           <TableBody>
             {logs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   No vehicle logs found
                 </TableCell>
               </TableRow>
@@ -567,8 +643,15 @@ export default function VehicleLogsPage() {
               logs.map(log => {
                 const typeInfo = getLogTypeInfo(log.log_type)
                 const Icon = typeInfo.icon
+                const isSelected = selectedIds.has(log.id)
                 return (
-                  <TableRow key={log.id} className="group hover:bg-muted/50 transition-colors">
+                  <TableRow key={log.id} className={`group hover:bg-muted/50 transition-colors ${isSelected ? 'bg-primary/5' : ''}`}>
+                    <TableCell>
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleSelection(log.id)}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className={`p-1.5 rounded ${typeInfo.color}`}>
@@ -736,6 +819,28 @@ export default function VehicleLogsPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Log(s)</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedIds.size} selected vehicle log(s)? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={bulkDeleting}
+            >
+              {bulkDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Delete {selectedIds.size} Log(s)
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

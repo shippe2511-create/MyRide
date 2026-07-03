@@ -370,7 +370,6 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -427,11 +426,6 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: allVerified
-              ? AppColors.success.withValues(alpha: 0.3)
-              : AppColors.warning.withValues(alpha: 0.3),
-        ),
       ),
       child: Column(
         children: [
@@ -561,7 +555,6 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
       decoration: BoxDecoration(
         color: context.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.borderColor),
       ),
       child: Column(
         children: [

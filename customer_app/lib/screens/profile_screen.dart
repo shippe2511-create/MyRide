@@ -115,7 +115,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppColors.yellow.withValues(alpha: 0.3)),
           ),
           child: Row(
             children: [
@@ -131,14 +130,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         )
                       : null,
                   borderRadius: BorderRadius.circular(20),
-                  border: (appState.profilePhotoPath != null || appState.avatarUrl != null)
-                      ? Border.all(color: AppColors.yellow, width: 2)
-                      : null,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.yellow.withValues(alpha: 0.4),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
@@ -576,9 +572,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ? const LinearGradient(colors: [AppColors.yellow, AppColors.yellow2])
                               : null,
                           borderRadius: BorderRadius.circular(28),
-                          border: (appState.profilePhotoPath != null || appState.avatarUrl != null)
-                              ? Border.all(color: AppColors.yellow, width: 3)
-                              : null,
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(25),
@@ -1953,7 +1946,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             ),
-            SizedBox(height: MediaQuery.of(context).padding.bottom),
           ],
         ),
       ),

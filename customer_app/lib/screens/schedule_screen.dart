@@ -543,7 +543,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
@@ -644,10 +643,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                   decoration: BoxDecoration(
                     color: context.surfaceColor,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: typeColor.withValues(alpha: isActive ? 0.8 : 0.3),
-                      width: 1.5,
-                    ),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,

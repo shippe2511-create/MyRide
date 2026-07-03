@@ -112,7 +112,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     });
   }
 
-  bool get _hasFilters => _statusFilter != null || _dateRange != null;
+  bool get _hasFilters => _dateRange != null;
 
   @override
   Widget build(BuildContext context) {
@@ -122,7 +122,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
       extendBody: true,
       body: Consumer<DriverState>(
         builder: (context, state, _) {
-          final filteredTrips = _filterTrips(state.completedTrips);
+          final allTrips = state.completedTrips;
+          final completedCount = allTrips.where((t) => t.status == TripStatus.completed).length;
+          final cancelledCount = allTrips.where((t) => t.status == TripStatus.cancelled).length;
+          final filteredTrips = _filterTrips(allTrips);
 
           return CustomScrollView(
             physics: const BouncingScrollPhysics(),
@@ -138,26 +141,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              'Trip History',
+                              'Activity',
                               style: TextStyle(
                                 color: context.textColor,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
                           ),
-                          if (_hasFilters)
-                            TextButton(
-                              onPressed: _clearFilters,
-                              child: Text(
-                                'Clear',
-                                style: TextStyle(
-                                  color: AppColors.yellow,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          const SizedBox(width: 4),
                           _FilterButton(
                             hasFilters: _hasFilters,
                             onTap: _showFilterSheet,
@@ -165,7 +156,48 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         ],
                       ),
                     ),
-                    if (_hasFilters) _buildActiveFilters(),
+                    const SizedBox(height: 12),
+                    // Status tabs
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: context.cardColor,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: context.borderColor),
+                        ),
+                        child: Row(
+                          children: [
+                            _buildStatusTab(
+                              context,
+                              label: 'All',
+                              count: allTrips.length,
+                              isSelected: _statusFilter == null,
+                              onTap: () => setState(() => _statusFilter = null),
+                            ),
+                            _buildStatusTab(
+                              context,
+                              label: 'Completed',
+                              count: completedCount,
+                              isSelected: _statusFilter == TripStatus.completed,
+                              onTap: () => setState(() => _statusFilter = TripStatus.completed),
+                            ),
+                            _buildStatusTab(
+                              context,
+                              label: 'Cancelled',
+                              count: cancelledCount,
+                              isSelected: _statusFilter == TripStatus.cancelled,
+                              onTap: () => setState(() => _statusFilter = TripStatus.cancelled),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (_dateRange != null) ...[
+                      const SizedBox(height: 12),
+                      _buildActiveFilters(),
+                    ],
                   ],
                 ),
               ),
@@ -202,6 +234,40 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
+  Widget _buildStatusTab(
+    BuildContext context, {
+    required String label,
+    required int count,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.yellow : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            '$label ($count)',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isSelected ? Colors.black : context.mutedColor,
+              fontSize: 14,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildActiveFilters() {
     final dateFormat = DateFormat('MMM d');
     return Padding(
@@ -210,15 +276,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
         spacing: 8,
         runSpacing: 8,
         children: [
-          if (_statusFilter != null)
-            _FilterChip(
-              label: _statusFilter == TripStatus.completed
-                  ? 'Completed'
-                  : _statusFilter == TripStatus.cancelled
-                      ? 'Cancelled'
-                      : 'Rejected',
-              onRemove: () => setState(() => _statusFilter = null),
-            ),
           if (_dateRange != null)
             _FilterChip(
               label: '${dateFormat.format(_dateRange!.start)} - ${dateFormat.format(_dateRange!.end)}',
@@ -675,23 +732,60 @@ class _FilterSheet extends StatefulWidget {
 }
 
 class _FilterSheetState extends State<_FilterSheet> {
-  TripStatus? _status;
-  DateTimeRange? _dateRange;
+  String _selectedPreset = 'all';
+  DateTimeRange? _customRange;
 
   @override
   void initState() {
     super.initState();
-    _status = widget.currentStatus;
-    _dateRange = widget.currentDateRange;
+    _customRange = widget.currentDateRange;
+    // Determine which preset matches the current date range
+    if (widget.currentDateRange == null) {
+      _selectedPreset = 'all';
+    } else {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final start = widget.currentDateRange!.start;
+
+      if (start == today) {
+        _selectedPreset = 'today';
+      } else if (start == today.subtract(Duration(days: today.weekday - 1))) {
+        _selectedPreset = 'week';
+      } else if (start == DateTime(now.year, now.month, 1)) {
+        _selectedPreset = 'month';
+      } else {
+        _selectedPreset = 'custom';
+      }
+    }
   }
 
-  Future<void> _selectDateRange() async {
+  DateTimeRange? _getDateRangeForPreset(String preset) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    switch (preset) {
+      case 'today':
+        return DateTimeRange(start: today, end: today.add(const Duration(days: 1)));
+      case 'week':
+        final weekStart = today.subtract(Duration(days: today.weekday - 1));
+        return DateTimeRange(start: weekStart, end: today.add(const Duration(days: 1)));
+      case 'month':
+        final monthStart = DateTime(now.year, now.month, 1);
+        return DateTimeRange(start: monthStart, end: today.add(const Duration(days: 1)));
+      case 'custom':
+        return _customRange;
+      default:
+        return null;
+    }
+  }
+
+  Future<void> _selectCustomRange() async {
     final now = DateTime.now();
     final picked = await showDateRangePicker(
       context: context,
       firstDate: now.subtract(const Duration(days: 365)),
       lastDate: now,
-      initialDateRange: _dateRange,
+      initialDateRange: _customRange,
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -707,7 +801,12 @@ class _FilterSheetState extends State<_FilterSheet> {
       },
     );
     if (picked != null) {
-      setState(() => _dateRange = picked);
+      setState(() {
+        _customRange = picked;
+        _selectedPreset = 'custom';
+      });
+      widget.onApply(null, picked);
+      if (mounted) Navigator.pop(context);
     }
   }
 
@@ -722,172 +821,130 @@ class _FilterSheetState extends State<_FilterSheet> {
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 12),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: context.borderColor,
-              borderRadius: BorderRadius.circular(2),
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: context.borderColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
           const SizedBox(height: 20),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Text(
-                  'Filter Trips',
-                  style: TextStyle(
-                    color: context.textColor,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const Spacer(),
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _status = null;
-                      _dateRange = null;
-                    });
-                  },
-                  child: Text(
-                    'Reset',
-                    style: TextStyle(
-                      color: context.mutedColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
+            child: Text(
+              'Filter by Date',
+              style: TextStyle(
+                color: context.textColor,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-          const SizedBox(height: 16),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Status',
-                  style: TextStyle(
-                    color: context.mutedColor,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _StatusOption(
-                      label: 'Completed',
-                      icon: Icons.check_circle,
-                      color: AppColors.success,
-                      isSelected: _status == TripStatus.completed,
-                      onTap: () => setState(() => _status = _status == TripStatus.completed ? null : TripStatus.completed),
-                    ),
-                    const SizedBox(width: 8),
-                    _StatusOption(
-                      label: 'Cancelled',
-                      icon: Icons.cancel,
-                      color: AppColors.error,
-                      isSelected: _status == TripStatus.cancelled,
-                      onTap: () => setState(() => _status = _status == TripStatus.cancelled ? null : TripStatus.cancelled),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
           const SizedBox(height: 20),
 
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Date Range',
-                  style: TextStyle(
-                    color: context.mutedColor,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
+          _buildDateOption(context, 'all', 'All Time', Icons.all_inclusive),
+          _buildDateOption(context, 'today', 'Today', Icons.calendar_today),
+          _buildDateOption(context, 'week', 'This Week', Icons.date_range),
+          _buildDateOption(context, 'month', 'This Month', Icons.calendar_month),
+
+          // Custom date range option
+          GestureDetector(
+            onTap: _selectCustomRange,
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              decoration: BoxDecoration(
+                color: _selectedPreset == 'custom' ? AppColors.yellow.withValues(alpha: 0.15) : context.bgColor,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: _selectedPreset == 'custom' ? AppColors.yellow : context.borderColor,
+                  width: _selectedPreset == 'custom' ? 2 : 1,
                 ),
-                const SizedBox(height: 12),
-                GestureDetector(
-                  onTap: _selectDateRange,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: context.bgColor,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: context.borderColor),
-                    ),
-                    child: Row(
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.edit_calendar, color: _selectedPreset == 'custom' ? AppColors.yellow : context.mutedColor, size: 22),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.date_range, color: context.mutedColor, size: 20),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _dateRange != null
-                                ? '${dateFormat.format(_dateRange!.start)} - ${dateFormat.format(_dateRange!.end)}'
-                                : 'Select date range',
-                            style: TextStyle(
-                              color: _dateRange != null ? context.textColor : context.mutedColor,
-                              fontSize: 15,
-                            ),
+                        Text(
+                          'Custom Range',
+                          style: TextStyle(
+                            color: _selectedPreset == 'custom' ? AppColors.yellow : context.textColor,
+                            fontSize: 16,
+                            fontWeight: _selectedPreset == 'custom' ? FontWeight.w600 : FontWeight.w500,
                           ),
                         ),
-                        if (_dateRange != null)
-                          GestureDetector(
-                            onTap: () => setState(() => _dateRange = null),
-                            child: Icon(Icons.close, color: context.mutedColor, size: 20),
+                        if (_customRange != null && _selectedPreset == 'custom')
+                          Text(
+                            '${dateFormat.format(_customRange!.start)} - ${dateFormat.format(_customRange!.end)}',
+                            style: TextStyle(
+                              color: AppColors.yellow.withValues(alpha: 0.8),
+                              fontSize: 12,
+                            ),
                           ),
                       ],
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  widget.onApply(_status, _dateRange);
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.yellow,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                child: const Text(
-                  'Apply Filters',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                  Icon(Icons.chevron_right, color: _selectedPreset == 'custom' ? AppColors.yellow : context.mutedColor, size: 22),
+                ],
               ),
             ),
           ),
-          SizedBox(height: MediaQuery.of(context).padding.bottom),
+
+          SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDateOption(BuildContext context, String preset, String label, IconData icon) {
+    final isSelected = _selectedPreset == preset;
+
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => _selectedPreset = preset);
+        widget.onApply(null, _getDateRangeForPreset(preset));
+        Navigator.pop(context);
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.yellow.withValues(alpha: 0.15) : context.bgColor,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? AppColors.yellow : context.borderColor,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: isSelected ? AppColors.yellow : context.mutedColor, size: 22),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? AppColors.yellow : context.textColor,
+                  fontSize: 16,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                ),
+              ),
+            ),
+            if (isSelected)
+              Icon(Icons.check, color: AppColors.yellow, size: 22),
+          ],
+        ),
       ),
     );
   }

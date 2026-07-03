@@ -483,19 +483,23 @@ export default function AppConfigPage() {
                     </TableRow>
                   ) : (
                     pages.map((page) => (
-                      <TableRow key={page.id} className="group hover:bg-muted/50 transition-colors">
+                      <TableRow
+                        key={page.id}
+                        className="group hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => openPageDialog(page)}
+                      >
                         <TableCell className="font-medium">{page.title}</TableCell>
                         <TableCell className="text-muted-foreground font-mono text-sm">{page.slug}</TableCell>
                         <TableCell><Badge variant="outline" className="capitalize">{page.page_type}</Badge></TableCell>
                         <TableCell><Badge variant="secondary" className="capitalize">{page.target_app}</Badge></TableCell>
-                        <TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           <Switch
                             checked={page.is_active}
                             onCheckedChange={() => toggleActive("page", page.id, page.is_active)}
                           />
                         </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <div className="flex gap-1">
                             <Button size="icon" variant="ghost" onClick={() => openPageDialog(page)}>
                               <Pencil className="h-4 w-4" />
                             </Button>

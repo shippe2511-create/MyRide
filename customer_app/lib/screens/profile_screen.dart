@@ -2174,7 +2174,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ]);
   }
 
-  void _showAbout(BuildContext context) {
+  void _showAbout(BuildContext context) async {
+    String aboutText = 'MyRide is your official staff transportation service. Book free rides to and from work with just a few taps.\n\nOur drivers are verified employees who ensure safe, comfortable journeys for all staff members.';
+
+    try {
+      final page = await SupabaseService.client
+          .from('pages')
+          .select('content')
+          .eq('slug', 'about-customer-app')
+          .eq('is_active', true)
+          .maybeSingle();
+      if (page != null && page['content'] != null) {
+        aboutText = page['content'];
+      }
+    } catch (e) {
+      debugPrint('Failed to load about text: $e');
+    }
+
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -2197,7 +2215,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 4),
               Text('Version 1.0.0 (Beta)', style: TextStyle(color: context.mutedColor, fontSize: 14)),
               const SizedBox(height: 20),
-              Text('Your trusted transportation partner in Maldives.', style: TextStyle(color: context.mutedColor, fontSize: 14), textAlign: TextAlign.center),
+              Text(aboutText, style: TextStyle(color: context.mutedColor, fontSize: 14), textAlign: TextAlign.center),
               const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -2210,7 +2228,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
               const SizedBox(height: 20),
-              Text('© 2024 MyRide. All rights reserved.', style: TextStyle(color: context.faintColor, fontSize: 12)),
+              Center(child: Text('© 2026 MyRide. All rights reserved.', style: TextStyle(color: context.faintColor, fontSize: 12), textAlign: TextAlign.center)),
               SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
             ],
           ),

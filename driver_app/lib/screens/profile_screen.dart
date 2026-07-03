@@ -13,6 +13,34 @@ import 'stats_screen.dart';
 import 'vehicle_logs_screen.dart';
 import 'push_to_talk_screen.dart';
 
+const String _defaultDriverTerms = '''MyRide Driver Terms & Conditions
+
+1. SERVICE AGREEMENT
+By using the MyRide Driver app, you agree to provide safe, professional transportation services to staff members.
+
+2. DRIVER RESPONSIBILITIES
+- Maintain a valid driving license at all times
+- Follow all traffic laws and regulations
+- Keep your vehicle clean and well-maintained
+- Treat all passengers with respect and courtesy
+- Complete assigned rides promptly
+
+3. SAFETY REQUIREMENTS
+- Complete pre-trip vehicle inspections
+- Report any safety concerns immediately
+- Use the SOS feature in emergencies
+- Never use mobile devices while driving
+
+4. DATA & PRIVACY
+- Your location is tracked during active shifts
+- Ride data is stored for record-keeping
+- Personal information is protected per our privacy policy
+
+5. TERMINATION
+MyRide reserves the right to suspend or terminate driver accounts for violations of these terms.
+
+For questions, contact support at itadminsupport@macl.aero''';
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -914,38 +942,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showTerms(BuildContext context) async {
-    const String termsContent = '''
-MyRide Driver Terms & Conditions
+    await _showLegalFromDatabase(context, 'terms-and-conditions', 'Terms & Conditions', _defaultDriverTerms);
+  }
 
-1. SERVICE AGREEMENT
-By using the MyRide Driver app, you agree to provide safe, professional transportation services to staff members.
-
-2. DRIVER RESPONSIBILITIES
-- Maintain a valid driving license at all times
-- Follow all traffic laws and regulations
-- Keep your vehicle clean and well-maintained
-- Treat all passengers with respect and courtesy
-- Complete assigned rides promptly
-
-3. SAFETY REQUIREMENTS
-- Complete pre-trip vehicle inspections
-- Report any safety concerns immediately
-- Use the SOS feature in emergencies
-- Never use mobile devices while driving
-
-4. DATA & PRIVACY
-- Your location is tracked during active shifts
-- Ride data is stored for record-keeping
-- Personal information is protected per our privacy policy
-
-5. TERMINATION
-MyRide reserves the right to suspend or terminate driver accounts for violations of these terms.
-
-For questions, contact support at itadminsupport@macl.aero
-''';
-
+  Future<void> _showLegalFromDatabase(BuildContext context, String slug, String title, String fallback) async {
+    String content = fallback;
+    try {
+      final page = await SupabaseService.client
+          .from('pages')
+          .select('content')
+          .eq('slug', slug)
+          .eq('is_active', true)
+          .maybeSingle();
+      if (page != null && page['content'] != null) {
+        content = page['content'];
+      }
+    } catch (e) {
+      debugPrint('Failed to load legal content: $e');
+    }
     if (!mounted) return;
+    _showLegalDocument(context, title, content);
+  }
 
+  void _showLegalDocument(BuildContext context, String title, String content) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -973,7 +992,7 @@ For questions, contact support at itadminsupport@macl.aero
             ),
             const SizedBox(height: 20),
             Text(
-              'Terms & Conditions',
+              title,
               style: TextStyle(
                 color: context.textColor,
                 fontSize: 20,
@@ -984,7 +1003,7 @@ For questions, contact support at itadminsupport@macl.aero
             Expanded(
               child: SingleChildScrollView(
                 child: Text(
-                  termsContent,
+                  content,
                   style: TextStyle(
                     color: context.mutedColor,
                     fontSize: 14,

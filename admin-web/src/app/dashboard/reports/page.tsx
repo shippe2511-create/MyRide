@@ -9,7 +9,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import { Download, FileSpreadsheet, FileText, Loader2, Calendar, Users, Car, Star, BarChart3, TrendingUp, Package, AlertTriangle, Shield, ClipboardCheck, Fuel, Coffee, Clock, MessageSquare, Ticket } from "lucide-react"
+import { Download, FileSpreadsheet, FileText, Loader2, Calendar, Users, Car, Star, BarChart3, TrendingUp, Package, AlertTriangle, Shield, ClipboardCheck, Fuel, Coffee, Clock, MessageSquare, Ticket, FileCheck, Truck, Bell, Activity, MessagesSquare } from "lucide-react"
 import { toast } from "sonner"
 
 const supabase = createClient()
@@ -78,6 +78,11 @@ const reportTypes = [
   { id: "incidents", name: "Incidents Report", description: "All reported incidents", icon: Shield },
   { id: "vehicle_checks", name: "Vehicle Checks", description: "Pre-trip inspection results", icon: ClipboardCheck },
   { id: "vehicle_logs", name: "Vehicle Logs", description: "Fuel, maintenance, odometer records", icon: Fuel },
+  { id: "documents", name: "Driver Documents", description: "Document upload status and verification", icon: FileCheck },
+  { id: "vehicles", name: "Vehicles Report", description: "Fleet inventory with status", icon: Truck },
+  { id: "announcements", name: "Announcements", description: "All announcements with engagement", icon: Bell },
+  { id: "activity_logs", name: "Activity Logs", description: "Admin and system activity", icon: Activity },
+  { id: "chat_messages", name: "Chat Messages", description: "Customer-driver chat history", icon: MessagesSquare },
 ]
 
 // Friendly column names mapping
@@ -216,6 +221,48 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Created": "created_at",
     "Resolved": "resolved_at",
     "Description": "description",
+  },
+  documents: {
+    "Driver": "driver_name",
+    "Document Type": "document_type",
+    "Status": "status",
+    "Uploaded": "uploaded_at",
+    "Expires": "expiry_date",
+    "Verified By": "verified_by",
+  },
+  vehicles: {
+    "Plate No": "plate_no",
+    "Type": "vehicle_type",
+    "Make/Model": "make_model",
+    "Color": "color",
+    "Status": "status",
+    "Assigned Driver": "assigned_driver",
+    "Capacity": "capacity",
+  },
+  announcements: {
+    "Title": "title",
+    "Target": "target",
+    "Status": "status",
+    "Created": "created_at",
+    "Expires": "expires_at",
+    "Message": "message",
+  },
+  activity_logs: {
+    "Action": "action",
+    "Entity": "entity_type",
+    "User": "user_name",
+    "Details": "details",
+    "Date": "date",
+    "Time": "time",
+  },
+  chat_messages: {
+    "Ride ID": "ride_id",
+    "From": "sender_name",
+    "To": "receiver_name",
+    "Message": "message",
+    "Type": "message_type",
+    "Date": "date",
+    "Time": "time",
   },
 }
 
@@ -781,6 +828,149 @@ export default function ReportsPage() {
           break
         }
 
+        case "documents": {
+          let query = supabase
+            .from("documents")
+            .select(`
+              id, document_type, status, created_at, expiry_date, verified_by,
+              driver:drivers!documents_driver_id_fkey(
+                profile:profiles!drivers_profile_id_fkey(full_name)
+              )
+            `)
+            .order("created_at", { ascending: false })
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          const { data: docs } = await query
+
+          rows = (docs || []).map((d: Record<string, unknown>) => {
+            const driver = d.driver as Record<string, unknown> | null
+            const profile = driver?.profile as Record<string, unknown> | null
+            return {
+              "Driver": String(profile?.full_name || "-"),
+              "Document Type": formatStatus(String(d.document_type || "")),
+              "Status": formatStatus(String(d.status || "")),
+              "Uploaded": formatDate(String(d.created_at || "")),
+              "Expires": d.expiry_date ? formatDate(String(d.expiry_date)) : "-",
+              "Verified By": String(d.verified_by || "-"),
+            }
+          })
+          filename = `documents_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "vehicles": {
+          const { data: vehicles } = await supabase
+            .from("vehicles")
+            .select(`
+              id, plate_no, make, model, color, status, capacity, created_at,
+              vehicle_type:vehicle_types(display_name),
+              driver:drivers(profile:profiles!drivers_profile_id_fkey(full_name))
+            `)
+            .order("created_at", { ascending: false })
+
+          rows = (vehicles || []).map((v: Record<string, unknown>) => {
+            const vehicleType = v.vehicle_type as Record<string, unknown> | null
+            const driver = v.driver as Record<string, unknown> | null
+            const profile = driver?.profile as Record<string, unknown> | null
+            return {
+              "Plate No": String(v.plate_no || "-"),
+              "Type": String(vehicleType?.display_name || "-"),
+              "Make/Model": `${v.make || ""} ${v.model || ""}`.trim() || "-",
+              "Color": String(v.color || "-"),
+              "Status": v.status ? "Active" : "Inactive",
+              "Assigned Driver": String(profile?.full_name || "-"),
+              "Capacity": String(v.capacity || "-"),
+            }
+          })
+          filename = `vehicles_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "announcements": {
+          let query = supabase
+            .from("announcements")
+            .select("id, title, message, target_audience, is_active, created_at, expires_at")
+            .order("created_at", { ascending: false })
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          const { data: announcements } = await query
+
+          rows = (announcements || []).map((a: Record<string, unknown>) => ({
+            "Title": String(a.title || "-"),
+            "Target": formatStatus(String(a.target_audience || "all")),
+            "Status": a.is_active ? "Active" : "Inactive",
+            "Created": formatDate(String(a.created_at || "")),
+            "Expires": a.expires_at ? formatDate(String(a.expires_at)) : "-",
+            "Message": String(a.message || "-").slice(0, 100),
+          }))
+          filename = `announcements_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "activity_logs": {
+          let query = supabase
+            .from("activity_logs")
+            .select(`
+              action, entity_type, entity_id, details, created_at,
+              user:profiles!activity_logs_user_id_fkey(full_name)
+            `)
+            .order("created_at", { ascending: false })
+            .limit(1000)
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          const { data: logs } = await query
+
+          rows = (logs || []).map((l: Record<string, unknown>) => {
+            const user = l.user as Record<string, unknown> | null
+            const details = l.details as Record<string, unknown> | null
+            return {
+              "Action": formatStatus(String(l.action || "")),
+              "Entity": formatStatus(String(l.entity_type || "")),
+              "User": String(user?.full_name || "System"),
+              "Details": details ? JSON.stringify(details).slice(0, 100) : "-",
+              "Date": formatDate(String(l.created_at || "")),
+              "Time": formatTime(String(l.created_at || "")),
+            }
+          })
+          filename = `activity_logs_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "chat_messages": {
+          let query = supabase
+            .from("chat_messages")
+            .select(`
+              id, message, message_type, created_at, ride_id,
+              sender:profiles!chat_messages_sender_id_fkey(full_name),
+              receiver:profiles!chat_messages_receiver_id_fkey(full_name)
+            `)
+            .order("created_at", { ascending: false })
+            .limit(1000)
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          const { data: messages } = await query
+
+          rows = (messages || []).map((m: Record<string, unknown>) => {
+            const sender = m.sender as Record<string, unknown> | null
+            const receiver = m.receiver as Record<string, unknown> | null
+            return {
+              "Ride ID": m.ride_id ? String(m.ride_id).slice(0, 8) : "-",
+              "From": String(sender?.full_name || "-"),
+              "To": String(receiver?.full_name || "-"),
+              "Message": String(m.message || "-").slice(0, 100),
+              "Type": formatStatus(String(m.message_type || "text")),
+              "Date": formatDate(String(m.created_at || "")),
+              "Time": formatTime(String(m.created_at || "")),
+            }
+          })
+          filename = `chat_messages_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
         default: {
           toast.error(`Unknown report type: ${reportType}`)
           if (showLoading) setLoading(null)
@@ -840,8 +1030,10 @@ export default function ReportsPage() {
     { name: "Operations", reports: ["rides", "shifts", "break_history", "quota_usage"] },
     { name: "Feedback", reports: ["ratings", "support_tickets"] },
     { name: "Safety", reports: ["sos_alerts", "incidents"] },
-    { name: "Vehicles", reports: ["vehicle_checks", "vehicle_logs"] },
-    { name: "Analytics", reports: ["usage"] },
+    { name: "Vehicles", reports: ["vehicles", "vehicle_checks", "vehicle_logs"] },
+    { name: "Documents", reports: ["documents"] },
+    { name: "Communications", reports: ["announcements", "chat_messages"] },
+    { name: "Analytics", reports: ["usage", "activity_logs"] },
   ]
 
   return (

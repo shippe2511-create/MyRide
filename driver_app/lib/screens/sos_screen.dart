@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
@@ -20,6 +21,7 @@ class SOSScreen extends StatefulWidget {
 class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   bool _sosActivated = false;
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   // Default emergency contacts (loaded from database if available)
   List<Map<String, dynamic>> _emergencyContacts = [
@@ -68,7 +70,27 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
   @override
   void dispose() {
     _pulseController.dispose();
+    _audioPlayer.dispose();
     super.dispose();
+  }
+
+  Future<void> _playSOSSound() async {
+    try {
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _audioPlayer.setVolume(1.0);
+      await _audioPlayer.play(AssetSource('sounds/alarm.mp3'));
+      debugPrint('SOS alarm sound started');
+    } catch (e) {
+      debugPrint('Error playing SOS sound: $e');
+    }
+  }
+
+  Future<void> _stopSOSSound() async {
+    try {
+      await _audioPlayer.stop();
+    } catch (e) {
+      debugPrint('Error stopping SOS sound: $e');
+    }
   }
 
   @override
@@ -117,8 +139,8 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
     HapticFeedback.heavyImpact();
     setState(() => _sosActivated = true);
 
-    // Play SOS alert sound via notification
-    NotificationService().showSOSNotification();
+    // Play SOS alarm sound
+    _playSOSSound();
 
     final driverState = Provider.of<DriverState>(context, listen: false);
     final driverId = driverState.driverId;
@@ -228,6 +250,7 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
           GestureDetector(
             onTap: () {
               HapticFeedback.mediumImpact();
+              _stopSOSSound();
               setState(() => _sosActivated = false);
             },
             child: Container(

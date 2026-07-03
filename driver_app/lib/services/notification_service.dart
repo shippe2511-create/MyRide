@@ -34,10 +34,47 @@ class NotificationService {
   }
 
   void showSOSNotification() {
-    showNotification(
-      title: '🚨 SOS ACTIVATED',
-      body: 'Emergency services have been notified. Help is on the way.',
+    // Always show system notification with sound for SOS (even in foreground)
+    _showSOSSystemNotification();
+  }
+
+  static Future<void> _showSOSSystemNotification() async {
+    const androidDetails = AndroidNotificationDetails(
+      'sos_channel',
+      'SOS Alerts',
+      channelDescription: 'Emergency SOS alerts',
+      importance: Importance.max,
+      priority: Priority.max,
+      showWhen: true,
+      playSound: true,
+      enableVibration: true,
+      fullScreenIntent: true,
     );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      sound: 'default',
+      interruptionLevel: InterruptionLevel.critical,
+    );
+
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    try {
+      await _notifications.show(
+        999999,
+        '🚨 SOS ACTIVATED',
+        'Emergency services have been notified. Help is on the way.',
+        details,
+      );
+      debugPrint('SOS notification with sound shown');
+    } catch (e) {
+      debugPrint('Error showing SOS notification: $e');
+    }
   }
 
   void showBreakReminderNow({required String breakType, int? minutes}) {

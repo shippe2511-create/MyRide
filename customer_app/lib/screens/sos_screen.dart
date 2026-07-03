@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -73,13 +74,15 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
 
   Future<void> _playSOSSound() async {
     try {
-      // Use URL source for a standard alarm tone
+      // Play looping alarm sound using audioplayers
       await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-      // Play system-like alarm using a publicly available alarm sound
-      await _audioPlayer.play(UrlSource('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3'));
+      await _audioPlayer.setVolume(1.0);
+      await _audioPlayer.play(AssetSource('sounds/alarm.mp3'));
+      debugPrint('SOS alarm sound started');
+      // Start haptic feedback for extra attention
+      _startHapticAlarm();
     } catch (e) {
       debugPrint('Error playing SOS sound: $e');
-      // Fallback: continuous haptic feedback
       _startHapticAlarm();
     }
   }

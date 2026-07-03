@@ -12,6 +12,7 @@ import '../widgets/app_snackbar.dart';
 import 'stats_screen.dart';
 import 'vehicle_logs_screen.dart';
 import 'push_to_talk_screen.dart';
+import '../services/app_settings_service.dart';
 
 const String _defaultDriverTerms = '''MyRide Driver Terms & Conditions
 
@@ -391,21 +392,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ]),
                 const SizedBox(height: 16),
 
-                // Emergency section
-                _buildSection(context, 'Emergency', [
-                  _buildSettingTile(
-                    context,
-                    icon: Icons.sos,
-                    title: 'SOS / Emergency',
-                    trailing: Icon(Icons.chevron_right, color: context.mutedColor),
-                    iconColor: AppColors.error,
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      Navigator.pushNamed(context, '/sos');
-                    },
-                  ),
-                ]),
-                const SizedBox(height: 16),
+                // Emergency section (only show if SOS enabled)
+                if (AppSettingsService.sosEnabled) ...[
+                  _buildSection(context, 'Emergency', [
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.sos,
+                      title: 'SOS / Emergency',
+                      trailing: Icon(Icons.chevron_right, color: context.mutedColor),
+                      iconColor: AppColors.error,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.pushNamed(context, '/sos');
+                      },
+                    ),
+                  ]),
+                  const SizedBox(height: 16),
+                ],
 
                 // Vehicle info section
                 _buildSection(context, 'Vehicle Info', [

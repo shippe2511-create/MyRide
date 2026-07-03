@@ -14,6 +14,8 @@ import '../services/realtime_service.dart';
 import '../providers/app_state.dart';
 import 'trip_tracking_screen.dart';
 import '../config/app_config.dart';
+import '../services/app_settings_service.dart';
+import 'package:geolocator/geolocator.dart';
 
 const String _darkMapStyle = '''
 [
@@ -227,6 +229,27 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
       // Get customer ID from AppState
       final appState = Provider.of<AppState>(context, listen: false);
       final customerId = appState.profileId;
+
+      // Validate ride distance against max allowed
+      final distanceInMeters = Geolocator.distanceBetween(
+        widget.pickupLat, widget.pickupLng,
+        widget.dropoffLat, widget.dropoffLng,
+      );
+      final distanceInKm = distanceInMeters / 1000;
+      final maxDistance = AppSettingsService.maxRideDistanceKm;
+
+      if (distanceInKm > maxDistance) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Ride distance (${distanceInKm.toStringAsFixed(1)} km) exceeds maximum allowed ($maxDistance km)'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          Navigator.pop(context);
+        }
+        return;
+      }
 
       // Validate pickup coordinates - use dropoff area if invalid
       double validPickupLat = widget.pickupLat;

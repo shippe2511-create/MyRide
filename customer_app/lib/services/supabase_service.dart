@@ -582,6 +582,53 @@ class SupabaseService {
     }
   }
 
+  static Future<bool> updateSavedPlace(String placeId, {String? address, double? lat, double? lng}) async {
+    try {
+      final id = userId;
+      if (id == null) {
+        debugPrint('Cannot update saved place: not logged in');
+        return false;
+      }
+
+      final updates = <String, dynamic>{};
+      if (address != null) updates['address'] = address;
+      if (lat != null) updates['latitude'] = lat;
+      if (lng != null) updates['longitude'] = lng;
+
+      if (updates.isEmpty) return true;
+
+      await client
+          .from('saved_places')
+          .update(updates)
+          .eq('id', placeId)
+          .eq('user_id', id);
+
+      debugPrint('Updated saved place $placeId');
+      return true;
+    } catch (e) {
+      debugPrint('Error updating saved place: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> updateSavedPlaceOrder(String placeId, int sortOrder) async {
+    try {
+      final id = userId;
+      if (id == null) return false;
+
+      await client
+          .from('saved_places')
+          .update({'sort_order': sortOrder})
+          .eq('id', placeId)
+          .eq('user_id', id);
+
+      return true;
+    } catch (e) {
+      debugPrint('Error updating saved place order: $e');
+      return false;
+    }
+  }
+
   static Future<String> exportUserData() async {
     final id = userId;
     if (id == null) throw Exception('Not logged in');

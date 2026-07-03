@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz_data;
 import '../main.dart' show showAppNotification;
 import '../widgets/app_notification_banner.dart';
 
@@ -62,13 +64,94 @@ class NotificationService {
     String? route,
     String? time,
     int? minutesBefore,
-  }) {
+  }) async {
     final routeInfo = route ?? (pickupName != null && dropoffName != null ? '$pickupName to $dropoffName' : 'Your ride');
     final timeInfo = time ?? (scheduledTime != null ? '${scheduledTime.hour}:${scheduledTime.minute.toString().padLeft(2, '0')}' : 'soon');
-    showNotification(
-      title: 'Upcoming Ride Reminder',
-      body: '$routeInfo at $timeInfo',
+
+    if (scheduledTime == null) {
+      // No scheduled time, show immediately
+      showNotification(
+        title: 'Upcoming Ride Reminder',
+        body: '$routeInfo at $timeInfo',
+      );
+      return;
+    }
+
+    // Calculate when to show reminder (minutesBefore the scheduled time)
+    final reminderTime = scheduledTime.subtract(Duration(minutes: minutesBefore ?? 15));
+
+    if (reminderTime.isBefore(DateTime.now())) {
+      // Reminder time already passed, show immediately
+      showNotification(
+        title: 'Upcoming Ride Reminder',
+        body: '$routeInfo at $timeInfo',
+      );
+      return;
+    }
+
+    // Schedule the notification using flutter_local_notifications
+    await _scheduleNotification(
+      id: id ?? reminderTime.millisecondsSinceEpoch ~/ 1000,
+      title: '🔔 Ride Reminder',
+      body: '$routeInfo departs at $timeInfo (in ${minutesBefore ?? 15} minutes)',
+      scheduledTime: reminderTime,
     );
+  }
+
+  static Future<void> _scheduleNotification({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime scheduledTime,
+  }) async {
+    try {
+      // Initialize timezone
+      tz_data.initializeTimeZones();
+      final location = tz.getLocation('Indian/Maldives');
+      final tzScheduledTime = tz.TZDateTime.from(scheduledTime, location);
+
+      const androidDetails = AndroidNotificationDetails(
+        'ride_reminders',
+        'Ride Reminders',
+        channelDescription: 'Scheduled ride reminders',
+        importance: Importance.high,
+        priority: Priority.high,
+        playSound: true,
+        enableVibration: true,
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+        sound: 'default',
+        interruptionLevel: InterruptionLevel.timeSensitive,
+      );
+
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await _notifications.zonedSchedule(
+        id,
+        title,
+        body,
+        tzScheduledTime,
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      );
+
+      debugPrint('Scheduled reminder for $scheduledTime (id: $id)');
+    } catch (e) {
+      debugPrint('Error scheduling notification: $e');
+    }
+  }
+
+  static Future<void> cancelScheduledNotification(int id) async {
+    await _notifications.cancel(id);
+    debugPrint('Cancelled scheduled notification: $id');
   }
 
   // Static methods
@@ -190,7 +273,45 @@ class NotificationService {
     onShowInAppMessage?.call(title, body, rideId);
   }
 
-  
+  static Future<void> showSOSAlert() async {
+    const androidDetails = AndroidNotificationDetails(
+      'sos_channel',
+      'SOS Alerts',
+      channelDescription: 'Emergency SOS alerts',
+      importance: Importance.max,
+      priority: Priority.max,
+      showWhen: true,
+      playSound: true,
+      enableVibration: true,
+      fullScreenIntent: true,
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      sound: 'default',
+      interruptionLevel: InterruptionLevel.critical,
+    );
+
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    try {
+      await _notifications.show(
+        999999,
+        '🚨 SOS ACTIVATED',
+        'Emergency services have been notified. Help is on the way.',
+        details,
+      );
+      debugPrint('SOS notification with sound shown');
+    } catch (e) {
+      debugPrint('Error showing SOS notification: $e');
+    }
+  }
+
   static void subscribeToNotifications(String userId) {
     _currentUserId = userId;
     _unsubscribe();

@@ -185,20 +185,31 @@ export default function SOSPage() {
       gainNode.connect(audioContext.destination)
 
       oscillator.type = 'sawtooth'
-      gainNode.gain.value = 0.5
+      gainNode.gain.value = 0.8
 
       oscillator.start()
 
-      // Siren effect - sweep between frequencies
+      // Loud siren effect - sweep between frequencies for 5 seconds
       let time = audioContext.currentTime
-      for (let i = 0; i < 6; i++) {
-        oscillator.frequency.setValueAtTime(600, time)
-        oscillator.frequency.linearRampToValueAtTime(1200, time + 0.25)
-        oscillator.frequency.linearRampToValueAtTime(600, time + 0.5)
+      for (let i = 0; i < 10; i++) {
+        oscillator.frequency.setValueAtTime(400, time)
+        oscillator.frequency.linearRampToValueAtTime(1400, time + 0.25)
+        oscillator.frequency.linearRampToValueAtTime(400, time + 0.5)
         time += 0.5
       }
 
-      oscillator.stop(audioContext.currentTime + 3)
+      oscillator.stop(audioContext.currentTime + 5)
+
+      // Also show browser notification if permitted
+      if (Notification.permission === 'granted') {
+        new Notification('🚨 SOS ALERT!', {
+          body: 'A user has triggered an emergency SOS alert',
+          requireInteraction: true,
+          tag: 'sos-alert',
+        })
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission()
+      }
     } catch (e) {
       console.error('Audio error:', e)
     }
@@ -689,17 +700,15 @@ export default function SOSPage() {
                       {alert.status.replace("_", " ")}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell
+                    className={alert.latitude && alert.longitude ? "cursor-pointer hover:text-primary" : ""}
+                    onClick={() => alert.latitude && alert.longitude && openMap(alert.latitude, alert.longitude)}
+                  >
                     {alert.latitude && alert.longitude ? (
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="p-0 h-auto"
-                        onClick={() => openMap(alert.latitude!, alert.longitude!)}
-                      >
-                        <MapPin className="h-3 w-3 mr-1" />
+                      <div className="flex items-center gap-1 text-primary">
+                        <MapPin className="h-3 w-3" />
                         View Map
-                      </Button>
+                      </div>
                     ) : (
                       "-"
                     )}

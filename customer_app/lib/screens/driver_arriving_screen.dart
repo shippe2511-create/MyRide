@@ -16,6 +16,7 @@ import '../widgets/app_snackbar.dart';
 import 'trip_tracking_screen.dart';
 import 'trip_complete_screen.dart';
 import 'chat_screen.dart';
+import '../services/app_settings_service.dart';
 
 const String _darkMapStyle = '''
 [
@@ -376,20 +377,21 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  // SOS Button
-                  GestureDetector(
-                    onTap: () => _showSOSOptions(),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.error.withValues(alpha: 0.5)),
+                  // SOS Button (only show if enabled)
+                  if (AppSettingsService.sosEnabled)
+                    GestureDetector(
+                      onTap: () => _showSOSOptions(),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.error.withValues(alpha: 0.5)),
+                        ),
+                        child: Icon(Icons.sos, color: AppColors.error, size: 22),
                       ),
-                      child: Icon(Icons.sos, color: AppColors.error, size: 22),
                     ),
-                  ),
                   const Spacer(),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -498,8 +500,10 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
                       child: Row(
                         children: [
                           Expanded(child: _buildActionButton(Icons.phone, 'Call')),
-                          const SizedBox(width: 12),
-                          Expanded(child: _buildActionButton(Icons.message, 'Message')),
+                          if (AppSettingsService.chatEnabled) ...[
+                            const SizedBox(width: 12),
+                            Expanded(child: _buildActionButton(Icons.message, 'Message')),
+                          ],
                           const SizedBox(width: 12),
                           Expanded(child: _buildActionButton(Icons.share_location, 'Share')),
                         ],

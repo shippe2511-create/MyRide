@@ -48,6 +48,23 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     super.dispose();
   }
 
+  String _getPeriodFromTime(String time) {
+    // Parse time like "15:00" or "3:00 PM"
+    try {
+      if (time.contains('AM') || time.contains('PM')) {
+        return time.contains('AM') ? 'AM' : 'PM';
+      }
+      final parts = time.split(':');
+      if (parts.isNotEmpty) {
+        final hour = int.tryParse(parts[0]) ?? 0;
+        return hour >= 12 ? 'PM' : 'AM';
+      }
+    } catch (e) {
+      // ignore
+    }
+    return '';
+  }
+
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
@@ -466,7 +483,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                   ),
                 ),
                 Text(
-                  reminder['period'] ?? '',
+                  _getPeriodFromTime(reminder['time'] ?? ''),
                   style: TextStyle(
                     color: context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5).withValues(alpha: 0.7),
                     fontSize: 10,
@@ -486,7 +503,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                   style: TextStyle(color: context.textColor, fontSize: 13, fontWeight: FontWeight.w600),
                 ),
                 Text(
-                  '${reminder['reminderMinutes']} min before',
+                  '${reminder['reminderMinutes'] ?? 15} min before',
                   style: TextStyle(color: context.mutedColor, fontSize: 11),
                 ),
               ],

@@ -478,6 +478,19 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  Future<void> _updateSavedPlacesOrder() async {
+    try {
+      for (int i = 0; i < _savedPlaces.length; i++) {
+        final placeId = _savedPlaces[i]['id'];
+        if (placeId != null) {
+          await SupabaseService.updateSavedPlaceOrder(placeId, i);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error updating saved places order: $e');
+    }
+  }
+
   IconData _getIconFromString(String iconName) {
     final iconMap = {
       'home': Icons.home_rounded,
@@ -710,10 +723,34 @@ class _SearchScreenState extends State<SearchScreen> {
                           child: Icon(Icons.close, color: context.textColor, size: 20),
                         ),
                       ),
-                      const Spacer(),
-                      Text('Set location', style: TextStyle(color: context.textColor, fontSize: 16, fontWeight: FontWeight.w600)),
-                      const Spacer(),
-                      const SizedBox(width: 40),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _showMapSearchSheet(ctx, isDark, (name, address, lat, lng) {
+                            setSheetState(() {
+                              selectedLocation = LatLng(lat, lng);
+                              locationName = name;
+                              locationAddress = address;
+                            });
+                            googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(lat, lng), 16));
+                          }),
+                          child: Container(
+                            height: 40,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.search, color: context.mutedColor, size: 18),
+                                const SizedBox(width: 8),
+                                Text('Search location...', style: TextStyle(color: context.mutedColor, fontSize: 14)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -723,12 +760,38 @@ class _SearchScreenState extends State<SearchScreen> {
                       GoogleMap(
                         initialCameraPosition: CameraPosition(target: selectedLocation, zoom: 15),
                         onMapCreated: (controller) => googleMapController = controller,
-                        onTap: (point) {
+                        onTap: (point) async {
                           HapticFeedback.lightImpact();
+                          // Reverse geocode to get address
+                          String address = '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
+                          String name = 'Selected Location';
+                          try {
+                            final url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=${point.latitude},${point.longitude}&key=${AppConfig.googleMapsApiKey}';
+                            final response = await http.get(Uri.parse(url));
+                            if (response.statusCode == 200) {
+                              final data = json.decode(response.body);
+                              if (data['results'] != null && (data['results'] as List).isNotEmpty) {
+                                address = data['results'][0]['formatted_address'] ?? address;
+                                final components = data['results'][0]['address_components'] as List? ?? [];
+                                for (var c in components) {
+                                  final types = c['types'] as List? ?? [];
+                                  if (types.contains('point_of_interest') || types.contains('establishment')) {
+                                    name = c['long_name'] ?? name;
+                                    break;
+                                  }
+                                }
+                                if (name == 'Selected Location' && components.isNotEmpty) {
+                                  name = components[0]['long_name'] ?? name;
+                                }
+                              }
+                            }
+                          } catch (e) {
+                            debugPrint('Reverse geocode error: $e');
+                          }
                           setSheetState(() {
                             selectedLocation = point;
-                            locationName = 'Selected Location';
-                            locationAddress = '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
+                            locationName = name;
+                            locationAddress = address;
                           });
                         },
                         markers: {
@@ -760,40 +823,17 @@ class _SearchScreenState extends State<SearchScreen> {
                               googleMapController?.animateCamera(CameraUpdate.zoomOut());
                             }, isDark),
                             const SizedBox(height: 8),
-                            _buildMapButton(Icons.my_location, () {
+                            _buildMapButton(Icons.my_location, () async {
                               HapticFeedback.mediumImpact();
-                              googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(const LatLng(4.1918, 73.5290), 15));
+                              final loc = await LocationService.getCurrentLocation();
+                              googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(loc.latitude, loc.longitude), 16));
+                              setSheetState(() {
+                                selectedLocation = LatLng(loc.latitude, loc.longitude);
+                                locationName = 'Current Location';
+                                locationAddress = '${loc.latitude.toStringAsFixed(5)}, ${loc.longitude.toStringAsFixed(5)}';
+                              });
                             }, isDark, isHighlighted: true),
                           ],
-                        ),
-                      ),
-                      // Tap hint
-                      Positioned(
-                        top: 16,
-                        left: 0,
-                        right: 0,
-                        child: Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: (isDark ? Colors.black : Colors.white).withValues(alpha: 0.9),
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
-                                  blurRadius: 8,
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.touch_app, color: AppColors.yellow, size: 16),
-                                const SizedBox(width: 6),
-                                Text('Tap to select location', style: TextStyle(color: context.textColor, fontSize: 12)),
-                              ],
-                            ),
-                          ),
                         ),
                       ),
                     ],
@@ -1402,6 +1442,310 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
             SizedBox(height: MediaQuery.of(ctx).padding.bottom + 8),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _relocatePlace(Map<String, dynamic> place, int index) {
+    // Show location search to pick new address
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: context.surfaceColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(color: context.mutedColor.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Relocate ${place['name']}',
+                      style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: 'Search for new location...',
+                        prefixIcon: Icon(Icons.search, color: context.mutedColor),
+                        filled: true,
+                        fillColor: context.isDark ? AppColors.surfaceDark : Colors.grey[100],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      onChanged: (value) {
+                        if (value.length > 2) {
+                          _searchForRelocate(value, place, index, ctx);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  children: _relocateResults.map((result) {
+                    return ListTile(
+                      leading: Icon(Icons.location_on, color: AppColors.yellow),
+                      title: Text(result['name'] ?? '', style: TextStyle(color: context.textColor)),
+                      subtitle: Text(result['address'] ?? '', style: TextStyle(color: context.mutedColor, fontSize: 12)),
+                      onTap: () async {
+                        Navigator.pop(ctx);
+                        await _updatePlaceLocation(place, index, result);
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _relocateResults = [];
+
+  Future<void> _searchForRelocate(String query, Map<String, dynamic> place, int index, BuildContext ctx) async {
+    try {
+      final url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+          '?input=${Uri.encodeComponent(query)}'
+          '&components=country:mv'
+          '&key=${AppConfig.googleMapsApiKey}';
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final predictions = data['predictions'] as List? ?? [];
+        setState(() {
+          _relocateResults = predictions.map((p) => {
+            'name': p['structured_formatting']?['main_text'] ?? p['description'],
+            'address': p['description'],
+            'place_id': p['place_id'],
+          }).toList();
+        });
+      }
+    } catch (e) {
+      debugPrint('Relocate search error: $e');
+    }
+  }
+
+  Future<void> _updatePlaceLocation(Map<String, dynamic> place, int index, Map<String, dynamic> newLocation) async {
+    try {
+      // Get coordinates from place_id
+      final placeId = newLocation['place_id'];
+      double? lat, lng;
+
+      if (placeId != null) {
+        final detailsUrl = 'https://maps.googleapis.com/maps/api/place/details/json'
+            '?place_id=$placeId'
+            '&fields=geometry'
+            '&key=${AppConfig.googleMapsApiKey}';
+        final response = await http.get(Uri.parse(detailsUrl));
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final location = data['result']?['geometry']?['location'];
+          if (location != null) {
+            lat = location['lat']?.toDouble();
+            lng = location['lng']?.toDouble();
+          }
+        }
+      }
+
+      final placeDbId = place['id'];
+      if (placeDbId != null) {
+        final success = await SupabaseService.updateSavedPlace(
+          placeDbId,
+          address: newLocation['address'],
+          lat: lat,
+          lng: lng,
+        );
+        if (success) {
+          setState(() {
+            _savedPlaces[index] = {
+              ..._savedPlaces[index],
+              'address': newLocation['address'],
+              'lat': lat ?? _savedPlaces[index]['lat'],
+              'lng': lng ?? _savedPlaces[index]['lng'],
+            };
+          });
+          HapticFeedback.mediumImpact();
+          AppSnackbar.success(context, '${place['name']} location updated');
+        } else {
+          AppSnackbar.error(context, 'Failed to update location');
+        }
+      }
+    } catch (e) {
+      debugPrint('Update place location error: $e');
+      AppSnackbar.error(context, 'Failed to update location');
+    }
+  }
+
+  List<Map<String, dynamic>> _mapSearchResults = [];
+
+  void _showMapSearchSheet(BuildContext parentCtx, bool isDark, Function(String name, String address, double lat, double lng) onSelect) {
+    final searchController = TextEditingController();
+
+    showModalBottomSheet(
+      context: parentCtx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setSearchState) => Container(
+          height: MediaQuery.of(context).size.height * 0.7,
+          decoration: BoxDecoration(
+            color: context.surfaceColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(color: context.mutedColor.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: searchController,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: 'Search for a place...',
+                        prefixIcon: Icon(Icons.search, color: context.mutedColor),
+                        suffixIcon: searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(Icons.clear, color: context.mutedColor),
+                                onPressed: () {
+                                  searchController.clear();
+                                  setSearchState(() => _mapSearchResults = []);
+                                },
+                              )
+                            : null,
+                        filled: true,
+                        fillColor: isDark ? AppColors.surfaceDark : Colors.grey[100],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      onChanged: (value) async {
+                        if (value.length > 2) {
+                          try {
+                            final url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+                                '?input=${Uri.encodeComponent(value)}'
+                                '&components=country:mv'
+                                '&key=${AppConfig.googleMapsApiKey}';
+                            final response = await http.get(Uri.parse(url));
+                            if (response.statusCode == 200) {
+                              final data = json.decode(response.body);
+                              final predictions = data['predictions'] as List? ?? [];
+                              setSearchState(() {
+                                _mapSearchResults = predictions.map((p) => {
+                                  'name': p['structured_formatting']?['main_text'] ?? p['description'],
+                                  'address': p['description'],
+                                  'place_id': p['place_id'],
+                                }).toList();
+                              });
+                            }
+                          } catch (e) {
+                            debugPrint('Map search error: $e');
+                          }
+                        } else {
+                          setSearchState(() => _mapSearchResults = []);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _mapSearchResults.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.search, size: 48, color: context.mutedColor.withValues(alpha: 0.3)),
+                            const SizedBox(height: 12),
+                            Text('Search for a location', style: TextStyle(color: context.mutedColor)),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: _mapSearchResults.length,
+                        itemBuilder: (context, index) {
+                          final result = _mapSearchResults[index];
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: AppColors.yellow.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(Icons.location_on, color: AppColors.yellow, size: 20),
+                            ),
+                            title: Text(result['name'] ?? '', style: TextStyle(color: context.textColor, fontWeight: FontWeight.w500)),
+                            subtitle: Text(
+                              result['address'] ?? '',
+                              style: TextStyle(color: context.mutedColor, fontSize: 12),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onTap: () async {
+                              Navigator.pop(ctx);
+                              // Get coordinates from place_id
+                              final placeId = result['place_id'];
+                              if (placeId != null) {
+                                try {
+                                  final detailsUrl = 'https://maps.googleapis.com/maps/api/place/details/json'
+                                      '?place_id=$placeId'
+                                      '&fields=geometry,name,formatted_address'
+                                      '&key=${AppConfig.googleMapsApiKey}';
+                                  final response = await http.get(Uri.parse(detailsUrl));
+                                  if (response.statusCode == 200) {
+                                    final data = json.decode(response.body);
+                                    final location = data['result']?['geometry']?['location'];
+                                    final name = data['result']?['name'] ?? result['name'];
+                                    final address = data['result']?['formatted_address'] ?? result['address'];
+                                    if (location != null) {
+                                      onSelect(name, address, location['lat'].toDouble(), location['lng'].toDouble());
+                                    }
+                                  }
+                                } catch (e) {
+                                  debugPrint('Place details error: $e');
+                                }
+                              }
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );

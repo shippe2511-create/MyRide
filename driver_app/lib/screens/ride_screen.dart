@@ -16,6 +16,7 @@ import '../services/realtime_service.dart';
 import '../widgets/app_snackbar.dart';
 import '../widgets/ride_request_popup.dart';
 import 'chat_screen.dart';
+import '../services/app_settings_service.dart';
 
 const String _darkMapStyle = '''
 [
@@ -926,35 +927,37 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                         ),
                       ),
 
-                    // SOS Button
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.heavyImpact();
-                        Navigator.pushNamed(context, '/sos');
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppColors.error,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.error.withValues(alpha: 0.4),
-                              blurRadius: 8,
-                            ),
-                          ],
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.warning_rounded, color: Colors.white, size: 16),
-                            SizedBox(width: 6),
-                            Text('SOS', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
-                          ],
+                    // SOS Button (only show if enabled)
+                    if (AppSettingsService.sosEnabled) ...[
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () {
+                          HapticFeedback.heavyImpact();
+                          Navigator.pushNamed(context, '/sos');
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.error,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.error.withValues(alpha: 0.4),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.warning_rounded, color: Colors.white, size: 16),
+                              SizedBox(width: 6),
+                              Text('SOS', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
+                    ],
 
                     // Radio/Push to Talk Button
                     const SizedBox(width: 8),
@@ -1324,8 +1327,10 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
               // Action buttons
               Column(
                 children: [
-                  _buildActionButton(Icons.chat, Colors.blue, () => _openChat(ride.customerName, customerPhone: ride.customerPhone, rideId: ride.id)),
-                  const SizedBox(height: 8),
+                  if (AppSettingsService.chatEnabled)
+                    _buildActionButton(Icons.chat, Colors.blue, () => _openChat(ride.customerName, customerPhone: ride.customerPhone, rideId: ride.id)),
+                  if (AppSettingsService.chatEnabled)
+                    const SizedBox(height: 8),
                   _buildActionButton(Icons.call, AppColors.success, () => _makeCall(ride.customerPhone)),
                 ],
               ),

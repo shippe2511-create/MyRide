@@ -12,6 +12,7 @@ import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../services/realtime_service.dart';
+import '../services/app_settings_service.dart';
 import '../widgets/status_animation.dart';
 import '../widgets/app_snackbar.dart';
 import 'trip_complete_screen.dart';
@@ -431,19 +432,20 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  // SOS Button
-                  GestureDetector(
-                    onTap: () => _showSOSOptions(),
-                    child: Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(12),
+                  // SOS Button (only show if enabled)
+                  if (AppSettingsService.sosEnabled)
+                    GestureDetector(
+                      onTap: () => _showSOSOptions(),
+                      child: Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(Icons.sos, color: AppColors.error, size: 20),
                       ),
-                      child: Icon(Icons.sos, color: AppColors.error, size: 20),
                     ),
-                  ),
                   const Spacer(),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -595,8 +597,10 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                             ),
                           ),
                           // Action buttons inline
-                          _buildCircleAction(Icons.chat_bubble_rounded, () => _messageDriver()),
-                          const SizedBox(width: 12),
+                          if (AppSettingsService.chatEnabled)
+                            _buildCircleAction(Icons.chat_bubble_rounded, () => _messageDriver()),
+                          if (AppSettingsService.chatEnabled)
+                            const SizedBox(width: 12),
                           _buildCircleAction(Icons.phone_rounded, () => _callDriver()),
                         ],
                       ),

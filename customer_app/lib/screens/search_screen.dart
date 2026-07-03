@@ -1264,13 +1264,36 @@ class _SearchScreenState extends State<SearchScreen> {
                   )
                 : SizedBox(
                     height: 110,
-                    child: ListView.builder(
+                    child: ReorderableListView.builder(
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       itemCount: _savedPlaces.length,
+                      buildDefaultDragHandles: false,
+                      proxyDecorator: (child, index, animation) {
+                        return Material(
+                          color: Colors.transparent,
+                          elevation: 8,
+                          shadowColor: AppColors.yellow.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(16),
+                          child: child,
+                        );
+                      },
+                      onReorder: (oldIndex, newIndex) async {
+                        HapticFeedback.mediumImpact();
+                        if (newIndex > oldIndex) newIndex--;
+                        final item = _savedPlaces.removeAt(oldIndex);
+                        setState(() {
+                          _savedPlaces.insert(newIndex, item);
+                        });
+                        await _updateSavedPlacesOrder();
+                      },
                       itemBuilder: (context, index) {
                         final place = _savedPlaces[index];
-                        return _buildSavedPlaceCard(place, index, isDark);
+                        return ReorderableDragStartListener(
+                          key: ValueKey(place['id'] ?? index),
+                          index: index,
+                          child: _buildSavedPlaceCard(place, index, isDark),
+                        );
                       },
                     ),
                   ),

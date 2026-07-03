@@ -7,7 +7,6 @@ import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../models/ride_request.dart';
 import '../services/realtime_service.dart';
-import '../services/supabase_service.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -59,14 +58,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
     if (!mounted) return;
 
     try {
-      final rides = await SupabaseService.getCompletedRides();
-
-      // Just trigger a rebuild - the DriverState already has the trips
-      // This realtime update ensures the UI refreshes when new trips are completed
-      if (mounted) {
-        setState(() {});
-      }
-      debugPrint('History updated: ${rides.length} completed rides');
+      final driverState = Provider.of<DriverState>(context, listen: false);
+      await driverState.loadCompletedTrips();
+      debugPrint('History updated via realtime');
     } catch (e) {
       debugPrint('Error loading completed trips: $e');
     }

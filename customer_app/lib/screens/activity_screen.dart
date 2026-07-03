@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../widgets/shimmer_loading.dart';
@@ -44,6 +46,7 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
   String _selectedDateFilter = 'All Time';
   bool _isLoading = true;
   List<TripHistory> _trips = [];
+  RealtimeChannel? _ridesChannel;
 
   final List<String> _dateFilters = ['All Time', 'Today', 'This Week', 'This Month'];
 
@@ -52,6 +55,30 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadTrips();
+    _subscribeToRides();
+  }
+
+  void _subscribeToRides() {
+    final userId = SupabaseService.userId;
+    if (userId == null || userId.isEmpty) return;
+
+    _ridesChannel = Supabase.instance.client
+        .channel('customer_rides_$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'rides',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'customer_id',
+            value: userId,
+          ),
+          callback: (payload) {
+            debugPrint('Activity realtime update: ${payload.eventType}');
+            _loadTrips();
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _loadTrips() async {
@@ -83,6 +110,7 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
 
   @override
   void dispose() {
+    _ridesChannel?.unsubscribe();
     _tabController.dispose();
     super.dispose();
   }

@@ -85,17 +85,16 @@ const reportTypes = [
   { id: "chat_messages", name: "Chat Messages", description: "Customer-driver chat history", icon: MessagesSquare },
 ]
 
-// Friendly column names mapping
+// Friendly column names mapping (cleaned - no internal UUIDs)
 const columnLabels: Record<string, Record<string, string>> = {
   rides: {
-    "Ride ID": "id",
-    "Pickup Location": "pickup_name",
-    "Dropoff Location": "dropoff_name",
+    "Customer": "customer_name",
+    "Phone": "customer_phone",
+    "Pickup": "pickup_name",
+    "Dropoff": "dropoff_name",
     "Status": "status",
     "Distance (km)": "distance_km",
     "Duration (mins)": "duration_minutes",
-    "Customer Name": "customer_name",
-    "Customer Phone": "customer_phone",
     "Date": "date",
     "Time": "time",
   },
@@ -107,7 +106,7 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Department": "department",
     "Gender": "gender",
     "Status": "status",
-    "Joined Date": "joined_date",
+    "Joined": "joined_date",
   },
   drivers: {
     "Name": "full_name",
@@ -119,23 +118,20 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Status": "status",
     "Rating": "rating",
     "Total Trips": "total_trips",
-    "Online Status": "online_status",
-    "Joined Date": "joined_date",
+    "Online": "online_status",
+    "Joined": "joined_date",
   },
   driver_performance: {
-    "Driver Name": "full_name",
+    "Driver": "full_name",
     "Phone": "phone",
     "Rating": "rating",
     "Total Rides": "total_rides",
-    "Completed Rides": "completed_rides",
-    "Cancelled Rides": "cancelled_rides",
-    "Completion Rate": "completion_rate",
-    "Cancellation Rate": "cancellation_rate",
+    "Completed": "completed_rides",
+    "Cancelled": "cancelled_rides",
+    "Completion %": "completion_rate",
     "This Week": "this_week",
     "This Month": "this_month",
-    "Online Status": "online_status",
     "Vehicle": "vehicle",
-    "License": "license",
   },
   ratings: {
     "From": "from_name",
@@ -146,24 +142,22 @@ const columnLabels: Record<string, Record<string, string>> = {
   },
   usage: {
     "Date": "date",
-    "Total Rides": "total_rides",
+    "Total": "total_rides",
     "Completed": "completed_rides",
     "Cancelled": "cancelled_rides",
-    "Completion Rate": "completion_rate",
+    "Completion %": "completion_rate",
   },
   sos_alerts: {
-    "Alert ID": "id",
-    "User Name": "user_name",
-    "User Phone": "user_phone",
-    "User Type": "user_type",
+    "User": "user_name",
+    "Phone": "user_phone",
+    "Type": "user_type",
     "Status": "status",
     "Location": "location",
     "Date": "date",
     "Time": "time",
-    "Resolved At": "resolved_at",
+    "Resolved": "resolved_at",
   },
   incidents: {
-    "Incident ID": "id",
     "Title": "title",
     "Type": "type",
     "Severity": "severity",
@@ -173,7 +167,6 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Description": "description",
   },
   vehicle_checks: {
-    "Check ID": "id",
     "Driver": "driver_name",
     "Vehicle": "vehicle",
     "Status": "status",
@@ -181,7 +174,6 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Issues": "issues",
   },
   vehicle_logs: {
-    "Log ID": "id",
     "Driver": "driver_name",
     "Type": "log_type",
     "Amount": "amount",
@@ -192,17 +184,16 @@ const columnLabels: Record<string, Record<string, string>> = {
   break_history: {
     "Driver": "driver_name",
     "Break Type": "break_type",
-    "Started At": "started_at",
-    "Ended At": "ended_at",
+    "Started": "started_at",
+    "Ended": "ended_at",
     "Duration (mins)": "duration_minutes",
-    "Date": "date",
   },
   shifts: {
     "Driver": "driver_name",
-    "Shift Date": "shift_date",
-    "Start Time": "start_time",
-    "End Time": "end_time",
-    "Shift Type": "shift_type",
+    "Date": "shift_date",
+    "Start": "start_time",
+    "End": "end_time",
+    "Type": "shift_type",
     "Status": "status",
   },
   quota_usage: {
@@ -214,7 +205,6 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Last Ride": "last_ride_date",
   },
   support_tickets: {
-    "Ticket ID": "id",
     "Customer": "customer_name",
     "Category": "category",
     "Status": "status",
@@ -224,11 +214,10 @@ const columnLabels: Record<string, Record<string, string>> = {
   },
   documents: {
     "Driver": "driver_name",
-    "Document Type": "document_type",
+    "Document": "document_type",
     "Status": "status",
     "Uploaded": "uploaded_at",
     "Expires": "expiry_date",
-    "Verified By": "verified_by",
   },
   vehicles: {
     "Plate No": "plate_no",
@@ -236,7 +225,7 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Make/Model": "make_model",
     "Color": "color",
     "Status": "status",
-    "Assigned Driver": "assigned_driver",
+    "Driver": "assigned_driver",
     "Capacity": "capacity",
   },
   announcements: {
@@ -256,11 +245,10 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Time": "time",
   },
   chat_messages: {
-    "Ride ID": "ride_id",
+    "Ride": "ride_id",
     "From": "sender_name",
     "To": "receiver_name",
     "Message": "message",
-    "Type": "message_type",
     "Date": "date",
     "Time": "time",
   },
@@ -385,14 +373,13 @@ export default function ReportsPage() {
           rows = (rides || []).map((r: Record<string, unknown>) => {
             const customer = r.customer as Record<string, unknown> | null
             return {
-              "Ride ID": String(r.id || "").slice(0, 8),
-              "Pickup Location": String(r.pickup_name || ""),
-              "Dropoff Location": String(r.dropoff_name || ""),
+              "Customer": String(customer?.full_name || "-"),
+              "Phone": formatPhone(customer?.phone as string | null),
+              "Pickup": String(r.pickup_name || ""),
+              "Dropoff": String(r.dropoff_name || ""),
               "Status": formatStatus(String(r.status || "")),
               "Distance (km)": r.distance_km ? String(r.distance_km) : "-",
               "Duration (mins)": r.duration_minutes ? String(r.duration_minutes) : "-",
-              "Customer Name": String(customer?.full_name || "-"),
-              "Customer Phone": formatPhone(customer?.phone as string | null),
               "Date": formatDate(String(r.created_at || "")),
               "Time": formatTime(String(r.created_at || "")),
             }
@@ -420,7 +407,7 @@ export default function ReportsPage() {
             "Department": String(c.department || "-"),
             "Gender": String(c.gender || "-"),
             "Status": formatStatus(String(c.status || "")),
-            "Joined Date": formatDate(String(c.created_at || "")),
+            "Joined": formatDate(String(c.created_at || "")),
           }))
           filename = `customers_report_${new Date().toISOString().split("T")[0]}.csv`
           break
@@ -452,8 +439,8 @@ export default function ReportsPage() {
               "Status": formatStatus(String(d.status || "")),
               "Rating": driverInfo?.rating ? `${driverInfo.rating}/5` : "-",
               "Total Trips": String(driverInfo?.total_trips || "0"),
-              "Online Status": driverInfo?.is_online ? "Online" : "Offline",
-              "Joined Date": formatDate(String(d.created_at || "")),
+              "Online": driverInfo?.is_online ? "Online" : "Offline",
+              "Joined": formatDate(String(d.created_at || "")),
             }
           })
           filename = `drivers_report_${new Date().toISOString().split("T")[0]}.csv`
@@ -502,19 +489,16 @@ export default function ReportsPage() {
             ).length
 
             return {
-              "Driver Name": String(profile?.full_name || "Unknown"),
+              "Driver": String(profile?.full_name || "Unknown"),
               "Phone": formatPhone(profile?.phone as string | null),
               "Rating": d.rating ? `${d.rating}/5` : "-",
               "Total Rides": String(totalRides),
-              "Completed Rides": String(completedRides),
-              "Cancelled Rides": String(cancelledRides),
-              "Completion Rate": `${completionRate}%`,
-              "Cancellation Rate": `${cancellationRate}%`,
+              "Completed": String(completedRides),
+              "Cancelled": String(cancelledRides),
+              "Completion %": `${completionRate}%`,
               "This Week": String(thisWeekRides),
               "This Month": String(thisMonthRides),
-              "Online Status": d.is_online ? "Online" : "Offline",
               "Vehicle": vehicle ? `${vehicle.display_name || ""} (${vehicle.plate_no || ""})` : "-",
-              "License": String(d.license_number || "-"),
             }
           })
 
@@ -550,10 +534,9 @@ export default function ReportsPage() {
             return {
               "Driver": String(profile?.full_name || "-"),
               "Break Type": String(b.break_type || "-"),
-              "Started At": b.started_at ? formatDateTime(String(b.started_at)) : "-",
-              "Ended At": b.ended_at ? formatDateTime(String(b.ended_at)) : "In Progress",
+              "Started": b.started_at ? formatDateTime(String(b.started_at)) : "-",
+              "Ended": b.ended_at ? formatDateTime(String(b.ended_at)) : "In Progress",
               "Duration (mins)": b.duration_minutes != null ? String(b.duration_minutes) : "-",
-              "Date": formatDate(String(b.created_at || "")),
             }
           })
           filename = `break_history_${new Date().toISOString().split("T")[0]}.csv`
@@ -580,10 +563,10 @@ export default function ReportsPage() {
             const profile = driver?.profile as Record<string, unknown> | null
             return {
               "Driver": String(profile?.full_name || "-"),
-              "Shift Date": formatDate(String(s.shift_date || "")),
-              "Start Time": String(s.start_time || "-"),
-              "End Time": String(s.end_time || "-"),
-              "Shift Type": formatStatus(String(s.shift_type || "")),
+              "Date": formatDate(String(s.shift_date || "")),
+              "Start": String(s.start_time || "-"),
+              "End": String(s.end_time || "-"),
+              "Type": formatStatus(String(s.shift_type || "")),
               "Status": formatStatus(String(s.status || "")),
             }
           })
@@ -633,7 +616,6 @@ export default function ReportsPage() {
           rows = (tickets || []).map((t: Record<string, unknown>) => {
             const user = t.user as Record<string, unknown> | null
             return {
-              "Ticket ID": String(t.id || "-").slice(0, 8),
               "Customer": String(user?.full_name || "-"),
               "Category": formatStatus(String(t.category || "-")),
               "Status": formatStatus(String(t.status || "")),
@@ -693,10 +675,10 @@ export default function ReportsPage() {
 
           rows = Object.entries(grouped).map(([date, stats]) => ({
             "Date": date,
-            "Total Rides": String(stats.total),
+            "Total": String(stats.total),
             "Completed": String(stats.completed),
             "Cancelled": String(stats.cancelled),
-            "Completion Rate": stats.total > 0 ? `${Math.round((stats.completed / stats.total) * 100)}%` : "0%",
+            "Completion %": stats.total > 0 ? `${Math.round((stats.completed / stats.total) * 100)}%` : "0%",
           }))
           filename = `daily_usage_${new Date().toISOString().split("T")[0]}.csv`
           break
@@ -718,15 +700,14 @@ export default function ReportsPage() {
           rows = (alerts || []).map((a: Record<string, unknown>) => {
             const user = a.user as Record<string, unknown> | null
             return {
-              "Alert ID": String(a.id || "").slice(0, 8),
-              "User Name": String(user?.full_name || "-"),
-              "User Phone": formatPhone(user?.phone as string | null),
-              "User Type": user?.role === "driver" ? "Driver" : "Customer",
+              "User": String(user?.full_name || "-"),
+              "Phone": formatPhone(user?.phone as string | null),
+              "Type": user?.role === "driver" ? "Driver" : "Customer",
               "Status": formatStatus(String(a.status || "")),
               "Location": a.location_address ? String(a.location_address) : (a.latitude ? `${a.latitude}, ${a.longitude}` : "-"),
               "Date": formatDate(String(a.created_at || "")),
               "Time": formatTime(String(a.created_at || "")),
-              "Resolved At": a.resolved_at ? formatDate(String(a.resolved_at)) : "-",
+              "Resolved": a.resolved_at ? formatDateTime(String(a.resolved_at)) : "-",
             }
           })
           filename = `sos_alerts_${new Date().toISOString().split("T")[0]}.csv`
@@ -749,7 +730,6 @@ export default function ReportsPage() {
           rows = (incidents || []).map((i: Record<string, unknown>) => {
             const reporter = i.reporter as Record<string, unknown> | null
             return {
-              "Incident ID": String(i.id || "").slice(0, 8),
               "Title": String(i.title || "-"),
               "Type": formatStatus(String(i.type || "")),
               "Severity": formatStatus(String(i.severity || "")),
@@ -784,7 +764,6 @@ export default function ReportsPage() {
             const profile = driver?.profile as Record<string, unknown> | null
             const vehicle = c.vehicle as Record<string, unknown> | null
             return {
-              "Check ID": String(c.id || "").slice(0, 8),
               "Driver": String(profile?.full_name || "-"),
               "Vehicle": vehicle ? `${vehicle.display_name || ""} (${vehicle.plate_no || ""})` : "-",
               "Status": formatStatus(String(c.status || "")),
@@ -815,7 +794,6 @@ export default function ReportsPage() {
             const driver = l.driver as Record<string, unknown> | null
             const profile = driver?.profile as Record<string, unknown> | null
             return {
-              "Log ID": String(l.id || "").slice(0, 8),
               "Driver": String(profile?.full_name || "-"),
               "Type": formatStatus(String(l.log_type || "")),
               "Amount": l.amount ? `$${l.amount}` : "-",
@@ -848,11 +826,10 @@ export default function ReportsPage() {
             const profile = driver?.profile as Record<string, unknown> | null
             return {
               "Driver": String(profile?.full_name || "-"),
-              "Document Type": formatStatus(String(d.document_type || "")),
+              "Document": formatStatus(String(d.document_type || "")),
               "Status": formatStatus(String(d.status || "")),
               "Uploaded": formatDate(String(d.created_at || "")),
               "Expires": d.expiry_date ? formatDate(String(d.expiry_date)) : "-",
-              "Verified By": String(d.verified_by || "-"),
             }
           })
           filename = `documents_${new Date().toISOString().split("T")[0]}.csv`
@@ -879,7 +856,7 @@ export default function ReportsPage() {
               "Make/Model": `${v.make || ""} ${v.model || ""}`.trim() || "-",
               "Color": String(v.color || "-"),
               "Status": v.status ? "Active" : "Inactive",
-              "Assigned Driver": String(profile?.full_name || "-"),
+              "Driver": String(profile?.full_name || "-"),
               "Capacity": String(v.capacity || "-"),
             }
           })
@@ -958,11 +935,10 @@ export default function ReportsPage() {
             const sender = m.sender as Record<string, unknown> | null
             const receiver = m.receiver as Record<string, unknown> | null
             return {
-              "Ride ID": m.ride_id ? String(m.ride_id).slice(0, 8) : "-",
+              "Ride": m.ride_id ? String(m.ride_id).slice(0, 8) : "-",
               "From": String(sender?.full_name || "-"),
               "To": String(receiver?.full_name || "-"),
               "Message": String(m.message || "-").slice(0, 100),
-              "Type": formatStatus(String(m.message_type || "text")),
               "Date": formatDate(String(m.created_at || "")),
               "Time": formatTime(String(m.created_at || "")),
             }

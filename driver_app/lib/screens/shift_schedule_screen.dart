@@ -444,7 +444,7 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
                     Icon(Icons.arrow_forward, color: context.mutedColor, size: 20),
                     const SizedBox(height: 4),
                     Text(
-                      '8 hours',
+                      _calculateDuration(shift['start'] as String, shift['end'] as String),
                       style: TextStyle(
                         color: context.mutedColor,
                         fontSize: 11,
@@ -470,7 +470,7 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Shift ends in 6 hours 30 minutes',
+                      _calculateTimeRemaining(shift['end'] as String),
                       style: TextStyle(
                         color: AppColors.success,
                         fontSize: 13,
@@ -523,6 +523,52 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
                    'July', 'August', 'September', 'October', 'November', 'December'];
     final days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     return '${days[date.weekday - 1]}, ${months[date.month - 1]} ${date.day}';
+  }
+
+  String _calculateDuration(String startTime, String endTime) {
+    try {
+      final startParts = startTime.split(':');
+      final endParts = endTime.split(':');
+      final startHour = int.parse(startParts[0]);
+      final startMin = int.parse(startParts[1]);
+      final endHour = int.parse(endParts[0]);
+      final endMin = int.parse(endParts[1]);
+
+      var totalMinutes = (endHour * 60 + endMin) - (startHour * 60 + startMin);
+      if (totalMinutes < 0) totalMinutes += 24 * 60;
+
+      final hours = totalMinutes ~/ 60;
+      final mins = totalMinutes % 60;
+
+      if (mins == 0) return '$hours hours';
+      return '$hours h ${mins}m';
+    } catch (e) {
+      return '8 hours';
+    }
+  }
+
+  String _calculateTimeRemaining(String endTime) {
+    try {
+      final now = DateTime.now();
+      final endParts = endTime.split(':');
+      final endHour = int.parse(endParts[0]);
+      final endMin = int.parse(endParts[1]);
+
+      var endDateTime = DateTime(now.year, now.month, now.day, endHour, endMin);
+      if (endDateTime.isBefore(now)) {
+        endDateTime = endDateTime.add(const Duration(days: 1));
+      }
+
+      final diff = endDateTime.difference(now);
+      final hours = diff.inHours;
+      final mins = diff.inMinutes % 60;
+
+      if (hours == 0) return 'Shift ends in $mins minutes';
+      if (mins == 0) return 'Shift ends in $hours hours';
+      return 'Shift ends in $hours hours $mins minutes';
+    } catch (e) {
+      return 'Shift in progress';
+    }
   }
 
   void _showMonthView(BuildContext context) {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -238,58 +239,20 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       return;
     }
 
-    // Fallback for mock mode
+    // Fallback when no ride - just show message locally
     final message = ChatMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       text: messageText,
       isDriver: true,
       time: DateTime.now(),
       type: type,
-      status: MessageStatus.sending,
+      status: MessageStatus.sent,
       voiceDuration: voiceDuration,
       locationName: locationName,
     );
 
     setState(() => _messages.add(message));
     _scrollToBottom();
-
-    // Simulate status updates
-    Future.delayed(const Duration(milliseconds: 400), () {
-      if (mounted) {
-        _updateMessageStatus(message.id, MessageStatus.sent);
-      }
-    });
-
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (mounted) {
-        _updateMessageStatus(message.id, MessageStatus.delivered);
-      }
-    });
-
-    // Simulate customer typing
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() => _customerTyping = true);
-        _scrollToBottom();
-      }
-    });
-
-    // Simulate customer response
-    Future.delayed(const Duration(seconds: 4), () {
-      if (mounted) {
-        setState(() {
-          _customerTyping = false;
-          _updateMessageStatus(message.id, MessageStatus.read);
-          _messages.add(ChatMessage(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
-            text: "Thanks for the update! See you soon 👍",
-            isDriver: false,
-            time: DateTime.now(),
-          ));
-        });
-        _scrollToBottom();
-      }
-    });
   }
 
   void _updateMessageStatus(String id, MessageStatus status) {
@@ -380,20 +343,65 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       final pickedFile = await picker.pickImage(source: source, imageQuality: 70, maxWidth: 1024);
       if (pickedFile == null) return;
 
+      // Show sending state
+      final tempId = DateTime.now().millisecondsSinceEpoch.toString();
       setState(() {
         _messages.add(ChatMessage(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          text: '📷 Shared an image',
+          id: tempId,
+          text: 'Uploading image...',
           isDriver: true,
           time: DateTime.now(),
           type: MessageType.image,
-          status: MessageStatus.sent,
+          status: MessageStatus.sending,
         ));
       });
 
-      AppSnackbar.success(context, 'Image sent');
+      // Upload to Supabase Storage
+      final file = File(pickedFile.path);
+      final fileName = 'chat_${widget.rideId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final path = 'chat-images/$fileName';
+
+      final imageUrl = await SupabaseService.uploadFile(
+        bucket: 'chat-images',
+        path: path,
+        file: file,
+      );
+
+      if (imageUrl != null) {
+        // Update message with actual URL
+        setState(() {
+          final idx = _messages.indexWhere((m) => m.id == tempId);
+          if (idx >= 0) {
+            _messages[idx] = ChatMessage(
+              id: tempId,
+              text: imageUrl,
+              isDriver: true,
+              time: DateTime.now(),
+              type: MessageType.image,
+              status: MessageStatus.sent,
+            );
+          }
+        });
+
+        // Send to Supabase chat messages table if ride exists
+        if (widget.rideId != null) {
+          await SupabaseService.sendChatMessage(
+            rideId: widget.rideId!,
+            message: imageUrl,
+            senderType: 'driver',
+          );
+        }
+
+        AppSnackbar.success(context, 'Image sent');
+      } else {
+        // Remove failed message
+        setState(() {
+          _messages.removeWhere((m) => m.id == tempId);
+        });
+        AppSnackbar.error(context, 'Failed to upload image');
+      }
     } catch (e) {
-      AppSnackbar.error(context, 'Failed to pick image');
+      AppSnackbar.error(context, 'Failed to send image');
     }
   }
 

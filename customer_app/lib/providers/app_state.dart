@@ -73,6 +73,25 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> loadNotificationSettingsFromSupabase() async {
+    if (_profileId == null || _profileId!.isEmpty) return;
+    try {
+      final settings = await SupabaseService.getNotificationSettings(_profileId!);
+      final prefs = await SharedPreferences.getInstance();
+      _notificationsEnabled = settings['push_notifications'] ?? settings['ride_requests'] ?? true;
+      _rideUpdatesEnabled = settings['ride_updates'] ?? settings['trip_updates'] ?? true;
+      _promotionsEnabled = settings['promotions'] ?? false;
+      _emailNotificationsEnabled = settings['email_notifications'] ?? true;
+      await prefs.setBool('notificationsEnabled', _notificationsEnabled);
+      await prefs.setBool('rideUpdatesEnabled', _rideUpdatesEnabled);
+      await prefs.setBool('promotionsEnabled', _promotionsEnabled);
+      await prefs.setBool('emailNotificationsEnabled', _emailNotificationsEnabled);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading notification settings from Supabase: $e');
+    }
+  }
+
   Future<void> toggleNotifications(bool value) async {
     _notificationsEnabled = value;
     final prefs = await SharedPreferences.getInstance();
@@ -244,6 +263,7 @@ class AppState extends ChangeNotifier {
   String _staffId = '';
   String _userPhone = '';
   String _userEmail = '';
+  String _userGender = '';
   double _userRating = 0.0;
   int _totalTrips = 0;
   String? _profilePhotoPath;
@@ -257,6 +277,7 @@ class AppState extends ChangeNotifier {
   String get staffId => _staffId;
   String get userPhone => _userPhone;
   String get userEmail => _userEmail;
+  String get userGender => _userGender;
   double get userRating => _userRating;
   int get totalTrips => _totalTrips;
   String? get profilePhotoPath => _profilePhotoPath;
@@ -342,17 +363,22 @@ class AppState extends ChangeNotifier {
     _userPhone = prefs.getString('user_phone') ?? '';
     _userName = prefs.getString('user_name') ?? '';
     _userEmail = prefs.getString('user_email') ?? '';
+    _userGender = prefs.getString('user_gender') ?? '';
     if (_userName.isNotEmpty) {
       _userInitials = _userName.split(' ').map((n) => n.isNotEmpty ? n[0] : '').take(2).join().toUpperCase();
     }
     if (_profileId != null) {
       SupabaseService.setProfileId(_profileId);
-      // Check if account is suspended
+      // Check if account is suspended and load profile data
       await _checkAccountStatus();
       if (_isSuspended) {
         notifyListeners();
         return;
       }
+      // Load gender from profile
+      await _loadGenderFromProfile();
+      // Load notification settings from Supabase
+      loadNotificationSettingsFromSupabase();
       loadEmergencyContactsFromProfile();
       loadBlockedUsersFromProfile();
       loadTripHistory();
@@ -364,6 +390,20 @@ class AppState extends ChangeNotifier {
       _subscribeToProfileUpdates();
     }
     notifyListeners();
+  }
+
+  Future<void> _loadGenderFromProfile() async {
+    if (_profileId == null) return;
+    try {
+      final profile = await SupabaseService.getProfile();
+      if (profile != null && profile['gender'] != null) {
+        _userGender = profile['gender'] as String;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user_gender', _userGender);
+      }
+    } catch (e) {
+      debugPrint('Error loading gender: $e');
+    }
   }
 
   Future<void> _checkAccountStatus() async {

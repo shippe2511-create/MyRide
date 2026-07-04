@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -394,22 +395,64 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       final pickedFile = await picker.pickImage(source: source, imageQuality: 70, maxWidth: 1024);
       if (pickedFile == null) return;
 
-      // For now, send as a text message indicating image was shared
-      // Full implementation would upload to Supabase Storage
+      // Show sending state
+      final tempId = DateTime.now().millisecondsSinceEpoch.toString();
       setState(() {
         _messages.add(ChatMessage(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          text: '📷 Shared an image',
+          id: tempId,
+          text: 'Uploading image...',
           isCustomer: true,
           time: DateTime.now(),
           type: MessageType.image,
-          status: MessageStatus.sent,
+          status: MessageStatus.sending,
         ));
       });
 
-      AppSnackbar.success(context, 'Image sent');
+      // Upload to Supabase Storage
+      final file = File(pickedFile.path);
+      final fileName = 'chat_${widget.rideId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final path = 'chat-images/$fileName';
+
+      final imageUrl = await SupabaseService.uploadFile(
+        bucket: 'chat-images',
+        path: path,
+        file: file,
+      );
+
+      if (imageUrl != null) {
+        // Update message with actual URL
+        setState(() {
+          final idx = _messages.indexWhere((m) => m.id == tempId);
+          if (idx >= 0) {
+            _messages[idx] = ChatMessage(
+              id: tempId,
+              text: imageUrl,
+              isCustomer: true,
+              time: DateTime.now(),
+              type: MessageType.image,
+              status: MessageStatus.sent,
+            );
+          }
+        });
+
+        // Send to Supabase chat messages table if ride exists
+        if (widget.rideId != null) {
+          await SupabaseService.sendChatMessage(
+            rideId: widget.rideId!,
+            message: imageUrl,
+          );
+        }
+
+        AppSnackbar.success(context, 'Image sent');
+      } else {
+        // Remove failed message
+        setState(() {
+          _messages.removeWhere((m) => m.id == tempId);
+        });
+        AppSnackbar.error(context, 'Failed to upload image');
+      }
     } catch (e) {
-      AppSnackbar.error(context, 'Failed to pick image');
+      AppSnackbar.error(context, 'Failed to send image');
     }
   }
 

@@ -1130,7 +1130,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showInviteFriends(BuildContext context) {
-    const referralCode = 'MYRIDE2024';
+    final appState = Provider.of<AppState>(context, listen: false);
+    // Generate referral code from staff ID or first 6 chars of profile ID
+    final referralCode = appState.staffId.isNotEmpty
+        ? 'MR${appState.staffId.toUpperCase()}'
+        : 'MR${appState.userPhone.replaceAll(RegExp(r'\D'), '').substring(appState.userPhone.length > 4 ? appState.userPhone.length - 4 : 0)}';
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1163,7 +1167,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   GestureDetector(
                     onTap: () {
                       HapticFeedback.mediumImpact();
-                      Clipboard.setData(const ClipboardData(text: referralCode));
+                      Clipboard.setData(ClipboardData(text: referralCode));
                       AppSnackbar.success(context, 'Code copied!');
                     },
                     child: const Icon(Icons.copy, color: AppColors.yellow, size: 20),
@@ -1200,7 +1204,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _buildInfoItem('Phone', appState.userPhone),
       _buildInfoItem('Email', appState.userEmail.isNotEmpty ? appState.userEmail : 'Not set'),
       _buildInfoItem('Staff ID', appState.staffId),
-      _buildInfoItem('Gender', 'Not set'),
+      _buildInfoItem('Gender', appState.userGender.isNotEmpty ? appState.userGender : 'Not set'),
     ]);
   }
 

@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../widgets/shimmer_loading.dart';
 import '../widgets/app_snackbar.dart';
+import '../config/app_config.dart';
 
 class RecurringRidesScreen extends StatefulWidget {
   const RecurringRidesScreen({super.key});
@@ -325,12 +328,100 @@ class _AddRecurringRideSheetState extends State<AddRecurringRideSheet> {
   Set<String> _selectedDays = {'Mon', 'Tue', 'Wed', 'Thu', 'Fri'};
   bool _isSaving = false;
 
-  double _pickupLat = 4.1755;
-  double _pickupLng = 73.5093;
-  double _dropoffLat = 4.1918;
-  double _dropoffLng = 73.5290;
+  double? _pickupLat;
+  double? _pickupLng;
+  double? _dropoffLat;
+  double? _dropoffLng;
+
+  List<Map<String, dynamic>> _pickupSuggestions = [];
+  List<Map<String, dynamic>> _dropoffSuggestions = [];
+  bool _showPickupSuggestions = false;
+  bool _showDropoffSuggestions = false;
 
   final _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  Future<void> _searchPlaces(String query, bool isPickup) async {
+    if (query.length < 2) {
+      setState(() {
+        if (isPickup) {
+          _pickupSuggestions = [];
+          _showPickupSuggestions = false;
+        } else {
+          _dropoffSuggestions = [];
+          _showDropoffSuggestions = false;
+        }
+      });
+      return;
+    }
+
+    final url = Uri.parse(
+      'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+      '?input=${Uri.encodeComponent(query)}'
+      '&components=country:mv'
+      '&key=${AppConfig.googleMapsApiKey}'
+    );
+
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final predictions = (data['predictions'] as List?) ?? [];
+        setState(() {
+          if (isPickup) {
+            _pickupSuggestions = predictions.map((p) => {
+              'description': p['description'],
+              'place_id': p['place_id'],
+            }).toList();
+            _showPickupSuggestions = _pickupSuggestions.isNotEmpty;
+          } else {
+            _dropoffSuggestions = predictions.map((p) => {
+              'description': p['description'],
+              'place_id': p['place_id'],
+            }).toList();
+            _showDropoffSuggestions = _dropoffSuggestions.isNotEmpty;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Places search error: $e');
+    }
+  }
+
+  Future<void> _selectPlace(String placeId, String description, bool isPickup) async {
+    final url = Uri.parse(
+      'https://maps.googleapis.com/maps/api/place/details/json'
+      '?place_id=$placeId'
+      '&fields=geometry'
+      '&key=${AppConfig.googleMapsApiKey}'
+    );
+
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final location = data['result']?['geometry']?['location'];
+        if (location != null) {
+          setState(() {
+            if (isPickup) {
+              _pickupController.text = description;
+              _pickupLat = location['lat'];
+              _pickupLng = location['lng'];
+              _pickupSuggestions = [];
+              _showPickupSuggestions = false;
+            } else {
+              _dropoffController.text = description;
+              _dropoffLat = location['lat'];
+              _dropoffLng = location['lng'];
+              _dropoffSuggestions = [];
+              _showDropoffSuggestions = false;
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Place details error: $e');
+    }
+  }
 
   Future<void> _selectTime() async {
     final picked = await showTimePicker(
@@ -359,6 +450,16 @@ class _AddRecurringRideSheetState extends State<AddRecurringRideSheet> {
       return;
     }
 
+    if (_pickupLat == null || _pickupLng == null) {
+      AppSnackbar.warning(context, 'Please select pickup location from suggestions');
+      return;
+    }
+
+    if (_dropoffLat == null || _dropoffLng == null) {
+      AppSnackbar.warning(context, 'Please select dropoff location from suggestions');
+      return;
+    }
+
     if (_selectedDays.isEmpty) {
       AppSnackbar.warning(context, 'Please select at least one day');
       return;
@@ -370,11 +471,11 @@ class _AddRecurringRideSheetState extends State<AddRecurringRideSheet> {
 
     final result = await SupabaseService.createRecurringRide(
       pickupName: _pickupController.text,
-      pickupLat: _pickupLat,
-      pickupLng: _pickupLng,
+      pickupLat: _pickupLat!,
+      pickupLng: _pickupLng!,
       dropoffName: _dropoffController.text,
-      dropoffLat: _dropoffLat,
-      dropoffLng: _dropoffLng,
+      dropoffLat: _dropoffLat!,
+      dropoffLng: _dropoffLng!,
       scheduleTime: timeStr,
       daysOfWeek: _selectedDays.toList(),
     );
@@ -430,10 +531,12 @@ class _AddRecurringRideSheetState extends State<AddRecurringRideSheet> {
             TextField(
               controller: _pickupController,
               style: TextStyle(color: context.textColor),
+              onChanged: (value) => _searchPlaces(value, true),
               decoration: InputDecoration(
-                hintText: 'Enter pickup location',
+                hintText: 'Search pickup location',
                 hintStyle: TextStyle(color: context.textColor.withValues(alpha: 0.4)),
                 prefixIcon: Icon(Icons.circle, size: 10, color: AppColors.yellow),
+                suffixIcon: _pickupLat != null ? Icon(Icons.check_circle, color: AppColors.success, size: 20) : null,
                 filled: true,
                 fillColor: context.bgColor,
                 border: OutlineInputBorder(
@@ -442,6 +545,30 @@ class _AddRecurringRideSheetState extends State<AddRecurringRideSheet> {
                 ),
               ),
             ),
+            if (_showPickupSuggestions) ...[
+              const SizedBox(height: 4),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 150),
+                decoration: BoxDecoration(
+                  color: context.bgColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: context.borderColor),
+                ),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _pickupSuggestions.length,
+                  itemBuilder: (ctx, i) {
+                    final s = _pickupSuggestions[i];
+                    return ListTile(
+                      dense: true,
+                      leading: Icon(Icons.location_on, color: AppColors.yellow, size: 18),
+                      title: Text(s['description'], style: TextStyle(color: context.textColor, fontSize: 13)),
+                      onTap: () => _selectPlace(s['place_id'], s['description'], true),
+                    );
+                  },
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
 
             Text('Dropoff', style: TextStyle(color: context.textColor.withValues(alpha: 0.6), fontSize: 13)),
@@ -449,10 +576,12 @@ class _AddRecurringRideSheetState extends State<AddRecurringRideSheet> {
             TextField(
               controller: _dropoffController,
               style: TextStyle(color: context.textColor),
+              onChanged: (value) => _searchPlaces(value, false),
               decoration: InputDecoration(
-                hintText: 'Enter dropoff location',
+                hintText: 'Search dropoff location',
                 hintStyle: TextStyle(color: context.textColor.withValues(alpha: 0.4)),
                 prefixIcon: const Icon(Icons.location_on, size: 16, color: Colors.red),
+                suffixIcon: _dropoffLat != null ? Icon(Icons.check_circle, color: AppColors.success, size: 20) : null,
                 filled: true,
                 fillColor: context.bgColor,
                 border: OutlineInputBorder(
@@ -461,6 +590,30 @@ class _AddRecurringRideSheetState extends State<AddRecurringRideSheet> {
                 ),
               ),
             ),
+            if (_showDropoffSuggestions) ...[
+              const SizedBox(height: 4),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 150),
+                decoration: BoxDecoration(
+                  color: context.bgColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: context.borderColor),
+                ),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _dropoffSuggestions.length,
+                  itemBuilder: (ctx, i) {
+                    final s = _dropoffSuggestions[i];
+                    return ListTile(
+                      dense: true,
+                      leading: Icon(Icons.location_on, color: Colors.red, size: 18),
+                      title: Text(s['description'], style: TextStyle(color: context.textColor, fontSize: 13)),
+                      onTap: () => _selectPlace(s['place_id'], s['description'], false),
+                    );
+                  },
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
 
             Text('Time', style: TextStyle(color: context.textColor.withValues(alpha: 0.6), fontSize: 13)),

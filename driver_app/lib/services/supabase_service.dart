@@ -1778,4 +1778,24 @@ class SupabaseService {
       rethrow;
     }
   }
+
+  // Generic file upload to storage
+  static Future<String?> uploadFile({
+    required String bucket,
+    required String path,
+    required File file,
+  }) async {
+    try {
+      await client.storage.from(bucket).upload(
+        path,
+        file,
+        fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+      );
+      final url = client.storage.from(bucket).getPublicUrl(path);
+      return url;
+    } catch (e) {
+      debugPrint('Error uploading file to $bucket: $e');
+      return null;
+    }
+  }
 }

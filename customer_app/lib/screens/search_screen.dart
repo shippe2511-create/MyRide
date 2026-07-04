@@ -145,6 +145,40 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() => _isSearching = true);
 
     try {
+      // Search admin-defined locations first
+      List<Map<String, dynamic>> adminLocations = [];
+      try {
+        final locations = await SupabaseService.getLocations();
+        adminLocations = locations
+            .where((loc) =>
+              (loc['name'] as String? ?? '').toLowerCase().contains(query.toLowerCase()) ||
+              (loc['address'] as String? ?? '').toLowerCase().contains(query.toLowerCase()))
+            .map((loc) {
+              // Parse lat/lng - handle both string and num types from database
+              double? lat;
+              double? lng;
+              if (loc['lat'] != null) {
+                lat = loc['lat'] is num ? (loc['lat'] as num).toDouble() : double.tryParse(loc['lat'].toString());
+              }
+              if (loc['lng'] != null) {
+                lng = loc['lng'] is num ? (loc['lng'] as num).toDouble() : double.tryParse(loc['lng'].toString());
+              }
+              debugPrint('Admin location ${loc['name']}: lat=$lat, lng=$lng');
+              return {
+                'title': loc['name'] ?? '',
+                'subtitle': loc['address'] ?? 'Saved Location',
+                'lat': lat,
+                'lng': lng,
+                'isAdminLocation': true,
+                'highlight': true,
+              };
+            })
+            .toList();
+      } catch (e) {
+        debugPrint('Admin locations search error: $e');
+      }
+
+      // Then search Google Places
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/place/autocomplete/json'
         '?input=${Uri.encodeComponent(query)}'
@@ -158,7 +192,6 @@ class _SearchScreenState extends State<SearchScreen> {
       debugPrint('Places API URL: $url');
       final response = await http.get(url);
       debugPrint('Places API status: ${response.statusCode}');
-      debugPrint('Places API body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -169,23 +202,30 @@ class _SearchScreenState extends State<SearchScreen> {
           final predictions = data['predictions'] as List;
           debugPrint('Found ${predictions.length} predictions');
 
+          final googleResults = predictions.map((p) => {
+            'title': p['structured_formatting']?['main_text'] ?? p['description'] ?? '',
+            'subtitle': p['structured_formatting']?['secondary_text'] ?? '',
+            'placeId': p['place_id'],
+            'highlight': false,
+          }).toList();
+
           setState(() {
-            _filteredResults = predictions.map((p) => {
-              'title': p['structured_formatting']?['main_text'] ?? p['description'] ?? '',
-              'subtitle': p['structured_formatting']?['secondary_text'] ?? '',
-              'placeId': p['place_id'],
-              'highlight': false,
-            }).toList();
+            // Admin locations first, then Google results
+            _filteredResults = [...adminLocations, ...googleResults];
             _isSearching = false;
           });
         } else {
           debugPrint('Places API error status: $status - ${data['error_message'] ?? ''}');
-          _filterResults();
-          setState(() => _isSearching = false);
+          setState(() {
+            _filteredResults = adminLocations.isNotEmpty ? adminLocations : _allResults;
+            _isSearching = false;
+          });
         }
       } else {
-        _filterResults();
-        setState(() => _isSearching = false);
+        setState(() {
+          _filteredResults = adminLocations.isNotEmpty ? adminLocations : _allResults;
+          _isSearching = false;
+        });
       }
     } catch (e) {
       debugPrint('Places search error: $e');
@@ -203,16 +243,24 @@ class _SearchScreenState extends State<SearchScreen> {
         '&key=${AppConfig.googleMapsApiKey}'
       );
 
+      debugPrint('Fetching place details for: $placeId');
       final response = await http.get(url);
+      debugPrint('Place details response: ${response.body}');
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        if (data['status'] != 'OK') {
+          debugPrint('Place details API error: ${data['status']} - ${data['error_message']}');
+          return null;
+        }
         final result = data['result'];
-        return {
+        final details = {
           'name': result['name'],
           'address': result['formatted_address'],
           'lat': result['geometry']['location']['lat'],
           'lng': result['geometry']['location']['lng'],
         };
+        debugPrint('Place details parsed: $details');
+        return details;
       }
     } catch (e) {
       debugPrint('Place details error: $e');
@@ -396,6 +444,28 @@ class _SearchScreenState extends State<SearchScreen> {
       final rides = await SupabaseService.getMyRides();
       final recentDestinations = <String, Map<String, dynamic>>{};
 
+      // Load admin locations to cross-reference coordinates
+      Map<String, Map<String, double>> adminLocationCoords = {};
+      try {
+        final adminLocs = await SupabaseService.getLocations();
+        for (final loc in adminLocs) {
+          final name = (loc['name'] as String? ?? '').toLowerCase();
+          double? lat;
+          double? lng;
+          if (loc['lat'] != null) {
+            lat = loc['lat'] is num ? (loc['lat'] as num).toDouble() : double.tryParse(loc['lat'].toString());
+          }
+          if (loc['lng'] != null) {
+            lng = loc['lng'] is num ? (loc['lng'] as num).toDouble() : double.tryParse(loc['lng'].toString());
+          }
+          if (lat != null && lng != null) {
+            adminLocationCoords[name] = {'lat': lat, 'lng': lng};
+          }
+        }
+      } catch (e) {
+        debugPrint('Error loading admin locations for recent places: $e');
+      }
+
       for (final ride in rides.take(10)) {
         final dropoffName = ride['dropoff_name'] as String?;
         if (dropoffName != null && dropoffName.isNotEmpty && !recentDestinations.containsKey(dropoffName)) {
@@ -413,10 +483,24 @@ class _SearchScreenState extends State<SearchScreen> {
               timeAgo = '${(diff.inDays / 7).floor()} week${diff.inDays >= 14 ? 's' : ''} ago';
             }
           }
+
+          // Check if this destination matches an admin location - use admin coords if so
+          final nameLower = dropoffName.toLowerCase();
+          double? lat = (ride['dropoff_lat'] as num?)?.toDouble();
+          double? lng = (ride['dropoff_lng'] as num?)?.toDouble();
+
+          if (adminLocationCoords.containsKey(nameLower)) {
+            lat = adminLocationCoords[nameLower]!['lat'];
+            lng = adminLocationCoords[nameLower]!['lng'];
+            debugPrint('Recent place "$dropoffName" matched admin location, using coords: lat=$lat, lng=$lng');
+          }
+
           recentDestinations[dropoffName] = {
             'name': dropoffName.split(',').first,
             'address': dropoffName,
             'time': timeAgo,
+            'lat': lat,
+            'lng': lng,
           };
         }
       }
@@ -471,6 +555,8 @@ class _SearchScreenState extends State<SearchScreen> {
           'name': p['name'] ?? '',
           'address': p['address'] ?? '',
           'color': _getColorFromString(p['color'] ?? 'yellow'),
+          'lat': (p['lat'] as num?)?.toDouble(),
+          'lng': (p['lng'] as num?)?.toDouble(),
         }).toList();
         _loadingSavedPlaces = false;
       });
@@ -605,13 +691,48 @@ class _SearchScreenState extends State<SearchScreen> {
                               itemBuilder: (context, index) {
                                 final result = _filteredResults[index];
                                 final placeId = result['placeId'] as String?;
+                                final isAdminLocation = result['isAdminLocation'] == true;
                                 return _buildResultItem(
                                   result['title'] as String,
                                   result['subtitle'] as String? ?? '',
                                   result['highlight'] as bool? ?? false,
                                   isDark,
                                   onTap: () async {
-                                    if (placeId != null) {
+                                    // Admin-defined locations already have coordinates
+                                    debugPrint('TAPPED: isAdminLocation=$isAdminLocation, lat=${result['lat']}, lng=${result['lng']}, title=${result['title']}');
+                                    if (isAdminLocation && result['lat'] != null && result['lng'] != null) {
+                                      final lat = result['lat'] as double;
+                                      final lng = result['lng'] as double;
+                                      final name = result['title'] as String;
+                                      debugPrint('USING ADMIN COORDS: lat=$lat, lng=$lng for $name');
+
+                                      if (_editingPickup) {
+                                        setState(() {
+                                          _pickupLocation = LatLng(lat, lng);
+                                          _pickupName = name;
+                                          _editingPickup = false;
+                                          _pickupController.clear();
+                                          _filteredResults = [];
+                                        });
+                                      } else {
+                                        final freshLoc = await LocationService.getCurrentLocation();
+                                        final pickupLat = _pickupLocation?.latitude ?? freshLoc.latitude;
+                                        final pickupLng = _pickupLocation?.longitude ?? freshLoc.longitude;
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => RideConfirmScreen(
+                                              pickup: _pickupName,
+                                              dropoff: name,
+                                              pickupLat: pickupLat,
+                                              pickupLng: pickupLng,
+                                              dropoffLat: lat,
+                                              dropoffLng: lng,
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    } else if (placeId != null) {
                                       final details = await _getPlaceDetails(placeId);
                                       if (details != null && mounted) {
                                         if (_editingPickup) {

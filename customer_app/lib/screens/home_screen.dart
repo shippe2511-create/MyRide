@@ -254,10 +254,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           final driver = ride['driver'] as Map<String, dynamic>?;
           final driverProfile = driver?['profile'] as Map<String, dynamic>?;
           final driverVehicle = driver?['vehicle'] as Map<String, dynamic>?;
+          debugPrint('Driver data: $driver');
+          debugPrint('Driver vehicle: $driverVehicle');
           final driverName = driverProfile?['full_name'] as String? ?? 'Driver';
-          final vehicleNumber = driverVehicle?['display_name'] as String? ?? driverVehicle?['plate_no'] as String?;
+          final vehicleNumber = driverVehicle?['display_name'] as String?;
+          final plateNo = driverVehicle?['plate_no'] as String?;
           final driverPhone = driverProfile?['phone'] as String?;
           final driverRating = driver?['rating'];
+          // Get driver photo - prefer driver's own avatar, fallback to profile avatar
+          final driverPhoto = driver?['avatar_url'] as String? ?? driverProfile?['avatar_url'] as String?;
+          debugPrint('Extracted - driverPhoto: $driverPhoto, plateNo: $plateNo, vehicleNumber: $vehicleNumber');
 
           setState(() {
             _ongoingTrip = {
@@ -265,7 +271,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               'driverName': driverName,
               'driverRating': driverRating,
               'driverPhone': driverPhone,
+              'driverPhoto': driverPhoto,
               'vehicleNumber': vehicleNumber,
+              'plateNo': plateNo,
               'pickup': ride['pickup_name'] ?? 'Pickup',
               'dropoff': ride['dropoff_name'] ?? 'Dropoff',
               'status': status,
@@ -1775,11 +1783,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         onTap: () async {
                           final result = await _showLocationPicker(context, 'Select Dropoff', AppColors.error);
                           if (result != null) {
+                            debugPrint('Location picker returned: $result');
                             setModalState(() {
                               final name = result['name'] as String? ?? '';
                               dropoffAddress = name.isNotEmpty && name != 'Pinned Location' ? name : (result['address'] as String);
                               dropoffLat = result['lat'] as double?;
                               dropoffLng = result['lng'] as double?;
+                              debugPrint('Set dropoffLat=$dropoffLat, dropoffLng=$dropoffLng');
                             });
                             _lastDropoffAddress = dropoffAddress;
                             _lastDropoffLat = dropoffLat;
@@ -2071,6 +2081,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       });
 
       try {
+        // Search admin-defined locations first
+        List<Map<String, dynamic>> adminLocations = [];
+        try {
+          final locations = await SupabaseService.getLocations();
+          adminLocations = locations
+              .where((loc) =>
+                (loc['name'] as String? ?? '').toLowerCase().contains(query.toLowerCase()) ||
+                (loc['address'] as String? ?? '').toLowerCase().contains(query.toLowerCase()))
+              .map((loc) {
+                // Parse lat/lng - handle both string and num types from database
+                double? lat;
+                double? lng;
+                if (loc['lat'] != null) {
+                  lat = loc['lat'] is num ? (loc['lat'] as num).toDouble() : double.tryParse(loc['lat'].toString());
+                }
+                if (loc['lng'] != null) {
+                  lng = loc['lng'] is num ? (loc['lng'] as num).toDouble() : double.tryParse(loc['lng'].toString());
+                }
+                debugPrint('Admin location ${loc['name']}: lat=$lat, lng=$lng');
+                return {
+                  'name': loc['name'] ?? '',
+                  'address': loc['address'] ?? 'Saved Location',
+                  'icon': Icons.star_rounded,
+                  'lat': lat,
+                  'lng': lng,
+                  'isAdminLocation': true,
+                };
+              })
+              .toList();
+        } catch (e) {
+          debugPrint('Admin locations search error: $e');
+        }
+
+        // Then search Google Places
         final url = Uri.parse(
           'https://maps.googleapis.com/maps/api/place/autocomplete/json'
           '?input=${Uri.encodeComponent(query)}'
@@ -2085,21 +2129,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           final data = json.decode(response.body);
           if (data['status'] == 'OK') {
             final predictions = data['predictions'] as List;
+            final googleResults = predictions.map((p) => {
+              'place_id': p['place_id'],
+              'name': p['structured_formatting']?['main_text'] ?? p['description'],
+              'address': p['description'],
+              'icon': Icons.location_on,
+            }).toList();
             setModalState(() {
-              searchResults = predictions.map((p) => {
-                'place_id': p['place_id'],
-                'name': p['structured_formatting']?['main_text'] ?? p['description'],
-                'address': p['description'],
-                'icon': Icons.location_on,
-              }).toList();
+              // Admin locations first, then Google results
+              searchResults = [...adminLocations, ...googleResults];
               isSearching = false;
             });
           } else {
             setModalState(() {
-              searchResults = [];
+              searchResults = adminLocations.isNotEmpty ? adminLocations : [];
               isSearching = false;
             });
           }
+        } else {
+          setModalState(() {
+            searchResults = adminLocations.isNotEmpty ? adminLocations : [];
+            isSearching = false;
+          });
         }
       } catch (e) {
         debugPrint('Places search error: $e');
@@ -2119,10 +2170,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         );
 
         final response = await http.get(url);
+        debugPrint('Place details response for $placeId: ${response.body}');
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
           if (data['status'] == 'OK') {
             final location = data['result']['geometry']['location'];
+            debugPrint('Place coordinates: lat=${location['lat']}, lng=${location['lng']}');
             return LatLng(location['lat'], location['lng']);
           }
         }
@@ -2303,9 +2356,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                     return GestureDetector(
                                       onTap: () async {
                                         final placeId = place['place_id'] as String?;
-                                        if (placeId != null) {
+                                        final isAdminLocation = place['isAdminLocation'] == true;
+                                        debugPrint('Place selected: ${place['name']}, placeId: $placeId, isAdminLocation: $isAdminLocation');
+
+                                        // Admin locations already have coordinates
+                                        if (isAdminLocation && place['lat'] != null && place['lng'] != null) {
+                                          final lat = place['lat'] as double;
+                                          final lng = place['lng'] as double;
+                                          debugPrint('Using admin location coords: lat=$lat, lng=$lng');
+                                          setModalState(() {
+                                            selectedLocation = LatLng(lat, lng);
+                                            addressText = place['address'] as String? ?? place['name'] as String;
+                                            selectedName = place['name'] as String;
+                                            showSearchResults = false;
+                                            isSearching = false;
+                                            searchController.text = place['name'] as String;
+                                          });
+                                          googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(selectedLocation, 16));
+                                        } else if (placeId != null) {
                                           setModalState(() => isSearching = true);
                                           final coords = await getPlaceDetails(placeId);
+                                          debugPrint('Got coords for ${place['name']}: $coords');
                                           if (coords != null) {
                                             setModalState(() {
                                               selectedLocation = coords;
@@ -2315,8 +2386,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                               isSearching = false;
                                               searchController.text = place['name'] as String;
                                             });
+                                            debugPrint('selectedLocation updated to: ${selectedLocation.latitude}, ${selectedLocation.longitude}');
                                             googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(selectedLocation, 16));
                                           } else {
+                                            debugPrint('coords is null, keeping old selectedLocation');
                                             setModalState(() => isSearching = false);
                                           }
                                         }

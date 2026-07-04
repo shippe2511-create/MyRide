@@ -611,24 +611,6 @@ class SupabaseService {
     }
   }
 
-  static Future<bool> updateSavedPlaceOrder(String placeId, int sortOrder) async {
-    try {
-      final id = userId;
-      if (id == null) return false;
-
-      await client
-          .from('saved_places')
-          .update({'sort_order': sortOrder})
-          .eq('id', placeId)
-          .eq('user_id', id);
-
-      return true;
-    } catch (e) {
-      debugPrint('Error updating saved place order: $e');
-      return false;
-    }
-  }
-
   static Future<String> exportUserData() async {
     final id = userId;
     if (id == null) throw Exception('Not logged in');

@@ -549,33 +549,25 @@ class _SearchScreenState extends State<SearchScreen> {
       final places = List<Map<String, dynamic>>.from(response);
 
       setState(() {
-        _savedPlaces = places.map((p) => {
-          'id': p['id'],
-          'icon': _getIconFromString(p['icon'] ?? 'location_on'),
-          'name': p['name'] ?? '',
-          'address': p['address'] ?? '',
-          'color': _getColorFromString(p['color'] ?? 'yellow'),
-          'lat': (p['lat'] as num?)?.toDouble(),
-          'lng': (p['lng'] as num?)?.toDouble(),
+        _savedPlaces = places.map((p) {
+          final lat = (p['latitude'] as num?)?.toDouble();
+          final lng = (p['longitude'] as num?)?.toDouble();
+          debugPrint('Saved place ${p['name']}: lat=$lat, lng=$lng (raw: ${p['latitude']}, ${p['longitude']})');
+          return {
+            'id': p['id'],
+            'icon': _getIconFromString(p['icon'] ?? 'location_on'),
+            'name': p['name'] ?? '',
+            'address': p['address'] ?? '',
+            'color': _getColorFromString(p['color'] ?? 'yellow'),
+            'lat': lat,
+            'lng': lng,
+          };
         }).toList();
         _loadingSavedPlaces = false;
       });
     } catch (e) {
       debugPrint('Error loading saved places: $e');
       setState(() => _loadingSavedPlaces = false);
-    }
-  }
-
-  Future<void> _updateSavedPlacesOrder() async {
-    try {
-      for (int i = 0; i < _savedPlaces.length; i++) {
-        final placeId = _savedPlaces[i]['id'];
-        if (placeId != null) {
-          await SupabaseService.updateSavedPlaceOrder(placeId, i);
-        }
-      }
-    } catch (e) {
-      debugPrint('Error updating saved places order: $e');
     }
   }
 
@@ -1424,36 +1416,13 @@ class _SearchScreenState extends State<SearchScreen> {
                   )
                 : SizedBox(
                     height: 110,
-                    child: ReorderableListView.builder(
+                    child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       itemCount: _savedPlaces.length,
-                      buildDefaultDragHandles: false,
-                      proxyDecorator: (child, index, animation) {
-                        return Material(
-                          color: Colors.transparent,
-                          elevation: 8,
-                          shadowColor: AppColors.yellow.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(16),
-                          child: child,
-                        );
-                      },
-                      onReorder: (oldIndex, newIndex) async {
-                        HapticFeedback.mediumImpact();
-                        if (newIndex > oldIndex) newIndex--;
-                        final item = _savedPlaces.removeAt(oldIndex);
-                        setState(() {
-                          _savedPlaces.insert(newIndex, item);
-                        });
-                        await _updateSavedPlacesOrder();
-                      },
                       itemBuilder: (context, index) {
                         final place = _savedPlaces[index];
-                        return ReorderableDragStartListener(
-                          key: ValueKey(place['id'] ?? index),
-                          index: index,
-                          child: _buildSavedPlaceCard(place, index, isDark),
-                        );
+                        return _buildSavedPlaceCard(place, index, isDark);
                       },
                     ),
                   ),
@@ -2310,6 +2279,8 @@ class _SearchScreenState extends State<SearchScreen> {
                                 'name': nameController.text,
                                 'address': selectedAddress,
                                 'color': _placeColors[selectedColorIndex % _placeColors.length],
+                                'lat': selectedLat,
+                                'lng': selectedLng,
                               });
                             });
                             Navigator.pop(ctx);

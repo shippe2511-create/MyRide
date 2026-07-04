@@ -122,24 +122,23 @@ class RealtimeService {
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
-          table: 'driver_locations',
+          table: 'drivers',
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
-            column: 'driver_id',
+            column: 'id',
             value: driverId,
           ),
           callback: (payload) {
             if (!controller.isClosed) {
               final data = payload.newRecord;
-              final lat = data['lat'] as num?;
-              final lng = data['lng'] as num?;
-              final heading = data['heading'] as num?;
+              final lat = data['current_location_lat'] as num?;
+              final lng = data['current_location_lng'] as num?;
               if (lat != null && lng != null) {
                 controller.add({
                   'lat': lat.toDouble(),
                   'lng': lng.toDouble(),
-                  'heading': heading?.toDouble(),
-                  'speed': data['speed'],
+                  'heading': null,
+                  'speed': null,
                 });
               }
             }

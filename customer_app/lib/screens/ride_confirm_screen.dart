@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -47,11 +48,70 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
   GoogleMapController? _mapController;
   String? _duration;
   String? _distance;
+  BitmapDescriptor? _pickupIcon;
+  BitmapDescriptor? _dropoffIcon;
 
   @override
   void initState() {
     super.initState();
+    _createMarkerIcons();
     _fetchRoute();
+  }
+
+  Future<void> _createMarkerIcons() async {
+    _pickupIcon = await _createLabeledMarker('A', Colors.green);
+    _dropoffIcon = await _createLabeledMarker('B', Colors.red);
+    if (mounted) setState(() {});
+  }
+
+  Future<BitmapDescriptor> _createLabeledMarker(String label, Color color) async {
+    final pictureRecorder = ui.PictureRecorder();
+    final canvas = Canvas(pictureRecorder);
+    const size = Size(40, 50);
+
+    final pinPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final pinPath = Path();
+    pinPath.addOval(Rect.fromCircle(center: Offset(size.width / 2, 15), radius: 14));
+    pinPath.moveTo(size.width / 2 - 10, 22);
+    pinPath.lineTo(size.width / 2, size.height - 5);
+    pinPath.lineTo(size.width / 2 + 10, 22);
+    pinPath.close();
+
+    canvas.drawPath(pinPath, pinPaint);
+
+    final whitePaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(size.width / 2, 15), 9, whitePaint);
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset(
+        (size.width - textPainter.width) / 2,
+        15 - textPainter.height / 2,
+      ),
+    );
+
+    final picture = pictureRecorder.endRecording();
+    final image = await picture.toImage(size.width.toInt(), size.height.toInt());
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+
+    return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
   }
 
   Future<void> _fetchRoute() async {
@@ -81,13 +141,8 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
               _distance = distance;
             });
 
-            // Fit map to route bounds
-            if (_mapController != null && points.isNotEmpty) {
-              final bounds = _getBounds(points);
-              _mapController!.animateCamera(
-                CameraUpdate.newLatLngBounds(bounds, 80),
-              );
-            }
+            // Fit map to route bounds with extra bottom padding for bottom sheet
+            _fitMapToBounds();
           }
         }
       }
@@ -157,6 +212,35 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
     );
   }
 
+  void _fitMapToBounds() {
+    if (_mapController == null) return;
+
+    // Include both markers and route points in bounds calculation
+    final allPoints = <LatLng>[
+      LatLng(widget.pickupLat, widget.pickupLng),
+      LatLng(widget.dropoffLat, widget.dropoffLng),
+      ..._routePoints,
+    ];
+
+    if (allPoints.isEmpty) return;
+
+    final bounds = _getBounds(allPoints);
+
+    // Padding: top 80, left/right 60, bottom 320 (to account for bottom sheet ~280 + margin)
+    _mapController!.animateCamera(
+      CameraUpdate.newLatLngBounds(bounds, 60),
+    );
+
+    // Apply additional offset to shift map up to account for bottom sheet
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (_mapController != null && mounted) {
+        _mapController!.moveCamera(
+          CameraUpdate.scrollBy(0, -100), // Scroll map up by 100 pixels
+        );
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -174,24 +258,21 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
             ),
             onMapCreated: (controller) {
               _mapController = controller;
-              // Fit bounds after map is created if route is already loaded
-              if (_routePoints.isNotEmpty) {
-                final bounds = _getBounds(_routePoints);
-                controller.animateCamera(
-                  CameraUpdate.newLatLngBounds(bounds, 80),
-                );
-              }
+              // Fit bounds after map is created
+              Future.delayed(const Duration(milliseconds: 500), () => _fitMapToBounds());
             },
             markers: {
               Marker(
                 markerId: const MarkerId('pickup'),
                 position: LatLng(widget.pickupLat, widget.pickupLng),
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                icon: _pickupIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                anchor: const Offset(0.5, 1.0),
               ),
               Marker(
                 markerId: const MarkerId('dropoff'),
                 position: LatLng(widget.dropoffLat, widget.dropoffLng),
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                icon: _dropoffIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                anchor: const Offset(0.5, 1.0),
               ),
             },
             polylines: {

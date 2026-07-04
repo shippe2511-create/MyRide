@@ -9,7 +9,7 @@ import {
   LocateFixed, Search, X, Volume2, VolumeX, Flame, Target
 } from "lucide-react"
 
-const libraries: ("visualization" | "places")[] = ["visualization"]
+const libraries: ("visualization" | "drawing")[] = ["visualization", "drawing"]
 
 interface Driver {
   id: string
@@ -157,14 +157,6 @@ function DriverMarker({
           />
         )}
 
-        {/* Status badge */}
-        <div
-          className="absolute -top-7 left-1/2 transform -translate-x-1/2 whitespace-nowrap px-2 py-0.5 rounded-full text-[10px] font-semibold text-white shadow-md z-10"
-          style={{ backgroundColor: statusColor }}
-        >
-          {statusLabel}
-        </div>
-
         {/* Vehicle container with rotation */}
         <div
           style={{
@@ -172,11 +164,12 @@ function DriverMarker({
             transition: "transform 0.5s ease-out",
           }}
         >
-          {/* SVG Truck Icon */}
-          <svg
-            width="44"
-            height="60"
-            viewBox="0 0 44 60"
+          {/* Pickup Truck Image */}
+          <img
+            src="/pickup-truck.png"
+            alt="Vehicle"
+            width="40"
+            height="50"
             style={{
               filter: isSelected
                 ? "drop-shadow(0 0 12px #FFD60A)"
@@ -184,44 +177,20 @@ function DriverMarker({
                   ? "drop-shadow(0 3px 8px rgba(0,0,0,0.6))"
                   : "drop-shadow(0 2px 6px rgba(0,0,0,0.4))",
             }}
-          >
-            {/* Direction arrow */}
-            <polygon points="22,0 16,10 28,10" fill={statusColor} />
-
-            {/* Truck body */}
-            <rect x="8" y="12" width="28" height="44" rx="4" fill="#f5f5f5" stroke="#333" strokeWidth="2" />
-
-            {/* Cabin (front) */}
-            <rect x="10" y="14" width="24" height="14" rx="2" fill="#e0e0e0" stroke="#333" strokeWidth="1" />
-
-            {/* Windshield */}
-            <rect x="12" y="16" width="20" height="10" rx="1" fill="#4a5568" />
-
-            {/* Truck bed */}
-            <rect x="10" y="30" width="24" height="24" rx="1" fill="#d4d4d4" stroke="#333" strokeWidth="1" />
-
-            {/* Bed lines */}
-            <line x1="10" y1="38" x2="34" y2="38" stroke="#999" strokeWidth="1" />
-            <line x1="10" y1="46" x2="34" y2="46" stroke="#999" strokeWidth="1" />
-
-            {/* Side mirrors */}
-            <rect x="4" y="18" width="4" height="6" rx="1" fill="#333" />
-            <rect x="36" y="18" width="4" height="6" rx="1" fill="#333" />
-
-            {/* Tail lights */}
-            <rect x="10" y="52" width="6" height="3" rx="1" fill="#ef4444" />
-            <rect x="28" y="52" width="6" height="3" rx="1" fill="#ef4444" />
-          </svg>
+          />
         </div>
 
-        {/* Vehicle Number Badge */}
-        {driver.vehicleNumber && (
-          <div
-            className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-white text-black px-2 py-0.5 rounded shadow-lg text-[10px] font-bold whitespace-nowrap border border-gray-300"
-          >
-            {driver.vehicleNumber}
+        {/* Driver Name & Vehicle Number Badge */}
+        <div className="absolute -bottom-10 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-1">
+          <div className="bg-gray-900/95 text-white px-2 py-1 rounded shadow-lg text-[10px] font-medium whitespace-nowrap border border-gray-600">
+            {driver.name || "Driver"}
           </div>
-        )}
+          {driver.vehicleNumber && (
+            <div className="bg-yellow-400 text-black px-2 py-0.5 rounded shadow-lg text-[10px] font-bold whitespace-nowrap">
+              {driver.vehicleNumber}
+            </div>
+          )}
+        </div>
 
         {/* ETA/Distance badge for active rides */}
         {driver.activeRide?.eta && (
@@ -1099,30 +1068,27 @@ export function LiveDriverMap({
       </div>
 
       {/* Legend */}
-      <div className="absolute bottom-3 left-3 bg-background/90 backdrop-blur rounded-lg p-3 shadow-lg text-xs">
-        <p className="font-semibold mb-2">Status</p>
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-green-500" />
+      <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-[10] bg-background/90 backdrop-blur rounded-lg px-4 py-2 shadow-lg text-xs">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
             <span>Available</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-blue-500" />
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
             <span>On Ride</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-amber-500" />
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
             <span>On Break</span>
           </div>
-        </div>
-        {showTrails && (
-          <div className="mt-2 pt-2 border-t">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-0.5 bg-purple-500" />
+          {showTrails && (
+            <div className="flex items-center gap-1.5 border-l pl-4">
+              <div className="w-4 h-0.5 bg-purple-500" />
               <span>Trail</span>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )

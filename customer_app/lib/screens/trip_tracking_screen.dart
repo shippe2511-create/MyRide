@@ -85,6 +85,11 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> with TickerProv
       vsync: this,
     );
 
+    debugPrint('TripTrackingScreen tripData: ${widget.tripData}');
+    debugPrint('driverPhoto: ${widget.tripData['driverPhoto']}');
+    debugPrint('plateNo: ${widget.tripData['plateNo']}');
+    debugPrint('vehicleNumber: ${widget.tripData['vehicleNumber']}');
+
     _dropoff = widget.tripData['dropoff'] ?? 'Velana International Airport';
     _rideStatus = widget.tripData['status'] as String? ?? 'accepted';
     _driverName = widget.tripData['driverName'] as String? ?? 'Driver';
@@ -127,44 +132,14 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> with TickerProv
   }
 
   Future<BitmapDescriptor> _createCarIcon() async {
-    final ByteData data = await rootBundle.load('assets/images/twin_cab.png');
-    final ui.Codec codec = await ui.instantiateImageCodec(
+    final data = await rootBundle.load('assets/images/pickup_truck.png');
+    final codec = await ui.instantiateImageCodec(
       data.buffer.asUint8List(),
-      targetWidth: 64,
-      targetHeight: 80,
+      targetWidth: 40,
     );
-    final ui.FrameInfo fi = await codec.getNextFrame();
-    final ui.Image resizedImage = fi.image;
-
-    final pictureRecorder = ui.PictureRecorder();
-    final canvas = Canvas(pictureRecorder);
-    const outputSize = Size(72, 88);
-
-    // Draw shadow
-    final shadowPaint = Paint()
-      ..color = Colors.black.withOpacity(0.35)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(outputSize.width / 2 + 2, outputSize.height - 8),
-        width: 50,
-        height: 14,
-      ),
-      shadowPaint,
-    );
-
-    // Draw the car image centered
-    canvas.drawImage(
-      resizedImage,
-      Offset((outputSize.width - 64) / 2, (outputSize.height - 80) / 2 - 4),
-      Paint(),
-    );
-
-    final picture = pictureRecorder.endRecording();
-    final image = await picture.toImage(outputSize.width.toInt(), outputSize.height.toInt());
-    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-
-    return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
+    final frame = await codec.getNextFrame();
+    final bytes = await frame.image.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
   }
 
   Future<void> _loadPinIcons() async {
@@ -494,14 +469,14 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> with TickerProv
   Future<void> _fetchDriverLocation(String driverId) async {
     try {
       final response = await SupabaseService.client
-          .from('driver_locations')
-          .select('lat, lng')
-          .eq('driver_id', driverId)
+          .from('drivers')
+          .select('current_location_lat, current_location_lng')
+          .eq('id', driverId)
           .maybeSingle();
 
       if (response != null && mounted) {
-        final lat = response['lat'] as num?;
-        final lng = response['lng'] as num?;
+        final lat = response['current_location_lat'] as num?;
+        final lng = response['current_location_lng'] as num?;
         if (lat != null && lng != null && _isValidMaldivesCoord(lat.toDouble(), lng.toDouble())) {
           setState(() {
             _driverLocation = LatLng(lat.toDouble(), lng.toDouble());
@@ -931,90 +906,65 @@ Live tracking link: https://myride.mv/track/$rideId
                       ),
                     ),
 
-                    // Driver info with vehicle image - Uber/Careem style
+                    // Driver info with profile photo
                     Padding(
                       padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
                       child: Row(
                         children: [
-                          // Vehicle image with driver photo overlay
-                          SizedBox(
-                            width: 120,
-                            height: 80,
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                // Vehicle image
-                                Positioned(
-                                  right: 0,
-                                  top: 0,
-                                  child: Image.asset(
-                                    'assets/images/twin_cab.png',
-                                    width: 100,
-                                    height: 70,
-                                    fit: BoxFit.contain,
-                                  ),
+                          // Driver profile photo with rating badge
+                          Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2),
+                                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 6)],
                                 ),
-                                // Driver photo with rating badge
-                                Positioned(
-                                  left: 0,
-                                  bottom: 0,
-                                  child: Stack(
-                                    clipBehavior: Clip.none,
+                                child: ClipOval(
+                                  child: widget.tripData['driverPhoto'] != null && (widget.tripData['driverPhoto'] as String).isNotEmpty
+                                      ? Image.network(
+                                          widget.tripData['driverPhoto'] as String,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => Container(
+                                            color: AppColors.yellow,
+                                            child: Icon(Icons.person, color: Colors.black87, size: 32),
+                                          ),
+                                        )
+                                      : Container(
+                                          color: AppColors.yellow,
+                                          child: Icon(Icons.person, color: Colors.black87, size: 32),
+                                        ),
+                                ),
+                              ),
+                              // Rating badge
+                              Positioned(
+                                bottom: -4,
+                                left: 8,
+                                right: 8,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 4)],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Container(
-                                        width: 52,
-                                        height: 52,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          border: Border.all(color: Colors.white, width: 2),
-                                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 6)],
-                                        ),
-                                        child: ClipOval(
-                                          child: widget.tripData['driverPhoto'] != null && (widget.tripData['driverPhoto'] as String).isNotEmpty
-                                              ? Image.network(
-                                                  widget.tripData['driverPhoto'] as String,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (_, __, ___) => Container(
-                                                    color: AppColors.yellow,
-                                                    child: Icon(Icons.person, color: Colors.black87, size: 28),
-                                                  ),
-                                                )
-                                              : Container(
-                                                  color: AppColors.yellow,
-                                                  child: Icon(Icons.person, color: Colors.black87, size: 28),
-                                                ),
-                                        ),
-                                      ),
-                                      // Rating badge
-                                      Positioned(
-                                        bottom: -4,
-                                        left: 8,
-                                        right: 8,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(10),
-                                            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 4)],
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              Text('${widget.tripData['driverRating'] ?? 0.0}', style: TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.w700)),
-                                              const SizedBox(width: 2),
-                                              Icon(Icons.star, color: Colors.black87, size: 10),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
+                                      Text('${widget.tripData['driverRating'] ?? 0.0}', style: TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.w700)),
+                                      const SizedBox(width: 2),
+                                      Icon(Icons.star, color: Colors.black87, size: 10),
                                     ],
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: 16),
                           // Driver info
                           Expanded(
                             child: Column(
@@ -1025,9 +975,13 @@ Live tracking link: https://myride.mv/track/$rideId
                                   style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w700),
                                 ),
                                 const SizedBox(height: 4),
-                                Text(widget.tripData['vehicleNumber'] ?? '', style: TextStyle(color: context.mutedColor, fontSize: 14, fontWeight: FontWeight.w500)),
-                                const SizedBox(height: 2),
-                                Text(widget.tripData['vehicleModel'] ?? '', style: TextStyle(color: context.mutedColor, fontSize: 12)),
+                                Text(
+                                  [
+                                    widget.tripData['vehicleNumber'],
+                                    widget.tripData['plateNo'],
+                                  ].where((s) => s != null && s.toString().isNotEmpty).join(' - '),
+                                  style: TextStyle(color: context.mutedColor, fontSize: 14, fontWeight: FontWeight.w500),
+                                ),
                               ],
                             ),
                           ),

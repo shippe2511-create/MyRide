@@ -70,39 +70,77 @@ export default function TrackingPage() {
   const { data: driverLocations = [], isLoading: loading, refetch } = useQuery({
     queryKey: ["tracking-page"],
     queryFn: async () => {
-      // Get driver locations with driver info
-      const { data: locations } = await supabase
+      // Get driver locations first
+      const { data: locations, error: locError } = await supabase
         .from("driver_locations")
-        .select(`
-          *,
-          driver:drivers!driver_locations_driver_id_fkey(
-            id,
-            profile_id,
-            is_on_break,
-            break_type,
-            vehicle:vehicles(display_name, plate_no),
-            profile:profiles!drivers_profile_id_fkey(full_name, phone, avatar_url)
-          )
-        `)
+        .select("*")
         .order("last_updated", { ascending: false })
 
-      // Get active rides for these drivers with customer info
+      if (locError) {
+        console.error("Driver locations error:", locError)
+        return []
+      }
+
+      // Get driver details separately
       const driverIds = locations?.map(l => l.driver_id).filter(Boolean) || []
+      if (driverIds.length === 0) return locations || []
+
+      const { data: drivers } = await supabase
+        .from("drivers")
+        .select(`
+          id,
+          profile_id,
+          is_online,
+          is_on_break,
+          break_type,
+          vehicle_id,
+          current_location_lat,
+          current_location_lng,
+          updated_at,
+          avatar_url,
+          rating,
+          profile:profiles(full_name, phone, avatar_url)
+        `)
+        .in("id", driverIds)
+
+      // Get vehicle_types separately using the vehicle_id from drivers
+      const vehicleIds = drivers?.map(d => d.vehicle_id).filter(Boolean) || []
+      const { data: vehicleTypes } = vehicleIds.length > 0 ? await supabase
+        .from("vehicle_types")
+        .select("id, display_name, plate_no")
+        .in("id", vehicleIds) : { data: [] }
+
+      // Get active rides for these drivers
       const { data: activeRides } = await supabase
         .from("rides")
         .select(`
           id, driver_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
           pickup_address, dropoff_address,
-          customer:profiles!rides_customer_id_fkey(full_name, phone)
+          customer:profiles(full_name, phone)
         `)
         .in("driver_id", driverIds)
         .in("status", ["accepted", "arriving", "in_progress"])
 
-      // Merge active rides into locations
-      return (locations || []).map(loc => ({
-        ...loc,
-        activeRide: activeRides?.find(r => r.driver_id === loc.driver_id) || null
-      }))
+      // Merge everything - use is_online and location from drivers table (more reliable)
+      return (locations || []).map(loc => {
+        const driver = drivers?.find(d => d.id === loc.driver_id)
+        const vehicleType = driver?.vehicle_id ? vehicleTypes?.find(v => v.id === driver.vehicle_id) : null
+        return {
+          ...loc,
+          lat: driver?.current_location_lat ? parseFloat(driver.current_location_lat) : loc.lat,
+          lng: driver?.current_location_lng ? parseFloat(driver.current_location_lng) : loc.lng,
+          is_online: driver?.is_online ?? loc.is_online,
+          last_updated: driver?.updated_at ?? loc.last_updated,
+          driver: driver ? {
+            ...driver,
+            vehicle: vehicleType ? {
+              vehicle_number: vehicleType.display_name,
+              plate_no: vehicleType.plate_no
+            } : null
+          } : null,
+          activeRide: activeRides?.find(r => r.driver_id === loc.driver_id) || null
+        }
+      })
     },
     staleTime: 3 * 1000,
     refetchInterval: 3000,
@@ -219,7 +257,7 @@ export default function TrackingPage() {
       </div>
 
       {/* Map and Driver List */}
-      <div className="grid grid-cols-4 gap-4 h-[calc(100%-200px)]">
+      <div className="grid grid-cols-4 gap-4 h-[calc(100%-120px)]">
         {/* Map */}
         <Card className="col-span-3 overflow-hidden">
           <LiveDriverMap
@@ -231,8 +269,9 @@ export default function TrackingPage() {
               speed: d.speed,
               name: d.driver?.profile?.full_name || "Unknown",
               phone: d.driver?.profile?.phone || undefined,
-              avatarUrl: d.driver?.profile?.avatar_url || undefined,
-              vehicleNumber: d.driver?.vehicle?.display_name || d.driver?.vehicle?.plate_no || undefined,
+              avatarUrl: d.driver?.avatar_url || d.driver?.profile?.avatar_url || undefined,
+              rating: d.driver?.rating || undefined,
+              vehicleNumber: d.driver?.vehicle?.vehicle_number || d.driver?.vehicle?.vehicle_model || undefined,
               isOnline: d.is_online,
               isOnBreak: d.driver?.is_on_break,
               breakType: d.driver?.break_type,

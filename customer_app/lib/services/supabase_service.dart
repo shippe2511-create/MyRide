@@ -327,7 +327,7 @@ class SupabaseService {
           .select('''
             *,
             driver:drivers!rides_driver_id_fkey(
-              *,
+              id, rating, avatar_url,
               profile:profiles!drivers_profile_id_fkey(id, full_name, phone, avatar_url),
               vehicle:vehicle_types!drivers_vehicle_id_fkey(id, display_name, plate_no, name)
             )

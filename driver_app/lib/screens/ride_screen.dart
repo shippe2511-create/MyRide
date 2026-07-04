@@ -202,44 +202,14 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   }
 
   Future<BitmapDescriptor> _createCarIcon() async {
-    final ByteData data = await rootBundle.load('assets/images/twin_cab.png');
-    final ui.Codec codec = await ui.instantiateImageCodec(
+    final data = await rootBundle.load('assets/images/pickup_truck.png');
+    final codec = await ui.instantiateImageCodec(
       data.buffer.asUint8List(),
-      targetWidth: 64,
-      targetHeight: 80,
+      targetWidth: 40,
     );
-    final ui.FrameInfo fi = await codec.getNextFrame();
-    final ui.Image resizedImage = fi.image;
-
-    final pictureRecorder = ui.PictureRecorder();
-    final canvas = Canvas(pictureRecorder);
-    const outputSize = Size(72, 88);
-
-    // Draw shadow
-    final shadowPaint = Paint()
-      ..color = Colors.black.withOpacity(0.35)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(outputSize.width / 2 + 2, outputSize.height - 8),
-        width: 50,
-        height: 14,
-      ),
-      shadowPaint,
-    );
-
-    // Draw the car image centered
-    canvas.drawImage(
-      resizedImage,
-      Offset((outputSize.width - 64) / 2, (outputSize.height - 80) / 2 - 4),
-      Paint(),
-    );
-
-    final picture = pictureRecorder.endRecording();
-    final image = await picture.toImage(outputSize.width.toInt(), outputSize.height.toInt());
-    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-
-    return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
+    final frame = await codec.getNextFrame();
+    final bytes = await frame.image.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
   }
 
   Future<void> _loadPinIcons() async {
@@ -1752,9 +1722,19 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                       gradient: LinearGradient(
                         colors: [AppColors.yellow, AppColors.yellow.withValues(alpha: 0.7)],
                       ),
-                      borderRadius: BorderRadius.circular(16),
+                      shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.person, color: Colors.black, size: 32),
+                    child: ride.customerPhoto != null && ride.customerPhoto!.isNotEmpty
+                        ? ClipOval(
+                            child: Image.network(
+                              ride.customerPhoto!,
+                              width: 60,
+                              height: 60,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.black, size: 32),
+                            ),
+                          )
+                        : const Icon(Icons.person, color: Colors.black, size: 32),
                   ),
                   Positioned(
                     bottom: -2,

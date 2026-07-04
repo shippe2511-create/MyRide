@@ -196,44 +196,14 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
   }
 
   Future<BitmapDescriptor> _createCarIcon() async {
-    final ByteData data = await rootBundle.load('assets/images/twin_cab.png');
-    final ui.Codec codec = await ui.instantiateImageCodec(
+    final data = await rootBundle.load('assets/images/pickup_truck.png');
+    final codec = await ui.instantiateImageCodec(
       data.buffer.asUint8List(),
-      targetWidth: 64,
-      targetHeight: 80,
+      targetWidth: 40,
     );
-    final ui.FrameInfo fi = await codec.getNextFrame();
-    final ui.Image resizedImage = fi.image;
-
-    final pictureRecorder = ui.PictureRecorder();
-    final canvas = Canvas(pictureRecorder);
-    const outputSize = Size(72, 88);
-
-    // Draw shadow
-    final shadowPaint = Paint()
-      ..color = Colors.black.withOpacity(0.35)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(outputSize.width / 2 + 2, outputSize.height - 8),
-        width: 50,
-        height: 14,
-      ),
-      shadowPaint,
-    );
-
-    // Draw the car image centered
-    canvas.drawImage(
-      resizedImage,
-      Offset((outputSize.width - 64) / 2, (outputSize.height - 80) / 2 - 4),
-      Paint(),
-    );
-
-    final picture = pictureRecorder.endRecording();
-    final image = await picture.toImage(outputSize.width.toInt(), outputSize.height.toInt());
-    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-
-    return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
+    final frame = await codec.getNextFrame();
+    final bytes = await frame.image.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
   }
 
   Future<BitmapDescriptor> _createPinIcon(String label, Color color) async {
@@ -338,17 +308,17 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
       }
     });
 
-    // Fetch initial location
+    // Fetch initial location from drivers table (more reliable)
     try {
       final response = await SupabaseService.client
-          .from('driver_locations')
-          .select('lat, lng')
-          .eq('driver_id', widget.driverId!)
+          .from('drivers')
+          .select('current_location_lat, current_location_lng')
+          .eq('id', widget.driverId!)
           .maybeSingle();
 
       if (response != null && mounted) {
-        final lat = response['lat'] as num?;
-        final lng = response['lng'] as num?;
+        final lat = response['current_location_lat'] as num?;
+        final lng = response['current_location_lng'] as num?;
         if (lat != null && lng != null && _isValidMaldivesCoord(lat.toDouble(), lng.toDouble())) {
           setState(() {
             _driverLocation = LatLng(lat.toDouble(), lng.toDouble());
@@ -736,7 +706,7 @@ ${widget.rideId != null ? 'Track: https://myride.mv/track/${widget.rideId}' : ''
                                   right: 0,
                                   top: 0,
                                   child: Image.asset(
-                                    'assets/images/twin_cab.png',
+                                    'assets/images/pickup_truck.png',
                                     width: 100,
                                     height: 70,
                                     fit: BoxFit.contain,

@@ -19,13 +19,15 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Map, Download } from "lucide-react"
+import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Map, Download, CheckSquare } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 import { formatDate } from "@/lib/utils"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { PermissionGate } from "@/components/permission-gate"
 import { ZoneMap } from "@/components/zone-map"
+import { LocationPicker } from "@/components/location-picker"
 
 interface Zone {
   id: string
@@ -41,8 +43,8 @@ interface Location {
   id: string
   name: string
   address: string | null
-  latitude: number | null
-  longitude: number | null
+  lat: number | null
+  lng: number | null
   location_type: string
   is_active: boolean
 }
@@ -52,13 +54,18 @@ export default function ZonesPage() {
   const [zones, setZones] = useState<Zone[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [loading, setLoading] = useState(true)
-  const [dialogType, setDialogType] = useState<"zone" | "location" | "delete-zone" | "delete-location" | null>(null)
+  const [dialogType, setDialogType] = useState<"zone" | "location" | "delete-zone" | "delete-location" | "bulk-delete-zones" | "bulk-delete-locations" | null>(null)
   const [selectedItem, setSelectedItem] = useState<any>(null)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState<any>({})
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null)
   const [drawingMode, setDrawingMode] = useState(false)
   const [pendingCoords, setPendingCoords] = useState<number[][] | null>(null)
+  const [serviceAreaRadius, setServiceAreaRadius] = useState(5000)
+  const [serviceAreaCenter, setServiceAreaCenter] = useState({ lat: 4.1755, lng: 73.5093 })
+  const [rideHeatmapData, setRideHeatmapData] = useState<{ lat: number; lng: number }[]>([])
+  const [selectedZoneIds, setSelectedZoneIds] = useState<Set<string>>(new Set())
+  const [selectedLocationIds, setSelectedLocationIds] = useState<Set<string>>(new Set())
 
   const isSavingRef = useRef(false)
 
@@ -81,12 +88,27 @@ export default function ZonesPage() {
   }, [])
 
   const loadData = async () => {
-    const [zonesRes, locationsRes] = await Promise.all([
+    const [zonesRes, locationsRes, settingsRes, ridesRes] = await Promise.all([
       supabase.from("service_zones").select("id, name, zone_type, priority, is_active, created_at, boundary_coords").order("priority", { ascending: false }),
       supabase.from("locations").select("*").order("name", { ascending: true }),
+      supabase.from("app_settings").select("service_area_radius, service_area_center_lat, service_area_center_lng").limit(1).maybeSingle(),
+      supabase.from("rides").select("pickup_lat, pickup_lng, dropoff_lat, dropoff_lng").not("pickup_lat", "is", null).limit(500),
     ])
     setZones(zonesRes.data || [])
     setLocations(locationsRes.data || [])
+    if (settingsRes.data) {
+      if (settingsRes.data.service_area_radius) setServiceAreaRadius(settingsRes.data.service_area_radius)
+      if (settingsRes.data.service_area_center_lat && settingsRes.data.service_area_center_lng) {
+        setServiceAreaCenter({ lat: settingsRes.data.service_area_center_lat, lng: settingsRes.data.service_area_center_lng })
+      }
+    }
+    // Build heatmap data from ride pickup/dropoff points
+    const heatmapPoints: { lat: number; lng: number }[] = []
+    ridesRes.data?.forEach(r => {
+      if (r.pickup_lat && r.pickup_lng) heatmapPoints.push({ lat: r.pickup_lat, lng: r.pickup_lng })
+      if (r.dropoff_lat && r.dropoff_lng) heatmapPoints.push({ lat: r.dropoff_lat, lng: r.dropoff_lng })
+    })
+    setRideHeatmapData(heatmapPoints)
     setLoading(false)
   }
 
@@ -115,6 +137,25 @@ export default function ZonesPage() {
     }
   }
 
+  const handleServiceAreaChange = async (radius: number, center: { lat: number; lng: number }) => {
+    const { error } = await supabase
+      .from("app_settings")
+      .update({
+        service_area_radius: radius,
+        service_area_center_lat: center.lat,
+        service_area_center_lng: center.lng
+      })
+      .eq("id", "default")
+
+    if (error) {
+      toast.error("Failed to save service area")
+    } else {
+      setServiceAreaRadius(radius)
+      setServiceAreaCenter(center)
+      toast.success(`Service area updated to ${(radius / 1000).toFixed(1)} km`)
+    }
+  }
+
   const openZoneDialog = (zone?: Zone) => {
     setSelectedItem(zone || null)
     setFormData({
@@ -131,9 +172,9 @@ export default function ZonesPage() {
     setFormData({
       name: location?.name || "",
       address: location?.address || "",
-      latitude: location?.latitude || "",
-      longitude: location?.longitude || "",
-      location_type: location?.location_type || "pickup",
+      lat: location?.lat || "",
+      lng: location?.lng || "",
+      location_type: location?.location_type || "both",
       is_active: location?.is_active ?? true
     })
     setDialogType("location")
@@ -176,6 +217,7 @@ export default function ZonesPage() {
     setSaving(false)
     setDialogType(null)
     setPendingCoords(null)
+    setSelectedZone(null)
   }
 
   const handleSaveLocation = async () => {
@@ -185,14 +227,14 @@ export default function ZonesPage() {
     }
 
     // Validate coordinates if provided
-    const lat = parseFloat(formData.latitude)
-    const lng = parseFloat(formData.longitude)
+    const lat = parseFloat(formData.lat)
+    const lng = parseFloat(formData.lng)
 
-    if (formData.latitude && (isNaN(lat) || lat < -90 || lat > 90)) {
+    if (formData.lat && (isNaN(lat) || lat < -90 || lat > 90)) {
       toast.error("Latitude must be between -90 and 90")
       return
     }
-    if (formData.longitude && (isNaN(lng) || lng < -180 || lng > 180)) {
+    if (formData.lng && (isNaN(lng) || lng < -180 || lng > 180)) {
       toast.error("Longitude must be between -180 and 180")
       return
     }
@@ -202,8 +244,8 @@ export default function ZonesPage() {
     const payload = {
       name: formData.name,
       address: formData.address || null,
-      latitude: formData.latitude ? lat : null,
-      longitude: formData.longitude ? lng : null,
+      lat: formData.lat ? lat : null,
+      lng: formData.lng ? lng : null,
       location_type: formData.location_type,
       is_active: formData.is_active
     }
@@ -291,6 +333,70 @@ export default function ZonesPage() {
       setLocations(prev => prev.filter(l => l.id !== itemToDelete.id))
     }
     setSaving(false)
+  }
+
+  const handleBulkDeleteZones = async () => {
+    if (selectedZoneIds.size === 0) return
+    setDialogType(null)
+    setSaving(true)
+    const ids = Array.from(selectedZoneIds)
+    const { error } = await supabase.from("service_zones").delete().in("id", ids)
+    if (error) toast.error("Failed to delete zones")
+    else {
+      toast.success(`${ids.length} zone(s) deleted`)
+      setZones(prev => prev.filter(z => !selectedZoneIds.has(z.id)))
+      setSelectedZoneIds(new Set())
+    }
+    setSaving(false)
+  }
+
+  const handleBulkDeleteLocations = async () => {
+    if (selectedLocationIds.size === 0) return
+    setDialogType(null)
+    setSaving(true)
+    const ids = Array.from(selectedLocationIds)
+    const { error } = await supabase.from("locations").delete().in("id", ids)
+    if (error) toast.error("Failed to delete locations")
+    else {
+      toast.success(`${ids.length} location(s) deleted`)
+      setLocations(prev => prev.filter(l => !selectedLocationIds.has(l.id)))
+      setSelectedLocationIds(new Set())
+    }
+    setSaving(false)
+  }
+
+  const toggleZoneSelection = (id: string) => {
+    setSelectedZoneIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) newSet.delete(id)
+      else newSet.add(id)
+      return newSet
+    })
+  }
+
+  const toggleLocationSelection = (id: string) => {
+    setSelectedLocationIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) newSet.delete(id)
+      else newSet.add(id)
+      return newSet
+    })
+  }
+
+  const toggleAllZones = () => {
+    if (selectedZoneIds.size === zones.length) {
+      setSelectedZoneIds(new Set())
+    } else {
+      setSelectedZoneIds(new Set(zones.map(z => z.id)))
+    }
+  }
+
+  const toggleAllLocations = () => {
+    if (selectedLocationIds.size === locations.length) {
+      setSelectedLocationIds(new Set())
+    } else {
+      setSelectedLocationIds(new Set(locations.map(l => l.id)))
+    }
   }
 
   const exportCSV = () => {
@@ -406,8 +512,16 @@ export default function ZonesPage() {
               onZoneSelect={(z) => setSelectedZone(z ? zones.find(zone => zone.id === z.id) || null : null)}
               onZoneCreate={handleZoneCreate}
               onZoneUpdate={handleZoneUpdate}
+              onZoneEdit={(z) => {
+                const zone = zones.find(zone => zone.id === z.id)
+                if (zone) openZoneDialog(zone)
+              }}
               drawingMode={drawingMode}
               setDrawingMode={setDrawingMode}
+              serviceAreaRadius={serviceAreaRadius}
+              serviceAreaCenter={serviceAreaCenter}
+              onServiceAreaChange={handleServiceAreaChange}
+              rideHeatmapData={rideHeatmapData}
             />
           </CardContent>
         </Card>
@@ -415,15 +529,29 @@ export default function ZonesPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Service Zones</CardTitle>
-            <Button size="sm" variant="outline" onClick={() => openZoneDialog()}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add
-            </Button>
+            <div className="flex items-center gap-2">
+              {selectedZoneIds.size > 0 && (
+                <Button size="sm" variant="destructive" onClick={() => setDialogType("bulk-delete-zones")}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete ({selectedZoneIds.size})
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={() => openZoneDialog()}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={zones.length > 0 && selectedZoneIds.size === zones.length}
+                      onCheckedChange={toggleAllZones}
+                    />
+                  </TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Active</TableHead>
@@ -433,13 +561,19 @@ export default function ZonesPage() {
               <TableBody>
                 {zones.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                       No zones defined
                     </TableCell>
                   </TableRow>
                 ) : (
                   zones.map((zone) => (
-                    <TableRow key={zone.id} className="group hover:bg-muted/50 transition-colors">
+                    <TableRow key={zone.id} className={`group hover:bg-muted/50 transition-colors ${selectedZoneIds.has(zone.id) ? "bg-muted/30" : ""}`}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedZoneIds.has(zone.id)}
+                          onCheckedChange={() => toggleZoneSelection(zone.id)}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">{zone.name}</TableCell>
                       <TableCell>
                         <Badge variant={zone.zone_type === "restricted" ? "destructive" : "secondary"}>
@@ -491,15 +625,29 @@ export default function ZonesPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Saved Locations</CardTitle>
-            <Button size="sm" variant="outline" onClick={() => openLocationDialog()}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add
-            </Button>
+            <div className="flex items-center gap-2">
+              {selectedLocationIds.size > 0 && (
+                <Button size="sm" variant="destructive" onClick={() => setDialogType("bulk-delete-locations")}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete ({selectedLocationIds.size})
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={() => openLocationDialog()}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={locations.length > 0 && selectedLocationIds.size === locations.length}
+                      onCheckedChange={toggleAllLocations}
+                    />
+                  </TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Active</TableHead>
@@ -509,13 +657,19 @@ export default function ZonesPage() {
               <TableBody>
                 {locations.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                       No locations saved
                     </TableCell>
                   </TableRow>
                 ) : (
                   locations.map((loc) => (
-                    <TableRow key={loc.id} className="group hover:bg-muted/50 transition-colors">
+                    <TableRow key={loc.id} className={`group hover:bg-muted/50 transition-colors ${selectedLocationIds.has(loc.id) ? "bg-muted/30" : ""}`}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedLocationIds.has(loc.id)}
+                          onCheckedChange={() => toggleLocationSelection(loc.id)}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">{loc.name}</TableCell>
                       <TableCell><Badge variant="secondary">{loc.location_type}</Badge></TableCell>
                       <TableCell>
@@ -562,7 +716,7 @@ export default function ZonesPage() {
       </div>
 
       {/* Zone Dialog */}
-      <Dialog open={dialogType === "zone"} onOpenChange={() => setDialogType(null)}>
+      <Dialog open={dialogType === "zone"} onOpenChange={() => { setDialogType(null); setPendingCoords(null); setSelectedZone(null) }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{selectedItem ? "Edit Zone" : "Create Zone"}</DialogTitle>
@@ -571,7 +725,7 @@ export default function ZonesPage() {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <label className="text-sm font-medium">Zone Name *</label>
-              <Input value={formData.name || ""} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Downtown Area" />
+              <Input value={formData.name || ""} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Airport Zone" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
@@ -601,9 +755,30 @@ export default function ZonesPage() {
                 </SelectContent>
               </Select>
             </div>
+            {/* Boundary info */}
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Zone Boundary</label>
+              {pendingCoords ? (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                  <Map className="h-4 w-4 text-green-500" />
+                  <span className="text-sm text-green-500">Polygon drawn ({pendingCoords.length} points)</span>
+                  <Button size="sm" variant="ghost" className="ml-auto h-7 text-xs" onClick={() => setPendingCoords(null)}>Clear</Button>
+                </div>
+              ) : selectedItem?.boundary_coords ? (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                  <Map className="h-4 w-4 text-blue-500" />
+                  <span className="text-sm text-blue-500">Existing boundary ({selectedItem.boundary_coords.length} points)</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-muted border border-border">
+                  <Map className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">No boundary - use pencil tool on map to draw</span>
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogType(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setDialogType(null); setPendingCoords(null); setSelectedZone(null) }}>Cancel</Button>
             <Button onClick={handleSaveZone} disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
           </DialogFooter>
         </DialogContent>
@@ -611,7 +786,7 @@ export default function ZonesPage() {
 
       {/* Location Dialog */}
       <Dialog open={dialogType === "location"} onOpenChange={() => setDialogType(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selectedItem ? "Edit Location" : "Add Location"}</DialogTitle>
             <DialogDescription>Save a frequently used pickup/dropoff location</DialogDescription>
@@ -619,31 +794,34 @@ export default function ZonesPage() {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <label className="text-sm font-medium">Location Name *</label>
-              <Input value={formData.name || ""} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Airport Terminal 1" />
+              <Input value={formData.name || ""} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Airport Terminal 1" />
             </div>
+
+            {/* Location Picker with map */}
             <div className="grid gap-2">
-              <label className="text-sm font-medium">Address</label>
-              <Input value={formData.address || ""} onChange={(e) => setFormData({ ...formData, address: e.target.value })} placeholder="123 Main St" />
+              <label className="text-sm font-medium">Location</label>
+              <LocationPicker
+                latitude={formData.lat ? parseFloat(formData.lat) : null}
+                longitude={formData.lng ? parseFloat(formData.lng) : null}
+                address={formData.address || ""}
+                onLocationChange={(lat, lng, addr) => setFormData({
+                  ...formData,
+                  lat: lat.toString(),
+                  lng: lng.toString(),
+                  address: addr || formData.address
+                })}
+              />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">Latitude</label>
-                <Input type="number" step="any" value={formData.latitude || ""} onChange={(e) => setFormData({ ...formData, latitude: e.target.value })} placeholder="4.1755" />
-              </div>
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">Longitude</label>
-                <Input type="number" step="any" value={formData.longitude || ""} onChange={(e) => setFormData({ ...formData, longitude: e.target.value })} placeholder="73.5093" />
-              </div>
-            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Type</label>
-                <Select value={formData.location_type || "pickup"} onValueChange={(v) => setFormData({ ...formData, location_type: v })}>
+                <Select value={formData.location_type || "both"} onValueChange={(v) => setFormData({ ...formData, location_type: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pickup">Pickup</SelectItem>
-                    <SelectItem value="dropoff">Dropoff</SelectItem>
-                    <SelectItem value="both">Both</SelectItem>
+                    <SelectItem value="pickup">Pickup Only</SelectItem>
+                    <SelectItem value="dropoff">Dropoff Only</SelectItem>
+                    <SelectItem value="both">Pickup & Dropoff</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -690,6 +868,34 @@ export default function ZonesPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogType(null)}>Cancel</Button>
             <Button variant="destructive" onClick={handleDeleteLocation} disabled={saving}>{saving ? "Deleting..." : "Delete"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Zones Dialog */}
+      <Dialog open={dialogType === "bulk-delete-zones"} onOpenChange={() => setDialogType(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {selectedZoneIds.size} Zone(s)</DialogTitle>
+            <DialogDescription>Are you sure you want to delete {selectedZoneIds.size} selected zone(s)? This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogType(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleBulkDeleteZones} disabled={saving}>{saving ? "Deleting..." : "Delete All"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Locations Dialog */}
+      <Dialog open={dialogType === "bulk-delete-locations"} onOpenChange={() => setDialogType(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {selectedLocationIds.size} Location(s)</DialogTitle>
+            <DialogDescription>Are you sure you want to delete {selectedLocationIds.size} selected location(s)? This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogType(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleBulkDeleteLocations} disabled={saving}>{saving ? "Deleting..." : "Delete All"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

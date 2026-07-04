@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -72,6 +73,9 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
   List<LatLng> _driverLocations = [];
   int _availableDriverCount = 0;
   Set<Polyline> _routePolylines = {};
+  BitmapDescriptor? _pickupIcon;
+  BitmapDescriptor? _dropoffIcon;
+  BitmapDescriptor? _carIcon;
 
   bool _isValidMaldivesLat(double lat) => lat >= 3.5 && lat <= 7.5;
   bool _isValidMaldivesLng(double lng) => lng >= 72.0 && lng <= 74.0;
@@ -114,6 +118,7 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
   @override
   void initState() {
     super.initState();
+    _loadMarkerIcons();
     _fetchAvailableDrivers();
     _createRideInDatabase();
     _fetchRoute();
@@ -125,6 +130,66 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
 
     _startMatching();
     _startDriverMovement();
+  }
+
+  Future<void> _loadMarkerIcons() async {
+    _pickupIcon = await _createPinIcon('A', const Color(0xFF22C55E));
+    _dropoffIcon = await _createPinIcon('B', AppColors.error);
+    _carIcon = await _createCarIcon();
+    if (mounted) setState(() {});
+  }
+
+  Future<BitmapDescriptor> _createPinIcon(String label, Color color) async {
+    final pictureRecorder = ui.PictureRecorder();
+    final canvas = Canvas(pictureRecorder);
+    const size = Size(40, 50);
+
+    final pinPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final pinPath = Path();
+    pinPath.addOval(Rect.fromCircle(center: Offset(size.width / 2, 15), radius: 14));
+    pinPath.moveTo(size.width / 2 - 10, 22);
+    pinPath.lineTo(size.width / 2, size.height - 5);
+    pinPath.lineTo(size.width / 2 + 10, 22);
+    pinPath.close();
+
+    canvas.drawPath(pinPath, pinPaint);
+
+    final whitePaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(size.width / 2, 15), 9, whitePaint);
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w900),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset((size.width - textPainter.width) / 2, 15 - textPainter.height / 2),
+    );
+
+    final picture = pictureRecorder.endRecording();
+    final image = await picture.toImage(size.width.toInt(), size.height.toInt());
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
+  }
+
+  Future<BitmapDescriptor> _createCarIcon() async {
+    final data = await rootBundle.load('assets/images/pickup_truck.png');
+    final codec = await ui.instantiateImageCodec(
+      data.buffer.asUint8List(),
+      targetWidth: 40,
+    );
+    final frame = await codec.getNextFrame();
+    final bytes = await frame.image.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
   }
 
   Future<void> _fetchRoute() async {
@@ -380,6 +445,7 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
     String driverName = 'Driver';
     double driverRating = 5.0;
     String vehicleNumber = '';
+    String? plateNo;
     String vehicleModel = '';
     String driverPhone = '';
     String? driverPhoto;
@@ -406,15 +472,17 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
           driverName = profile?['full_name'] ?? 'Driver';
           driverRating = (driver['rating'] ?? 5.0).toDouble();
           driverPhone = profile?['phone'] ?? '';
-          driverPhoto = profile?['avatar_url'];
+          // Get driver photo from driver's avatar_url first, then fallback to profile
+          driverPhoto = driver['avatar_url'] as String? ?? profile?['avatar_url'] as String?;
           driverProfileId = driver['profile_id'] as String? ?? profile?['id'] as String?;
 
           if (vehicle != null) {
-            vehicleNumber = vehicle['display_name'] ?? vehicle['plate_no'] ?? '';
+            vehicleNumber = vehicle['display_name'] ?? '';
+            plateNo = vehicle['plate_no'] as String?;
             vehicleModel = vehicle['name'] ?? 'Vehicle';
           }
 
-          debugPrint('Found actual driver: $driverName, driverId: $driverId, profileId: $driverProfileId');
+          debugPrint('Found actual driver: $driverName, driverId: $driverId, profileId: $driverProfileId, photo: $driverPhoto, plateNo: $plateNo');
         } else {
           debugPrint('No driver in ride response. Ride driver_id: ${ride?['driver_id']}');
         }
@@ -441,6 +509,7 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
             'driverName': driverName,
             'driverRating': driverRating,
             'vehicleNumber': vehicleNumber,
+            'plateNo': plateNo,
             'vehicleModel': vehicleModel,
             'driverPhone': driverPhone,
             'driverPhoto': driverPhoto,
@@ -503,19 +572,20 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
               Marker(
                 markerId: const MarkerId('pickup'),
                 position: _userLocation,
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-                infoWindow: InfoWindow(title: 'Pickup', snippet: widget.pickup),
+                icon: _pickupIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                anchor: const Offset(0.5, 1.0),
               ),
               Marker(
                 markerId: const MarkerId('dropoff'),
                 position: dropoff,
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-                infoWindow: InfoWindow(title: 'Drop-off', snippet: widget.dropoff),
+                icon: _dropoffIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                anchor: const Offset(0.5, 1.0),
               ),
               ..._driverLocations.asMap().entries.map((entry) => Marker(
                 markerId: MarkerId('driver_${entry.key}'),
                 position: entry.value,
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+                icon: _carIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+                anchor: const Offset(0.5, 0.5),
               )),
             },
             polylines: _routePolylines,

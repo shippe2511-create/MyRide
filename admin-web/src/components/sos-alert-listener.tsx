@@ -6,17 +6,12 @@ import { toast } from "sonner"
 
 export function SOSAlertListener() {
   const supabase = createClient()
-  const audioContextRef = useRef<AudioContext | null>(null)
-  const oscillatorRef = useRef<OscillatorNode | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const stopAlarm = useCallback(() => {
-    try {
-      if (oscillatorRef.current) {
-        oscillatorRef.current.stop()
-        oscillatorRef.current = null
-      }
-    } catch (e) {
-      // Ignore - oscillator may already be stopped
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
     }
   }, [])
 
@@ -25,39 +20,24 @@ export function SOSAlertListener() {
       // Stop any existing alarm
       stopAlarm()
 
-      // Create or resume audio context
-      if (!audioContextRef.current) {
-        const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-        audioContextRef.current = new AudioContextClass()
+      // Create audio element if not exists
+      if (!audioRef.current) {
+        audioRef.current = new Audio('/alarm.mp3')
+        audioRef.current.loop = true
+        audioRef.current.volume = 1.0
       }
 
-      const audioContext = audioContextRef.current
-      if (audioContext.state === 'suspended') {
-        audioContext.resume()
-      }
+      // Play the alarm
+      audioRef.current.play().catch(e => {
+        console.error('Audio play failed:', e)
+        // Fallback to oscillator if audio fails
+        playFallbackSiren()
+      })
 
-      const oscillator = audioContext.createOscillator()
-      const gainNode = audioContext.createGain()
-      oscillatorRef.current = oscillator
-
-      oscillator.connect(gainNode)
-      gainNode.connect(audioContext.destination)
-
-      oscillator.type = 'sawtooth'
-      gainNode.gain.value = 0.9 // Loud!
-
-      oscillator.start()
-
-      // Urgent siren effect for 8 seconds
-      let time = audioContext.currentTime
-      for (let i = 0; i < 16; i++) {
-        oscillator.frequency.setValueAtTime(400, time)
-        oscillator.frequency.linearRampToValueAtTime(1500, time + 0.25)
-        oscillator.frequency.linearRampToValueAtTime(400, time + 0.5)
-        time += 0.5
-      }
-
-      oscillator.stop(audioContext.currentTime + 8)
+      // Stop after 15 seconds
+      setTimeout(() => {
+        stopAlarm()
+      }, 15000)
 
       // Show browser notification
       if (typeof Notification !== 'undefined') {
@@ -75,6 +55,33 @@ export function SOSAlertListener() {
       console.error('Audio error:', e)
     }
   }, [stopAlarm])
+
+  const playFallbackSiren = useCallback(() => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      const audioContext = new AudioContextClass()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+      oscillator.type = 'sawtooth'
+      gainNode.gain.value = 0.9
+
+      oscillator.start()
+
+      let time = audioContext.currentTime
+      for (let i = 0; i < 16; i++) {
+        oscillator.frequency.setValueAtTime(400, time)
+        oscillator.frequency.linearRampToValueAtTime(1500, time + 0.25)
+        oscillator.frequency.linearRampToValueAtTime(400, time + 0.5)
+        time += 0.5
+      }
+      oscillator.stop(audioContext.currentTime + 8)
+    } catch (e) {
+      console.error('Fallback siren error:', e)
+    }
+  }, [])
 
   useEffect(() => {
     console.log('SOSAlertListener: Setting up realtime subscription...')

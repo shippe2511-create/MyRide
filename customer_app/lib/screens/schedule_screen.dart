@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:add_2_calendar/add_2_calendar.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/notification_service.dart';
@@ -1490,12 +1491,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
   }
 
   void _showRouteMap(bool isDark) {
+    final route = _getRouteById(_selectedRoute);
+    final routeName = route?['name'] ?? 'Route';
+    final stopsStr = _formatStops(route?['stops']);
+    final stops = stopsStr.split(' → ');
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
+        height: MediaQuery.of(context).size.height * 0.75,
         decoration: BoxDecoration(
           color: context.surfaceColor,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
@@ -1511,11 +1517,132 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                 borderRadius: BorderRadius.circular(99),
               ),
             ),
-            const SizedBox(height: 20),
-            Text('Route Map', style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
-            const Expanded(
-              child: Center(
-                child: Text('Map view coming soon', style: TextStyle(color: Colors.white54)),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.yellow.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.route, color: AppColors.yellow, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(routeName, style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w700)),
+                        Text('${stops.length} stops', style: TextStyle(color: context.mutedColor, fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: context.mutedColor),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                    child: GoogleMap(
+                      initialCameraPosition: const CameraPosition(
+                        target: LatLng(4.1755, 73.5093),
+                        zoom: 14,
+                      ),
+                      mapType: MapType.normal,
+                      zoomControlsEnabled: false,
+                      myLocationButtonEnabled: false,
+                      markers: {
+                        if (stops.isNotEmpty)
+                          Marker(
+                            markerId: const MarkerId('start'),
+                            position: const LatLng(4.1755, 73.5093),
+                            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                            infoWindow: InfoWindow(title: stops.first),
+                          ),
+                        if (stops.length > 1)
+                          Marker(
+                            markerId: const MarkerId('end'),
+                            position: const LatLng(4.1855, 73.5193),
+                            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                            infoWindow: InfoWindow(title: stops.last),
+                          ),
+                      },
+                    ),
+                  ),
+                  // Stop list overlay
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    bottom: 12,
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: context.cardColor,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('Stops', style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 8),
+                          ...stops.asMap().entries.map((entry) {
+                            final isFirst = entry.key == 0;
+                            final isLast = entry.key == stops.length - 1;
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 20,
+                                    height: 20,
+                                    decoration: BoxDecoration(
+                                      color: isFirst ? AppColors.success : isLast ? Colors.red : AppColors.yellow,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '${entry.key + 1}',
+                                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      entry.value.trim(),
+                                      style: TextStyle(color: context.textColor, fontSize: 13),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

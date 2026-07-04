@@ -5,6 +5,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:record/record.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'dart:async';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
@@ -100,6 +103,11 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   late Animation<double> _recordingAnimation;
   RealtimeChannel? _chatChannel;
   String? _myProfileId;
+
+  // Voice recording
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  String? _recordingPath;
 
   final List<_QuickReply> _quickReplies = [
     _QuickReply(icon: Icons.waving_hand, text: "Hi, I'm here!", color: AppColors.yellow),
@@ -208,6 +216,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _typingTimer?.cancel();
     _recordingTimer?.cancel();
     _recordingController.dispose();
+    _audioRecorder.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -519,38 +529,147 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     }
   }
 
-  void _startRecording() {
+  Future<void> _startRecording() async {
     HapticFeedback.heavyImpact();
-    setState(() {
-      _isRecording = true;
-      _recordingSeconds = 0;
-    });
-    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
-        setState(() => _recordingSeconds++);
+    try {
+      if (await _audioRecorder.hasPermission()) {
+        final dir = await getTemporaryDirectory();
+        _recordingPath = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+        await _audioRecorder.start(
+          const RecordConfig(encoder: AudioEncoder.aacLc),
+          path: _recordingPath!,
+        );
+
+        setState(() {
+          _isRecording = true;
+          _recordingSeconds = 0;
+        });
+        _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+          if (mounted) {
+            setState(() => _recordingSeconds++);
+          }
+        });
+      } else {
+        if (mounted) {
+          AppSnackbar.warning(context, 'Microphone permission required');
+        }
       }
-    });
+    } catch (e) {
+      debugPrint('Error starting recording: $e');
+      if (mounted) {
+        AppSnackbar.error(context, 'Could not start recording');
+      }
+    }
   }
 
-  void _stopRecording() {
+  Future<void> _stopRecording() async {
     _recordingTimer?.cancel();
     final duration = _recordingSeconds;
-    setState(() {
-      _isRecording = false;
-      _recordingSeconds = 0;
-    });
-    if (duration >= 1) {
-      _sendMessage("Voice message", type: MessageType.voice, voiceDuration: duration);
+
+    try {
+      final path = await _audioRecorder.stop();
+      setState(() {
+        _isRecording = false;
+        _recordingSeconds = 0;
+      });
+
+      if (duration >= 1 && path != null) {
+        await _uploadAndSendVoice(path, duration);
+      }
+    } catch (e) {
+      debugPrint('Error stopping recording: $e');
+      setState(() {
+        _isRecording = false;
+        _recordingSeconds = 0;
+      });
     }
+  }
+
+  Future<void> _uploadAndSendVoice(String filePath, int duration) async {
+    final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+    setState(() {
+      _messages.add(ChatMessage(
+        id: tempId,
+        text: 'Sending voice message...',
+        isCustomer: true,
+        time: DateTime.now(),
+        type: MessageType.voice,
+        status: MessageStatus.sending,
+        voiceDuration: duration,
+      ));
+    });
+    _scrollToBottom();
+
+    try {
+      final file = File(filePath);
+      final fileName = 'voice_${widget.rideId}_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final path = 'voice-messages/$fileName';
+
+      final voiceUrl = await SupabaseService.uploadFile(
+        bucket: 'voice-messages',
+        path: path,
+        file: file,
+      );
+
+      if (voiceUrl != null) {
+        setState(() {
+          final idx = _messages.indexWhere((m) => m.id == tempId);
+          if (idx >= 0) {
+            _messages[idx] = ChatMessage(
+              id: tempId,
+              text: voiceUrl,
+              isCustomer: true,
+              time: DateTime.now(),
+              type: MessageType.voice,
+              status: MessageStatus.sent,
+              voiceDuration: duration,
+            );
+          }
+        });
+
+        if (widget.rideId != null) {
+          await SupabaseService.sendChatMessage(
+            rideId: widget.rideId!,
+            message: voiceUrl,
+          );
+        }
+      } else {
+        setState(() {
+          _messages.removeWhere((m) => m.id == tempId);
+        });
+        if (mounted) {
+          AppSnackbar.error(context, 'Failed to send voice message');
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _messages.removeWhere((m) => m.id == tempId);
+      });
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to send voice message');
+      }
+    }
+
+    // Clean up temp file
+    try {
+      await File(filePath).delete();
+    } catch (_) {}
   }
 
   void _cancelRecording() {
     HapticFeedback.mediumImpact();
     _recordingTimer?.cancel();
+    _audioRecorder.stop();
     setState(() {
       _isRecording = false;
       _recordingSeconds = 0;
     });
+    if (_recordingPath != null) {
+      try {
+        File(_recordingPath!).delete();
+      } catch (_) {}
+    }
   }
 
   String _formatRecordingTime(int seconds) {

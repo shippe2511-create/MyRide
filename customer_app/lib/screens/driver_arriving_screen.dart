@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import '../config/app_config.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
@@ -87,9 +91,199 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
   bool _tripStarted = false;
   GoogleMapController? _mapController;
   final _realtimeService = RealtimeService();
+  List<LatLng> _routePoints = [];
+  bool _trafficEnabled = false;
+  MapType _mapType = MapType.normal;
+  BitmapDescriptor? _pickupIcon;
+  BitmapDescriptor? _carIcon;
 
   bool _isValidMaldivesCoord(double lat, double lng) {
     return lat >= -0.7 && lat <= 7.1 && lng >= 72.6 && lng <= 73.8;
+  }
+
+  Future<void> _fetchRoute() async {
+    try {
+      final url = 'https://maps.googleapis.com/maps/api/directions/json'
+          '?origin=${_driverLocation.latitude},${_driverLocation.longitude}'
+          '&destination=${_pickupLocation.latitude},${_pickupLocation.longitude}'
+          '&key=${AppConfig.googleMapsApiKey}';
+
+      debugPrint('Fetching route: $url');
+      final response = await http.get(Uri.parse(url));
+      debugPrint('Route response: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        debugPrint('API status: ${data['status']}');
+
+        if (data['status'] == 'OK' && data['routes'] != null && data['routes'].isNotEmpty) {
+          final route = data['routes'][0];
+          final polyline = route['overview_polyline']['points'];
+          final points = _decodePolyline(polyline);
+          debugPrint('Decoded ${points.length} route points');
+
+          final leg = route['legs'][0];
+          final durationValue = leg['duration']['value'] as int?;
+
+          if (mounted) {
+            setState(() {
+              _routePoints = points;
+              if (durationValue != null) {
+                _currentEta = (durationValue / 60).ceil();
+              }
+            });
+          }
+        } else {
+          debugPrint('Route API error: ${data['status']}');
+          if (mounted) {
+            setState(() {
+              _routePoints = [_driverLocation, _pickupLocation];
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching route: $e');
+      if (mounted) {
+        setState(() {
+          _routePoints = [_driverLocation, _pickupLocation];
+        });
+      }
+    }
+  }
+
+  List<LatLng> _decodePolyline(String encoded) {
+    List<LatLng> points = [];
+    int index = 0;
+    int lat = 0;
+    int lng = 0;
+
+    while (index < encoded.length) {
+      int shift = 0;
+      int result = 0;
+      int b;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlat = (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlng = (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+      lng += dlng;
+
+      points.add(LatLng(lat / 1e5, lng / 1e5));
+    }
+    return points;
+  }
+
+  Future<void> _loadPickupIcon() async {
+    _pickupIcon = await _createPinIcon('A', const Color(0xFF22C55E));
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _loadCarIcon() async {
+    _carIcon = await _createCarIcon();
+    if (mounted) setState(() {});
+  }
+
+  Future<BitmapDescriptor> _createCarIcon() async {
+    final ByteData data = await rootBundle.load('assets/images/twin_cab.png');
+    final ui.Codec codec = await ui.instantiateImageCodec(
+      data.buffer.asUint8List(),
+      targetWidth: 64,
+      targetHeight: 80,
+    );
+    final ui.FrameInfo fi = await codec.getNextFrame();
+    final ui.Image resizedImage = fi.image;
+
+    final pictureRecorder = ui.PictureRecorder();
+    final canvas = Canvas(pictureRecorder);
+    const outputSize = Size(72, 88);
+
+    // Draw shadow
+    final shadowPaint = Paint()
+      ..color = Colors.black.withOpacity(0.35)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(outputSize.width / 2 + 2, outputSize.height - 8),
+        width: 50,
+        height: 14,
+      ),
+      shadowPaint,
+    );
+
+    // Draw the car image centered
+    canvas.drawImage(
+      resizedImage,
+      Offset((outputSize.width - 64) / 2, (outputSize.height - 80) / 2 - 4),
+      Paint(),
+    );
+
+    final picture = pictureRecorder.endRecording();
+    final image = await picture.toImage(outputSize.width.toInt(), outputSize.height.toInt());
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+
+    return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
+  }
+
+  Future<BitmapDescriptor> _createPinIcon(String label, Color color) async {
+    final pictureRecorder = ui.PictureRecorder();
+    final canvas = Canvas(pictureRecorder);
+    const size = Size(40, 50);
+
+    final pinPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final pinPath = Path();
+    pinPath.addOval(Rect.fromCircle(center: Offset(size.width / 2, 15), radius: 14));
+    pinPath.moveTo(size.width / 2 - 10, 22);
+    pinPath.lineTo(size.width / 2, size.height - 5);
+    pinPath.lineTo(size.width / 2 + 10, 22);
+    pinPath.close();
+
+    canvas.drawPath(pinPath, pinPaint);
+
+    final whitePaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(size.width / 2, 15), 9, whitePaint);
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset(
+        (size.width - textPainter.width) / 2,
+        15 - textPainter.height / 2,
+      ),
+    );
+
+    final picture = pictureRecorder.endRecording();
+    final image = await picture.toImage(size.width.toInt(), size.height.toInt());
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+
+    return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
   }
 
   @override
@@ -109,6 +303,9 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
     _subscribeToRideUpdates();
     _subscribeToDriverLocation();
     _startStatusPolling(); // Backup polling
+    _fetchRoute();
+    _loadPickupIcon();
+    _loadCarIcon();
 
     // Subscribe to chat notifications
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -133,6 +330,10 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
           setState(() {
             _driverLocation = LatLng(lat, lng);
           });
+          // Refresh route when driver moves
+          _fetchRoute();
+          // Move camera to follow driver
+          _mapController?.animateCamera(CameraUpdate.newLatLng(_driverLocation));
         }
       }
     });
@@ -319,13 +520,13 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
       Marker(
         markerId: const MarkerId('pickup'),
         position: _pickupLocation,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        icon: _pickupIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
         infoWindow: InfoWindow(title: 'Pickup', snippet: widget.pickup),
       ),
       Marker(
         markerId: const MarkerId('driver'),
         position: _driverLocation,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
+        icon: _carIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
         infoWindow: InfoWindow(title: widget.driverName, snippet: widget.vehicleModel),
       ),
     };
@@ -335,11 +536,47 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
     return {
       Polyline(
         polylineId: const PolylineId('route'),
-        points: [_driverLocation, _pickupLocation],
+        points: _routePoints.isNotEmpty ? _routePoints : [_driverLocation, _pickupLocation],
         color: AppColors.yellow,
-        width: 4,
+        width: 5,
       ),
     };
+  }
+
+  Widget _buildMapControl(IconData icon, bool isActive, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.yellow : Colors.black.withOpacity(0.7),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: isActive ? AppColors.yellow : Colors.white24),
+        ),
+        child: Icon(icon, color: isActive ? Colors.black : Colors.white, size: 20),
+      ),
+    );
+  }
+
+  void _shareLiveLocation() {
+    final shareText = '''
+My ride is on the way!
+
+Driver: ${widget.driverName}
+Vehicle: ${widget.vehicleModel} (${widget.vehicleNumber})
+ETA: $_currentEta min
+Pickup: ${widget.pickup}
+Destination: ${widget.dropoff}
+
+${widget.rideId != null ? 'Track: https://myride.mv/track/${widget.rideId}' : ''}
+''';
+
+    Share.share(shareText, subject: 'Track My MyRide');
+    HapticFeedback.mediumImpact();
   }
 
   @override
@@ -354,11 +591,38 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
             onMapCreated: (controller) => _mapController = controller,
             markers: _buildMarkers(),
             polylines: _buildPolylines(),
+            mapType: _mapType,
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             mapToolbarEnabled: false,
-            style: context.isDark ? _darkMapStyle : null,
+            trafficEnabled: _trafficEnabled,
+            buildingsEnabled: true,
+            style: _mapType == MapType.normal && context.isDark ? _darkMapStyle : null,
+          ),
+
+          // Map controls (right side)
+          Positioned(
+            right: 16,
+            top: MediaQuery.of(context).padding.top + 70,
+            child: Column(
+              children: [
+                // Share location
+                _buildMapControl(Icons.share_location, false, _shareLiveLocation),
+                const SizedBox(height: 8),
+                // Satellite toggle
+                _buildMapControl(
+                  _mapType == MapType.satellite ? Icons.map : Icons.satellite,
+                  _mapType == MapType.satellite,
+                  () => setState(() => _mapType = _mapType == MapType.normal ? MapType.satellite : MapType.normal),
+                ),
+                const SizedBox(height: 8),
+                // Traffic toggle
+                _buildMapControl(Icons.traffic, _trafficEnabled, () {
+                  setState(() => _trafficEnabled = !_trafficEnabled);
+                }),
+              ],
+            ),
           ),
 
           // Top bar
@@ -412,11 +676,11 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
 
           // Bottom sheet
           DraggableScrollableSheet(
-            initialChildSize: 0.44,
-            minChildSize: 0.35,
-            maxChildSize: 0.44,
+            initialChildSize: 0.38,
+            minChildSize: 0.30,
+            maxChildSize: 0.42,
             snap: true,
-            snapSizes: const [0.44],
+            snapSizes: const [0.38],
             builder: (context, scrollController) {
               return Container(
                 decoration: BoxDecoration(color: context.surfaceColor, borderRadius: const BorderRadius.vertical(top: Radius.circular(28))),
@@ -428,7 +692,7 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
 
                     // Status with animation
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
                       child: Row(
                         children: [
                           if (_driverArrived)
@@ -457,7 +721,7 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
 
                     // Driver info
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                       child: Row(
                         children: [
                           CircleAvatar(radius: 28, backgroundColor: context.bgColor, child: Icon(Icons.person, color: context.mutedColor, size: 28)),
@@ -496,7 +760,7 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
 
                     // Action buttons
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                       child: Row(
                         children: [
                           Expanded(child: _buildActionButton(Icons.phone, 'Call')),
@@ -512,7 +776,7 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
 
                     // Trip route
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(color: context.isDark ? context.isDark ? AppColors.bgDark : Colors.white : Colors.white, borderRadius: BorderRadius.circular(16)),

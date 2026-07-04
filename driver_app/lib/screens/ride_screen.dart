@@ -202,75 +202,41 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   }
 
   Future<BitmapDescriptor> _createCarIcon() async {
+    final ByteData data = await rootBundle.load('assets/images/twin_cab.png');
+    final ui.Codec codec = await ui.instantiateImageCodec(
+      data.buffer.asUint8List(),
+      targetWidth: 64,
+      targetHeight: 80,
+    );
+    final ui.FrameInfo fi = await codec.getNextFrame();
+    final ui.Image resizedImage = fi.image;
+
     final pictureRecorder = ui.PictureRecorder();
     final canvas = Canvas(pictureRecorder);
-    const size = Size(40, 64);
+    const outputSize = Size(72, 88);
 
-    final bodyPaint = Paint()
-      ..color = AppColors.yellow
-      ..style = PaintingStyle.fill;
+    // Draw shadow
+    final shadowPaint = Paint()
+      ..color = Colors.black.withOpacity(0.35)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(outputSize.width / 2 + 2, outputSize.height - 8),
+        width: 50,
+        height: 14,
+      ),
+      shadowPaint,
+    );
 
-    final windowPaint = Paint()
-      ..color = const Color(0xFF1A1A1A)
-      ..style = PaintingStyle.fill;
-
-    final wheelPaint = Paint()
-      ..color = const Color(0xFF333333)
-      ..style = PaintingStyle.fill;
-
-    // Main body - sleek pickup shape
-    final bodyPath = Path();
-    bodyPath.moveTo(size.width * 0.2, size.height * 0.15);
-    bodyPath.quadraticBezierTo(size.width * 0.5, size.height * 0.05, size.width * 0.8, size.height * 0.15);
-    bodyPath.lineTo(size.width * 0.85, size.height * 0.85);
-    bodyPath.quadraticBezierTo(size.width * 0.5, size.height * 0.92, size.width * 0.15, size.height * 0.85);
-    bodyPath.close();
-    canvas.drawPath(bodyPath, bodyPaint);
-
-    // Windshield (front)
-    final windshield = Path();
-    windshield.moveTo(size.width * 0.28, size.height * 0.18);
-    windshield.quadraticBezierTo(size.width * 0.5, size.height * 0.12, size.width * 0.72, size.height * 0.18);
-    windshield.lineTo(size.width * 0.68, size.height * 0.30);
-    windshield.lineTo(size.width * 0.32, size.height * 0.30);
-    windshield.close();
-    canvas.drawPath(windshield, windowPaint);
-
-    // Rear window
-    canvas.drawRRect(RRect.fromRectAndRadius(
-      Rect.fromLTWH(size.width * 0.30, size.height * 0.35, size.width * 0.40, size.height * 0.08),
-      const Radius.circular(2),
-    ), windowPaint);
-
-    // Truck bed (darker section)
-    final bedPaint = Paint()
-      ..color = const Color(0xFFB8960A)
-      ..style = PaintingStyle.fill;
-    canvas.drawRRect(RRect.fromRectAndRadius(
-      Rect.fromLTWH(size.width * 0.25, size.height * 0.48, size.width * 0.50, size.height * 0.32),
-      const Radius.circular(3),
-    ), bedPaint);
-
-    // Wheels
-    canvas.drawRRect(RRect.fromRectAndRadius(
-      Rect.fromLTWH(size.width * 0.08, size.height * 0.22, size.width * 0.12, size.height * 0.18),
-      const Radius.circular(2),
-    ), wheelPaint);
-    canvas.drawRRect(RRect.fromRectAndRadius(
-      Rect.fromLTWH(size.width * 0.80, size.height * 0.22, size.width * 0.12, size.height * 0.18),
-      const Radius.circular(2),
-    ), wheelPaint);
-    canvas.drawRRect(RRect.fromRectAndRadius(
-      Rect.fromLTWH(size.width * 0.08, size.height * 0.62, size.width * 0.12, size.height * 0.18),
-      const Radius.circular(2),
-    ), wheelPaint);
-    canvas.drawRRect(RRect.fromRectAndRadius(
-      Rect.fromLTWH(size.width * 0.80, size.height * 0.62, size.width * 0.12, size.height * 0.18),
-      const Radius.circular(2),
-    ), wheelPaint);
+    // Draw the car image centered
+    canvas.drawImage(
+      resizedImage,
+      Offset((outputSize.width - 64) / 2, (outputSize.height - 80) / 2 - 4),
+      Paint(),
+    );
 
     final picture = pictureRecorder.endRecording();
-    final image = await picture.toImage(size.width.toInt(), size.height.toInt());
+    final image = await picture.toImage(outputSize.width.toInt(), outputSize.height.toInt());
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
 
     return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());

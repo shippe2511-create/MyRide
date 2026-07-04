@@ -719,12 +719,89 @@ ${widget.rideId != null ? 'Track: https://myride.mv/track/${widget.rideId}' : ''
                       ),
                     ),
 
-                    // Driver info
+                    // Vehicle with driver overlay (Uber/Careem style)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                       child: Row(
                         children: [
-                          CircleAvatar(radius: 28, backgroundColor: context.bgColor, child: Icon(Icons.person, color: context.mutedColor, size: 28)),
+                          // Vehicle image with driver photo overlay
+                          SizedBox(
+                            width: 120,
+                            height: 80,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                // Vehicle image
+                                Positioned(
+                                  right: 0,
+                                  top: 0,
+                                  child: Image.asset(
+                                    'assets/images/twin_cab.png',
+                                    width: 100,
+                                    height: 70,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                                // Driver photo with rating badge
+                                Positioned(
+                                  left: 0,
+                                  bottom: 0,
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      Container(
+                                        width: 52,
+                                        height: 52,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: Colors.white, width: 2),
+                                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 6)],
+                                        ),
+                                        child: ClipOval(
+                                          child: widget.driverPhoto != null && widget.driverPhoto!.isNotEmpty
+                                              ? Image.network(
+                                                  widget.driverPhoto!,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (_, __, ___) => Container(
+                                                    color: AppColors.yellow,
+                                                    child: Icon(Icons.person, color: Colors.black87, size: 28),
+                                                  ),
+                                                )
+                                              : Container(
+                                                  color: AppColors.yellow,
+                                                  child: Icon(Icons.person, color: Colors.black87, size: 28),
+                                                ),
+                                        ),
+                                      ),
+                                      // Rating badge
+                                      Positioned(
+                                        bottom: -4,
+                                        left: 8,
+                                        right: 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(10),
+                                            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 4)],
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Text('${widget.driverRating}', style: TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.w700)),
+                                              const SizedBox(width: 2),
+                                              Icon(Icons.star, color: Colors.black87, size: 10),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                           const SizedBox(width: 14),
                           Expanded(
                             child: Column(
@@ -732,27 +809,14 @@ ${widget.rideId != null ? 'Track: https://myride.mv/track/${widget.rideId}' : ''
                               children: [
                                 Text(widget.driverName, style: TextStyle(color: context.textColor, fontSize: 17, fontWeight: FontWeight.w700)),
                                 const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Icon(Icons.star, color: AppColors.yellow, size: 16),
-                                    const SizedBox(width: 4),
-                                    Text('${widget.driverRating}', style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600)),
-                                    const SizedBox(width: 10),
-                                    Text(widget.vehicleNumber, style: TextStyle(color: context.mutedColor, fontSize: 13)),
-                                  ],
-                                ),
+                                Text(widget.vehicleNumber, style: TextStyle(color: context.mutedColor, fontSize: 14, fontWeight: FontWeight.w500)),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Vehicle: ${widget.vehicleModel}',
+                                  widget.vehicleModel,
                                   style: TextStyle(color: context.mutedColor, fontSize: 12),
                                 ),
                               ],
                             ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(color: AppColors.yellow.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.yellow.withValues(alpha: 0.3))),
-                            child: Text(widget.vehicleModel, style: TextStyle(color: AppColors.yellow, fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: 1)),
                           ),
                         ],
                       ),

@@ -931,22 +931,90 @@ Live tracking link: https://myride.mv/track/$rideId
                       ),
                     ),
 
-                    // Driver info with inline actions - Uber style
+                    // Driver info with vehicle image - Uber/Careem style
                     Padding(
                       padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
                       child: Row(
                         children: [
-                          // Driver avatar
-                          Container(
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(
-                              color: AppColors.yellow,
-                              borderRadius: BorderRadius.circular(30),
+                          // Vehicle image with driver photo overlay
+                          SizedBox(
+                            width: 120,
+                            height: 80,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                // Vehicle image
+                                Positioned(
+                                  right: 0,
+                                  top: 0,
+                                  child: Image.asset(
+                                    'assets/images/twin_cab.png',
+                                    width: 100,
+                                    height: 70,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                                // Driver photo with rating badge
+                                Positioned(
+                                  left: 0,
+                                  bottom: 0,
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      Container(
+                                        width: 52,
+                                        height: 52,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: Colors.white, width: 2),
+                                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 6)],
+                                        ),
+                                        child: ClipOval(
+                                          child: widget.tripData['driverPhoto'] != null && (widget.tripData['driverPhoto'] as String).isNotEmpty
+                                              ? Image.network(
+                                                  widget.tripData['driverPhoto'] as String,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (_, __, ___) => Container(
+                                                    color: AppColors.yellow,
+                                                    child: Icon(Icons.person, color: Colors.black87, size: 28),
+                                                  ),
+                                                )
+                                              : Container(
+                                                  color: AppColors.yellow,
+                                                  child: Icon(Icons.person, color: Colors.black87, size: 28),
+                                                ),
+                                        ),
+                                      ),
+                                      // Rating badge
+                                      Positioned(
+                                        bottom: -4,
+                                        left: 8,
+                                        right: 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(10),
+                                            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 4)],
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Text('${widget.tripData['driverRating'] ?? 0.0}', style: TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.w700)),
+                                              const SizedBox(width: 2),
+                                              Icon(Icons.star, color: Colors.black87, size: 10),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                            child: const Icon(Icons.person_rounded, color: Colors.black, size: 32),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 14),
                           // Driver info
                           Expanded(
                             child: Column(
@@ -957,17 +1025,9 @@ Live tracking link: https://myride.mv/track/$rideId
                                   style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w700),
                                 ),
                                 const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Icon(Icons.star_rounded, color: AppColors.yellow, size: 16),
-                                    const SizedBox(width: 4),
-                                    Text('${widget.tripData['driverRating'] ?? 0.0}', style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600)),
-                                    const SizedBox(width: 12),
-                                    Text('•', style: TextStyle(color: context.mutedColor)),
-                                    const SizedBox(width: 12),
-                                    Text(widget.tripData['vehicleNumber'] ?? '', style: TextStyle(color: context.mutedColor, fontSize: 14)),
-                                  ],
-                                ),
+                                Text(widget.tripData['vehicleNumber'] ?? '', style: TextStyle(color: context.mutedColor, fontSize: 14, fontWeight: FontWeight.w500)),
+                                const SizedBox(height: 2),
+                                Text(widget.tripData['vehicleModel'] ?? '', style: TextStyle(color: context.mutedColor, fontSize: 12)),
                               ],
                             ),
                           ),

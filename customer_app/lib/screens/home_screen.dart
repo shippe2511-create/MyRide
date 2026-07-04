@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../config/app_config.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
@@ -2047,24 +2050,108 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     String addressText = '';
     String selectedName = '';
     bool showSearchResults = false;
+    bool isSearching = false;
     List<Map<String, dynamic>> searchResults = [];
     LatLng? userLocation = selectedLocation;
+    Timer? debounceTimer;
 
-    final List<Map<String, dynamic>> allPlaces = [
-      {'name': 'Current Location', 'address': 'Use your GPS location', 'lat': userLocation.latitude, 'lng': userLocation.longitude, 'icon': Icons.my_location, 'isGps': true},
-      {'name': 'Hulhumale Phase 2', 'address': 'Hulhumale Phase 2, Flat Area', 'lat': 4.2286, 'lng': 73.5400, 'icon': Icons.location_city},
-      {'name': 'Hulhumale Phase 1', 'address': 'Hulhumale Phase 1, Housing', 'lat': 4.2116, 'lng': 73.5380, 'icon': Icons.location_city},
-      {'name': 'Velana Airport', 'address': 'Velana International Airport', 'lat': 4.1918, 'lng': 73.5290, 'icon': Icons.flight},
-      {'name': 'Male City Center', 'address': 'Male City, Republic Square', 'lat': 4.1755, 'lng': 73.5093, 'icon': Icons.location_city},
-      {'name': 'Ferry Terminal', 'address': 'Hulhumale Ferry Terminal', 'lat': 4.2106, 'lng': 73.5400, 'icon': Icons.directions_boat},
-      {'name': 'Central Park', 'address': 'Hulhumale Central Park', 'lat': 4.2200, 'lng': 73.5380, 'icon': Icons.park},
-      {'name': 'Tree Top Hospital', 'address': 'Tree Top Hospital, Hulhumale', 'lat': 4.2250, 'lng': 73.5420, 'icon': Icons.local_hospital},
-      {'name': 'ADK Hospital', 'address': 'ADK Hospital, Male City', 'lat': 4.1740, 'lng': 73.5100, 'icon': Icons.local_hospital},
-      {'name': 'Artificial Beach', 'address': 'Artificial Beach, Male', 'lat': 4.1720, 'lng': 73.5050, 'icon': Icons.beach_access},
-      {'name': 'Fish Market', 'address': 'Male Fish Market', 'lat': 4.1760, 'lng': 73.5070, 'icon': Icons.store},
-      {'name': 'Islamic Centre', 'address': 'Islamic Centre, Male', 'lat': 4.1750, 'lng': 73.5090, 'icon': Icons.mosque},
-      {'name': 'Dharubaaruge', 'address': 'Dharubaaruge Convention Center', 'lat': 4.1730, 'lng': 73.5110, 'icon': Icons.business},
-    ];
+    Future<void> searchPlaces(String query, void Function(void Function()) setModalState) async {
+      if (query.length < 2) {
+        setModalState(() {
+          showSearchResults = false;
+          searchResults = [];
+          isSearching = false;
+        });
+        return;
+      }
+
+      setModalState(() {
+        isSearching = true;
+        showSearchResults = true;
+      });
+
+      try {
+        final url = Uri.parse(
+          'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+          '?input=${Uri.encodeComponent(query)}'
+          '&location=${userLocation?.latitude ?? 4.1755},${userLocation?.longitude ?? 73.5093}'
+          '&radius=50000'
+          '&components=country:mv'
+          '&key=${AppConfig.googleMapsApiKey}'
+        );
+
+        final response = await http.get(url);
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data['status'] == 'OK') {
+            final predictions = data['predictions'] as List;
+            setModalState(() {
+              searchResults = predictions.map((p) => {
+                'place_id': p['place_id'],
+                'name': p['structured_formatting']?['main_text'] ?? p['description'],
+                'address': p['description'],
+                'icon': Icons.location_on,
+              }).toList();
+              isSearching = false;
+            });
+          } else {
+            setModalState(() {
+              searchResults = [];
+              isSearching = false;
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('Places search error: $e');
+        setModalState(() {
+          isSearching = false;
+        });
+      }
+    }
+
+    Future<LatLng?> getPlaceDetails(String placeId) async {
+      try {
+        final url = Uri.parse(
+          'https://maps.googleapis.com/maps/api/place/details/json'
+          '?place_id=$placeId'
+          '&fields=geometry'
+          '&key=${AppConfig.googleMapsApiKey}'
+        );
+
+        final response = await http.get(url);
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data['status'] == 'OK') {
+            final location = data['result']['geometry']['location'];
+            return LatLng(location['lat'], location['lng']);
+          }
+        }
+      } catch (e) {
+        debugPrint('Place details error: $e');
+      }
+      return null;
+    }
+
+    Future<String> reverseGeocode(LatLng point) async {
+      try {
+        final url = Uri.parse(
+          'https://maps.googleapis.com/maps/api/geocode/json'
+          '?latlng=${point.latitude},${point.longitude}'
+          '&key=${AppConfig.googleMapsApiKey}'
+        );
+
+        final response = await http.get(url);
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data['status'] == 'OK' && (data['results'] as List).isNotEmpty) {
+            return data['results'][0]['formatted_address'] ?? 'Pinned Location';
+          }
+        }
+      } catch (e) {
+        debugPrint('Reverse geocode error: $e');
+      }
+      return 'Pinned Location';
+    }
 
     return await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
@@ -2073,20 +2160,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) {
           void performSearch(String query) {
+            debounceTimer?.cancel();
             if (query.isEmpty) {
               setModalState(() {
                 showSearchResults = false;
                 searchResults = [];
+                isSearching = false;
               });
             } else {
-              final results = allPlaces.where((place) {
-                final name = (place['name'] as String).toLowerCase();
-                final address = (place['address'] as String).toLowerCase();
-                return name.contains(query.toLowerCase()) || address.contains(query.toLowerCase());
-              }).toList();
-              setModalState(() {
-                showSearchResults = true;
-                searchResults = results;
+              debounceTimer = Timer(const Duration(milliseconds: 400), () {
+                searchPlaces(query, setModalState);
               });
             }
           }
@@ -2189,7 +2272,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ? // Search Results
                         Container(
                           color: context.surfaceColor,
-                          child: searchResults.isEmpty
+                          child: isSearching
+                              ? Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      CircularProgressIndicator(color: accentColor),
+                                      const SizedBox(height: 12),
+                                      Text('Searching...', style: TextStyle(color: context.mutedColor, fontSize: 16)),
+                                    ],
+                                  ),
+                                )
+                              : searchResults.isEmpty
                               ? Center(
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
@@ -2207,17 +2301,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                     final place = searchResults[index];
                                     final isSelected = addressText == place['address'];
                                     return GestureDetector(
-                                      onTap: () {
-                                        final lat = place['lat'] as double;
-                                        final lng = place['lng'] as double;
-                                        setModalState(() {
-                                          selectedLocation = LatLng(lat, lng);
-                                          addressText = place['address'] as String;
-                                          selectedName = place['name'] as String;
-                                          showSearchResults = false;
-                                          searchController.text = place['name'] as String;
-                                        });
-                                        googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(selectedLocation, 16));
+                                      onTap: () async {
+                                        final placeId = place['place_id'] as String?;
+                                        if (placeId != null) {
+                                          setModalState(() => isSearching = true);
+                                          final coords = await getPlaceDetails(placeId);
+                                          if (coords != null) {
+                                            setModalState(() {
+                                              selectedLocation = coords;
+                                              addressText = place['address'] as String;
+                                              selectedName = place['name'] as String;
+                                              showSearchResults = false;
+                                              isSearching = false;
+                                              searchController.text = place['name'] as String;
+                                            });
+                                            googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(selectedLocation, 16));
+                                          } else {
+                                            setModalState(() => isSearching = false);
+                                          }
+                                        }
                                       },
                                       child: Container(
                                         margin: const EdgeInsets.only(bottom: 8),
@@ -2270,23 +2372,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             GoogleMap(
                               initialCameraPosition: CameraPosition(target: selectedLocation, zoom: 14),
                               onMapCreated: (controller) => googleMapController = controller,
-                              onTap: (point) {
-                                String nearestName = 'Custom Location';
-                                double minDist = double.infinity;
-                                for (final place in allPlaces) {
-                                  final pLat = place['lat'] as double;
-                                  final pLng = place['lng'] as double;
-                                  final dist = (point.latitude - pLat).abs() + (point.longitude - pLng).abs();
-                                  if (dist < minDist && dist < 0.01) {
-                                    minDist = dist;
-                                    nearestName = 'Near ${place['name']}';
-                                  }
-                                }
+                              onTap: (point) async {
                                 setModalState(() {
                                   selectedLocation = point;
-                                  addressText = nearestName;
-                                  selectedName = nearestName;
+                                  addressText = 'Loading...';
+                                  selectedName = 'Pinned Location';
                                   searchController.text = '';
+                                });
+                                final address = await reverseGeocode(point);
+                                setModalState(() {
+                                  addressText = address;
+                                  selectedName = 'Pinned Location';
                                 });
                               },
                               markers: {

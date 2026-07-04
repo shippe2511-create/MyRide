@@ -321,13 +321,16 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           ),
                           // MIDDLE - waiting block (icon + text) + End Shift button
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _buildLookingForRidesContent(context),
-                              const SizedBox(height: 40),
-                              _buildEndShiftButton(context, state),
-                            ],
+                          Padding(
+                            padding: const EdgeInsets.only(top: 40),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildLookingForRidesContent(context),
+                                const SizedBox(height: 40),
+                                _buildEndShiftButton(context, state),
+                              ],
+                            ),
                           ),
                           // BOTTOM - nav clearance only
                           SizedBox(height: bottomNavHeight),
@@ -666,6 +669,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildOfflineView(BuildContext context, DriverState state) {
+    // Calculate available height for centering
+    final screenHeight = MediaQuery.of(context).size.height;
+    final topPadding = MediaQuery.of(context).padding.top;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    // Header ~80, stats card ~120, bottom nav ~80, checklist ~50 if shown
+    final usedHeight = topPadding + 80 + 120 + bottomPadding + 80 + (state.checklistCompleted ? 60 : 0);
+    final availableHeight = screenHeight - usedHeight;
+
     return Column(
       children: [
         // Stats card
@@ -710,8 +721,9 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-          // Go online prompt
-          Expanded(
+          // Go online prompt - centered in available space
+          SizedBox(
+            height: availableHeight,
             child: Center(
               child: Padding(
                 padding: const EdgeInsets.all(30),

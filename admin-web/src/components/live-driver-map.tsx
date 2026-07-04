@@ -96,7 +96,6 @@ function DriverMarker({
       : "Available"
 
   const hasActiveRide = !!driver.activeRide
-  const speedPercent = Math.min((driver.speed || 0) / 80 * 100, 100)
 
   return (
     <OverlayView
@@ -166,32 +165,6 @@ function DriverMarker({
           {statusLabel}
         </div>
 
-        {/* Speed gauge (circular) */}
-        <div
-          className="absolute -left-4 top-1/2 transform -translate-y-1/2"
-          style={{ width: 24, height: 24 }}
-        >
-          <svg viewBox="0 0 36 36" className="w-full h-full">
-            <path
-              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-              fill="none"
-              stroke={isDark ? "#333" : "#e5e5e5"}
-              strokeWidth="3"
-            />
-            <path
-              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-              fill="none"
-              stroke={driver.speed && driver.speed > 60 ? "#ef4444" : driver.speed && driver.speed > 30 ? "#f59e0b" : "#22c55e"}
-              strokeWidth="3"
-              strokeDasharray={`${speedPercent}, 100`}
-              strokeLinecap="round"
-            />
-            <text x="18" y="22" textAnchor="middle" fontSize="10" fill={isDark ? "#fff" : "#000"} fontWeight="bold">
-              {Math.round(driver.speed || 0)}
-            </text>
-          </svg>
-        </div>
-
         {/* Vehicle container with rotation */}
         <div
           style={{
@@ -199,32 +172,46 @@ function DriverMarker({
             transition: "transform 0.5s ease-out",
           }}
         >
-          {/* Direction arrow */}
-          <div
-            className="absolute -top-3 left-1/2 transform -translate-x-1/2"
+          {/* SVG Truck Icon */}
+          <svg
+            width="44"
+            height="60"
+            viewBox="0 0 44 60"
             style={{
-              width: 0,
-              height: 0,
-              borderLeft: "6px solid transparent",
-              borderRight: "6px solid transparent",
-              borderBottom: `10px solid ${statusColor}`,
-            }}
-          />
-
-          {/* Truck image */}
-          <img
-            src="/truck-top.png"
-            alt={driver.name}
-            style={{
-              width: 44,
-              height: 66,
               filter: isSelected
                 ? "drop-shadow(0 0 12px #FFD60A)"
                 : isDark
                   ? "drop-shadow(0 3px 8px rgba(0,0,0,0.6))"
                   : "drop-shadow(0 2px 6px rgba(0,0,0,0.4))",
             }}
-          />
+          >
+            {/* Direction arrow */}
+            <polygon points="22,0 16,10 28,10" fill={statusColor} />
+
+            {/* Truck body */}
+            <rect x="8" y="12" width="28" height="44" rx="4" fill="#f5f5f5" stroke="#333" strokeWidth="2" />
+
+            {/* Cabin (front) */}
+            <rect x="10" y="14" width="24" height="14" rx="2" fill="#e0e0e0" stroke="#333" strokeWidth="1" />
+
+            {/* Windshield */}
+            <rect x="12" y="16" width="20" height="10" rx="1" fill="#4a5568" />
+
+            {/* Truck bed */}
+            <rect x="10" y="30" width="24" height="24" rx="1" fill="#d4d4d4" stroke="#333" strokeWidth="1" />
+
+            {/* Bed lines */}
+            <line x1="10" y1="38" x2="34" y2="38" stroke="#999" strokeWidth="1" />
+            <line x1="10" y1="46" x2="34" y2="46" stroke="#999" strokeWidth="1" />
+
+            {/* Side mirrors */}
+            <rect x="4" y="18" width="4" height="6" rx="1" fill="#333" />
+            <rect x="36" y="18" width="4" height="6" rx="1" fill="#333" />
+
+            {/* Tail lights */}
+            <rect x="10" y="52" width="6" height="3" rx="1" fill="#ef4444" />
+            <rect x="28" y="52" width="6" height="3" rx="1" fill="#ef4444" />
+          </svg>
         </div>
 
         {/* Vehicle Number Badge */}
@@ -794,7 +781,8 @@ export function LiveDriverMap({
         mapTypeId={mapType}
         options={{
           styles: isDark && mapType === "roadmap" ? darkMapStyle : undefined,
-          zoomControl: true,
+          disableDefaultUI: true,
+          zoomControl: false,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false,

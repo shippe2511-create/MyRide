@@ -49,6 +49,8 @@ class _SearchScreenState extends State<SearchScreen> {
   LatLng _currentLocation = const LatLng(4.1755, 73.5093);
   LatLng? _pickupLocation;
   String _pickupName = 'Current location';
+  MapType _pickerMapType = MapType.normal;
+  bool _pickerTrafficEnabled = false;
 
   @override
   void initState() {
@@ -762,7 +764,6 @@ class _SearchScreenState extends State<SearchScreen> {
                         onMapCreated: (controller) => googleMapController = controller,
                         onTap: (point) async {
                           HapticFeedback.lightImpact();
-                          // Reverse geocode to get address
                           String address = '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
                           String name = 'Selected Location';
                           try {
@@ -801,13 +802,46 @@ class _SearchScreenState extends State<SearchScreen> {
                             icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
                           ),
                         },
+                        mapType: _pickerMapType,
                         myLocationEnabled: true,
                         myLocationButtonEnabled: false,
                         zoomControlsEnabled: false,
                         mapToolbarEnabled: false,
-                        style: isDark ? _darkMapStyle : null,
+                        trafficEnabled: _pickerTrafficEnabled,
+                        buildingsEnabled: true,
+                        style: _pickerMapType == MapType.normal && isDark ? _darkMapStyle : null,
                       ),
-                      // Zoom controls
+                      // Map controls (right side)
+                      Positioned(
+                        right: 16,
+                        top: 16,
+                        child: Column(
+                          children: [
+                            // Satellite toggle
+                            _buildMapButton(
+                              _pickerMapType == MapType.satellite ? Icons.map : Icons.satellite_alt,
+                              () {
+                                HapticFeedback.lightImpact();
+                                setSheetState(() => _pickerMapType = _pickerMapType == MapType.normal ? MapType.satellite : MapType.normal);
+                              },
+                              isDark,
+                              isHighlighted: _pickerMapType == MapType.satellite,
+                            ),
+                            const SizedBox(height: 8),
+                            // Traffic toggle
+                            _buildMapButton(
+                              Icons.traffic,
+                              () {
+                                HapticFeedback.lightImpact();
+                                setSheetState(() => _pickerTrafficEnabled = !_pickerTrafficEnabled);
+                              },
+                              isDark,
+                              isHighlighted: _pickerTrafficEnabled,
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Zoom and location controls (bottom right)
                       Positioned(
                         right: 16,
                         bottom: 16,
@@ -920,8 +954,9 @@ class _SearchScreenState extends State<SearchScreen> {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: context.surfaceColor,
+          color: isHighlighted ? AppColors.yellow : context.surfaceColor,
           borderRadius: BorderRadius.circular(12),
+          border: isHighlighted ? Border.all(color: AppColors.yellow, width: 2) : null,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.1),
@@ -929,7 +964,11 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
           ],
         ),
-        child: Icon(icon, color: isHighlighted ? AppColors.yellow : context.textColor, size: 22),
+        child: Icon(
+          icon,
+          color: isHighlighted ? Colors.black : context.textColor,
+          size: 22,
+        ),
       ),
     );
   }

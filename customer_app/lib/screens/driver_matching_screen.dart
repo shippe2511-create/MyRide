@@ -140,7 +140,7 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
         '?origin=$origin'
         '&destination=$destination'
         '&mode=driving'
-        '&key=$AppConfig.googleMapsApiKey'
+        '&key=${AppConfig.googleMapsApiKey}'
       );
 
       final response = await http.get(url);

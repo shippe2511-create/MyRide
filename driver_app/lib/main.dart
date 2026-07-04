@@ -25,6 +25,7 @@ import 'services/supabase_service.dart';
 import 'services/notification_service.dart';
 import 'services/voice_service.dart';
 import 'services/offline_service.dart';
+import 'services/app_settings_service.dart';
 import 'widgets/offline_banner.dart';
 import 'widgets/app_notification_banner.dart';
 
@@ -78,6 +79,7 @@ void main() async {
 
   try {
     await SupabaseService.initialize();
+    await AppSettingsService.load();
   } catch (e) {
     debugPrint('Supabase init failed: $e');
   }

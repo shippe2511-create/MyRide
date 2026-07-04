@@ -21,6 +21,7 @@ import 'services/notification_service.dart';
 import 'services/cache_service.dart';
 import 'services/supabase_service.dart';
 import 'services/location_service.dart';
+import 'services/app_settings_service.dart';
 import 'widgets/offline_banner.dart';
 import 'widgets/app_notification_banner.dart';
 
@@ -74,6 +75,8 @@ void main() async {
   try {
     // Initialize Supabase
     await SupabaseService.initialize();
+    // Load app settings
+    await AppSettingsService.load();
   } catch (e) {
     debugPrint('Supabase init error: $e');
   }

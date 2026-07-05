@@ -4,7 +4,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
-import '../main.dart' show showAppNotification;
+import '../main.dart' show showAppNotification, navigatorKey;
 import '../widgets/app_notification_banner.dart';
 
 class NotificationService {
@@ -210,6 +210,7 @@ class NotificationService {
     required String title,
     required String body,
     String? payload,
+    VoidCallback? onTap,
   }) async {
     debugPrint('NotificationService.showNotification called: title=$title, body=$body, inForeground=$_isAppInForeground');
 
@@ -226,7 +227,7 @@ class NotificationService {
     if (_isAppInForeground) {
       // App is in foreground - show only in-app banner (less intrusive)
       debugPrint('NotificationService: Showing in-app banner only (foreground)');
-      showAppNotification(title: title, message: body, type: bannerType);
+      showAppNotification(title: title, message: body, type: bannerType, onTap: onTap);
     } else {
       // App is in background - show system notification
       debugPrint('NotificationService: Showing system notification (background)');
@@ -435,6 +436,9 @@ class NotificationService {
             title: 'New message from $senderName',
             body: message,
             payload: 'chat_$rideId',
+            onTap: () {
+              _navigateToRideChat(rideId);
+            },
           );
         } else {
           debugPrint('NotificationService: NOT showing notification - senderId=$senderId vs myUserId=$myUserId, message=$message');
@@ -459,10 +463,85 @@ class NotificationService {
     _notificationChannel?.unsubscribe();
     _notificationChannel = null;
     _unsubscribeChat();
+    _unsubscribeSupportChat();
   }
 
   static void dispose() {
     _unsubscribe();
     _currentUserId = null;
+  }
+
+  // Support Chat Notifications
+  static RealtimeChannel? _supportChatChannel;
+  static String? _currentSupportChatId;
+
+  static void subscribeToSupportChat(String chatId, String myUserId) {
+    if (_currentSupportChatId == chatId && _supportChatChannel != null) return;
+
+    _unsubscribeSupportChat();
+    _currentSupportChatId = chatId;
+
+    debugPrint('NotificationService: Subscribing to support chat notifications for chat $chatId');
+
+    final channel = Supabase.instance.client.channel('support_chat_notif_$chatId');
+
+    channel.onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'support_chat_messages',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'chat_id',
+        value: chatId,
+      ),
+      callback: (payload) {
+        final data = payload.newRecord;
+        final senderId = data['sender_id'] as String?;
+        final senderType = data['sender_type'] as String?;
+        final message = data['message'] as String?;
+
+        debugPrint('NotificationService: Support chat message received - senderId=$senderId, myId=$myUserId, senderType=$senderType');
+
+        // Show notification if message is from admin
+        if (senderType == 'admin' && message != null && message.isNotEmpty) {
+          debugPrint('NotificationService: SHOWING support chat notification');
+          showNotification(
+            title: 'Support Team',
+            body: message,
+            payload: 'support_chat',
+            onTap: () {
+              _navigateToSupportChat();
+            },
+          );
+        }
+      },
+    );
+
+    channel.subscribe((status, error) {
+      debugPrint('NotificationService: Support chat subscription status=$status, error=$error');
+    });
+
+    _supportChatChannel = channel;
+  }
+
+  static void _unsubscribeSupportChat() {
+    _supportChatChannel?.unsubscribe();
+    _supportChatChannel = null;
+    _currentSupportChatId = null;
+  }
+
+  static void _navigateToSupportChat() {
+    final nav = navigatorKey.currentState;
+    if (nav != null) {
+      nav.pushNamed('/support-chat');
+    }
+  }
+
+  static void _navigateToRideChat(String rideId) {
+    // For ride chat, navigate to home which shows active ride with chat button
+    final nav = navigatorKey.currentState;
+    if (nav != null) {
+      nav.popUntil((route) => route.isFirst);
+    }
   }
 }

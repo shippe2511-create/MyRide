@@ -388,7 +388,7 @@ function ZoneMapInner({
 
       {/* Search */}
       {showSearch && (
-        <div className="absolute top-3 left-3 z-[1000] flex items-center gap-2">
+        <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -408,7 +408,7 @@ function ZoneMapInner({
       )}
 
       {/* Controls */}
-      <div className="absolute top-3 right-3 z-[1000] flex flex-col gap-2">
+      <div className="absolute top-3 right-3 z-10 flex flex-col gap-2">
         <Button variant={drawingMode ? "default" : "secondary"} size="icon" className="shadow-lg h-8 w-8" onClick={() => setDrawingMode(!drawingMode)} title="Draw zone">
           {drawingMode ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
         </Button>
@@ -448,7 +448,7 @@ function ZoneMapInner({
 
       {/* Service Area Controls */}
       {showGeofence && (
-        <div className="absolute top-3 left-3 z-[1000] bg-background/95 backdrop-blur p-3 rounded-lg shadow-lg border" style={{ marginTop: showSearch ? '50px' : '0' }}>
+        <div className="absolute top-3 left-3 z-10 bg-background/95 backdrop-blur p-3 rounded-lg shadow-lg border" style={{ marginTop: showSearch ? '50px' : '0' }}>
           <p className="font-semibold text-sm mb-2 flex items-center gap-2">
             <Target className="h-4 w-4 text-blue-500" />
             Service Area
@@ -481,7 +481,7 @@ function ZoneMapInner({
 
       {/* Selected Zone */}
       {selectedZone && (
-        <div className="absolute bottom-3 left-3 z-[1000] bg-background/95 backdrop-blur p-3 rounded-lg shadow-lg border max-w-xs">
+        <div className="absolute bottom-3 left-3 z-10 bg-background/95 backdrop-blur p-3 rounded-lg shadow-lg border max-w-xs">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: getZoneColor(selectedZone) }} />
             <p className="font-semibold text-sm">{selectedZone.name}</p>
@@ -528,7 +528,7 @@ function ZoneMapInner({
 
       {/* Drawing Mode */}
       {drawingMode && (
-        <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-[1000] bg-yellow-500 text-black px-4 py-2 rounded-full shadow-lg text-sm font-medium">
+        <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-10 bg-yellow-500 text-black px-4 py-2 rounded-full shadow-lg text-sm font-medium">
           Click map to draw zone polygon
         </div>
       )}

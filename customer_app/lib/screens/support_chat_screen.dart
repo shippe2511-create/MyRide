@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../providers/app_state.dart';
 import '../widgets/app_snackbar.dart';
+import '../services/notification_service.dart';
 
 class SupportChatMessage {
   final String id;
@@ -14,6 +17,9 @@ class SupportChatMessage {
   final bool isCustomer;
   final DateTime time;
   final bool isRead;
+  final String? imageUrl;
+  final double? latitude;
+  final double? longitude;
 
   SupportChatMessage({
     required this.id,
@@ -21,7 +27,13 @@ class SupportChatMessage {
     required this.isCustomer,
     required this.time,
     this.isRead = false,
+    this.imageUrl,
+    this.latitude,
+    this.longitude,
   });
+
+  bool get hasImage => imageUrl != null && imageUrl!.isNotEmpty;
+  bool get hasLocation => latitude != null && longitude != null;
 }
 
 class SupportChatScreen extends StatefulWidget {
@@ -36,10 +48,13 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
   final List<SupportChatMessage> _messages = [];
+  final _imagePicker = ImagePicker();
+  final _supabase = Supabase.instance.client;
 
   String? _chatId;
   bool _isLoading = true;
   bool _isSending = false;
+  bool _isUploading = false;
   RealtimeChannel? _chatChannel;
 
   final List<_QuickReply> _quickReplies = [
@@ -61,6 +76,12 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
       setState(() => _chatId = chatId);
       await _loadMessages();
       _subscribeToMessages();
+
+      // Subscribe to notifications when not on this screen
+      final appState = Provider.of<AppState>(context, listen: false);
+      if (appState.profileId != null) {
+        NotificationService.subscribeToSupportChat(chatId, appState.profileId!);
+      }
     }
     if (mounted) {
       setState(() => _isLoading = false);
@@ -81,6 +102,9 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
               isCustomer: msg['sender_type'] == 'customer',
               time: (DateTime.tryParse(msg['created_at'] ?? '') ?? DateTime.now()).toLocal(),
               isRead: msg['is_read'] ?? false,
+              imageUrl: msg['image_url'],
+              latitude: (msg['latitude'] as num?)?.toDouble(),
+              longitude: (msg['longitude'] as num?)?.toDouble(),
             ));
           }
         });
@@ -105,6 +129,9 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
               text: newMessage['message'] ?? '',
               isCustomer: false,
               time: (DateTime.tryParse(newMessage['created_at'] ?? '') ?? DateTime.now()).toLocal(),
+              imageUrl: newMessage['image_url'],
+              latitude: (newMessage['latitude'] as num?)?.toDouble(),
+              longitude: (newMessage['longitude'] as num?)?.toDouble(),
             ));
           });
           _scrollToBottom();
@@ -126,34 +153,251 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     });
   }
 
-  Future<void> _sendMessage(String text) async {
-    if (text.trim().isEmpty || _chatId == null || _isSending) return;
+  Future<void> _sendMessage({String? text, String? imageUrl, double? lat, double? lng}) async {
+    final message = text ?? _messageController.text.trim();
+    if (message.isEmpty && imageUrl == null && lat == null) return;
+    if (_chatId == null || _isSending) return;
 
-    final message = SupportChatMessage(
+    setState(() => _isSending = true);
+    _messageController.clear();
+
+    final msgText = message.isNotEmpty ? message : (imageUrl != null ? '📷 Photo' : '📍 Location');
+
+    // Add message locally first for instant feedback
+    final localMsg = SupportChatMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      text: text.trim(),
+      text: msgText,
       isCustomer: true,
       time: DateTime.now(),
+      imageUrl: imageUrl,
+      latitude: lat,
+      longitude: lng,
     );
-
-    setState(() {
-      _messages.add(message);
-      _isSending = true;
-    });
-    _messageController.clear();
+    setState(() => _messages.add(localMsg));
     _scrollToBottom();
 
-    final success = await SupabaseService.sendSupportChatMessage(
-      chatId: _chatId!,
-      message: text.trim(),
-    );
+    try {
+      final appState = Provider.of<AppState>(context, listen: false);
+      await _supabase.from('support_chat_messages').insert({
+        'chat_id': _chatId,
+        'sender_id': appState.profileId,
+        'sender_type': 'customer',
+        'message': msgText,
+        'image_url': imageUrl,
+        'latitude': lat,
+        'longitude': lng,
+      });
 
-    if (mounted) {
-      setState(() => _isSending = false);
-      if (!success) {
+      await _supabase.from('support_chats').update({
+        'status': 'active',
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', _chatId!);
+    } catch (e) {
+      debugPrint('Error sending message: $e');
+      if (mounted) {
         AppSnackbar.error(context, 'Failed to send message');
       }
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
     }
+  }
+
+  Future<void> _pickAndSendImage() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
+
+      if (image == null) return;
+
+      setState(() => _isUploading = true);
+
+      final bytes = await image.readAsBytes();
+      final fileName = 'support_${_chatId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final path = 'support-chat/$fileName';
+
+      await _supabase.storage.from('chat-images').uploadBinary(
+        path,
+        bytes,
+        fileOptions: const FileOptions(contentType: 'image/jpeg'),
+      );
+
+      final imageUrl = _supabase.storage.from('chat-images').getPublicUrl(path);
+
+      await _sendMessage(imageUrl: imageUrl);
+    } catch (e) {
+      debugPrint('Error uploading image: $e');
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to upload image');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploading = false);
+      }
+    }
+  }
+
+  Future<void> _takeAndSendPhoto() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
+
+      if (image == null) return;
+
+      setState(() => _isUploading = true);
+
+      final bytes = await image.readAsBytes();
+      final fileName = 'support_${_chatId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final path = 'support-chat/$fileName';
+
+      await _supabase.storage.from('chat-images').uploadBinary(
+        path,
+        bytes,
+        fileOptions: const FileOptions(contentType: 'image/jpeg'),
+      );
+
+      final imageUrl = _supabase.storage.from('chat-images').getPublicUrl(path);
+
+      await _sendMessage(imageUrl: imageUrl);
+    } catch (e) {
+      debugPrint('Error taking photo: $e');
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to take photo');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploading = false);
+      }
+    }
+  }
+
+  Future<void> _sendLocation() async {
+    try {
+      setState(() => _isSending = true);
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw Exception('Location permission denied');
+        }
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+
+      await _sendMessage(
+        lat: position.latitude,
+        lng: position.longitude,
+      );
+    } catch (e) {
+      debugPrint('Error getting location: $e');
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to get location');
+        setState(() => _isSending = false);
+      }
+    }
+  }
+
+  void _showAttachmentOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: context.cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.mutedColor.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildAttachmentOption(
+                    icon: Icons.photo_library_rounded,
+                    label: 'Gallery',
+                    color: Colors.purple,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _pickAndSendImage();
+                    },
+                  ),
+                  _buildAttachmentOption(
+                    icon: Icons.camera_alt_rounded,
+                    label: 'Camera',
+                    color: Colors.blue,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _takeAndSendPhoto();
+                    },
+                  ),
+                  _buildAttachmentOption(
+                    icon: Icons.location_on_rounded,
+                    label: 'Location',
+                    color: Colors.green,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _sendLocation();
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttachmentOption({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: color, size: 28),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(color: context.textColor, fontSize: 13),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -185,6 +429,22 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
             Expanded(child: Center(child: Text('Failed to connect. Try again.', style: TextStyle(color: context.mutedColor))))
           else ...[
             Expanded(child: _buildMessageList(context)),
+            if (_isUploading)
+              Container(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.yellow),
+                    ),
+                    const SizedBox(width: 12),
+                    Text('Uploading...', style: TextStyle(color: context.mutedColor)),
+                  ],
+                ),
+              ),
             _buildQuickReplies(context),
             _buildInputBar(context),
           ],
@@ -355,12 +615,67 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                     ),
                     border: isCustomer ? null : Border.all(color: context.borderColor),
                   ),
-                  child: Text(
-                    message.text,
-                    style: TextStyle(
-                      color: isCustomer ? Colors.black : context.textColor,
-                      fontSize: 15,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (message.hasImage) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            message.imageUrl!,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (context, child, progress) {
+                              if (progress == null) return child;
+                              return Container(
+                                height: 150,
+                                color: context.cardColor,
+                                child: const Center(
+                                  child: CircularProgressIndicator(color: AppColors.yellow),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      if (message.hasLocation) ...[
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: isCustomer ? Colors.black.withValues(alpha: 0.1) : context.bgColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                color: isCustomer ? Colors.black : AppColors.yellow,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${message.latitude!.toStringAsFixed(4)}, ${message.longitude!.toStringAsFixed(4)}',
+                                style: TextStyle(
+                                  color: isCustomer ? Colors.black : context.textColor,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      if (message.text.isNotEmpty && !message.text.startsWith('📷') && !message.text.startsWith('📍'))
+                        Text(
+                          message.text,
+                          style: TextStyle(
+                            color: isCustomer ? Colors.black : context.textColor,
+                            fontSize: 15,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 Padding(
@@ -397,7 +712,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
             child: GestureDetector(
               onTap: () {
                 HapticFeedback.lightImpact();
-                _sendMessage(reply.text);
+                _sendMessage(text: reply.text);
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -441,6 +756,19 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
       ),
       child: Row(
         children: [
+          GestureDetector(
+            onTap: _showAttachmentOptions,
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: context.bgColor,
+                borderRadius: BorderRadius.circular(22),
+              ),
+              child: Icon(Icons.add, color: context.textColor, size: 24),
+            ),
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: Container(
               height: 48,
@@ -463,17 +791,17 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 ),
                 onChanged: (_) => setState(() {}),
-                onSubmitted: _sendMessage,
+                onSubmitted: (text) => _sendMessage(text: text),
                 onTap: () => _focusNode.requestFocus(),
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           GestureDetector(
-            onTap: () {
+            onTap: (_isSending || _isUploading) ? null : () {
               HapticFeedback.mediumImpact();
               if (hasText) {
-                _sendMessage(_messageController.text);
+                _sendMessage(text: _messageController.text);
               }
             },
             child: Container(
@@ -481,17 +809,22 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
               height: 48,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: hasText
+                  colors: (hasText && !_isSending && !_isUploading)
                       ? [AppColors.yellow, AppColors.yellow.withValues(alpha: 0.9)]
                       : [context.mutedColor, context.mutedColor.withValues(alpha: 0.5)],
                 ),
                 borderRadius: BorderRadius.circular(24),
               ),
-              child: Icon(
-                Icons.send,
-                color: hasText ? Colors.black : context.bgColor,
-                size: 22,
-              ),
+              child: (_isSending || _isUploading)
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Icon(
+                      Icons.send,
+                      color: hasText ? Colors.black : context.bgColor,
+                      size: 22,
+                    ),
             ),
           ),
         ],

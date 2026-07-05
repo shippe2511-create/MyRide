@@ -17,24 +17,28 @@ class AppNotificationBanner {
     VoidCallback? onTap,
     IconData? icon,
   }) {
-    _dismiss();
+    try {
+      _dismiss();
 
-    final overlay = Overlay.of(context, rootOverlay: true);
+      final overlay = Overlay.of(context, rootOverlay: true);
 
-    _currentOverlay = OverlayEntry(
-      builder: (context) => _NotificationBannerWidget(
-        title: title,
-        message: message,
-        type: type,
-        duration: duration,
-        onTap: onTap,
-        icon: icon,
-        onDismiss: _dismiss,
-      ),
-    );
+      _currentOverlay = OverlayEntry(
+        builder: (context) => _NotificationBannerWidget(
+          title: title,
+          message: message,
+          type: type,
+          duration: duration,
+          onTap: onTap,
+          icon: icon,
+          onDismiss: _dismiss,
+        ),
+      );
 
-    overlay.insert(_currentOverlay!);
-    HapticFeedback.lightImpact();
+      overlay.insert(_currentOverlay!);
+      HapticFeedback.lightImpact();
+    } catch (e) {
+      debugPrint('AppNotificationBanner: Failed to show - $e');
+    }
   }
 
   static void showGlobal({

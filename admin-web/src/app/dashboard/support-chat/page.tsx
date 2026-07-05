@@ -57,6 +57,9 @@ interface ChatMessage {
   message: string
   is_read: boolean
   created_at: string
+  image_url?: string | null
+  latitude?: number | null
+  longitude?: number | null
 }
 
 export default function SupportChatPage() {
@@ -384,7 +387,7 @@ export default function SupportChatPage() {
       </div>
 
       <div className="grid grid-cols-3 gap-4 h-[calc(100vh-320px)]">
-        <Card className="col-span-1 flex flex-col">
+        <Card className="col-span-1 flex flex-col h-[600px]">
           <div className="p-3 border-b">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -444,7 +447,7 @@ export default function SupportChatPage() {
           </ScrollArea>
         </Card>
 
-        <Card className="col-span-2 flex flex-col">
+        <Card className="col-span-2 flex flex-col h-[600px]">
           {selectedChat ? (
             <>
               <div className="p-4 border-b flex items-center justify-between">
@@ -501,7 +504,34 @@ export default function SupportChatPage() {
                               : 'bg-muted rounded-bl-sm'
                           }`}
                         >
-                          <p className="text-sm">{msg.message}</p>
+                          {msg.image_url && (
+                            <a href={msg.image_url} target="_blank" rel="noopener noreferrer" className="block mb-2">
+                              <img
+                                src={msg.image_url}
+                                alt="Shared image"
+                                className="max-w-full rounded-lg max-h-64 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                              />
+                            </a>
+                          )}
+                          {msg.latitude && msg.longitude && (
+                            <a
+                              href={`https://www.google.com/maps?q=${msg.latitude},${msg.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`flex items-center gap-2 p-2 rounded-lg mb-2 hover:opacity-80 transition-opacity ${
+                                msg.sender_type === 'admin' ? 'bg-primary-foreground/10' : 'bg-background'
+                              }`}
+                            >
+                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                              <span className="text-xs">{msg.latitude.toFixed(4)}, {msg.longitude.toFixed(4)}</span>
+                            </a>
+                          )}
+                          {msg.message && !msg.message.startsWith('📷') && !msg.message.startsWith('📍') && (
+                            <p className="text-sm">{msg.message}</p>
+                          )}
                           <p className={`text-xs mt-1 ${
                             msg.sender_type === 'admin' ? 'text-primary-foreground/70' : 'text-muted-foreground'
                           }`}>

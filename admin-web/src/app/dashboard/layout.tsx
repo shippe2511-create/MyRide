@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Sidebar } from "@/components/layout/sidebar"
 import { Header } from "@/components/layout/header"
 import { SOSAlertListener } from "@/components/sos-alert-listener"
+import { SupportChatListener } from "@/components/support-chat-listener"
 import { GlobalSearch } from "@/components/global-search"
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts"
 
@@ -30,6 +31,7 @@ export default function DashboardLayout({
   return (
     <div className="flex h-screen w-screen overflow-hidden">
       <SOSAlertListener />
+      <SupportChatListener />
       <GlobalSearch />
       <KeyboardShortcuts />
       <Sidebar collapsed={sidebarCollapsed} onCollapse={handleCollapse} />

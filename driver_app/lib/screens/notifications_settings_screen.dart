@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../providers/driver_state.dart';
@@ -72,6 +73,11 @@ class _NotificationsSettingsScreenState
         'sounds': _sounds,
         'vibration': _vibration,
       });
+
+      // Also save to SharedPreferences for local access
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('notification_sounds', _sounds);
+      await prefs.setBool('notification_vibration', _vibration);
     } catch (e) {
       debugPrint('Error saving notification settings: $e');
       if (mounted) {

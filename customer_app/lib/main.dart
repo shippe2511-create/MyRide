@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'providers/app_state.dart';
 import 'screens/splash_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -33,14 +35,190 @@ void showAppNotification({
   NotificationType type = NotificationType.info,
   VoidCallback? onTap,
 }) {
-  final context = navigatorKey.currentContext;
-  if (context != null) {
-    AppNotificationBanner.show(
-      context,
-      title: title,
-      message: message,
-      type: type,
-      onTap: onTap,
+  debugPrint('showAppNotification: called with title=$title');
+  // Use navigator's overlay directly
+  final navigatorState = navigatorKey.currentState;
+  if (navigatorState != null && navigatorState.overlay != null) {
+    final overlay = navigatorState.overlay!;
+    final entry = OverlayEntry(
+      builder: (context) => _GlobalNotificationBanner(
+        title: title,
+        message: message,
+        type: type,
+        onTap: onTap,
+      ),
+    );
+    overlay.insert(entry);
+    debugPrint('showAppNotification: inserted overlay entry');
+    // Auto dismiss after 3 seconds
+    Future.delayed(const Duration(seconds: 3), () {
+      entry.remove();
+    });
+    HapticFeedback.lightImpact();
+    // Play notification sound (check setting)
+    _playNotificationSound();
+  } else {
+    debugPrint('showAppNotification: Navigator overlay not available');
+  }
+}
+
+Future<void> _playNotificationSound() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final soundsEnabled = prefs.getBool('notification_sounds') ?? true;
+    final vibrationEnabled = prefs.getBool('notification_vibration') ?? true;
+
+    debugPrint('_playNotificationSound: soundsEnabled=$soundsEnabled, vibrationEnabled=$vibrationEnabled');
+
+    // Play sound if enabled
+    if (soundsEnabled) {
+      debugPrint('_playNotificationSound: Playing sound...');
+      final player = AudioPlayer();
+      await player.play(AssetSource('sounds/notification.mp3'));
+      debugPrint('_playNotificationSound: Sound played');
+    }
+
+    // Vibrate if enabled
+    if (vibrationEnabled) {
+      debugPrint('_playNotificationSound: Vibrating...');
+      HapticFeedback.heavyImpact();
+    }
+  } catch (e) {
+    debugPrint('Error playing notification sound: $e');
+  }
+}
+
+class _GlobalNotificationBanner extends StatefulWidget {
+  final String title;
+  final String? message;
+  final NotificationType type;
+  final VoidCallback? onTap;
+
+  const _GlobalNotificationBanner({
+    required this.title,
+    this.message,
+    required this.type,
+    this.onTap,
+  });
+
+  @override
+  State<_GlobalNotificationBanner> createState() => _GlobalNotificationBannerState();
+}
+
+class _GlobalNotificationBannerState extends State<_GlobalNotificationBanner>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, -1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Color get _backgroundColor {
+    switch (widget.type) {
+      case NotificationType.success:
+        return Colors.green;
+      case NotificationType.error:
+        return Colors.red;
+      case NotificationType.warning:
+        return Colors.orange;
+      case NotificationType.info:
+        return Colors.blue;
+    }
+  }
+
+  IconData get _icon {
+    switch (widget.type) {
+      case NotificationType.success:
+        return Icons.check_circle;
+      case NotificationType.error:
+        return Icons.error;
+      case NotificationType.warning:
+        return Icons.warning;
+      case NotificationType.info:
+        return Icons.info;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 8,
+      left: 16,
+      right: 16,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: Material(
+          color: Colors.transparent,
+          child: GestureDetector(
+            onTap: widget.onTap,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: _backgroundColor,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Icon(_icon, color: Colors.white, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          widget.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        if (widget.message != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.message!,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

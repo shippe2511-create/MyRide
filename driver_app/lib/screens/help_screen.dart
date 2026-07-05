@@ -76,6 +76,18 @@ class _HelpScreenState extends State<HelpScreen> {
                   padding: const EdgeInsets.all(20),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
+                // Live Chat with Support
+                _buildSection(context, 'Live Support', [
+                  _buildContactTile(
+                    context,
+                    icon: Icons.chat_bubble_outline_rounded,
+                    title: 'Chat with Support',
+                    subtitle: 'Get help from our support team',
+                    onTap: () => Navigator.pushNamed(context, '/support-chat'),
+                  ),
+                ]),
+                const SizedBox(height: 24),
+
                 if (_contacts.isNotEmpty) ...[
                   _buildSection(context, 'Contact Support', [
                     for (final contact in _contacts)

@@ -58,11 +58,15 @@ class AppState extends ChangeNotifier {
   bool _rideUpdatesEnabled = true;
   bool _promotionsEnabled = false;
   bool _emailNotificationsEnabled = true;
+  bool _soundsEnabled = true;
+  bool _vibrationEnabled = true;
 
   bool get notificationsEnabled => _notificationsEnabled;
   bool get rideUpdatesEnabled => _rideUpdatesEnabled;
   bool get promotionsEnabled => _promotionsEnabled;
   bool get emailNotificationsEnabled => _emailNotificationsEnabled;
+  bool get soundsEnabled => _soundsEnabled;
+  bool get vibrationEnabled => _vibrationEnabled;
 
   Future<void> _loadNotificationSettings() async {
     final prefs = await SharedPreferences.getInstance();
@@ -70,6 +74,8 @@ class AppState extends ChangeNotifier {
     _rideUpdatesEnabled = prefs.getBool('rideUpdatesEnabled') ?? true;
     _promotionsEnabled = prefs.getBool('promotionsEnabled') ?? false;
     _emailNotificationsEnabled = prefs.getBool('emailNotificationsEnabled') ?? true;
+    _soundsEnabled = prefs.getBool('notification_sounds') ?? true;
+    _vibrationEnabled = prefs.getBool('notification_vibration') ?? true;
     notifyListeners();
   }
 
@@ -124,6 +130,22 @@ class AppState extends ChangeNotifier {
     _saveNotificationSettingsToSupabase();
   }
 
+  Future<void> toggleSounds(bool value) async {
+    _soundsEnabled = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notification_sounds', value);
+    notifyListeners();
+    _saveNotificationSettingsToSupabase();
+  }
+
+  Future<void> toggleVibration(bool value) async {
+    _vibrationEnabled = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notification_vibration', value);
+    notifyListeners();
+    _saveNotificationSettingsToSupabase();
+  }
+
   Future<void> _saveNotificationSettingsToSupabase() async {
     if (_profileId == null || _profileId!.isEmpty) return;
     try {
@@ -132,6 +154,8 @@ class AppState extends ChangeNotifier {
         'ride_updates': _rideUpdatesEnabled,
         'promotions': _promotionsEnabled,
         'email_notifications': _emailNotificationsEnabled,
+        'sounds': _soundsEnabled,
+        'vibration': _vibrationEnabled,
       });
     } catch (e) {
       debugPrint('Error saving notification settings to Supabase: $e');

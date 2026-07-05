@@ -124,13 +124,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _initNotifications() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final appState = Provider.of<AppState>(context, listen: false);
       if (appState.profileId != null) {
         NotificationService.subscribeToNotifications(appState.profileId!);
         debugPrint('Subscribed to general notifications for user ${appState.profileId}');
+
+        // Subscribe to support chat notifications if user has an existing chat
+        _subscribeToSupportChatNotifications(appState.profileId!);
       }
     });
+  }
+
+  Future<void> _subscribeToSupportChatNotifications(String profileId) async {
+    try {
+      final response = await Supabase.instance.client
+          .from('support_chats')
+          .select('id')
+          .eq('customer_id', profileId)
+          .maybeSingle();
+
+      if (response != null && response['id'] != null) {
+        final chatId = response['id'] as String;
+        NotificationService.subscribeToSupportChat(chatId, profileId);
+        debugPrint('Subscribed to support chat notifications for chat $chatId');
+      }
+    } catch (e) {
+      debugPrint('Error subscribing to support chat: $e');
+    }
   }
 
   void _checkForScheduledRides() {
@@ -245,6 +266,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 },
               )
               .subscribe();
+
+          // Subscribe to chat notifications for this active ride
+          NotificationService.subscribeToChatMessages(rideId, profileId!);
         }
 
         // Update ongoing trip for banner display

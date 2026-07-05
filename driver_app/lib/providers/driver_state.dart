@@ -258,6 +258,8 @@ class DriverState extends ChangeNotifier {
         _checkForActiveRide();
         // Start profile subscription for realtime updates (even when offline)
         _subscribeToDriverProfile();
+        // Subscribe to support chat notifications
+        _subscribeToSupportChatNotifications();
       }
 
       // Fetch employee_id from database if not set but logged in
@@ -1096,6 +1098,25 @@ class DriverState extends ChangeNotifier {
             },
           )
           .subscribe();
+    }
+  }
+
+  Future<void> _subscribeToSupportChatNotifications() async {
+    if (_profileId.isEmpty) return;
+    try {
+      final response = await Supabase.instance.client
+          .from('support_chats')
+          .select('id')
+          .eq('customer_id', _profileId)
+          .maybeSingle();
+
+      if (response != null && response['id'] != null) {
+        final chatId = response['id'] as String;
+        NotificationService.subscribeToSupportChat(chatId, _profileId);
+        debugPrint('Subscribed to support chat notifications for chat $chatId');
+      }
+    } catch (e) {
+      debugPrint('Error subscribing to support chat: $e');
     }
   }
 

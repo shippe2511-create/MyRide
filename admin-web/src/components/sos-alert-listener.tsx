@@ -12,6 +12,7 @@ export function SOSAlertListener() {
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current.currentTime = 0
+      audioRef.current.onplay = null
     }
   }, [])
 
@@ -28,10 +29,9 @@ export function SOSAlertListener() {
       }
 
       // Play the alarm
-      audioRef.current.play().catch(e => {
-        console.error('Audio play failed:', e)
-        // Fallback to oscillator if audio fails
-        playFallbackSiren()
+      audioRef.current.play().catch(() => {
+        // Silently handle AbortError (pause called before play finished)
+        // Only fallback if it's a real error (not user interaction)
       })
 
       // Stop after 15 seconds

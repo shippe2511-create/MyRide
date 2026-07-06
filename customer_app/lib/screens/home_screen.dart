@@ -2071,6 +2071,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         child: ElevatedButton(
                           onPressed: (pickupAddress.isNotEmpty && dropoffAddress.isNotEmpty)
                               ? () async {
+                                  // Validate allowed time window FIRST
+                                  final selectedHour = selectedTime.hour;
+                                  final selectedMinute = selectedTime.minute;
+                                  final selectedMinutes = selectedHour * 60 + selectedMinute;
+                                  final startMinutes = allowedStartTime.hour * 60 + allowedStartTime.minute;
+                                  final endMinutes = allowedEndTime.hour * 60 + allowedEndTime.minute;
+
+                                  if (selectedMinutes < startMinutes || selectedMinutes > endMinutes) {
+                                    final startStr = '${allowedStartTime.hour.toString().padLeft(2, '0')}:${allowedStartTime.minute.toString().padLeft(2, '0')}';
+                                    final endStr = '${allowedEndTime.hour.toString().padLeft(2, '0')}:${allowedEndTime.minute.toString().padLeft(2, '0')}';
+                                    AppSnackbar.warning(context, 'Schedule between $startStr - $endStr only');
+                                    return;
+                                  }
+
                                   // Validate minimum hours ahead
                                   final minTime = DateTime.now().add(Duration(hours: minHoursAhead));
                                   if (selectedDate.isBefore(minTime)) {
@@ -2082,20 +2096,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   final maxDate = DateTime.now().add(Duration(days: maxDaysAhead));
                                   if (selectedDate.isAfter(maxDate)) {
                                     AppSnackbar.warning(context, 'Cannot schedule more than $maxDaysAhead days ahead');
-                                    return;
-                                  }
-
-                                  // Validate allowed time window
-                                  final selectedHour = selectedTime.hour;
-                                  final selectedMinute = selectedTime.minute;
-                                  final selectedMinutes = selectedHour * 60 + selectedMinute;
-                                  final startMinutes = allowedStartTime.hour * 60 + allowedStartTime.minute;
-                                  final endMinutes = allowedEndTime.hour * 60 + allowedEndTime.minute;
-
-                                  if (selectedMinutes < startMinutes || selectedMinutes > endMinutes) {
-                                    final startStr = '${allowedStartTime.hour.toString().padLeft(2, '0')}:${allowedStartTime.minute.toString().padLeft(2, '0')}';
-                                    final endStr = '${allowedEndTime.hour.toString().padLeft(2, '0')}:${allowedEndTime.minute.toString().padLeft(2, '0')}';
-                                    AppSnackbar.warning(context, 'Schedule between $startStr - $endStr only');
                                     return;
                                   }
                                   Navigator.pop(context);

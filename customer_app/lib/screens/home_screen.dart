@@ -449,20 +449,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
           child: Row(
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  gradient: (appState.profilePhotoPath == null && appState.avatarUrl == null)
-                      ? const LinearGradient(
-                          colors: [AppColors.yellow, AppColors.yellow2],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                      : null,
-                  borderRadius: BorderRadius.circular(16),
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _pageController.jumpToPage(3); // Switch to Profile tab
+                },
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    gradient: (appState.profilePhotoPath == null && appState.avatarUrl == null)
+                        ? const LinearGradient(
+                            colors: [AppColors.yellow, AppColors.yellow2],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : null,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: _buildProfileAvatar(appState),
                 ),
-                child: _buildProfileAvatar(appState),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -2137,12 +2143,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           debugPrint('Admin locations search error: $e');
         }
 
-        // Then search Google Places
+        // Then search Google Places - restricted to Male/Hulhumale area
         final url = Uri.parse(
           'https://maps.googleapis.com/maps/api/place/autocomplete/json'
           '?input=${Uri.encodeComponent(query)}'
-          '&location=${userLocation?.latitude ?? 4.1755},${userLocation?.longitude ?? 73.5093}'
-          '&radius=50000'
+          '&location=4.2000,73.5300'
+          '&radius=15000'
+          '&strictbounds=true'
           '&components=country:mv'
           '&key=${AppConfig.googleMapsApiKey}'
         );

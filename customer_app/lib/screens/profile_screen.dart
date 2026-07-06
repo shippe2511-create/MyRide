@@ -2158,14 +2158,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final phone = supportPhone.replaceAll(RegExp(r'[^0-9+]'), '');
         final uri = Uri.parse('tel:$phone');
         if (await canLaunchUrl(uri)) {
-          await launchUrl(uri);
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
         }
       }, subtitle: supportPhone),
       _buildActionItem('Email Support', Icons.email, () async {
         Navigator.pop(context);
         final uri = Uri.parse('mailto:$supportEmail?subject=Support%20Request');
         if (await canLaunchUrl(uri)) {
-          await launchUrl(uri);
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
         }
       }, subtitle: supportEmail),
       _buildActionItem('Live Chat', Icons.chat, () {
@@ -3102,13 +3102,14 @@ class _AddressPickerScreenState extends State<_AddressPickerScreen> {
     setState(() => _isSearching = true);
 
     try {
+      // Restricted to Male/Hulhumale area (15km radius)
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/place/autocomplete/json'
         '?input=${Uri.encodeComponent(query)}'
         '&key=$AppConfig.googleMapsApiKey'
         '&components=country:mv'
-        '&location=4.1755,73.5093'
-        '&radius=50000'
+        '&location=4.2000,73.5300'
+        '&radius=15000'
         '&strictbounds=true'
       );
 

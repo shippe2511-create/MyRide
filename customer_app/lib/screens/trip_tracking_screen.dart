@@ -1191,27 +1191,134 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
     Share.share(message, subject: 'My Trip Details');
   }
 
-  void _showChangeDestinationSheet() {
+  void _showChangeDestinationSheet() async {
     String? selectedDestination;
     String? selectedName;
     double? selectedLat;
     double? selectedLng;
     String searchQuery = '';
     bool showMap = false;
+    bool isLoading = true;
     LatLng mapLocation = const LatLng(4.1755, 73.5093);
     final searchController = TextEditingController();
     GoogleMapController? googleMapController;
 
-    final List<Map<String, dynamic>> allPlaces = [
-      {'name': 'Hulhumale Phase 2', 'address': 'Hulhumale Phase 2, Flat Area', 'lat': 4.2286, 'lng': 73.5400, 'icon': Icons.apartment_rounded},
-      {'name': 'Hulhumale Phase 1', 'address': 'Hulhumale Phase 1, Housing Area', 'lat': 4.2116, 'lng': 73.5380, 'icon': Icons.home_work_rounded},
-      {'name': 'Male City Center', 'address': 'Republic Square, Male', 'lat': 4.1755, 'lng': 73.5093, 'icon': Icons.location_city_rounded},
-      {'name': 'Velana Airport', 'address': 'Velana International Airport', 'lat': 4.1918, 'lng': 73.5290, 'icon': Icons.flight_rounded},
-      {'name': 'Ferry Terminal', 'address': 'Hulhumale Ferry Terminal', 'lat': 4.2106, 'lng': 73.5400, 'icon': Icons.directions_boat_rounded},
-      {'name': 'Tree Top Hospital', 'address': 'Tree Top Hospital, Hulhumale', 'lat': 4.2250, 'lng': 73.5420, 'icon': Icons.local_hospital_rounded},
-      {'name': 'ADK Hospital', 'address': 'ADK Hospital, Male City', 'lat': 4.1740, 'lng': 73.5100, 'icon': Icons.medical_services_rounded},
-      {'name': 'Central Park', 'address': 'Hulhumale Central Park', 'lat': 4.2200, 'lng': 73.5380, 'icon': Icons.park_rounded},
-    ];
+    List<Map<String, dynamic>> allPlaces = [];
+
+    // Load admin locations and user's saved places
+    try {
+      // Get admin locations
+      final adminLocations = await SupabaseService.getLocations();
+      for (final loc in adminLocations) {
+        double? lat;
+        double? lng;
+        if (loc['lat'] != null) {
+          lat = loc['lat'] is num ? (loc['lat'] as num).toDouble() : double.tryParse(loc['lat'].toString());
+        }
+        if (loc['lng'] != null) {
+          lng = loc['lng'] is num ? (loc['lng'] as num).toDouble() : double.tryParse(loc['lng'].toString());
+        }
+        if (lat != null && lng != null) {
+          allPlaces.add({
+            'name': loc['name'] ?? '',
+            'address': loc['address'] ?? 'Admin Location',
+            'lat': lat,
+            'lng': lng,
+            'icon': Icons.location_city_rounded,
+          });
+        }
+      }
+
+      // Get user's saved places
+      final appState = Provider.of<AppState>(context, listen: false);
+      final profileId = appState.profileId;
+      if (profileId != null && profileId.isNotEmpty) {
+        final savedPlaces = await SupabaseService.client
+            .from('saved_places')
+            .select()
+            .eq('profile_id', profileId)
+            .order('created_at', ascending: false);
+        for (final place in savedPlaces) {
+          double? lat;
+          double? lng;
+          if (place['lat'] != null) {
+            lat = place['lat'] is num ? (place['lat'] as num).toDouble() : double.tryParse(place['lat'].toString());
+          }
+          if (place['lng'] != null) {
+            lng = place['lng'] is num ? (place['lng'] as num).toDouble() : double.tryParse(place['lng'].toString());
+          }
+          if (lat != null && lng != null) {
+            allPlaces.add({
+              'name': place['name'] ?? place['label'] ?? 'Saved Place',
+              'address': place['address'] ?? 'Saved Location',
+              'lat': lat,
+              'lng': lng,
+              'icon': place['label'] == 'Home' ? Icons.home_rounded : (place['label'] == 'Work' ? Icons.work_rounded : Icons.star_rounded),
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading places: $e');
+    }
+    isLoading = false;
+
+    if (!mounted) return;
+
+    List<Map<String, dynamic>> googleResults = [];
+    bool isSearching = false;
+    Timer? searchDebounce;
+
+    Future<void> searchPlaces(String query, void Function(void Function()) setSheetState) async {
+      if (query.isEmpty) {
+        setSheetState(() {
+          googleResults = [];
+          isSearching = false;
+        });
+        return;
+      }
+
+      setSheetState(() => isSearching = true);
+
+      try {
+        // Restricted to Male/Hulhumale area (15km radius)
+        final url = Uri.parse(
+          'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+          '?input=${Uri.encodeComponent(query)}'
+          '&location=4.2000,73.5300'
+          '&radius=15000'
+          '&strictbounds=true'
+          '&components=country:mv'
+          '&key=${AppConfig.googleMapsApiKey}'
+        );
+
+        final response = await http.get(url);
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data['status'] == 'OK') {
+            final predictions = data['predictions'] as List;
+            setSheetState(() {
+              googleResults = predictions.map((p) => {
+                'place_id': p['place_id'],
+                'name': p['structured_formatting']?['main_text'] ?? p['description'],
+                'address': p['description'],
+                'icon': Icons.location_on_rounded,
+                'isGoogle': true,
+              }).toList().cast<Map<String, dynamic>>();
+              isSearching = false;
+            });
+          } else {
+            setSheetState(() {
+              googleResults = [];
+              isSearching = false;
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('Places search error: $e');
+        setSheetState(() => isSearching = false);
+      }
+    }
 
     showModalBottomSheet(
       context: context,
@@ -1219,11 +1326,15 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
       isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setSheetState) {
-          final filteredPlaces = searchQuery.isEmpty
+          // Filter local places (admin + saved)
+          final localMatches = searchQuery.isEmpty
               ? allPlaces
               : allPlaces.where((p) =>
                   (p['name'] as String).toLowerCase().contains(searchQuery.toLowerCase()) ||
                   (p['address'] as String).toLowerCase().contains(searchQuery.toLowerCase())).toList();
+
+          // Combine local matches with Google results
+          final filteredPlaces = [...localMatches, ...googleResults];
 
           return AnimatedContainer(
             duration: const Duration(milliseconds: 300),
@@ -1315,7 +1426,13 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
                                           isDense: true,
                                           contentPadding: const EdgeInsets.symmetric(vertical: 12),
                                         ),
-                                        onChanged: (value) => setSheetState(() => searchQuery = value),
+                                        onChanged: (value) {
+                                          setSheetState(() => searchQuery = value);
+                                          searchDebounce?.cancel();
+                                          searchDebounce = Timer(const Duration(milliseconds: 400), () {
+                                            searchPlaces(value, setSheetState);
+                                          });
+                                        },
                                       ),
                                     ),
                                   ],
@@ -1423,45 +1540,53 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
                                       ),
                                     ),
                                   ),
-                                  // Selected location card
+                                  // Selected location card - tap to confirm
                                   if (selectedName != null)
                                     Positioned(
                                       bottom: 16,
                                       left: 16,
                                       right: 16,
-                                      child: Container(
-                                        padding: const EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            colors: context.isDark
-                                                ? [const Color(0xFF2A2A2A), const Color(0xFF1E1E1E)]
-                                                : [Colors.white, const Color(0xFFF8F9FA)],
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          HapticFeedback.mediumImpact();
+                                          Navigator.pop(ctx);
+                                          _showWaitingForDriverApproval(selectedName!, selectedName!, lat: selectedLat, lng: selectedLng);
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            gradient: const LinearGradient(
+                                              colors: [AppColors.yellow, Color(0xFFFFC107)],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            ),
+                                            borderRadius: BorderRadius.circular(16),
+                                            boxShadow: [BoxShadow(color: AppColors.yellow.withValues(alpha: 0.4), blurRadius: 12, offset: const Offset(0, 4))],
                                           ),
-                                          borderRadius: BorderRadius.circular(16),
-                                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 12, offset: const Offset(0, 4))],
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.all(10),
-                                              decoration: BoxDecoration(
-                                                color: AppColors.yellow.withValues(alpha: 0.15),
-                                                borderRadius: BorderRadius.circular(12),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(10),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.black.withValues(alpha: 0.15),
+                                                  borderRadius: BorderRadius.circular(12),
+                                                ),
+                                                child: const Icon(Icons.location_on_rounded, color: Colors.black, size: 22),
                                               ),
-                                              child: Icon(Icons.location_on_rounded, color: AppColors.yellow, size: 22),
-                                            ),
-                                            const SizedBox(width: 14),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(selectedName!, style: TextStyle(color: context.textColor, fontSize: 15, fontWeight: FontWeight.w700)),
-                                                  Text('${selectedLat!.toStringAsFixed(4)}, ${selectedLng!.toStringAsFixed(4)}', style: TextStyle(color: context.mutedColor, fontSize: 12)),
-                                                ],
+                                              const SizedBox(width: 14),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(selectedName!, style: const TextStyle(color: Colors.black, fontSize: 15, fontWeight: FontWeight.w700)),
+                                                    const SizedBox(height: 2),
+                                                    Text('Tap to confirm destination', style: TextStyle(color: Colors.black.withValues(alpha: 0.7), fontSize: 12)),
+                                                  ],
+                                                ),
                                               ),
-                                            ),
-                                            Icon(Icons.check_circle_rounded, color: AppColors.success, size: 24),
-                                          ],
+                                              const Icon(Icons.send_rounded, color: Colors.black, size: 24),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -1469,7 +1594,40 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
                               ),
                             ),
                           )
-                        : ListView.builder(
+                        : isSearching
+                            ? Center(
+                                key: const ValueKey('loading'),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 32,
+                                      height: 32,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 3,
+                                        valueColor: AlwaysStoppedAnimation(AppColors.yellow),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text('Searching...', style: TextStyle(color: context.mutedColor)),
+                                  ],
+                                ),
+                              )
+                            : filteredPlaces.isEmpty
+                                ? Center(
+                                    key: const ValueKey('empty'),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.search_off_rounded, color: context.mutedColor, size: 48),
+                                        const SizedBox(height: 16),
+                                        Text('No places found', style: TextStyle(color: context.mutedColor, fontSize: 16)),
+                                        const SizedBox(height: 8),
+                                        Text('Try a different search or use the map', style: TextStyle(color: context.mutedColor.withValues(alpha: 0.7), fontSize: 14)),
+                                      ],
+                                    ),
+                                  )
+                                : ListView.builder(
                             key: const ValueKey('list'),
                             padding: const EdgeInsets.symmetric(horizontal: 20),
                             itemCount: filteredPlaces.length,
@@ -1485,14 +1643,43 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
                                   child: Opacity(opacity: value, child: child),
                                 ),
                                 child: GestureDetector(
-                                  onTap: () {
+                                  onTap: () async {
                                     HapticFeedback.lightImpact();
-                                    setSheetState(() {
-                                      selectedDestination = place['name'];
-                                      selectedName = place['name'];
-                                      selectedLat = place['lat'];
-                                      selectedLng = place['lng'];
-                                    });
+
+                                    // For Google results, fetch coordinates first
+                                    if (place['isGoogle'] == true && place['place_id'] != null) {
+                                      try {
+                                        final detailsUrl = Uri.parse(
+                                          'https://maps.googleapis.com/maps/api/place/details/json'
+                                          '?place_id=${place['place_id']}'
+                                          '&fields=geometry'
+                                          '&key=${AppConfig.googleMapsApiKey}'
+                                        );
+                                        final response = await http.get(detailsUrl);
+                                        if (response.statusCode == 200) {
+                                          final data = json.decode(response.body);
+                                          if (data['status'] == 'OK') {
+                                            final location = data['result']['geometry']['location'];
+                                            setSheetState(() {
+                                              selectedDestination = place['name'];
+                                              selectedName = place['name'];
+                                              selectedLat = location['lat'];
+                                              selectedLng = location['lng'];
+                                            });
+                                          }
+                                        }
+                                      } catch (e) {
+                                        debugPrint('Error fetching place details: $e');
+                                      }
+                                    } else {
+                                      // Local place already has coordinates
+                                      setSheetState(() {
+                                        selectedDestination = place['name'];
+                                        selectedName = place['name'];
+                                        selectedLat = place['lat'];
+                                        selectedLng = place['lng'];
+                                      });
+                                    }
                                   },
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 200),

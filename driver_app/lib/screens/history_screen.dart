@@ -813,102 +813,65 @@ class _FilterSheetState extends State<_FilterSheet> {
         color: context.cardColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 12),
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: context.borderColor,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              'Filter by Date',
-              style: TextStyle(
-                color: context.textColor,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          _buildDateOption(context, 'all', 'All Time', Icons.all_inclusive),
-          _buildDateOption(context, 'today', 'Today', Icons.calendar_today),
-          _buildDateOption(context, 'week', 'This Week', Icons.date_range),
-          _buildDateOption(context, 'month', 'This Month', Icons.calendar_month),
-
-          // Custom date range option
-          GestureDetector(
-            onTap: _selectCustomRange,
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              decoration: BoxDecoration(
-                color: _selectedPreset == 'custom' ? AppColors.yellow.withValues(alpha: 0.15) : context.bgColor,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: _selectedPreset == 'custom' ? AppColors.yellow : context.borderColor,
-                  width: _selectedPreset == 'custom' ? 2 : 1,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 12),
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.borderColor,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              child: Row(
-                children: [
-                  Icon(Icons.edit_calendar, color: _selectedPreset == 'custom' ? AppColors.yellow : context.mutedColor, size: 22),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Custom Range',
-                          style: TextStyle(
-                            color: _selectedPreset == 'custom' ? AppColors.yellow : context.textColor,
-                            fontSize: 16,
-                            fontWeight: _selectedPreset == 'custom' ? FontWeight.w600 : FontWeight.w500,
-                          ),
-                        ),
-                        if (_customRange != null && _selectedPreset == 'custom')
-                          Text(
-                            '${dateFormat.format(_customRange!.start)} - ${dateFormat.format(_customRange!.end)}',
-                            style: TextStyle(
-                              color: AppColors.yellow.withValues(alpha: 0.8),
-                              fontSize: 12,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  Icon(Icons.chevron_right, color: _selectedPreset == 'custom' ? AppColors.yellow : context.mutedColor, size: 22),
-                ],
+            ),
+            const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                'Filter by Date',
+                style: TextStyle(
+                  color: context.textColor,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
-          ),
+            const SizedBox(height: 20),
 
-          SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
-        ],
+            _buildDateOption(context, 'all', 'All Time', Icons.all_inclusive),
+            _buildDateOption(context, 'today', 'Today', Icons.calendar_today),
+            _buildDateOption(context, 'week', 'This Week', Icons.date_range),
+            _buildDateOption(context, 'month', 'This Month', Icons.calendar_month),
+            _buildDateOption(context, 'custom', 'Custom Range', Icons.edit_calendar),
+
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildDateOption(BuildContext context, String preset, String label, IconData icon) {
     final isSelected = _selectedPreset == preset;
+    final dateFormat = DateFormat('MMM d, yyyy');
 
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
         HapticFeedback.selectionClick();
-        setState(() => _selectedPreset = preset);
-        widget.onApply(null, _getDateRangeForPreset(preset));
-        Navigator.pop(context);
+
+        if (preset == 'custom') {
+          // Show date range picker for custom
+          await _selectCustomRange();
+        } else {
+          setState(() => _selectedPreset = preset);
+          widget.onApply(null, _getDateRangeForPreset(preset));
+          Navigator.pop(context);
+        }
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
@@ -926,16 +889,31 @@ class _FilterSheetState extends State<_FilterSheet> {
             Icon(icon, color: isSelected ? AppColors.yellow : context.mutedColor, size: 22),
             const SizedBox(width: 14),
             Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? AppColors.yellow : context.textColor,
-                  fontSize: 16,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: isSelected ? AppColors.yellow : context.textColor,
+                      fontSize: 16,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                    ),
+                  ),
+                  if (preset == 'custom' && _customRange != null && isSelected)
+                    Text(
+                      '${dateFormat.format(_customRange!.start)} - ${dateFormat.format(_customRange!.end)}',
+                      style: TextStyle(
+                        color: AppColors.yellow.withValues(alpha: 0.8),
+                        fontSize: 12,
+                      ),
+                    ),
+                ],
               ),
             ),
-            if (isSelected)
+            if (preset == 'custom')
+              Icon(Icons.chevron_right, color: isSelected ? AppColors.yellow : context.mutedColor, size: 22)
+            else if (isSelected)
               Icon(Icons.check, color: AppColors.yellow, size: 22),
           ],
         ),

@@ -904,7 +904,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 final phone = supportPhone.replaceAll(RegExp(r'[^0-9+]'), '');
                 final uri = Uri.parse('tel:$phone');
                 if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri);
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
                 }
               },
             ),
@@ -924,7 +924,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Navigator.pop(ctx);
                 final uri = Uri.parse('mailto:$supportEmail?subject=Driver%20Support%20Request');
                 if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri);
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
                 }
               },
             ),

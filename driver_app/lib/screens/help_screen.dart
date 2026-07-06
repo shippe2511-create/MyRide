@@ -355,9 +355,10 @@ class _HelpScreenState extends State<HelpScreen> {
   }
 
   void _launchWhatsApp(String phone) async {
-    final uri = Uri.parse('https://wa.me/$phone');
+    final cleanPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    final uri = Uri.parse('https://wa.me/$cleanPhone');
     if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 }

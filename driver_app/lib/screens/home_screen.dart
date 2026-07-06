@@ -560,7 +560,9 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           // Profile avatar
           GestureDetector(
-            onTap: () => Navigator.pushNamed(context, '/profile'),
+            onTap: () {
+              setState(() => _selectedTab = 2); // Switch to Profile tab
+            },
             child: Container(
               width: 50,
               height: 50,

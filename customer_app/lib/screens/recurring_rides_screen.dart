@@ -354,9 +354,13 @@ class _AddRecurringRideSheetState extends State<AddRecurringRideSheet> {
       return;
     }
 
+    // Restricted to Male/Hulhumale area (15km radius)
     final url = Uri.parse(
       'https://maps.googleapis.com/maps/api/place/autocomplete/json'
       '?input=${Uri.encodeComponent(query)}'
+      '&location=4.2000,73.5300'
+      '&radius=15000'
+      '&strictbounds=true'
       '&components=country:mv'
       '&key=${AppConfig.googleMapsApiKey}'
     );

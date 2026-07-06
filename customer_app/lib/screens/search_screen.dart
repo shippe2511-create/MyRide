@@ -86,11 +86,12 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() => _isSearchingPickup = true);
 
     try {
+      // Restricted to Male/Hulhumale area (15km radius)
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/place/autocomplete/json'
         '?input=${Uri.encodeComponent(query)}'
-        '&location=4.1755,73.5093'
-        '&radius=100000'
+        '&location=4.2000,73.5300'
+        '&radius=15000'
         '&strictbounds=true'
         '&components=country:mv'
         '&key=${AppConfig.googleMapsApiKey}'
@@ -179,12 +180,12 @@ class _SearchScreenState extends State<SearchScreen> {
         debugPrint('Admin locations search error: $e');
       }
 
-      // Then search Google Places
+      // Then search Google Places - restricted to Male/Hulhumale area
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/place/autocomplete/json'
         '?input=${Uri.encodeComponent(query)}'
-        '&location=4.1755,73.5093'
-        '&radius=100000'
+        '&location=4.2000,73.5300'
+        '&radius=15000'
         '&strictbounds=true'
         '&components=country:mv'
         '&key=${AppConfig.googleMapsApiKey}'
@@ -1681,8 +1682,12 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _searchForRelocate(String query, Map<String, dynamic> place, int index, BuildContext ctx) async {
     try {
+      // Restricted to Male/Hulhumale area
       final url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json'
           '?input=${Uri.encodeComponent(query)}'
+          '&location=4.2000,73.5300'
+          '&radius=15000'
+          '&strictbounds=true'
           '&components=country:mv'
           '&key=${AppConfig.googleMapsApiKey}';
       final response = await http.get(Uri.parse(url));
@@ -1806,8 +1811,12 @@ class _SearchScreenState extends State<SearchScreen> {
                       onChanged: (value) async {
                         if (value.length > 2) {
                           try {
+                            // Restricted to Male/Hulhumale area
                             final url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json'
                                 '?input=${Uri.encodeComponent(value)}'
+                                '&location=4.2000,73.5300'
+                                '&radius=15000'
+                                '&strictbounds=true'
                                 '&components=country:mv'
                                 '&key=${AppConfig.googleMapsApiKey}';
                             final response = await http.get(Uri.parse(url));

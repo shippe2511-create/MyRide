@@ -1805,28 +1805,6 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                           )
                         : const Icon(Icons.person, color: Colors.black, size: 32),
                   ),
-                  Positioned(
-                    bottom: -2,
-                    right: -2,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.success,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.star, color: Colors.white, size: 10),
-                          const SizedBox(width: 2),
-                          Text(
-                            ride.customerRating?.toStringAsFixed(1) ?? '-',
-                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                 ],
               ),
               const SizedBox(width: 14),

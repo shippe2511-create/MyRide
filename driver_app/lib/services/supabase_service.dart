@@ -357,11 +357,11 @@ class SupabaseService {
     if (isOnline != null) {
       await client
           .from('driver_locations')
-          .update({
+          .upsert({
+            'driver_id': driverId,
             'is_online': isOnline,
             'last_updated': DateTime.now().toIso8601String(),
-          })
-          .eq('driver_id', driverId);
+          }, onConflict: 'driver_id');
     }
   }
 

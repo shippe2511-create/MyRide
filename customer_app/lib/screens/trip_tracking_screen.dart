@@ -954,29 +954,6 @@ Live tracking link: https://myride.mv/track/$rideId
                                         ),
                                 ),
                               ),
-                              // Rating badge
-                              Positioned(
-                                bottom: -4,
-                                left: 8,
-                                right: 8,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(10),
-                                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 4)],
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text('${widget.tripData['driverRating'] ?? 0.0}', style: TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.w700)),
-                                      const SizedBox(width: 2),
-                                      Icon(Icons.star, color: Colors.black87, size: 10),
-                                    ],
-                                  ),
-                                ),
-                              ),
                             ],
                           ),
                           const SizedBox(width: 16),

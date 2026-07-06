@@ -2088,6 +2088,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     List<Map<String, dynamic>> searchResults = [];
     LatLng? userLocation = selectedLocation;
     Timer? debounceTimer;
+    MapType mapType = MapType.normal;
 
     Future<void> searchPlaces(String query, void Function(void Function()) setModalState) async {
       if (query.length < 2) {
@@ -2468,6 +2469,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           children: [
                             GoogleMap(
                               initialCameraPosition: CameraPosition(target: selectedLocation, zoom: 14),
+                              mapType: mapType,
                               onMapCreated: (controller) => googleMapController = controller,
                               onTap: (point) async {
                                 setModalState(() {
@@ -2501,7 +2503,44 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               myLocationButtonEnabled: false,
                               zoomControlsEnabled: false,
                               mapToolbarEnabled: false,
-                              style: context.isDark ? _darkMapStyle : null,
+                              style: mapType == MapType.normal && context.isDark ? _darkMapStyle : null,
+                            ),
+                            // Map type button (normal/satellite/terrain)
+                            Positioned(
+                              top: 16,
+                              right: 16,
+                              child: GestureDetector(
+                                onTap: () => setModalState(() {
+                                  if (mapType == MapType.normal) {
+                                    mapType = MapType.satellite;
+                                  } else if (mapType == MapType.satellite) {
+                                    mapType = MapType.terrain;
+                                  } else {
+                                    mapType = MapType.normal;
+                                  }
+                                }),
+                                child: Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFD60A),
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.2),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(
+                                    mapType == MapType.satellite ? Icons.satellite_alt :
+                                    mapType == MapType.terrain ? Icons.terrain : Icons.map,
+                                    color: Colors.black,
+                                    size: 24,
+                                  ),
+                                ),
+                              ),
                             ),
                             // Map Controls
                             Positioned(

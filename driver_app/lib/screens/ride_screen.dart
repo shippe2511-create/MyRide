@@ -284,6 +284,58 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     _markerAnimController.forward();
   }
 
+  /// Snaps GPS position to nearest point on the route polyline
+  /// Returns the snapped position, or original if route is empty or too far
+  LatLng _snapToRoute(double lat, double lng) {
+    if (_routePoints.isEmpty) return LatLng(lat, lng);
+
+    double minDistance = double.infinity;
+    LatLng snappedPoint = LatLng(lat, lng);
+
+    // Find nearest point on route
+    for (int i = 0; i < _routePoints.length - 1; i++) {
+      final p1 = _routePoints[i];
+      final p2 = _routePoints[i + 1];
+
+      // Project point onto line segment
+      final projected = _projectPointOnSegment(lat, lng, p1, p2);
+      final distance = Geolocator.distanceBetween(
+        lat, lng, projected.latitude, projected.longitude);
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        snappedPoint = projected;
+      }
+    }
+
+    // Only snap if within 30 meters of route (reasonable GPS error margin)
+    if (minDistance <= 30) {
+      return snappedPoint;
+    }
+    return LatLng(lat, lng);
+  }
+
+  /// Projects a point onto a line segment, returning the closest point on the segment
+  LatLng _projectPointOnSegment(double lat, double lng, LatLng p1, LatLng p2) {
+    final dx = p2.latitude - p1.latitude;
+    final dy = p2.longitude - p1.longitude;
+
+    if (dx == 0 && dy == 0) {
+      return p1; // Segment is a point
+    }
+
+    // Calculate projection factor (0 = at p1, 1 = at p2)
+    final t = ((lat - p1.latitude) * dx + (lng - p1.longitude) * dy) / (dx * dx + dy * dy);
+
+    // Clamp to segment
+    final tClamped = t.clamp(0.0, 1.0);
+
+    return LatLng(
+      p1.latitude + tClamped * dx,
+      p1.longitude + tClamped * dy,
+    );
+  }
+
   void _addToBreadcrumb(double lat, double lng) {
     final point = LatLng(lat, lng);
     if (_breadcrumbTrail.isEmpty ||
@@ -831,10 +883,13 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   }
 
   Set<Marker> _buildMarkers(RideRequest ride, DriverState state) {
+    // Snap driver position to route for smoother display
+    final snappedPos = _snapToRoute(_animatedDriverLat, _animatedDriverLng);
+
     return {
       Marker(
         markerId: const MarkerId('driver'),
-        position: LatLng(_animatedDriverLat, _animatedDriverLng),
+        position: snappedPos,
         icon: _carIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
         rotation: _driverHeading,
         anchor: const Offset(0.5, 0.5),
@@ -1212,12 +1267,22 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                 top: MediaQuery.of(context).padding.top + 240,
                 child: Column(
                   children: [
-                    // Map type toggle (satellite/normal)
+                    // Map type toggle (normal/satellite/terrain)
                     _buildMapControlButton(
-                      _mapType == MapType.satellite ? Icons.map : Icons.satellite,
-                      _mapType == MapType.satellite,
-                      () => setState(() => _mapType = _mapType == MapType.normal ? MapType.satellite : MapType.normal),
-                      'Satellite',
+                      _mapType == MapType.satellite ? Icons.satellite_alt :
+                      _mapType == MapType.terrain ? Icons.terrain : Icons.map,
+                      false,
+                      () => setState(() {
+                        if (_mapType == MapType.normal) {
+                          _mapType = MapType.satellite;
+                        } else if (_mapType == MapType.satellite) {
+                          _mapType = MapType.terrain;
+                        } else {
+                          _mapType = MapType.normal;
+                        }
+                      }),
+                      'Map Type',
+                      alwaysYellow: true,
                     ),
                     const SizedBox(height: 8),
                     // Traffic toggle
@@ -1622,7 +1687,8 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildMapControlButton(IconData icon, bool isActive, VoidCallback onTap, String label) {
+  Widget _buildMapControlButton(IconData icon, bool isActive, VoidCallback onTap, String label, {bool alwaysYellow = false}) {
+    final showYellow = alwaysYellow || isActive;
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
@@ -1632,17 +1698,20 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: isActive ? AppColors.yellow : Colors.black.withValues(alpha: 0.7),
+          color: showYellow ? AppColors.yellow : Colors.black.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isActive ? AppColors.yellow : Colors.white24,
-            width: isActive ? 2 : 1,
-          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Icon(
           icon,
-          color: isActive ? Colors.black : Colors.white,
-          size: 20,
+          color: showYellow ? Colors.black : Colors.white,
+          size: 22,
         ),
       ),
     );

@@ -513,21 +513,28 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
     };
   }
 
-  Widget _buildMapControl(IconData icon, bool isActive, VoidCallback onTap) {
+  Widget _buildMapControl(IconData icon, bool isActive, VoidCallback onTap, {bool alwaysYellow = false}) {
+    final showYellow = alwaysYellow || isActive;
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
         onTap();
       },
       child: Container(
-        width: 40,
-        height: 40,
+        width: 44,
+        height: 44,
         decoration: BoxDecoration(
-          color: isActive ? AppColors.yellow : Colors.black.withOpacity(0.7),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: isActive ? AppColors.yellow : Colors.white24),
+          color: showYellow ? AppColors.yellow : Colors.black.withOpacity(0.7),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        child: Icon(icon, color: isActive ? Colors.black : Colors.white, size: 20),
+        child: Icon(icon, color: showYellow ? Colors.black : Colors.white, size: 22),
       ),
     );
   }
@@ -580,11 +587,21 @@ ${widget.rideId != null ? 'Track: https://myride.mv/track/${widget.rideId}' : ''
                 // Share location
                 _buildMapControl(Icons.share_location, false, _shareLiveLocation),
                 const SizedBox(height: 8),
-                // Satellite toggle
+                // Map type toggle (normal/satellite/terrain)
                 _buildMapControl(
-                  _mapType == MapType.satellite ? Icons.map : Icons.satellite,
-                  _mapType == MapType.satellite,
-                  () => setState(() => _mapType = _mapType == MapType.normal ? MapType.satellite : MapType.normal),
+                  _mapType == MapType.satellite ? Icons.satellite_alt :
+                  _mapType == MapType.terrain ? Icons.terrain : Icons.map,
+                  false,
+                  () => setState(() {
+                    if (_mapType == MapType.normal) {
+                      _mapType = MapType.satellite;
+                    } else if (_mapType == MapType.satellite) {
+                      _mapType = MapType.terrain;
+                    } else {
+                      _mapType = MapType.normal;
+                    }
+                  }),
+                  alwaysYellow: true,
                 ),
                 const SizedBox(height: 8),
                 // Traffic toggle

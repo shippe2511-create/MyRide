@@ -50,6 +50,7 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
   String? _distance;
   BitmapDescriptor? _pickupIcon;
   BitmapDescriptor? _dropoffIcon;
+  MapType _mapType = MapType.normal;
 
   @override
   void initState() {
@@ -256,6 +257,7 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
               ),
               zoom: 13,
             ),
+            mapType: _mapType,
             onMapCreated: (controller) {
               _mapController = controller;
               // Fit bounds after map is created
@@ -291,7 +293,46 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
-            style: context.isDark ? _darkMapStyle : null,
+            style: _mapType == MapType.normal && context.isDark ? _darkMapStyle : null,
+          ),
+
+          // Map layer button
+          // Map type button (normal/satellite/terrain)
+          Positioned(
+            right: 16,
+            top: MediaQuery.of(context).padding.top + 70,
+            child: GestureDetector(
+              onTap: () => setState(() {
+                if (_mapType == MapType.normal) {
+                  _mapType = MapType.satellite;
+                } else if (_mapType == MapType.satellite) {
+                  _mapType = MapType.terrain;
+                } else {
+                  _mapType = MapType.normal;
+                }
+              }),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFD60A),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  _mapType == MapType.satellite ? Icons.satellite_alt :
+                  _mapType == MapType.terrain ? Icons.terrain : Icons.map,
+                  color: Colors.black,
+                  size: 24,
+                ),
+              ),
+            ),
           ),
 
           // Back button

@@ -76,6 +76,7 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
   BitmapDescriptor? _pickupIcon;
   BitmapDescriptor? _dropoffIcon;
   BitmapDescriptor? _carIcon;
+  MapType _mapType = MapType.normal;
 
   bool _isValidMaldivesLat(double lat) => lat >= 3.5 && lat <= 7.5;
   bool _isValidMaldivesLng(double lng) => lng >= 72.0 && lng <= 74.0;
@@ -568,6 +569,7 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
             final dropoff = _getValidDropoffLocation();
             return GoogleMap(
             initialCameraPosition: CameraPosition(target: _userLocation, zoom: 14),
+            mapType: _mapType,
             markers: {
               Marker(
                 markerId: const MarkerId('pickup'),
@@ -608,9 +610,47 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             mapToolbarEnabled: false,
-            style: context.isDark ? _darkMapStyle : null,
+            style: _mapType == MapType.normal && context.isDark ? _darkMapStyle : null,
           );
           }),
+
+          // Map type button (normal/satellite/terrain)
+          Positioned(
+            right: 16,
+            top: MediaQuery.of(context).padding.top + 70,
+            child: GestureDetector(
+              onTap: () => setState(() {
+                if (_mapType == MapType.normal) {
+                  _mapType = MapType.satellite;
+                } else if (_mapType == MapType.satellite) {
+                  _mapType = MapType.terrain;
+                } else {
+                  _mapType = MapType.normal;
+                }
+              }),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFD60A),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  _mapType == MapType.satellite ? Icons.satellite_alt :
+                  _mapType == MapType.terrain ? Icons.terrain : Icons.map,
+                  color: Colors.black,
+                  size: 24,
+                ),
+              ),
+            ),
+          ),
 
           // Top bar
           SafeArea(

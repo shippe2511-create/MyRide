@@ -24,6 +24,7 @@ import 'schedule_screen.dart';
 import 'announcements_screen.dart';
 import 'staff_corner_screen.dart';
 import 'trip_tracking_screen.dart';
+import '../utils/timezone_utils.dart';
 
 const String _darkMapStyle = '''
 [
@@ -201,7 +202,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         // Restore scheduled time badge and pickup/dropoff for scheduled/pending rides
         if ((status == 'scheduled' || status == 'pending') && scheduledTimeStr != null) {
           try {
-            final scheduledTime = DateTime.parse(scheduledTimeStr).toLocal();
+            final scheduledTime = MaldivesTimezone.parse(scheduledTimeStr)!;
             if (_scheduledTime != scheduledTime) {
               setState(() => _scheduledTime = scheduledTime);
             }
@@ -1038,8 +1039,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   itemCount: _announcements.length,
                   itemBuilder: (context, index) {
                     final a = _announcements[index];
-                    final createdAt = DateTime.tryParse(a['created_at'] ?? '')?.toLocal();
-                    final isNew = createdAt != null && DateTime.now().difference(createdAt).inDays < 3;
+                    final createdAt = MaldivesTimezone.parse(a['created_at']);
+                    final isNew = createdAt != null && MaldivesTimezone.now().difference(createdAt).inDays < 3;
                     return _buildAnnouncementCard(
                       context,
                       title: a['title'] ?? '',
@@ -1419,12 +1420,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   String _formatScheduledTimeFromString(String? timeStr) {
     if (timeStr == null) return '';
-    try {
-      final time = DateTime.parse(timeStr).toLocal();
-      return _formatScheduledTime(time);
-    } catch (e) {
-      return timeStr;
-    }
+    final time = MaldivesTimezone.parse(timeStr);
+    if (time == null) return timeStr;
+    return _formatScheduledTime(time);
   }
 
   void _showStaffCornerDetail(BuildContext context, {required String title, required String subtitle, required String imageUrl, required String category, required Color categoryColor}) {

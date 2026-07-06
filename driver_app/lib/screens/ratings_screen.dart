@@ -4,6 +4,7 @@ import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../widgets/shimmer_loading.dart';
+import '../utils/timezone_utils.dart';
 
 class RatingsScreen extends StatefulWidget {
   const RatingsScreen({super.key});
@@ -279,7 +280,7 @@ class _RatingsScreenState extends State<RatingsScreen> {
           final customerName = item['from_user']?['full_name'] ?? 'Customer';
           final rating = (item['rating'] as num?)?.toInt() ?? 5;
           final comment = item['comment'] as String?;
-          final createdAt = DateTime.tryParse(item['created_at'] ?? '')?.toLocal();
+          final createdAt = MaldivesTimezone.parse(item['created_at']);
           final timeAgo = createdAt != null ? _formatTimeAgo(createdAt) : '';
 
           return Container(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../utils/timezone_utils.dart';
 
 class StaffCornerScreen extends StatefulWidget {
   const StaffCornerScreen({super.key});
@@ -149,7 +150,7 @@ class _StaffCornerScreenState extends State<StaffCornerScreen> {
   }
 
   Widget _buildPostCard(Map<String, dynamic> post) {
-    final createdAt = DateTime.tryParse(post['created_at'] ?? '')?.toLocal();
+    final createdAt = MaldivesTimezone.parse(post['created_at']);
     final category = post['category'] ?? 'General';
     final imageUrl = post['image_url'] ?? '';
 
@@ -296,7 +297,7 @@ class _StaffCornerScreenState extends State<StaffCornerScreen> {
   }
 
   void _showPostDetail(Map<String, dynamic> post) {
-    final createdAt = DateTime.tryParse(post['created_at'] ?? '')?.toLocal();
+    final createdAt = MaldivesTimezone.parse(post['created_at']);
     final imageUrl = post['image_url'] ?? '';
 
     showModalBottomSheet(

@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../widgets/shimmer_loading.dart';
+import '../utils/timezone_utils.dart';
 import 'search_screen.dart';
 
 enum TripStatus { completed, cancelled, ongoing }
@@ -94,7 +95,7 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
           id: ride['id'] ?? '',
           pickup: ride['pickup_name'] ?? 'Unknown',
           dropoff: ride['dropoff_name'] ?? 'Unknown',
-          date: (DateTime.tryParse(ride['created_at'] ?? '') ?? DateTime.now()).toLocal(),
+          date: MaldivesTimezone.parse(ride['created_at']) ?? MaldivesTimezone.now(),
           status: status == 'cancelled' ? TripStatus.cancelled : TripStatus.completed,
           driverName: driverProfile?['full_name'] ?? 'Driver',
           vehicleNumber: vehicle?['plate_no'] ?? '-',

@@ -5,6 +5,7 @@ import '../services/supabase_service.dart';
 import '../services/realtime_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_container.dart';
+import '../utils/timezone_utils.dart';
 
 class RideHistoryScreen extends StatefulWidget {
   final String? customerId;
@@ -289,7 +290,7 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
 
   Widget _buildRideCard(Map<String, dynamic> ride, bool isDark) {
     final status = ride['status'] as String? ?? 'unknown';
-    final createdAt = DateTime.tryParse(ride['created_at'] ?? '')?.toLocal();
+    final createdAt = MaldivesTimezone.parse(ride['created_at']);
     final pickupName = ride['pickup_name'] ?? 'Unknown';
     final dropoffName = ride['dropoff_name'] ?? 'Unknown';
     final driver = ride['driver'] as Map<String, dynamic>?;

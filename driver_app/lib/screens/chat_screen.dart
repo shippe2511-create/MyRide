@@ -12,6 +12,7 @@ import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../providers/driver_state.dart';
 import '../widgets/app_snackbar.dart';
+import '../utils/timezone_utils.dart';
 
 enum MessageType { text, voice, location, image }
 enum MessageStatus { sending, sent, delivered, read }
@@ -148,7 +149,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           id: msg['id'] ?? '',
           text: msg['message'] ?? '',
           isDriver: isDriver,
-          time: (DateTime.tryParse(msg['created_at'] ?? '') ?? DateTime.now()).toLocal(),
+          time: MaldivesTimezone.parse(msg['created_at']) ?? MaldivesTimezone.now(),
           status: MessageStatus.read,
         ));
       }
@@ -177,7 +178,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           id: newMessage['id'] ?? '',
           text: newMessage['message'] ?? '',
           isDriver: isDriver,
-          time: (DateTime.tryParse(newMessage['created_at'] ?? '') ?? DateTime.now()).toLocal(),
+          time: MaldivesTimezone.parse(newMessage['created_at']) ?? MaldivesTimezone.now(),
           status: MessageStatus.read,
         );
 

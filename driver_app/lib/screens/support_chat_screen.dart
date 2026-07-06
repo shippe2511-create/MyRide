@@ -9,6 +9,7 @@ import 'dart:io';
 import '../theme/app_theme.dart';
 import '../providers/driver_state.dart';
 import '../services/notification_service.dart';
+import '../utils/timezone_utils.dart';
 
 class SupportChatMessage {
   final String id;
@@ -142,7 +143,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
               id: msg['id'].toString(),
               text: msg['message'] ?? '',
               isFromMe: msg['sender_type'] == 'customer',
-              time: (DateTime.tryParse(msg['created_at'] ?? '') ?? DateTime.now()).toLocal(),
+              time: MaldivesTimezone.parse(msg['created_at']) ?? MaldivesTimezone.now(),
               isRead: msg['is_read'] ?? false,
               imageUrl: msg['image_url'],
               latitude: (msg['latitude'] as num?)?.toDouble(),
@@ -180,7 +181,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                   id: newMessage['id'].toString(),
                   text: newMessage['message'] ?? '',
                   isFromMe: false,
-                  time: (DateTime.tryParse(newMessage['created_at'] ?? '') ?? DateTime.now()).toLocal(),
+                  time: MaldivesTimezone.parse(newMessage['created_at']) ?? MaldivesTimezone.now(),
                   imageUrl: newMessage['image_url'],
                   latitude: (newMessage['latitude'] as num?)?.toDouble(),
                   longitude: (newMessage['longitude'] as num?)?.toDouble(),

@@ -8,6 +8,7 @@ import '../models/ride_request.dart';
 import '../services/notification_service.dart';
 import '../services/supabase_service.dart';
 import '../services/voice_service.dart';
+import '../services/background_location_service.dart';
 
 class DriverState extends ChangeNotifier {
   bool _isDarkMode = true;
@@ -641,11 +642,20 @@ class DriverState extends ChangeNotifier {
 
     // Update Supabase
     if (_driverId.isNotEmpty) {
-      await SupabaseService.updateDriverStatus(
-        driverId: _driverId,
-        isOnline: true,
-        isOnBreak: false,
-      );
+      try {
+        await SupabaseService.updateDriverStatus(
+          driverId: _driverId,
+          isOnline: true,
+          isOnBreak: false,
+        );
+      } catch (e) {
+        debugPrint('Error updating driver status: $e');
+      }
+
+      // Start background location tracking
+      debugPrint('Starting background location service...');
+      await BackgroundLocationService().startTracking(_driverId);
+      debugPrint('Background location service started');
 
       // Subscribe to ride requests
       _subscribeToRideRequests();
@@ -820,6 +830,9 @@ class DriverState extends ChangeNotifier {
         isOnline: false,
         isOnBreak: false,
       );
+
+      // Stop background location tracking
+      await BackgroundLocationService().stopTracking();
     }
 
     notifyListeners();
@@ -829,10 +842,11 @@ class DriverState extends ChangeNotifier {
     // Send initial location
     _sendLocationUpdate();
 
-    // Start periodic updates every 5 seconds
+    // Background location service handles continuous updates
+    // Timer is kept as fallback for foreground updates
     _locationTimer?.cancel();
-    _locationTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (_isOnline) {
+    _locationTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (_isOnline && !BackgroundLocationService().isTracking) {
         _sendLocationUpdate();
       }
     });

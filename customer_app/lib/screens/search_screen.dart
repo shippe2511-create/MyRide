@@ -16,6 +16,7 @@ import '../services/location_service.dart';
 import 'driver_matching_screen.dart';
 import 'ride_confirm_screen.dart';
 import '../config/app_config.dart';
+import '../utils/timezone_utils.dart';
 
 const String _darkMapStyle = '''
 [
@@ -469,10 +470,10 @@ class _SearchScreenState extends State<SearchScreen> {
       for (final ride in rides.take(10)) {
         final dropoffName = ride['dropoff_name'] as String?;
         if (dropoffName != null && dropoffName.isNotEmpty && !recentDestinations.containsKey(dropoffName)) {
-          final createdAt = DateTime.tryParse(ride['created_at'] ?? '')?.toLocal();
+          final createdAt = MaldivesTimezone.parse(ride['created_at']);
           String timeAgo = '';
           if (createdAt != null) {
-            final diff = DateTime.now().difference(createdAt);
+            final diff = MaldivesTimezone.now().difference(createdAt);
             if (diff.inDays == 0) {
               timeAgo = 'Today';
             } else if (diff.inDays == 1) {

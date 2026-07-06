@@ -7,6 +7,7 @@ import '../services/supabase_service.dart';
 import '../services/realtime_service.dart';
 import '../providers/driver_state.dart';
 import '../widgets/shimmer_loading.dart';
+import '../utils/timezone_utils.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -154,7 +155,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final title = notification['title'] as String? ?? 'Notification';
     final message = notification['message'] as String? ?? '';
     final timeStr = notification['created_at'] as String?;
-    final time = timeStr != null ? DateTime.tryParse(timeStr)?.toLocal() : null;
+    final time = MaldivesTimezone.parse(timeStr);
 
     IconData icon;
     Color iconColor;

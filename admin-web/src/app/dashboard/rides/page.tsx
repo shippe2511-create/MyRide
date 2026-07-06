@@ -115,11 +115,11 @@ async function fetchRidesData(statusFilter: string, dateRange: string) {
   const dateCount: Record<string, number> = {}
   for (let i = 6; i >= 0; i--) {
     const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
-    const key = d.toLocaleDateString("en-US", { weekday: "short" })
+    const key = d.toLocaleDateString("en-US", { weekday: "short", timeZone: "Indian/Maldives" })
     dateCount[key] = 0
   }
   last7Days.forEach(r => {
-    const key = new Date(r.created_at).toLocaleDateString("en-US", { weekday: "short" })
+    const key = new Date(r.created_at).toLocaleDateString("en-US", { weekday: "short", timeZone: "Indian/Maldives" })
     if (dateCount[key] !== undefined) dateCount[key]++
   })
 
@@ -256,7 +256,7 @@ export default function RidesPage() {
       ride.pickup_name,
       ride.dropoff_name,
       ride.status,
-      new Date(ride.created_at).toLocaleString(),
+      new Date(ride.created_at).toLocaleString("en-US", { timeZone: "Indian/Maldives" }),
       ride.duration_minutes || "",
       ride.distance_km || ""
     ])

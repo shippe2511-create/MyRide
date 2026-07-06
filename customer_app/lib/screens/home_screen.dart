@@ -16,6 +16,7 @@ import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../services/location_service.dart';
+import '../services/app_settings_service.dart';
 import '../widgets/onboarding_tooltip.dart';
 import '../widgets/app_snackbar.dart';
 import 'search_screen.dart';
@@ -1605,8 +1606,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  void _showSchedulePicker(BuildContext context) {
-    DateTime selectedDate = _scheduledTime ?? DateTime.now().add(const Duration(hours: 1));
+  void _showSchedulePicker(BuildContext context) async {
+    // Reload settings from server to get latest values
+    await AppSettingsService.reload();
+
+    // Check if scheduling is enabled
+    if (!AppSettingsService.scheduleEnabled) {
+      if (mounted) AppSnackbar.warning(context, 'Scheduled rides are currently disabled');
+      return;
+    }
+
+    // Calculate minimum allowed time based on admin settings
+    final minHoursAhead = AppSettingsService.scheduleMinHoursAhead;
+    final maxDaysAhead = AppSettingsService.scheduleMaxDaysAhead;
+    final allowedStartTime = AppSettingsService.scheduleStartTime;
+    final allowedEndTime = AppSettingsService.scheduleEndTime;
+
+    DateTime minDateTime = DateTime.now().add(Duration(hours: minHoursAhead));
+    DateTime selectedDate = _scheduledTime ?? minDateTime;
+
+    // If selected date is before min, set to min
+    if (selectedDate.isBefore(minDateTime)) {
+      selectedDate = minDateTime;
+    }
+
     TimeOfDay selectedTime = TimeOfDay.fromDateTime(selectedDate);
     // Pre-fill with last used locations
     String pickupAddress = _lastPickupAddress;
@@ -1900,7 +1923,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             context: context,
                             initialDate: selectedDate,
                             firstDate: DateTime.now(),
-                            lastDate: DateTime.now().add(const Duration(days: 30)),
+                            lastDate: DateTime.now().add(Duration(days: maxDaysAhead)),
                             builder: (ctx, child) => Theme(
                               data: ThemeData.dark().copyWith(colorScheme: const ColorScheme.dark(primary: AppColors.yellow, onPrimary: Colors.black, surface: Color(0xFF1E1E1E))),
                               child: child!,
@@ -2048,9 +2071,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         child: ElevatedButton(
                           onPressed: (pickupAddress.isNotEmpty && dropoffAddress.isNotEmpty)
                               ? () async {
-                                  final minTime = DateTime.now().add(const Duration(minutes: 5));
+                                  // Validate minimum hours ahead
+                                  final minTime = DateTime.now().add(Duration(hours: minHoursAhead));
                                   if (selectedDate.isBefore(minTime)) {
-                                    AppSnackbar.warning(context, 'Select a time at least 5 minutes from now');
+                                    AppSnackbar.warning(context, 'Schedule at least $minHoursAhead hour${minHoursAhead > 1 ? 's' : ''} ahead');
+                                    return;
+                                  }
+
+                                  // Validate max days ahead
+                                  final maxDate = DateTime.now().add(Duration(days: maxDaysAhead));
+                                  if (selectedDate.isAfter(maxDate)) {
+                                    AppSnackbar.warning(context, 'Cannot schedule more than $maxDaysAhead days ahead');
+                                    return;
+                                  }
+
+                                  // Validate allowed time window
+                                  final selectedHour = selectedTime.hour;
+                                  final selectedMinute = selectedTime.minute;
+                                  final selectedMinutes = selectedHour * 60 + selectedMinute;
+                                  final startMinutes = allowedStartTime.hour * 60 + allowedStartTime.minute;
+                                  final endMinutes = allowedEndTime.hour * 60 + allowedEndTime.minute;
+
+                                  if (selectedMinutes < startMinutes || selectedMinutes > endMinutes) {
+                                    final startStr = '${allowedStartTime.hour.toString().padLeft(2, '0')}:${allowedStartTime.minute.toString().padLeft(2, '0')}';
+                                    final endStr = '${allowedEndTime.hour.toString().padLeft(2, '0')}:${allowedEndTime.minute.toString().padLeft(2, '0')}';
+                                    AppSnackbar.warning(context, 'Schedule between $startStr - $endStr only');
                                     return;
                                   }
                                   Navigator.pop(context);

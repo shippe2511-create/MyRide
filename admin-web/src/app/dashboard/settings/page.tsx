@@ -11,7 +11,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Settings, Globe, Bell, Shield, Database, Save, Loader2, KeyRound, Phone, Plus, Trash2, GripVertical, Eye, EyeOff } from "lucide-react"
+import { TimePicker } from "@/components/ui/time-picker"
+import { Settings, Globe, Bell, Shield, Database, Save, Loader2, KeyRound, Phone, Plus, Trash2, GripVertical, Eye, EyeOff, Clock } from "lucide-react"
 import { toast } from "sonner"
 import { logActivity } from "@/lib/activity-logger"
 import { PermissionGate } from "@/components/permission-gate"
@@ -28,6 +29,11 @@ interface AppSettings {
   enable_sos: boolean
   enable_chat: boolean
   enable_ratings: boolean
+  schedule_enabled: boolean
+  schedule_min_hours_ahead: number
+  schedule_max_days_ahead: number
+  schedule_allowed_start_time: string
+  schedule_allowed_end_time: string
   notif_ride_request: boolean
   notif_ride_accepted: boolean
   notif_driver_arrived: boolean
@@ -66,6 +72,11 @@ const defaultSettings: AppSettings = {
   enable_sos: true,
   enable_chat: true,
   enable_ratings: true,
+  schedule_enabled: true,
+  schedule_min_hours_ahead: 1,
+  schedule_max_days_ahead: 7,
+  schedule_allowed_start_time: "06:00",
+  schedule_allowed_end_time: "22:00",
   notif_ride_request: true,
   notif_ride_accepted: true,
   notif_driver_arrived: true,
@@ -126,7 +137,13 @@ export default function SettingsPage() {
         .single()
 
       if (data) {
-        setSettings({ ...defaultSettings, ...data })
+        // Convert time fields from HH:mm:ss to HH:mm format
+        const processedData = {
+          ...data,
+          schedule_allowed_start_time: data.schedule_allowed_start_time?.substring(0, 5) || "06:00",
+          schedule_allowed_end_time: data.schedule_allowed_end_time?.substring(0, 5) || "22:00",
+        }
+        setSettings({ ...defaultSettings, ...processedData })
       }
     } catch {
       // Use defaults if no settings exist
@@ -152,6 +169,11 @@ export default function SettingsPage() {
           enable_sos: settings.enable_sos,
           enable_chat: settings.enable_chat,
           enable_ratings: settings.enable_ratings,
+          schedule_enabled: settings.schedule_enabled,
+          schedule_min_hours_ahead: settings.schedule_min_hours_ahead,
+          schedule_max_days_ahead: settings.schedule_max_days_ahead,
+          schedule_allowed_start_time: settings.schedule_allowed_start_time,
+          schedule_allowed_end_time: settings.schedule_allowed_end_time,
           notif_ride_request: settings.notif_ride_request,
           notif_ride_accepted: settings.notif_ride_accepted,
           notif_driver_arrived: settings.notif_driver_arrived,
@@ -502,6 +524,77 @@ export default function SettingsPage() {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">Allow in-app chat between customer and driver</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Scheduled Rides
+              </CardTitle>
+              <CardDescription>Configure scheduling restrictions for customers</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Enable Scheduled Rides</label>
+                  <Select
+                    value={settings.schedule_enabled ? "enabled" : "disabled"}
+                    onValueChange={(v) => updateSetting("schedule_enabled", v === "enabled")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="enabled">Enabled</SelectItem>
+                      <SelectItem value="disabled">Disabled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Allow customers to schedule rides in advance</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Minimum Hours Ahead</label>
+                  <Input
+                    type="number"
+                    value={settings.schedule_min_hours_ahead}
+                    onChange={(e) => updateSetting("schedule_min_hours_ahead", Number(e.target.value))}
+                    min={0}
+                    max={48}
+                  />
+                  <p className="text-xs text-muted-foreground">Minimum hours before scheduled time (0 = no minimum)</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Maximum Days Ahead</label>
+                  <Input
+                    type="number"
+                    value={settings.schedule_max_days_ahead}
+                    onChange={(e) => updateSetting("schedule_max_days_ahead", Number(e.target.value))}
+                    min={1}
+                    max={30}
+                  />
+                  <p className="text-xs text-muted-foreground">Maximum days in advance for scheduling</p>
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-sm font-medium">Allowed Time Range</label>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <TimePicker
+                        value={settings.schedule_allowed_start_time}
+                        onChange={(v) => updateSetting("schedule_allowed_start_time", v)}
+                      />
+                    </div>
+                    <span className="text-muted-foreground font-medium">to</span>
+                    <div className="flex-1">
+                      <TimePicker
+                        value={settings.schedule_allowed_end_time}
+                        onChange={(v) => updateSetting("schedule_allowed_end_time", v)}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Allowed time window for scheduled pickups</p>
                 </div>
               </div>
             </CardContent>

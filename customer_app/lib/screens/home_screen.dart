@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -1406,6 +1408,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildPickerMapButton(IconData icon, VoidCallback onTap, bool isDark, {bool isActive = false}) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.yellow : (isDark ? Colors.black87 : Colors.white),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 6)],
+        ),
+        child: Icon(
+          icon,
+          color: isActive ? Colors.black : (isDark ? Colors.white70 : Colors.black54),
+          size: 22,
+        ),
+      ),
+    );
+  }
+
   String _formatScheduledTime(DateTime time) {
     final now = DateTime.now();
     final isToday = time.day == now.day && time.month == now.month && time.year == now.year;
@@ -2093,6 +2118,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     LatLng? userLocation = selectedLocation;
     Timer? debounceTimer;
     MapType mapType = MapType.normal;
+    bool trafficEnabled = false;
 
     Future<void> searchPlaces(String query, void Function(void Function()) setModalState) async {
       if (query.length < 2) {
@@ -2469,169 +2495,158 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   },
                                 ),
                         )
-                      : // Map View
-                        Stack(
-                          children: [
-                            GoogleMap(
-                              initialCameraPosition: CameraPosition(target: selectedLocation, zoom: 14),
-                              mapType: mapType,
-                              onMapCreated: (controller) => googleMapController = controller,
-                              onTap: (point) async {
-                                setModalState(() {
-                                  selectedLocation = point;
-                                  addressText = 'Loading...';
-                                  selectedName = 'Pinned Location';
-                                  searchController.text = '';
-                                });
-                                final address = await reverseGeocode(point);
-                                setModalState(() {
-                                  addressText = address;
-                                  selectedName = 'Pinned Location';
-                                });
-                              },
-                              markers: {
-                                if (userLocation != null)
-                                  Marker(
-                                    markerId: const MarkerId('user'),
-                                    position: userLocation!,
-                                    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-                                  ),
-                                Marker(
-                                  markerId: const MarkerId('selected'),
-                                  position: selectedLocation,
-                                  icon: BitmapDescriptor.defaultMarkerWithHue(
-                                    accentColor == AppColors.success ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed,
-                                  ),
+                      : // Map View - Drag to select
+                        ClipRRect(
+                          child: Stack(
+                            children: [
+                              // Map with drag-to-select
+                              Positioned.fill(
+                                child: GoogleMap(
+                                  initialCameraPosition: CameraPosition(target: selectedLocation, zoom: 16),
+                                  mapType: mapType,
+                                  onMapCreated: (controller) => googleMapController = controller,
+                                  onCameraMove: (position) {
+                                    selectedLocation = position.target;
+                                  },
+                                  onCameraIdle: () async {
+                                    setModalState(() {
+                                      addressText = 'Loading...';
+                                      selectedName = 'Pinned Location';
+                                    });
+                                    final address = await reverseGeocode(selectedLocation);
+                                    setModalState(() {
+                                      addressText = address;
+                                      selectedName = 'Pinned Location';
+                                    });
+                                  },
+                                  gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                                    Factory<PanGestureRecognizer>(() => PanGestureRecognizer()),
+                                    Factory<ScaleGestureRecognizer>(() => ScaleGestureRecognizer()),
+                                    Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
+                                    Factory<VerticalDragGestureRecognizer>(() => VerticalDragGestureRecognizer()),
+                                    Factory<HorizontalDragGestureRecognizer>(() => HorizontalDragGestureRecognizer()),
+                                  },
+                                  myLocationEnabled: true,
+                                  myLocationButtonEnabled: false,
+                                  zoomControlsEnabled: false,
+                                  mapToolbarEnabled: false,
+                                  scrollGesturesEnabled: true,
+                                  zoomGesturesEnabled: true,
+                                  rotateGesturesEnabled: true,
+                                  tiltGesturesEnabled: true,
+                                  compassEnabled: true,
+                                  trafficEnabled: trafficEnabled,
+                                  style: mapType == MapType.normal && context.isDark ? _darkMapStyle : null,
                                 ),
-                              },
-                              myLocationEnabled: true,
-                              myLocationButtonEnabled: false,
-                              zoomControlsEnabled: false,
-                              mapToolbarEnabled: false,
-                              style: mapType == MapType.normal && context.isDark ? _darkMapStyle : null,
-                            ),
-                            // Map type button (normal/satellite/terrain)
-                            Positioned(
-                              top: 16,
-                              right: 16,
-                              child: GestureDetector(
-                                onTap: () => setModalState(() {
-                                  if (mapType == MapType.normal) {
-                                    mapType = MapType.satellite;
-                                  } else if (mapType == MapType.satellite) {
-                                    mapType = MapType.terrain;
-                                  } else {
-                                    mapType = MapType.normal;
-                                  }
-                                }),
-                                child: Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFFD60A),
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.2),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Icon(
-                                    mapType == MapType.satellite ? Icons.satellite_alt :
-                                    mapType == MapType.terrain ? Icons.terrain : Icons.map,
-                                    color: Colors.black,
-                                    size: 24,
+                              ),
+                              // Center pin - IgnorePointer so map receives all touches
+                              Positioned.fill(
+                                child: IgnorePointer(
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black87,
+                                            borderRadius: BorderRadius.circular(20),
+                                          ),
+                                          child: const Text(
+                                            'Move map to select',
+                                            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Icon(Icons.location_on, color: accentColor, size: 48),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            // Map Controls
-                            Positioned(
-                              bottom: 20,
-                              right: 16,
-                              child: Column(
-                                children: [
-                                  GestureDetector(
-                                    onTap: () => googleMapController?.animateCamera(CameraUpdate.zoomIn()),
-                                    child: Container(
-                                      width: 48,
-                                      height: 48,
-                                      decoration: BoxDecoration(
-                                        color: context.surfaceColor,
-                                        borderRadius: BorderRadius.circular(14),
-                                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 10)],
-                                      ),
-                                      child: Icon(Icons.add, color: context.textColor, size: 24),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  GestureDetector(
-                                    onTap: () => googleMapController?.animateCamera(CameraUpdate.zoomOut()),
-                                    child: Container(
-                                      width: 48,
-                                      height: 48,
-                                      decoration: BoxDecoration(
-                                        color: context.surfaceColor,
-                                        borderRadius: BorderRadius.circular(14),
-                                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 10)],
-                                      ),
-                                      child: Icon(Icons.remove, color: context.textColor, size: 24),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  GestureDetector(
-                                    onTap: () async {
-                                      final currentPos = await _getCurrentLocation();
-                                      setModalState(() {
-                                        userLocation = currentPos;
-                                        selectedLocation = currentPos;
-                                      });
-                                      googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(currentPos, 16));
-                                    },
-                                    child: Container(
-                                      width: 48,
-                                      height: 48,
-                                      decoration: BoxDecoration(
-                                        color: context.surfaceColor,
-                                        borderRadius: BorderRadius.circular(14),
-                                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 10)],
-                                      ),
-                                      child: Icon(Icons.my_location, color: accentColor, size: 22),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // Hint overlay
-                            if (addressText.isEmpty)
+                              // Map type controls (top right)
                               Positioned(
-                                top: 20,
-                                left: 16,
-                                right: 16,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: context.surfaceColor.withValues(alpha: 0.95),
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 10)],
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.touch_app, color: accentColor, size: 20),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          'Tap on the map to pin location or search above',
-                                          style: TextStyle(color: context.textColor, fontSize: 13),
+                                top: 12,
+                                right: 12,
+                                child: Column(
+                                  children: [
+                                    _buildPickerMapButton(
+                                      Icons.map_outlined,
+                                      () => setModalState(() => mapType = MapType.normal),
+                                      context.isDark,
+                                      isActive: mapType == MapType.normal,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _buildPickerMapButton(
+                                      Icons.satellite_alt,
+                                      () => setModalState(() => mapType = MapType.satellite),
+                                      context.isDark,
+                                      isActive: mapType == MapType.satellite,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _buildPickerMapButton(
+                                      Icons.terrain,
+                                      () => setModalState(() => mapType = MapType.terrain),
+                                      context.isDark,
+                                      isActive: mapType == MapType.terrain,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _buildPickerMapButton(
+                                      Icons.traffic,
+                                      () => setModalState(() => trafficEnabled = !trafficEnabled),
+                                      context.isDark,
+                                      isActive: trafficEnabled,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Zoom & location controls (bottom right)
+                              Positioned(
+                                bottom: 12,
+                                right: 12,
+                                child: Column(
+                                  children: [
+                                    _buildPickerMapButton(
+                                      Icons.add,
+                                      () => googleMapController?.animateCamera(CameraUpdate.zoomIn()),
+                                      context.isDark,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _buildPickerMapButton(
+                                      Icons.remove,
+                                      () => googleMapController?.animateCamera(CameraUpdate.zoomOut()),
+                                      context.isDark,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: AppColors.yellow,
+                                        borderRadius: BorderRadius.circular(12),
+                                        boxShadow: [BoxShadow(color: AppColors.yellow.withValues(alpha: 0.4), blurRadius: 8)],
+                                      ),
+                                      child: Material(
+                                        color: Colors.transparent,
+                                        child: InkWell(
+                                          borderRadius: BorderRadius.circular(12),
+                                          onTap: () async {
+                                            final currentPos = await _getCurrentLocation();
+                                            setModalState(() {
+                                              userLocation = currentPos;
+                                            });
+                                            googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(currentPos, 17));
+                                          },
+                                          child: const Padding(
+                                            padding: EdgeInsets.all(12),
+                                            child: Icon(Icons.my_location, color: Colors.black, size: 22),
+                                          ),
                                         ),
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                          ],
+                            ],
+                          ),
                         ),
                 ),
 

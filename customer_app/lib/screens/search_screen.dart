@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -795,11 +797,67 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  void _showMapPicker(bool isDark) {
+  void _showMapPicker(bool isDark) async {
     LatLng selectedLocation = const LatLng(4.1918, 73.5290);
     GoogleMapController? googleMapController;
     String locationName = 'Velana International Airport';
     String locationAddress = 'Velana International Airport';
+
+    // Load service zones and admin locations
+    List<Map<String, dynamic>> serviceZones = [];
+    List<Map<String, dynamic>> adminLocations = [];
+    Set<Polygon> zonePolygons = {};
+    Set<Marker> locationMarkers = {};
+
+    try {
+      // Fetch service zones
+      final zonesRes = await SupabaseService.client
+          .from('service_zones')
+          .select('id, name, zone_type, boundary_coords, is_active')
+          .eq('is_active', true);
+      serviceZones = List<Map<String, dynamic>>.from(zonesRes);
+
+      // Create polygons from zones
+      for (final zone in serviceZones) {
+        final coords = zone['boundary_coords'];
+        if (coords != null && coords is List && coords.isNotEmpty) {
+          final points = coords.map<LatLng>((c) {
+            if (c is Map) {
+              return LatLng(
+                (c['lat'] as num?)?.toDouble() ?? 0,
+                (c['lng'] as num?)?.toDouble() ?? 0,
+              );
+            }
+            return const LatLng(0, 0);
+          }).toList();
+
+          if (points.length >= 3) {
+            Color zoneColor = AppColors.yellow;
+            if (zone['zone_type'] == 'restricted') {
+              zoneColor = Colors.red;
+            } else if (zone['zone_type'] == 'priority') {
+              zoneColor = Colors.green;
+            }
+
+            zonePolygons.add(Polygon(
+              polygonId: PolygonId('zone_${zone['id']}'),
+              points: points,
+              strokeWidth: 2,
+              strokeColor: zoneColor,
+              fillColor: zoneColor.withValues(alpha: 0.15),
+            ));
+          }
+        }
+      }
+
+      // Fetch admin locations (for chip row and search, not markers)
+      final locationsRes = await SupabaseService.getLocations();
+      adminLocations = List<Map<String, dynamic>>.from(locationsRes);
+    } catch (e) {
+      debugPrint('Error loading zones/locations: $e');
+    }
+
+    if (!mounted) return;
 
     showModalBottomSheet(
       context: context,
@@ -837,155 +895,241 @@ class _SearchScreenState extends State<SearchScreen> {
                             color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Icon(Icons.close, color: context.textColor, size: 20),
+                          child: Icon(Icons.arrow_back, color: context.textColor, size: 20),
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => _showMapSearchSheet(ctx, isDark, (name, address, lat, lng) {
-                            setSheetState(() {
-                              selectedLocation = LatLng(lat, lng);
-                              locationName = name;
-                              locationAddress = address;
-                            });
-                            googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(lat, lng), 16));
-                          }),
-                          child: Container(
-                            height: 40,
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.search, color: context.mutedColor, size: 18),
-                                const SizedBox(width: 8),
-                                Text('Search location...', style: TextStyle(color: context.mutedColor, fontSize: 14)),
-                              ],
-                            ),
-                          ),
-                        ),
+                      Text(
+                        'Select Dropoff',
+                        style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w700),
                       ),
                     ],
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                  child: GestureDetector(
+                    onTap: () => _showMapSearchSheet(ctx, isDark, (name, address, lat, lng) {
+                      setSheetState(() {
+                        selectedLocation = LatLng(lat, lng);
+                        locationName = name;
+                        locationAddress = address;
+                      });
+                      googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(lat, lng), 16));
+                    }),
+                    child: Container(
+                      height: 48,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.search, color: AppColors.success, size: 20),
+                          const SizedBox(width: 10),
+                          Text('Search by name or address...', style: TextStyle(color: context.mutedColor, fontSize: 15)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
                 Expanded(
-                  child: Stack(
-                    children: [
-                      GoogleMap(
-                        initialCameraPosition: CameraPosition(target: selectedLocation, zoom: 15),
-                        onMapCreated: (controller) => googleMapController = controller,
-                        onTap: (point) async {
-                          HapticFeedback.lightImpact();
-                          String address = '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
-                          String name = 'Selected Location';
-                          try {
-                            final url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=${point.latitude},${point.longitude}&key=${AppConfig.googleMapsApiKey}';
-                            final response = await http.get(Uri.parse(url));
-                            if (response.statusCode == 200) {
-                              final data = json.decode(response.body);
-                              if (data['results'] != null && (data['results'] as List).isNotEmpty) {
-                                address = data['results'][0]['formatted_address'] ?? address;
-                                final components = data['results'][0]['address_components'] as List? ?? [];
-                                for (var c in components) {
-                                  final types = c['types'] as List? ?? [];
-                                  if (types.contains('point_of_interest') || types.contains('establishment')) {
-                                    name = c['long_name'] ?? name;
-                                    break;
+                  child: ClipRRect(
+                    child: Stack(
+                      children: [
+                        // Map takes full space
+                        Positioned.fill(
+                          child: GoogleMap(
+                            initialCameraPosition: CameraPosition(target: selectedLocation, zoom: 16),
+                            onMapCreated: (controller) => googleMapController = controller,
+                            onCameraMove: (position) {
+                              selectedLocation = position.target;
+                            },
+                            onCameraIdle: () async {
+                              final point = selectedLocation;
+                              String address = '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
+                              String name = 'Selected Location';
+                              try {
+                                final url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=${point.latitude},${point.longitude}&key=${AppConfig.googleMapsApiKey}';
+                                final response = await http.get(Uri.parse(url));
+                                if (response.statusCode == 200) {
+                                  final data = json.decode(response.body);
+                                  if (data['results'] != null && (data['results'] as List).isNotEmpty) {
+                                    address = data['results'][0]['formatted_address'] ?? address;
+                                    final components = data['results'][0]['address_components'] as List? ?? [];
+                                    for (var c in components) {
+                                      final types = c['types'] as List? ?? [];
+                                      if (types.contains('point_of_interest') || types.contains('establishment')) {
+                                        name = c['long_name'] ?? name;
+                                        break;
+                                      }
+                                    }
+                                    if (name == 'Selected Location' && components.isNotEmpty) {
+                                      name = components[0]['long_name'] ?? name;
+                                    }
                                   }
                                 }
-                                if (name == 'Selected Location' && components.isNotEmpty) {
-                                  name = components[0]['long_name'] ?? name;
-                                }
+                              } catch (e) {
+                                debugPrint('Reverse geocode error: $e');
                               }
-                            }
-                          } catch (e) {
-                            debugPrint('Reverse geocode error: $e');
-                          }
-                          setSheetState(() {
-                            selectedLocation = point;
-                            locationName = name;
-                            locationAddress = address;
-                          });
-                        },
-                        markers: {
-                          Marker(
-                            markerId: const MarkerId('selected'),
-                            position: selectedLocation,
-                            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
-                          ),
-                        },
-                        mapType: _pickerMapType,
-                        myLocationEnabled: true,
-                        myLocationButtonEnabled: false,
-                        zoomControlsEnabled: false,
-                        mapToolbarEnabled: false,
-                        trafficEnabled: _pickerTrafficEnabled,
-                        buildingsEnabled: true,
-                        style: _pickerMapType == MapType.normal && isDark ? _darkMapStyle : null,
-                      ),
-                      // Map controls (right side)
-                      Positioned(
-                        right: 16,
-                        top: 16,
-                        child: Column(
-                          children: [
-                            // Satellite toggle
-                            _buildMapButton(
-                              _pickerMapType == MapType.satellite ? Icons.map : Icons.satellite_alt,
-                              () {
-                                HapticFeedback.lightImpact();
-                                setSheetState(() => _pickerMapType = _pickerMapType == MapType.normal ? MapType.satellite : MapType.normal);
-                              },
-                              isDark,
-                              isHighlighted: _pickerMapType == MapType.satellite,
-                            ),
-                            const SizedBox(height: 8),
-                            // Traffic toggle
-                            _buildMapButton(
-                              Icons.traffic,
-                              () {
-                                HapticFeedback.lightImpact();
-                                setSheetState(() => _pickerTrafficEnabled = !_pickerTrafficEnabled);
-                              },
-                              isDark,
-                              isHighlighted: _pickerTrafficEnabled,
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Zoom and location controls (bottom right)
-                      Positioned(
-                        right: 16,
-                        bottom: 16,
-                        child: Column(
-                          children: [
-                            _buildMapButton(Icons.add, () {
-                              HapticFeedback.lightImpact();
-                              googleMapController?.animateCamera(CameraUpdate.zoomIn());
-                            }, isDark),
-                            const SizedBox(height: 8),
-                            _buildMapButton(Icons.remove, () {
-                              HapticFeedback.lightImpact();
-                              googleMapController?.animateCamera(CameraUpdate.zoomOut());
-                            }, isDark),
-                            const SizedBox(height: 8),
-                            _buildMapButton(Icons.my_location, () async {
-                              HapticFeedback.mediumImpact();
-                              final loc = await LocationService.getCurrentLocation();
-                              googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(loc.latitude, loc.longitude), 16));
                               setSheetState(() {
-                                selectedLocation = LatLng(loc.latitude, loc.longitude);
-                                locationName = 'Current Location';
-                                locationAddress = '${loc.latitude.toStringAsFixed(5)}, ${loc.longitude.toStringAsFixed(5)}';
+                                locationName = name;
+                                locationAddress = address;
                               });
-                            }, isDark, isHighlighted: true),
-                          ],
+                            },
+                            gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                              Factory<PanGestureRecognizer>(() => PanGestureRecognizer()),
+                              Factory<ScaleGestureRecognizer>(() => ScaleGestureRecognizer()),
+                              Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
+                              Factory<VerticalDragGestureRecognizer>(() => VerticalDragGestureRecognizer()),
+                              Factory<HorizontalDragGestureRecognizer>(() => HorizontalDragGestureRecognizer()),
+                            },
+                            polygons: zonePolygons,
+                            mapType: _pickerMapType,
+                            myLocationEnabled: true,
+                            myLocationButtonEnabled: false,
+                            zoomControlsEnabled: false,
+                            mapToolbarEnabled: false,
+                            trafficEnabled: _pickerTrafficEnabled,
+                            buildingsEnabled: true,
+                            compassEnabled: true,
+                            scrollGesturesEnabled: true,
+                            zoomGesturesEnabled: true,
+                            rotateGesturesEnabled: true,
+                            tiltGesturesEnabled: true,
+                            style: _pickerMapType == MapType.normal && isDark ? _darkMapStyle : null,
+                          ),
                         ),
-                      ),
-                    ],
+                        // Center pin - IgnorePointer so map receives all touches
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black87,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: const Text(
+                                      'Move map to select',
+                                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Icon(Icons.location_on, color: AppColors.success, size: 48),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Map type toggle (top right)
+                        Positioned(
+                          right: 12,
+                          top: 12,
+                          child: Column(
+                            children: [
+                              // Map type button
+                              _buildMapControlButton(
+                                Icons.map_outlined,
+                                () {
+                                  HapticFeedback.lightImpact();
+                                  setSheetState(() => _pickerMapType = MapType.normal);
+                                },
+                                isDark,
+                                isActive: _pickerMapType == MapType.normal,
+                              ),
+                              const SizedBox(height: 8),
+                              // Satellite button
+                              _buildMapControlButton(
+                                Icons.satellite_alt,
+                                () {
+                                  HapticFeedback.lightImpact();
+                                  setSheetState(() => _pickerMapType = MapType.satellite);
+                                },
+                                isDark,
+                                isActive: _pickerMapType == MapType.satellite,
+                              ),
+                              const SizedBox(height: 8),
+                              // Terrain button
+                              _buildMapControlButton(
+                                Icons.terrain,
+                                () {
+                                  HapticFeedback.lightImpact();
+                                  setSheetState(() => _pickerMapType = MapType.terrain);
+                                },
+                                isDark,
+                                isActive: _pickerMapType == MapType.terrain,
+                              ),
+                              const SizedBox(height: 8),
+                              // Traffic toggle
+                              _buildMapControlButton(
+                                Icons.traffic,
+                                () {
+                                  HapticFeedback.lightImpact();
+                                  setSheetState(() => _pickerTrafficEnabled = !_pickerTrafficEnabled);
+                                },
+                                isDark,
+                                isActive: _pickerTrafficEnabled,
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Zoom & location controls (bottom right)
+                        Positioned(
+                          right: 12,
+                          bottom: 12,
+                          child: Column(
+                            children: [
+                              _buildMapControlButton(
+                                Icons.add,
+                                () {
+                                  HapticFeedback.lightImpact();
+                                  googleMapController?.animateCamera(CameraUpdate.zoomIn());
+                                },
+                                isDark,
+                              ),
+                              const SizedBox(height: 8),
+                              _buildMapControlButton(
+                                Icons.remove,
+                                () {
+                                  HapticFeedback.lightImpact();
+                                  googleMapController?.animateCamera(CameraUpdate.zoomOut());
+                                },
+                                isDark,
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.yellow,
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [BoxShadow(color: AppColors.yellow.withValues(alpha: 0.4), blurRadius: 8)],
+                                ),
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(12),
+                                    onTap: () async {
+                                      HapticFeedback.mediumImpact();
+                                      final loc = await LocationService.getCurrentLocation();
+                                      googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(loc.latitude, loc.longitude), 17));
+                                    },
+                                    child: const Padding(
+                                      padding: EdgeInsets.all(12),
+                                      child: Icon(Icons.my_location, color: Colors.black, size: 22),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 Container(
@@ -1005,8 +1149,9 @@ class _SearchScreenState extends State<SearchScreen> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
+                          color: AppColors.success.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
                         ),
                         child: Row(
                           children: [
@@ -1014,18 +1159,18 @@ class _SearchScreenState extends State<SearchScreen> {
                               width: 44,
                               height: 44,
                               decoration: BoxDecoration(
-                                color: AppColors.yellow,
+                                color: AppColors.success,
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Icon(Icons.location_on, color: context.isDark ? AppColors.bgDark : Colors.white, size: 24),
+                              child: const Icon(Icons.check, color: Colors.white, size: 24),
                             ),
                             const SizedBox(width: 14),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(locationName, style: TextStyle(color: context.textColor, fontSize: 16, fontWeight: FontWeight.w600)),
-                                  Text(locationAddress, style: TextStyle(color: context.mutedColor, fontSize: 13)),
+                                  Text('Pinned Location', style: TextStyle(color: context.textColor, fontSize: 16, fontWeight: FontWeight.w600)),
+                                  Text(locationAddress, style: TextStyle(color: context.mutedColor, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
                                 ],
                               ),
                             ),
@@ -1033,23 +1178,36 @@ class _SearchScreenState extends State<SearchScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      PrimaryButton(
-                        text: 'Confirm location',
-                        onPressed: () async {
-                          Navigator.pop(ctx);
-                          final freshLoc = await LocationService.getCurrentLocation();
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => RideConfirmScreen(
-                              pickup: 'Current location',
-                              dropoff: locationName,
-                              pickupLat: freshLoc.latitude,
-                              pickupLng: freshLoc.longitude,
-                              dropoffLat: selectedLocation.latitude,
-                              dropoffLng: selectedLocation.longitude,
-                            )),
-                          );
-                        },
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            Navigator.pop(ctx);
+                            final freshLoc = await LocationService.getCurrentLocation();
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => RideConfirmScreen(
+                                pickup: 'Current location',
+                                dropoff: locationName,
+                                pickupLat: freshLoc.latitude,
+                                pickupLng: freshLoc.longitude,
+                                dropoffLat: selectedLocation.latitude,
+                                dropoffLng: selectedLocation.longitude,
+                              )),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.success,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Confirm Location',
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -1082,6 +1240,55 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Icon(
           icon,
           color: isHighlighted ? Colors.black : context.textColor,
+          size: 22,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEnhancedMapButton(IconData icon, String tooltip, VoidCallback onTap, bool isDark, {bool isHighlighted = false, bool isFirst = false, bool isLast = false}) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.vertical(
+          top: isFirst ? const Radius.circular(12) : Radius.zero,
+          bottom: isLast ? const Radius.circular(12) : Radius.zero,
+        ),
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: isHighlighted ? AppColors.yellow : Colors.transparent,
+            borderRadius: BorderRadius.vertical(
+              top: isFirst ? const Radius.circular(12) : Radius.zero,
+              bottom: isLast ? const Radius.circular(12) : Radius.zero,
+            ),
+          ),
+          child: Icon(
+            icon,
+            color: isHighlighted ? Colors.black : (isDark ? Colors.white70 : Colors.black54),
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMapControlButton(IconData icon, VoidCallback onTap, bool isDark, {bool isActive = false}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.yellow : (isDark ? Colors.black87 : Colors.white),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 6)],
+        ),
+        child: Icon(
+          icon,
+          color: isActive ? Colors.black : (isDark ? Colors.white70 : Colors.black54),
           size: 22,
         ),
       ),
@@ -1809,9 +2016,31 @@ class _SearchScreenState extends State<SearchScreen> {
                         ),
                       ),
                       onChanged: (value) async {
-                        if (value.length > 2) {
+                        if (value.isNotEmpty) {
                           try {
-                            // Restricted to Male/Hulhumale area
+                            List<Map<String, dynamic>> results = [];
+
+                            // First search admin locations
+                            final adminLocs = await SupabaseService.getLocations();
+                            debugPrint('Loaded ${adminLocs.length} admin locations');
+                            final query = value.toLowerCase();
+                            for (final loc in adminLocs) {
+                              final name = (loc['name'] ?? '').toString().toLowerCase();
+                              final address = (loc['address'] ?? '').toString().toLowerCase();
+                              if (name.contains(query) || address.contains(query)) {
+                                final lat = loc['lat'] is num ? (loc['lat'] as num).toDouble() : double.tryParse(loc['lat']?.toString() ?? '');
+                                final lng = loc['lng'] is num ? (loc['lng'] as num).toDouble() : double.tryParse(loc['lng']?.toString() ?? '');
+                                results.add({
+                                  'name': loc['name'] ?? 'Location',
+                                  'address': loc['address'] ?? '',
+                                  'lat': lat,
+                                  'lng': lng,
+                                  'isAdmin': true,
+                                });
+                              }
+                            }
+
+                            // Then search Google Places
                             final url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json'
                                 '?input=${Uri.encodeComponent(value)}'
                                 '&location=4.2000,73.5300'
@@ -1823,14 +2052,16 @@ class _SearchScreenState extends State<SearchScreen> {
                             if (response.statusCode == 200) {
                               final data = json.decode(response.body);
                               final predictions = data['predictions'] as List? ?? [];
-                              setSearchState(() {
-                                _mapSearchResults = predictions.map((p) => {
+                              for (final p in predictions) {
+                                results.add({
                                   'name': p['structured_formatting']?['main_text'] ?? p['description'],
                                   'address': p['description'],
                                   'place_id': p['place_id'],
-                                }).toList();
-                              });
+                                });
+                              }
                             }
+
+                            setSearchState(() => _mapSearchResults = results);
                           } catch (e) {
                             debugPrint('Map search error: $e');
                           }
@@ -1859,16 +2090,21 @@ class _SearchScreenState extends State<SearchScreen> {
                         itemCount: _mapSearchResults.length,
                         itemBuilder: (context, index) {
                           final result = _mapSearchResults[index];
+                          final isAdmin = result['isAdmin'] == true;
                           return ListTile(
                             contentPadding: EdgeInsets.zero,
                             leading: Container(
                               width: 40,
                               height: 40,
                               decoration: BoxDecoration(
-                                color: AppColors.yellow.withValues(alpha: 0.15),
+                                color: isAdmin ? AppColors.yellow : AppColors.yellow.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Icon(Icons.location_on, color: AppColors.yellow, size: 20),
+                              child: Icon(
+                                isAdmin ? Icons.star : Icons.location_on,
+                                color: isAdmin ? Colors.black : AppColors.yellow,
+                                size: 20,
+                              ),
                             ),
                             title: Text(result['name'] ?? '', style: TextStyle(color: context.textColor, fontWeight: FontWeight.w500)),
                             subtitle: Text(
@@ -1879,26 +2115,36 @@ class _SearchScreenState extends State<SearchScreen> {
                             ),
                             onTap: () async {
                               Navigator.pop(ctx);
-                              // Get coordinates from place_id
-                              final placeId = result['place_id'];
-                              if (placeId != null) {
-                                try {
-                                  final detailsUrl = 'https://maps.googleapis.com/maps/api/place/details/json'
-                                      '?place_id=$placeId'
-                                      '&fields=geometry,name,formatted_address'
-                                      '&key=${AppConfig.googleMapsApiKey}';
-                                  final response = await http.get(Uri.parse(detailsUrl));
-                                  if (response.statusCode == 200) {
-                                    final data = json.decode(response.body);
-                                    final location = data['result']?['geometry']?['location'];
-                                    final name = data['result']?['name'] ?? result['name'];
-                                    final address = data['result']?['formatted_address'] ?? result['address'];
-                                    if (location != null) {
-                                      onSelect(name, address, location['lat'].toDouble(), location['lng'].toDouble());
+                              // Admin locations have direct coordinates
+                              if (isAdmin && result['lat'] != null && result['lng'] != null) {
+                                onSelect(
+                                  result['name'] ?? 'Location',
+                                  result['address'] ?? '',
+                                  (result['lat'] as num).toDouble(),
+                                  (result['lng'] as num).toDouble(),
+                                );
+                              } else {
+                                // Get coordinates from place_id for Google Places
+                                final placeId = result['place_id'];
+                                if (placeId != null) {
+                                  try {
+                                    final detailsUrl = 'https://maps.googleapis.com/maps/api/place/details/json'
+                                        '?place_id=$placeId'
+                                        '&fields=geometry,name,formatted_address'
+                                        '&key=${AppConfig.googleMapsApiKey}';
+                                    final response = await http.get(Uri.parse(detailsUrl));
+                                    if (response.statusCode == 200) {
+                                      final data = json.decode(response.body);
+                                      final location = data['result']?['geometry']?['location'];
+                                      final name = data['result']?['name'] ?? result['name'];
+                                      final address = data['result']?['formatted_address'] ?? result['address'];
+                                      if (location != null) {
+                                        onSelect(name, address, location['lat'].toDouble(), location['lng'].toDouble());
+                                      }
                                     }
+                                  } catch (e) {
+                                    debugPrint('Place details error: $e');
                                   }
-                                } catch (e) {
-                                  debugPrint('Place details error: $e');
                                 }
                               }
                             },
@@ -2340,9 +2586,12 @@ class _SearchScreenState extends State<SearchScreen> {
     }
     final searchController = TextEditingController();
     String addressText = '';
-    String selectedName = '';
+    String selectedName = 'Pinned Location';
     bool showSearchResults = false;
     List<Map<String, dynamic>> searchResults = [];
+    MapType pickerMapType = MapType.normal;
+    bool trafficEnabled = false;
+    bool isDragging = false;
 
     final List<Map<String, dynamic>> allPlaces = [
       {'name': 'Hulhumale Phase 2', 'address': 'Hulhumale Phase 2, Flat Area', 'lat': 4.2286, 'lng': 73.5400, 'icon': Icons.location_city},
@@ -2358,6 +2607,22 @@ class _SearchScreenState extends State<SearchScreen> {
       {'name': 'Islamic Centre', 'address': 'Islamic Centre, Male', 'lat': 4.1750, 'lng': 73.5090, 'icon': Icons.mosque},
       {'name': 'SO Fitness', 'address': 'SO Fitness, Male City', 'lat': 4.1735, 'lng': 73.5095, 'icon': Icons.fitness_center},
     ];
+
+    Widget buildMapButton(StateSetter setModalState, {required IconData icon, required bool isActive, required VoidCallback onTap, Color? activeColor}) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: isActive ? (activeColor ?? AppColors.yellow) : (isDark ? AppColors.surfaceDark : Colors.white),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 8)],
+          ),
+          child: Icon(icon, color: isActive ? Colors.black : (isDark ? context.textColor : Colors.black54), size: 22),
+        ),
+      );
+    }
 
     return await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
@@ -2556,31 +2821,90 @@ class _SearchScreenState extends State<SearchScreen> {
                       : Stack(
                           children: [
                             GoogleMap(
-                              initialCameraPosition: CameraPosition(target: selectedLocation, zoom: 14),
-                              onMapCreated: (controller) => googleMapController = controller,
-                              onTap: (point) {
+                              initialCameraPosition: CameraPosition(target: selectedLocation, zoom: 15),
+                              onMapCreated: (controller) {
+                                googleMapController = controller;
+                                if (isDark) controller.setMapStyle(_darkMapStyle);
+                              },
+                              onCameraMove: (position) {
+                                selectedLocation = position.target;
+                                if (!isDragging) {
+                                  setModalState(() => isDragging = true);
+                                }
+                              },
+                              onCameraIdle: () {
                                 setModalState(() {
-                                  selectedLocation = point;
-                                  addressText = '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
+                                  isDragging = false;
+                                  addressText = '${selectedLocation.latitude.toStringAsFixed(4)}, ${selectedLocation.longitude.toStringAsFixed(4)}';
                                   selectedName = 'Pinned Location';
-                                  searchController.text = '';
                                 });
                               },
-                              markers: {
-                                Marker(
-                                  markerId: const MarkerId('selected'),
-                                  position: selectedLocation,
-                                  icon: BitmapDescriptor.defaultMarkerWithHue(
-                                    accentColor == AppColors.success ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed,
-                                  ),
-                                ),
-                              },
+                              mapType: pickerMapType,
+                              trafficEnabled: trafficEnabled,
                               myLocationEnabled: true,
                               myLocationButtonEnabled: false,
                               zoomControlsEnabled: false,
                               mapToolbarEnabled: false,
-                              style: isDark ? _darkMapStyle : null,
+                              gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                                Factory<PanGestureRecognizer>(() => PanGestureRecognizer()),
+                                Factory<ScaleGestureRecognizer>(() => ScaleGestureRecognizer()),
+                                Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
+                                Factory<VerticalDragGestureRecognizer>(() => VerticalDragGestureRecognizer()),
+                                Factory<HorizontalDragGestureRecognizer>(() => HorizontalDragGestureRecognizer()),
+                              },
                             ),
+                            // Center pin (drag to select)
+                            Center(
+                              child: IgnorePointer(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? AppColors.surfaceDark : Colors.white,
+                                        borderRadius: BorderRadius.circular(8),
+                                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 8)],
+                                      ),
+                                      child: Text(
+                                        'Move map to select',
+                                        style: TextStyle(color: isDark ? context.textColor : Colors.black87, fontSize: 13, fontWeight: FontWeight.w500),
+                                      ),
+                                    ),
+                                    AnimatedContainer(
+                                      duration: const Duration(milliseconds: 150),
+                                      transform: Matrix4.translationValues(0, isDragging ? -8 : 0, 0),
+                                      child: Icon(Icons.location_pin, color: accentColor, size: 48),
+                                    ),
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: accentColor.withValues(alpha: 0.5),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            // Map type buttons (top right)
+                            Positioned(
+                              top: 16,
+                              right: 16,
+                              child: Column(
+                                children: [
+                                  buildMapButton(setModalState, icon: Icons.map_outlined, isActive: pickerMapType == MapType.normal, onTap: () => setModalState(() => pickerMapType = MapType.normal)),
+                                  const SizedBox(height: 8),
+                                  buildMapButton(setModalState, icon: Icons.satellite_alt, isActive: pickerMapType == MapType.satellite, onTap: () => setModalState(() => pickerMapType = MapType.satellite)),
+                                  const SizedBox(height: 8),
+                                  buildMapButton(setModalState, icon: Icons.terrain, isActive: pickerMapType == MapType.terrain, onTap: () => setModalState(() => pickerMapType = MapType.terrain)),
+                                  const SizedBox(height: 8),
+                                  buildMapButton(setModalState, icon: Icons.traffic, isActive: trafficEnabled, onTap: () => setModalState(() => trafficEnabled = !trafficEnabled)),
+                                ],
+                              ),
+                            ),
+                            // Zoom controls and my location (bottom right)
                             Positioned(
                               bottom: 20,
                               right: 16,
@@ -2593,13 +2917,13 @@ class _SearchScreenState extends State<SearchScreen> {
                                       height: 48,
                                       decoration: BoxDecoration(
                                         color: isDark ? AppColors.surfaceDark : Colors.white,
-                                        borderRadius: BorderRadius.circular(14),
-                                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10)],
+                                        borderRadius: BorderRadius.circular(12),
+                                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 8)],
                                       ),
                                       child: Icon(Icons.add, color: isDark ? context.textColor : Colors.black87, size: 24),
                                     ),
                                   ),
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: 8),
                                   GestureDetector(
                                     onTap: () => googleMapController?.animateCamera(CameraUpdate.zoomOut()),
                                     child: Container(
@@ -2607,55 +2931,34 @@ class _SearchScreenState extends State<SearchScreen> {
                                       height: 48,
                                       decoration: BoxDecoration(
                                         color: isDark ? AppColors.surfaceDark : Colors.white,
-                                        borderRadius: BorderRadius.circular(14),
-                                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10)],
+                                        borderRadius: BorderRadius.circular(12),
+                                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 8)],
                                       ),
                                       child: Icon(Icons.remove, color: isDark ? context.textColor : Colors.black87, size: 24),
                                     ),
                                   ),
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: 8),
                                   GestureDetector(
-                                    onTap: () => googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(const LatLng(4.1755, 73.5093), 13)),
+                                    onTap: () async {
+                                      try {
+                                        final position = await Geolocator.getCurrentPosition();
+                                        googleMapController?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(position.latitude, position.longitude), 16));
+                                      } catch (_) {}
+                                    },
                                     child: Container(
                                       width: 48,
                                       height: 48,
                                       decoration: BoxDecoration(
-                                        color: isDark ? AppColors.surfaceDark : Colors.white,
-                                        borderRadius: BorderRadius.circular(14),
-                                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10)],
+                                        color: AppColors.yellow,
+                                        borderRadius: BorderRadius.circular(12),
+                                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 8)],
                                       ),
-                                      child: Icon(Icons.my_location, color: accentColor, size: 22),
+                                      child: Icon(Icons.my_location, color: Colors.black, size: 22),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            if (addressText.isEmpty)
-                              Positioned(
-                                top: 20,
-                                left: 16,
-                                right: 16,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: (isDark ? AppColors.surfaceDark : Colors.white).withValues(alpha: 0.95),
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 10)],
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.touch_app, color: accentColor, size: 20),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          'Tap on the map to pin location or search above',
-                                          style: TextStyle(color: isDark ? context.textColor : Colors.black87, fontSize: 13),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
                           ],
                         ),
                 ),
@@ -2669,49 +2972,48 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                   child: Column(
                     children: [
-                      if (addressText.isNotEmpty)
-                        Container(
-                          width: double.infinity,
-                          margin: const EdgeInsets.only(bottom: 14),
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: accentColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: accentColor.withValues(alpha: 0.3)),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: accentColor,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(Icons.check, color: Colors.white, size: 22),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      selectedName.isEmpty ? 'Selected Location' : selectedName,
-                                      style: TextStyle(color: isDark ? context.textColor : Colors.black87, fontSize: 15, fontWeight: FontWeight.w600),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      addressText,
-                                      style: TextStyle(color: isDark ? context.mutedColor : Colors.grey, fontSize: 12),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 14),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: accentColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: accentColor.withValues(alpha: 0.3)),
                         ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: accentColor,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(Icons.check, color: Colors.white, size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    selectedName,
+                                    style: TextStyle(color: isDark ? context.textColor : Colors.black87, fontSize: 15, fontWeight: FontWeight.w600),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    addressText.isEmpty ? 'Move map to select location' : addressText,
+                                    style: TextStyle(color: isDark ? context.mutedColor : Colors.grey, fontSize: 12),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
@@ -2728,7 +3030,7 @@ class _SearchScreenState extends State<SearchScreen> {
                             elevation: 0,
                           ),
                           child: Text(
-                            addressText.isEmpty ? 'Select a location' : 'Confirm Location',
+                            'Confirm Location',
                             style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                           ),
                         ),

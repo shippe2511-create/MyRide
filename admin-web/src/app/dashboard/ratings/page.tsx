@@ -102,9 +102,9 @@ interface LeaderboardDriver {
   full_name: string
   avatar_url: string | null
   rating: number
-  completed_rides: number
+  review_count: number
   completion_rate: number
-  this_month_rides: number
+  this_month_reviews: number
 }
 
 interface DriverDetails {
@@ -274,8 +274,12 @@ export default function RatingsPage() {
       const completedRides = driverRides.filter(r => r.status === 'completed').length
       const totalRides = driverRides.length
       const completionRate = totalRides > 0 ? (completedRides / totalRides) * 100 : 0
-      const thisMonthRides = driverRides.filter(r =>
-        r.status === 'completed' && new Date(r.created_at) >= monthAgo
+
+      // Count reviews (ratings) for this driver
+      const driverReviews = allRatings.filter(r => r.to_user_id === driver.profile_id)
+      const reviewCount = driverReviews.length
+      const thisMonthReviews = driverReviews.filter(r =>
+        new Date(r.created_at) >= monthAgo
       ).length
 
       const profile = Array.isArray(driver.profile) ? driver.profile[0] : driver.profile
@@ -285,16 +289,16 @@ export default function RatingsPage() {
         full_name: profile?.full_name || "Unknown",
         avatar_url: profile?.avatar_url,
         rating: parseFloat(driver.rating) || 0,
-        completed_rides: completedRides,
+        review_count: reviewCount,
         completion_rate: Math.round(completionRate),
-        this_month_rides: thisMonthRides
+        this_month_reviews: thisMonthReviews
       }
     })
 
-    // Sort by: rating first, then completed rides, then completion rate
+    // Sort by: rating first, then review count, then completion rate
     leaderboardData.sort((a, b) => {
       if (b.rating !== a.rating) return b.rating - a.rating
-      if (b.completed_rides !== a.completed_rides) return b.completed_rides - a.completed_rides
+      if (b.review_count !== a.review_count) return b.review_count - a.review_count
       return b.completion_rate - a.completion_rate
     })
 
@@ -876,7 +880,7 @@ export default function RatingsPage() {
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <CheckCircle2 className="h-3 w-3 text-green-500" />
-                          {driver.completed_rides} rides
+                          {driver.review_count} reviews
                         </span>
                         <span>•</span>
                         <span>{driver.completion_rate}% rate</span>
@@ -889,9 +893,9 @@ export default function RatingsPage() {
                         <span className="text-lg font-bold">{driver.rating.toFixed(1)}</span>
                         <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                       </div>
-                      {driver.this_month_rides > 0 && (
+                      {driver.this_month_reviews > 0 && (
                         <p className="text-xs text-muted-foreground">
-                          {driver.this_month_rides} this month
+                          {driver.this_month_reviews} this month
                         </p>
                       )}
                     </div>

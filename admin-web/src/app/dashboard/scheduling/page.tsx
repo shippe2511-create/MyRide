@@ -995,7 +995,72 @@ export default function SchedulingPage() {
           <div className="space-y-4">
             {/* Add New Time */}
             <div className="p-4 border rounded-lg space-y-3">
-              <h4 className="font-medium text-sm">Add New Time</h4>
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium text-sm">Add New Time</h4>
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file || !timesRoute) return
+                      try {
+                        toast.info("Extracting times from image...")
+                        const { createWorker } = await import("tesseract.js")
+                        const worker = await createWorker("eng")
+                        const { data: { text } } = await worker.recognize(file)
+                        await worker.terminate()
+
+                        // Extract times in format HH:MM or H:MM (with optional AM/PM)
+                        const timeRegex = /\b([01]?[0-9]|2[0-3]):([0-5][0-9])(?:\s*([AaPp][Mm]))?\b/g
+                        const matches = text.matchAll(timeRegex)
+                        const times: string[] = []
+
+                        for (const match of matches) {
+                          let hour = parseInt(match[1])
+                          const minute = match[2]
+                          const ampm = match[3]?.toUpperCase()
+
+                          if (ampm === "PM" && hour < 12) hour += 12
+                          if (ampm === "AM" && hour === 12) hour = 0
+
+                          const time24 = `${hour.toString().padStart(2, "0")}:${minute}`
+                          if (!times.includes(time24)) times.push(time24)
+                        }
+
+                        if (times.length === 0) {
+                          toast.error("No times found in image")
+                          return
+                        }
+
+                        // Add extracted times to the route
+                        const inserts = times.map(time => ({
+                          route_id: timesRoute.id,
+                          departure_time: time,
+                          days_of_week: newDays.length > 0 ? newDays : DAYS
+                        }))
+
+                        const { error } = await supabase.from("schedules").insert(inserts)
+                        if (error) throw error
+
+                        toast.success(`Added ${times.length} times from image`)
+                        loadSchedules(timesRoute.id)
+                      } catch (err) {
+                        console.error(err)
+                        toast.error("Failed to extract times")
+                      }
+                      e.target.value = ""
+                    }}
+                  />
+                  <Button variant="outline" size="sm" asChild>
+                    <span>
+                      <Upload className="h-4 w-4 mr-1" />
+                      From Photo
+                    </span>
+                  </Button>
+                </label>
+              </div>
               <div className="flex gap-2">
                 <Input
                   type="time"

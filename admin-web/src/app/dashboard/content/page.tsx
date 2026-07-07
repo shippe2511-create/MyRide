@@ -233,6 +233,7 @@ export default function ContentPage() {
   const [selectedItem, setSelectedItem] = useState<any>(null)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState<any>({})
+  const [selectedNotifications, setSelectedNotifications] = useState<Set<string>>(new Set())
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -877,7 +878,23 @@ export default function ContentPage() {
         <TabsContent value="notifications">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Push Notification History</CardTitle>
+              <div className="flex items-center gap-4">
+                <CardTitle>Push Notification History</CardTitle>
+                {selectedNotifications.size > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{selectedNotifications.size} selected</span>
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedNotifications(new Set())}>Clear</Button>
+                    <Button variant="destructive" size="sm" onClick={async () => {
+                      const ids = Array.from(selectedNotifications)
+                      await supabase.from("push_notification_logs").delete().in("id", ids)
+                      setNotifications(notifications.filter(n => !selectedNotifications.has(n.id)))
+                      setSelectedNotifications(new Set())
+                    }}>
+                      <Trash2 className="mr-2 h-4 w-4" />Delete Selected
+                    </Button>
+                  </div>
+                )}
+              </div>
               <Button size="sm" onClick={() => openDialog("push")}>
                 <Bell className="mr-2 h-4 w-4" />
                 Send Push
@@ -887,6 +904,18 @@ export default function ContentPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={notifications.length > 0 && selectedNotifications.size === notifications.length}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedNotifications(new Set(notifications.map(n => n.id)))
+                          } else {
+                            setSelectedNotifications(new Set())
+                          }
+                        }}
+                      />
+                    </TableHead>
                     <TableHead>Title</TableHead>
                     <TableHead>Message</TableHead>
                     <TableHead>Target</TableHead>
@@ -899,13 +928,27 @@ export default function ContentPage() {
                 <TableBody>
                   {notifications.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         No push notifications sent yet
                       </TableCell>
                     </TableRow>
                   ) : (
                     notifications.map((notif) => (
                       <TableRow key={notif.id} className="group hover:bg-muted/50 transition-colors">
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedNotifications.has(notif.id)}
+                            onCheckedChange={(checked) => {
+                              const newSet = new Set(selectedNotifications)
+                              if (checked) {
+                                newSet.add(notif.id)
+                              } else {
+                                newSet.delete(notif.id)
+                              }
+                              setSelectedNotifications(newSet)
+                            }}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">{notif.title}</TableCell>
                         <TableCell className="max-w-[200px] truncate text-muted-foreground">{notif.body}</TableCell>
                         <TableCell><Badge variant="secondary">{notif.target_type}</Badge></TableCell>

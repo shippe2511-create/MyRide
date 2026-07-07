@@ -333,10 +333,6 @@ class _InboxScreenState extends State<InboxScreen> {
           decoration: BoxDecoration(
             color: context.surfaceColor,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: message.isRead ? context.borderColor : AppColors.yellow.withValues(alpha: 0.5),
-              width: message.isRead ? 1 : 1.5,
-            ),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -163,13 +163,35 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.notifications_none, size: 80, color: context.mutedColor),
-          const SizedBox(height: 16),
-          Text('No notifications', style: TextStyle(color: context.mutedColor, fontSize: 18)),
+          const SizedBox(height: 100),
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              color: context.cardColor,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Icon(Icons.notifications_off_outlined, size: 48, color: context.mutedColor),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'No Notifications',
+            style: TextStyle(
+              color: context.textColor,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text('You\'re all caught up!', style: TextStyle(color: context.mutedColor, fontSize: 14)),
+          Text(
+            'You\'re all caught up!',
+            style: TextStyle(
+              color: context.mutedColor,
+              fontSize: 14,
+            ),
+          ),
         ],
       ),
     );
@@ -210,29 +232,35 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        color: AppColors.error,
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.error,
+          borderRadius: BorderRadius.circular(18),
+        ),
         child: const Icon(Icons.delete, color: Colors.white),
       ),
-      child: InkWell(
+      child: GestureDetector(
         onTap: () => _markAsRead(index),
         child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isRead ? context.cardColor : AppColors.yellow.withValues(alpha: 0.1),
-            border: Border(bottom: BorderSide(color: context.borderColor, width: 0.5)),
+            color: context.cardColor,
+            borderRadius: BorderRadius.circular(18),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                width: 46,
+                height: 46,
                 decoration: BoxDecoration(
                   color: iconColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, color: iconColor, size: 24),
+                child: Icon(icon, color: iconColor, size: 22),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -245,8 +273,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             style: TextStyle(
                               color: context.textColor,
                               fontSize: 15,
-                              fontWeight: isRead ? FontWeight.w500 : FontWeight.w600,
+                              fontWeight: isRead ? FontWeight.w600 : FontWeight.w700,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         if (!isRead)
@@ -267,10 +297,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Text(
                       time != null ? _formatTime(time) : '',
-                      style: TextStyle(color: context.mutedColor.withValues(alpha: 0.7), fontSize: 12),
+                      style: TextStyle(color: context.mutedColor.withValues(alpha: 0.7), fontSize: 11),
                     ),
                   ],
                 ),

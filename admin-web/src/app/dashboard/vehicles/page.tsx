@@ -333,10 +333,6 @@ export default function VehiclesPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant="success" className="gap-1">
-            <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
-            Synced to Apps
-          </Badge>
           <Button variant="outline" onClick={exportCSV}>
             <Download className="mr-2 h-4 w-4" />
             Export

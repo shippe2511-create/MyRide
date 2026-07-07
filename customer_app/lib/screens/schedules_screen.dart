@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 
@@ -14,16 +16,51 @@ class _SchedulesScreenState extends State<SchedulesScreen> with SingleTickerProv
   List<Map<String, dynamic>> _routes = [];
   List<Map<String, dynamic>> _schedules = [];
   bool _isLoading = true;
+  RealtimeChannel? _routesChannel;
+  RealtimeChannel? _schedulesChannel;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this); // All + 3 types
     _loadData();
+    _setupRealtimeSubscriptions();
   }
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+  void _setupRealtimeSubscriptions() {
+    final supabase = Supabase.instance.client;
+
+    // Listen for transport_routes changes
+    _routesChannel = supabase
+        .channel('schedules_screen_routes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'transport_routes',
+          callback: (payload) {
+            debugPrint('Routes changed: ${payload.eventType}');
+            _loadData(showLoading: false);
+          },
+        )
+        .subscribe();
+
+    // Listen for route_schedules changes
+    _schedulesChannel = supabase
+        .channel('schedules_screen_schedules')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'route_schedules',
+          callback: (payload) {
+            debugPrint('Schedules changed: ${payload.eventType}');
+            _loadData(showLoading: false);
+          },
+        )
+        .subscribe();
+  }
+
+  Future<void> _loadData({bool showLoading = true}) async {
+    if (showLoading) setState(() => _isLoading = true);
     try {
       final types = await SupabaseService.getTransportTypes();
       final routes = await SupabaseService.getRoutes();
@@ -44,6 +81,8 @@ class _SchedulesScreenState extends State<SchedulesScreen> with SingleTickerProv
 
   @override
   void dispose() {
+    _routesChannel?.unsubscribe();
+    _schedulesChannel?.unsubscribe();
     if (!_isLoading) _tabController.dispose();
     super.dispose();
   }

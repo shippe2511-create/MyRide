@@ -34,6 +34,13 @@ import { PermissionGate } from "@/components/permission-gate"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent
+} from "@dnd-kit/core"
+import {
+  arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 
 interface TransportRoute {
   id: string
@@ -47,6 +54,103 @@ interface TransportRoute {
 }
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+function SortableRow({
+  route,
+  selectedIds,
+  setSelectedIds,
+  toggleRouteStatus,
+  setEditingRoute,
+  openTimesDialog,
+  setDeleteId,
+}: {
+  route: TransportRoute
+  selectedIds: Set<string>
+  setSelectedIds: (ids: Set<string>) => void
+  toggleRouteStatus: (route: TransportRoute) => void
+  setEditingRoute: (route: TransportRoute) => void
+  openTimesDialog: (route: TransportRoute) => void
+  setDeleteId: (id: string) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: route.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <TableRow ref={setNodeRef} style={style} className="group hover:bg-muted/50 transition-colors">
+      <TableCell>
+        <Checkbox
+          checked={selectedIds.has(route.id)}
+          onCheckedChange={(checked) => {
+            const newSelected = new Set(selectedIds)
+            if (checked) {
+              newSelected.add(route.id)
+            } else {
+              newSelected.delete(route.id)
+            }
+            setSelectedIds(newSelected)
+          }}
+        />
+      </TableCell>
+      <TableCell>
+        <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1">
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </div>
+      </TableCell>
+      <TableCell className="font-medium">{route.route_name}</TableCell>
+      <TableCell>{route.route_code || "-"}</TableCell>
+      <TableCell>
+        <Badge variant="outline">{route.direction}</Badge>
+      </TableCell>
+      <TableCell>
+        {route.schedules?.length || 0} times
+      </TableCell>
+      <TableCell>
+        <Switch
+          checked={route.is_active}
+          onCheckedChange={() => toggleRouteStatus(route)}
+        />
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setEditingRoute(route)}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => openTimesDialog(route)}>
+                <Clock className="h-4 w-4 mr-2" />
+                Manage Times
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setEditingRoute(route)}>
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDeleteId(route.id)} className="text-red-500">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </TableCell>
+    </TableRow>
+  )
+}
 
 export default function SchedulingPage() {
   const supabase = createClient()
@@ -99,8 +203,22 @@ export default function SchedulingPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transport_routes' }, () => {
         if (!isSavingRef.current) loadRoutes(false)
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'route_schedules' }, () => {
-        if (!isSavingRef.current) loadRoutes(false)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'route_schedules' }, (payload) => {
+        if (!isSavingRef.current) {
+          loadRoutes(false)
+          // Also update the schedules dialog if open
+          if (payload.new && 'route_id' in payload.new) {
+            const routeId = payload.new.route_id
+            supabase
+              .from("route_schedules")
+              .select("*")
+              .eq("route_id", routeId)
+              .order("departure_time")
+              .then(({ data }) => {
+                if (data) setSchedules(data)
+              })
+          }
+        }
       })
       .subscribe()
 
@@ -114,11 +232,42 @@ export default function SchedulingPage() {
     const { data } = await supabase
       .from("transport_routes")
       .select("*, schedules:route_schedules(id, departure_time, days_of_week, is_active)")
+      .order("sort_order")
       .order("route_name")
 
     setRoutes(data || [])
     if (showLoading) setLoading(false)
   }
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const filteredRoutes = routes.filter(r => r.transport_type === activeTab)
+    const oldIndex = filteredRoutes.findIndex(r => r.id === active.id)
+    const newIndex = filteredRoutes.findIndex(r => r.id === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) return
+
+    // Reorder locally first for immediate feedback
+    const reordered = arrayMove(filteredRoutes, oldIndex, newIndex)
+
+    // Update sort_order for all affected routes
+    isSavingRef.current = true
+    const updates = reordered.map((route, index) =>
+      supabase.from("transport_routes").update({ sort_order: index }).eq("id", route.id)
+    )
+    await Promise.all(updates)
+    isSavingRef.current = false
+
+    loadRoutes(false)
+    toast.success("Order updated")
+  }
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
 
   const handleSave = async () => {
     if (!formData.route_name) {
@@ -295,12 +444,8 @@ export default function SchedulingPage() {
 
     setExtracting(true)
     try {
-      const Tesseract = (await import('tesseract.js')).default
-
-      const result = await Tesseract.recognize(importImage, 'eng', {
-        logger: () => {}
-      })
-
+      const Tesseract = (await import("tesseract.js")).default
+      const result = await Tesseract.recognize(importImage, "eng", { logger: () => {} })
       const text = result.data.text
 
       // Extract all times in HH:MM format
@@ -560,105 +705,57 @@ export default function SchedulingPage() {
           )}
 
           <Card className="p-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[50px]">
-                    <Checkbox
-                      checked={filteredRoutes.length > 0 && filteredRoutes.every(r => selectedIds.has(r.id))}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedIds(new Set(filteredRoutes.map(r => r.id)))
-                        } else {
-                          setSelectedIds(new Set())
-                        }
-                      }}
-                    />
-                  </TableHead>
-                  <TableHead>Route</TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Direction</TableHead>
-                  <TableHead>Schedules</TableHead>
-                  <TableHead>Active</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRoutes.length === 0 ? (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      No routes found
-                    </TableCell>
+                    <TableHead className="w-[50px]">
+                      <Checkbox
+                        checked={filteredRoutes.length > 0 && filteredRoutes.every(r => selectedIds.has(r.id))}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedIds(new Set(filteredRoutes.map(r => r.id)))
+                          } else {
+                            setSelectedIds(new Set())
+                          }
+                        }}
+                      />
+                    </TableHead>
+                    <TableHead className="w-[40px]"></TableHead>
+                    <TableHead>Route</TableHead>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Direction</TableHead>
+                    <TableHead>Schedules</TableHead>
+                    <TableHead>Active</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
-                ) : (
-                  filteredRoutes.map(route => (
-                    <TableRow key={route.id} className="group hover:bg-muted/50 transition-colors">
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedIds.has(route.id)}
-                          onCheckedChange={(checked) => {
-                            const newSelected = new Set(selectedIds)
-                            if (checked) {
-                              newSelected.add(route.id)
-                            } else {
-                              newSelected.delete(route.id)
-                            }
-                            setSelectedIds(newSelected)
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">{route.route_name}</TableCell>
-                      <TableCell>{route.route_code || "-"}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{route.direction}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {route.schedules?.length || 0} times
-                      </TableCell>
-                      <TableCell>
-                        <Switch
-                          checked={route.is_active}
-                          onCheckedChange={() => toggleRouteStatus(route)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => setEditingRoute(route)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <DropdownMenu modal={false}>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openTimesDialog(route)}>
-                                <Clock className="h-4 w-4 mr-2" />
-                                Manage Times
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setEditingRoute(route)}>
-                                <Pencil className="h-4 w-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setDeleteId(route.id)} className="text-red-500">
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredRoutes.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        No routes found
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : (
+                    <SortableContext items={filteredRoutes.map(r => r.id)} strategy={verticalListSortingStrategy}>
+                      {filteredRoutes.map((route) => (
+                        <SortableRow
+                          key={route.id}
+                          route={route}
+                          selectedIds={selectedIds}
+                          setSelectedIds={setSelectedIds}
+                          toggleRouteStatus={toggleRouteStatus}
+                          setEditingRoute={setEditingRoute}
+                          openTimesDialog={openTimesDialog}
+                          setDeleteId={setDeleteId}
+                        />
+                      ))}
+                    </SortableContext>
+                  )}
+                </TableBody>
+              </Table>
+            </DndContext>
           </Card>
         </TabsContent>
       </Tabs>
@@ -1007,48 +1104,59 @@ export default function SchedulingPage() {
                       if (!file || !timesRoute) return
                       try {
                         toast.info("Extracting times from image...")
-                        const { createWorker } = await import("tesseract.js")
-                        const worker = await createWorker("eng")
-                        const { data: { text } } = await worker.recognize(file)
-                        await worker.terminate()
 
-                        // Extract times in format HH:MM or H:MM (with optional AM/PM)
-                        const timeRegex = /\b([01]?[0-9]|2[0-3]):([0-5][0-9])(?:\s*([AaPp][Mm]))?\b/g
-                        const matches = text.matchAll(timeRegex)
-                        const times: string[] = []
+                        // Convert file to base64 data URL for Tesseract
+                        const reader = new FileReader()
+                        reader.onload = async () => {
+                          try {
+                            const imageData = reader.result as string
+                            const Tesseract = (await import("tesseract.js")).default
+                            const result = await Tesseract.recognize(imageData, "eng", { logger: () => {} })
+                            const text = result.data.text
 
-                        for (const match of matches) {
-                          let hour = parseInt(match[1])
-                          const minute = match[2]
-                          const ampm = match[3]?.toUpperCase()
+                            // Extract times in format HH:MM
+                            const timePattern = /\b([0-2]?[0-9]):([0-5][0-9])\b/g
+                            const matches = text.match(timePattern) || []
 
-                          if (ampm === "PM" && hour < 12) hour += 12
-                          if (ampm === "AM" && hour === 12) hour = 0
+                            // Normalize and dedupe
+                            const times = [...new Set(matches.map(t => {
+                              const [h, m] = t.split(":")
+                              return `${h.padStart(2, "0")}:${m}`
+                            }))].sort()
 
-                          const time24 = `${hour.toString().padStart(2, "0")}:${minute}`
-                          if (!times.includes(time24)) times.push(time24)
+                            if (times.length === 0) {
+                              toast.error("No times found in image. Try a clearer image.")
+                              return
+                            }
+
+                            // Add extracted times to the route
+                            const inserts = times.map(time => ({
+                              route_id: timesRoute.id,
+                              departure_time: time,
+                              days_of_week: newDays.length > 0 ? newDays : DAYS
+                            }))
+
+                            const { error } = await supabase.from("route_schedules").insert(inserts)
+                            if (error) throw error
+
+                            toast.success(`Added ${times.length} times from image`)
+
+                            // Reload schedules for current route
+                            const { data: updatedSchedules } = await supabase
+                              .from("route_schedules")
+                              .select("*")
+                              .eq("route_id", timesRoute.id)
+                            setSchedules(updatedSchedules || [])
+                          } catch (err: unknown) {
+                            const error = err as Error
+                            console.error("OCR Error:", error?.message, error?.stack, JSON.stringify(err))
+                            toast.error(error?.message || "Failed to read image")
+                          }
                         }
-
-                        if (times.length === 0) {
-                          toast.error("No times found in image")
-                          return
-                        }
-
-                        // Add extracted times to the route
-                        const inserts = times.map(time => ({
-                          route_id: timesRoute.id,
-                          departure_time: time,
-                          days_of_week: newDays.length > 0 ? newDays : DAYS
-                        }))
-
-                        const { error } = await supabase.from("schedules").insert(inserts)
-                        if (error) throw error
-
-                        toast.success(`Added ${times.length} times from image`)
-                        loadSchedules(timesRoute.id)
+                        reader.readAsDataURL(file)
                       } catch (err) {
                         console.error(err)
-                        toast.error("Failed to extract times")
+                        toast.error("Failed to process image")
                       }
                       e.target.value = ""
                     }}

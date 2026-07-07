@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:add_2_calendar/add_2_calendar.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/notification_service.dart';
@@ -20,7 +21,7 @@ class ScheduleScreen extends StatefulWidget {
 
 class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStateMixin {
   String _selectedType = 'Internal';
-  String _selectedRoute = '';
+  String _selectedRoute = ''; // Single route selection
   bool _showReminders = false;
   bool _showAllTypes = false; // True when View All is clicked
 
@@ -32,6 +33,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
   Set<String> _favoriteRoutes = {};
 
   late AnimationController _fabController;
+  RealtimeChannel? _routesChannel;
+  RealtimeChannel? _schedulesChannel;
 
   @override
   void initState() {
@@ -41,10 +44,45 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
       vsync: this,
     );
     _loadData();
+    _setupRealtimeSubscriptions();
+  }
+
+  void _setupRealtimeSubscriptions() {
+    final supabase = Supabase.instance.client;
+
+    // Listen for transport_routes changes
+    _routesChannel = supabase
+        .channel('schedule_screen_routes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'transport_routes',
+          callback: (payload) {
+            debugPrint('Routes realtime update: ${payload.eventType}');
+            _loadData(showLoading: false);
+          },
+        )
+        .subscribe();
+
+    // Listen for route_schedules changes
+    _schedulesChannel = supabase
+        .channel('schedule_screen_schedules')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'route_schedules',
+          callback: (payload) {
+            debugPrint('Schedules realtime update: ${payload.eventType}');
+            _loadData(showLoading: false);
+          },
+        )
+        .subscribe();
   }
 
   @override
   void dispose() {
+    _routesChannel?.unsubscribe();
+    _schedulesChannel?.unsubscribe();
     _fabController.dispose();
     super.dispose();
   }
@@ -66,8 +104,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     return '';
   }
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadData({bool showLoading = true}) async {
+    if (showLoading) setState(() => _isLoading = true);
     try {
       final types = await SupabaseService.getTransportTypes();
       final routes = await SupabaseService.getRoutes();
@@ -103,7 +141,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
             _showAllTypes = true;
           }
           final filteredRoutes = _getFilteredRoutes();
-          if (filteredRoutes.isNotEmpty) {
+          if (filteredRoutes.isNotEmpty && _selectedRoute.isEmpty) {
             _selectedRoute = filteredRoutes.first['id'] ?? '';
           }
         });
@@ -628,12 +666,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                   HapticFeedback.lightImpact();
                   setState(() {
                     _selectedType = type['name'];
-                    final filteredRoutes = _getFilteredRoutes();
-                    if (filteredRoutes.isNotEmpty) {
-                      _selectedRoute = filteredRoutes.first['id'] ?? '';
-                    } else {
-                      _selectedRoute = '';
-                    }
+                    _selectedRoute = '';
                   });
                 },
                 child: AnimatedContainer(
@@ -695,19 +728,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
         itemCount: filteredRoutes.length,
         itemBuilder: (context, index) {
           final route = filteredRoutes[index];
-          final isActive = _selectedRoute == route['id'];
-          String label = route['route_name'] ?? '';
-          if (label.length > 18) {
-            label = 'To ${route['to_location']?.toString().split(' ').first ?? ''}';
-          }
+          final routeId = route['id'] as String;
+          final isActive = _selectedRoute == routeId;
+          final label = route['route_name'] ?? '';
 
-          final isFavorite = _favoriteRoutes.contains(route['id']);
+          final isFavorite = _favoriteRoutes.contains(routeId);
           return Padding(
             padding: EdgeInsets.only(right: index < filteredRoutes.length - 1 ? 8 : 0),
             child: GestureDetector(
               onTap: () {
                 HapticFeedback.selectionClick();
-                setState(() => _selectedRoute = route['id']);
+                setState(() => _selectedRoute = routeId);
               },
               onLongPress: () {
                 HapticFeedback.mediumImpact();
@@ -730,11 +761,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (isFavorite) ...[
+                    if (isFavorite && !isActive) ...[
                       Icon(
                         Icons.star,
                         size: 14,
-                        color: isActive ? AppColors.bgDark : AppColors.yellow,
+                        color: AppColors.yellow,
                       ),
                       const SizedBox(width: 4),
                     ],

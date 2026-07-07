@@ -912,7 +912,7 @@ class SupabaseService {
       if (transportType != null) {
         query = query.eq('transport_type', transportType);
       }
-      final response = await query.order('route_name');
+      final response = await query.order('sort_order').order('route_name');
       debugPrint('getRoutes: Got ${response.length} routes');
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {

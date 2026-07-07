@@ -55,6 +55,7 @@ interface AnimatedPosition {
   heading: number
   targetLat: number
   targetLng: number
+  targetHeading: number
 }
 
 interface DriverTrail {
@@ -324,6 +325,36 @@ function ClusterMarker({ count, position, onClick }: { count: number; position: 
   )
 }
 
+// Calculate proper geodetic bearing between two points
+function calculateBearing(from: { lat: number; lng: number }, to: { lat: number; lng: number }): number {
+  const dLon = (to.lng - from.lng) * Math.PI / 180
+  const lat1 = from.lat * Math.PI / 180
+  const lat2 = to.lat * Math.PI / 180
+  const y = Math.sin(dLon) * Math.cos(lat2)
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon)
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360
+}
+
+// Calculate distance between two points in meters
+function calculateDistance(from: { lat: number; lng: number }, to: { lat: number; lng: number }): number {
+  const R = 6371000
+  const dLat = (to.lat - from.lat) * Math.PI / 180
+  const dLon = (to.lng - from.lng) * Math.PI / 180
+  const lat1 = from.lat * Math.PI / 180
+  const lat2 = to.lat * Math.PI / 180
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+// Interpolate angle using shortest path (handles 0/360 boundary)
+function lerpAngle(from: number, to: number, t: number): number {
+  const diff = ((to - from + 540) % 360) - 180
+  return (from + diff * t + 360) % 360
+}
+
+const MIN_DISTANCE_FOR_BEARING = 2 // meters
+
 const darkMapStyle = [
   { elementType: "geometry", stylers: [{ color: "#212121" }] },
   { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
@@ -492,7 +523,7 @@ export function LiveDriverMap({
     setDriverTrails(newTrails)
   }, [driversKey, showTrails])
 
-  // Smooth position interpolation
+  // Smooth position and heading interpolation
   useEffect(() => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current)
@@ -505,24 +536,30 @@ export function LiveDriverMap({
       const current = animatedPositions.get(driver.id)
 
       if (prev && current && (prev.lat !== driver.lat || prev.lng !== driver.lng)) {
-        const deltaLat = driver.lat - prev.lat
-        const deltaLng = driver.lng - prev.lng
-        const calculatedHeading = Math.atan2(deltaLng, deltaLat) * (180 / Math.PI)
+        const distance = calculateDistance(prev, { lat: driver.lat, lng: driver.lng })
+
+        // Only update heading if moved enough (prevents spinning when stationary)
+        let newTargetHeading = current.targetHeading
+        if (distance >= MIN_DISTANCE_FOR_BEARING) {
+          newTargetHeading = calculateBearing(prev, { lat: driver.lat, lng: driver.lng })
+        }
 
         newAnimated.set(driver.id, {
           lat: current.lat,
           lng: current.lng,
-          heading: driver.heading ?? calculatedHeading,
+          heading: current.heading,
           targetLat: driver.lat,
           targetLng: driver.lng,
+          targetHeading: driver.heading ?? newTargetHeading,
         })
       } else {
         newAnimated.set(driver.id, {
           lat: driver.lat,
           lng: driver.lng,
-          heading: driver.heading ?? 0,
+          heading: current?.heading ?? 0,
           targetLat: driver.lat,
           targetLng: driver.lng,
+          targetHeading: current?.targetHeading ?? 0,
         })
       }
 
@@ -536,6 +573,7 @@ export function LiveDriverMap({
         const diffLat = pos.targetLat - pos.lat
         const diffLng = pos.targetLng - pos.lng
 
+        // Interpolate position
         if (Math.abs(diffLat) > 0.000001 || Math.abs(diffLng) > 0.000001) {
           pos.lat += diffLat * 0.1
           pos.lng += diffLng * 0.1
@@ -543,6 +581,15 @@ export function LiveDriverMap({
         } else {
           pos.lat = pos.targetLat
           pos.lng = pos.targetLng
+        }
+
+        // Interpolate heading smoothly (shortest path)
+        const headingDiff = ((pos.targetHeading - pos.heading + 540) % 360) - 180
+        if (Math.abs(headingDiff) > 0.5) {
+          pos.heading = (pos.heading + headingDiff * 0.15 + 360) % 360
+          needsAnimation = true
+        } else {
+          pos.heading = pos.targetHeading
         }
       })
 
@@ -897,6 +944,7 @@ export function LiveDriverMap({
               heading: driver.heading || 0,
               targetLat: driver.lat,
               targetLng: driver.lng,
+              targetHeading: driver.heading || 0,
             }
 
             return (

@@ -32,21 +32,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void dispose() {
     _notificationsSubscription?.cancel();
     final driverState = Provider.of<DriverState>(context, listen: false);
-    if (driverState.driverId.isNotEmpty) {
-      RealtimeService().unsubscribeFromNotifications(driverState.driverId);
+    if (driverState.profileId.isNotEmpty) {
+      RealtimeService().unsubscribeFromNotifications(driverState.profileId);
     }
     super.dispose();
   }
 
   void _subscribeToNotifications() {
     final driverState = Provider.of<DriverState>(context, listen: false);
-    final driverId = driverState.driverId;
-    if (driverId.isEmpty) return;
+    final profileId = driverState.profileId;
+    if (profileId.isEmpty) return;
 
-    _notificationsSubscription = RealtimeService().subscribeToNotifications(driverId).listen((data) {
+    _notificationsSubscription = RealtimeService().subscribeToNotifications(profileId).listen((data) {
       debugPrint('Notifications realtime update: ${data['event']}');
-      // Reload notifications when there's any change
-      _loadNotifications();
+      // Only reload on INSERT (new notifications), not on DELETE/UPDATE
+      final event = data['event'];
+      if (event == 'INSERT' && mounted) {
+        _loadNotifications();
+      }
     });
   }
 
@@ -54,9 +57,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     setState(() => _isLoading = true);
     try {
       final driverState = Provider.of<DriverState>(context, listen: false);
-      final driverId = driverState.driverId;
-      if (driverId.isNotEmpty) {
-        final notifications = await SupabaseService.getDriverNotifications(driverId);
+      final profileId = driverState.profileId;
+      if (profileId.isNotEmpty) {
+        final notifications = await SupabaseService.getDriverNotifications(profileId);
         setState(() {
           _notifications = notifications;
           _isLoading = false;
@@ -72,7 +75,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final unreadCount = _notifications.where((n) => n['read'] != true).length;
+    final unreadCount = _notifications.where((n) => n['is_read'] != true).length;
 
     return Scaffold(
       backgroundColor: context.bgColor,
@@ -150,7 +153,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Widget _buildNotificationCard(BuildContext context, Map<String, dynamic> notification, int index) {
-    final isRead = notification['read'] == true;
+    final isRead = notification['is_read'] == true;
     final type = notification['type'] as String? ?? 'system';
     final title = notification['title'] as String? ?? 'Notification';
     final message = notification['message'] as String? ?? '';
@@ -268,14 +271,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   void _markAsRead(int index) async {
-    if (_notifications[index]['read'] == true) return;
+    if (_notifications[index]['is_read'] == true) return;
 
     final notificationId = _notifications[index]['id']?.toString();
     if (notificationId != null) {
       try {
         await SupabaseService.markNotificationAsRead(notificationId);
         setState(() {
-          _notifications[index] = {..._notifications[index], 'read': true};
+          _notifications[index] = {..._notifications[index], 'is_read': true};
         });
       } catch (e) {
         debugPrint('Error marking notification as read: $e');
@@ -285,12 +288,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   void _markAllAsRead() async {
     final driverState = Provider.of<DriverState>(context, listen: false);
-    final driverId = driverState.driverId;
-    if (driverId.isNotEmpty) {
+    final profileId = driverState.profileId;
+    if (profileId.isNotEmpty) {
       try {
-        await SupabaseService.markAllNotificationsAsRead(driverId);
+        await SupabaseService.markAllNotificationsAsRead(profileId);
         setState(() {
-          _notifications = _notifications.map((n) => {...n, 'read': true}).toList();
+          _notifications = _notifications.map((n) => {...n, 'is_read': true}).toList();
         });
         HapticFeedback.lightImpact();
       } catch (e) {

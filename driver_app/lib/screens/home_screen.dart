@@ -48,6 +48,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _quotes = [];
   RealtimeChannel? _breakTipsChannel;
   RealtimeChannel? _quotesChannel;
+  RealtimeChannel? _notificationsChannel;
+  int _unreadNotificationCount = 0;
 
   @override
   void initState() {
@@ -61,6 +63,10 @@ class _HomeScreenState extends State<HomeScreen> {
       final state = context.read<DriverState>();
       state.setOnHomeScreen(true);
       state.addListener(_onDriverStateChanged);
+
+      // Load notifications after state is available
+      _loadUnreadCount();
+      _subscribeToNotifications();
 
       // If there are incoming requests, switch to home tab
       if (state.incomingRequests.isNotEmpty && _selectedTab != 0) {
@@ -94,6 +100,28 @@ class _HomeScreenState extends State<HomeScreen> {
         _breakTips = tips;
         _quotes = quotes;
       });
+    }
+  }
+
+  Future<void> _loadUnreadCount() async {
+    final driverState = context.read<DriverState>();
+    // Use profileId for notifications, not driverId
+    final profileId = driverState.profileId;
+    debugPrint('Loading unread count for profile: $profileId');
+    if (profileId.isEmpty) {
+      debugPrint('Profile ID is empty, skipping unread count');
+      return;
+    }
+    try {
+      final notifications = await SupabaseService.getDriverNotifications(profileId);
+      debugPrint('Got ${notifications.length} notifications');
+      final unread = notifications.where((n) => n['is_read'] != true).length;
+      debugPrint('Unread count: $unread');
+      if (mounted) {
+        setState(() => _unreadNotificationCount = unread);
+      }
+    } catch (e) {
+      debugPrint('Error loading unread count: $e');
     }
   }
 
@@ -132,6 +160,42 @@ class _HomeScreenState extends State<HomeScreen> {
         });
   }
 
+  void _subscribeToNotifications() {
+    final driverState = context.read<DriverState>();
+    // Use profileId for notifications, not driverId
+    final profileId = driverState.profileId;
+    debugPrint('Subscribing to notifications for profile: $profileId');
+    if (profileId.isEmpty) {
+      // Retry after a delay if profileId not loaded yet
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) _subscribeToNotifications();
+      });
+      return;
+    }
+
+    final supabase = SupabaseService.client;
+    _notificationsChannel = supabase.channel('home_notifications_$profileId');
+    _notificationsChannel!
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'notifications',
+          callback: (payload) {
+            debugPrint('Notification change: ${payload.eventType}');
+            // Check if this notification is for this profile
+            final newRecord = payload.newRecord;
+            final oldRecord = payload.oldRecord;
+            final userId = newRecord['user_id'] ?? oldRecord['user_id'];
+            if (userId == profileId && mounted) {
+              _loadUnreadCount();
+            }
+          },
+        )
+        .subscribe((status, error) {
+          debugPrint('Notifications subscription status: $status, error: $error');
+        });
+  }
+
   void _onBreakStateChanged(bool isOnBreak) {
     if (isOnBreak) {
       _loadBreakContent();
@@ -141,8 +205,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
-    SupabaseService.client.removeChannel(_breakTipsChannel!);
-    SupabaseService.client.removeChannel(_quotesChannel!);
+    if (_breakTipsChannel != null) SupabaseService.client.removeChannel(_breakTipsChannel!);
+    if (_quotesChannel != null) SupabaseService.client.removeChannel(_quotesChannel!);
+    if (_notificationsChannel != null) SupabaseService.client.removeChannel(_notificationsChannel!);
     // Remove listener
     try {
       context.read<DriverState>().removeListener(_onDriverStateChanged);
@@ -608,6 +673,52 @@ class _HomeScreenState extends State<HomeScreen> {
           StatusToggle(
             isOnline: state.isOnline,
             isOnBreak: state.isOnBreak,
+          ),
+
+          const SizedBox(width: 10),
+
+          // Notification bell (right corner)
+          GestureDetector(
+            onTap: () async {
+              HapticFeedback.lightImpact();
+              await Navigator.pushNamed(context, '/notifications-list');
+              _loadUnreadCount();
+            },
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: context.cardColor,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: context.borderColor),
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Center(
+                    child: Icon(Icons.notifications_outlined, color: context.textColor, size: 22),
+                  ),
+                  if (_unreadNotificationCount > 0)
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                        decoration: const BoxDecoration(
+                          color: AppColors.error,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          _unreadNotificationCount > 9 ? '9+' : '$_unreadNotificationCount',
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ],
       ),

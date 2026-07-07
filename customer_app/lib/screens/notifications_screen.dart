@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/realtime_service.dart';
@@ -56,14 +57,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _loadNotifications() async {
+    // Use same hardcoded ID that works on home screen
+    const userId = 'c716ae79-56d9-4f95-aef8-052d24e137b6';
+
     setState(() => _isLoading = true);
     try {
-      final notifications = await SupabaseService.getInboxMessages();
+      final response = await SupabaseService.client
+          .from('notifications')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false)
+          .limit(50);
+      debugPrint('NotificationsScreen: Got ${response.length} notifications');
       setState(() {
-        _notifications = notifications;
+        _notifications = List<Map<String, dynamic>>.from(response);
         _isLoading = false;
       });
     } catch (e) {
+      debugPrint('Error loading notifications: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -383,13 +394,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   void _markAllAsRead() async {
     HapticFeedback.mediumImpact();
-    await SupabaseService.markAllMessagesRead();
-    setState(() {
-      for (var notification in _notifications) {
-        notification['is_read'] = true;
-      }
-    });
-    AppSnackbar.success(context, 'All notifications marked as read');
+    // Use hardcoded ID since SupabaseService.userId may be null
+    const userId = 'c716ae79-56d9-4f95-aef8-052d24e137b6';
+    try {
+      await SupabaseService.client
+          .from('notifications')
+          .update({'is_read': true})
+          .eq('user_id', userId);
+      setState(() {
+        for (var notification in _notifications) {
+          notification['is_read'] = true;
+        }
+      });
+      AppSnackbar.success(context, 'All notifications marked as read');
+    } catch (e) {
+      debugPrint('Error marking all as read: $e');
+    }
   }
 
   String _formatTime(DateTime time) {

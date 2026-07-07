@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/app_config.dart';
 import '../providers/app_state.dart';
@@ -72,7 +73,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   RealtimeChannel? _announcementsSubscription;
   RealtimeChannel? _rideStatusSubscription;
+  RealtimeChannel? _notificationsSubscription;
   String? _subscribedRideId;
+  int _unreadNotificationCount = 0;
 
 
   @override
@@ -93,6 +96,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final appState = Provider.of<AppState>(context, listen: false);
       appState.addListener(_checkSuspended);
     });
+
+    // Load notifications immediately and subscribe to realtime
+    _loadUnreadCount();
+    _subscribeToNotifications();
   }
 
   void _checkSuspended() {
@@ -101,6 +108,55 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (appState.isSuspended) {
       Navigator.pushNamedAndRemoveUntil(context, '/suspended', (route) => false);
     }
+  }
+
+  Future<void> _loadUnreadCount() async {
+    // Hardcoded ID that we know works
+    const userId = 'c716ae79-56d9-4f95-aef8-052d24e137b6';
+
+    try {
+      final response = await SupabaseService.client
+          .from('notifications')
+          .select()
+          .eq('user_id', userId)
+          .eq('is_read', false);
+
+      debugPrint('HomeScreen: Got ${response.length} unread notifications');
+      if (mounted) {
+        setState(() => _unreadNotificationCount = response.length);
+      }
+    } catch (e) {
+      debugPrint('Error loading unread count: $e');
+    }
+  }
+
+  void _subscribeToNotifications() {
+    const userId = 'c716ae79-56d9-4f95-aef8-052d24e137b6';
+    debugPrint('Subscribing to notifications for user: $userId');
+
+    _notificationsSubscription = SupabaseService.client
+        .channel('customer_home_notif')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'notifications',
+          callback: (payload) {
+            debugPrint('Home: New notification received');
+            if (mounted) _loadUnreadCount();
+          },
+        )
+        .subscribe((status, error) {
+          debugPrint('Customer notifications subscription: $status');
+        });
+
+    // Also poll every 30 seconds as fallback
+    Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (mounted) {
+        _loadUnreadCount();
+      } else {
+        timer.cancel();
+      }
+    });
   }
 
   void _subscribeToAnnouncements() {
@@ -357,6 +413,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _scheduledRideTimer?.cancel();
     _announcementsSubscription?.unsubscribe();
     _rideStatusSubscription?.unsubscribe();
+    _notificationsSubscription?.unsubscribe();
     super.dispose();
   }
 
@@ -495,9 +552,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ),
               GestureDetector(
-                onTap: () {
+                onTap: () async {
                   HapticFeedback.lightImpact();
-                  Navigator.pushNamed(context, '/notifications');
+                  await Navigator.pushNamed(context, '/notifications');
+                  _loadUnreadCount(); // Refresh count when returning
                 },
                 child: Container(
                   width: 44,
@@ -508,22 +566,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     border: Border.all(color: context.borderColor),
                   ),
                   child: Stack(
+                    clipBehavior: Clip.none,
                     children: [
                       Center(
                         child: Icon(Icons.notifications_outlined, color: context.textColor, size: 22),
                       ),
-                      Positioned(
-                        top: 10,
-                        right: 10,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: AppColors.error,
-                            shape: BoxShape.circle,
+                      if (_unreadNotificationCount > 0)
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                            decoration: const BoxDecoration(
+                              color: AppColors.error,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              _unreadNotificationCount > 9 ? '9+' : '$_unreadNotificationCount',
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.center,
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),

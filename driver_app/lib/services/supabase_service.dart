@@ -1393,7 +1393,7 @@ class SupabaseService {
 
   static Future<void> markNotificationAsRead(String notificationId) async {
     try {
-      await client.from('notifications').update({'read': true}).eq('id', notificationId);
+      await client.from('notifications').update({'is_read': true}).eq('id', notificationId);
     } catch (e) {
       debugPrint('Error marking notification as read: $e');
     }
@@ -1401,7 +1401,7 @@ class SupabaseService {
 
   static Future<void> markAllNotificationsAsRead(String driverId) async {
     try {
-      await client.from('notifications').update({'read': true}).eq('user_id', driverId);
+      await client.from('notifications').update({'is_read': true}).eq('user_id', driverId);
     } catch (e) {
       debugPrint('Error marking all notifications as read: $e');
     }

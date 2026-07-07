@@ -50,6 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
   RealtimeChannel? _quotesChannel;
   RealtimeChannel? _notificationsChannel;
   int _unreadNotificationCount = 0;
+  Timer? _notificationPollTimer;
 
   @override
   void initState() {
@@ -57,6 +58,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _scrollController.addListener(_onScroll);
     _loadBreakContent();
     _subscribeToBreakContent();
+    // Poll notifications every 10 seconds
+    _notificationPollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) _loadUnreadCount();
+    });
     // Mark that we're on home screen and listen for active ride
     _instance = this;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -204,6 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _notificationPollTimer?.cancel();
     _scrollController.dispose();
     if (_breakTipsChannel != null) SupabaseService.client.removeChannel(_breakTipsChannel!);
     if (_quotesChannel != null) SupabaseService.client.removeChannel(_quotesChannel!);

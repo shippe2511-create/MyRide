@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../widgets/shimmer_loading.dart';
@@ -60,69 +62,90 @@ class _InboxScreenState extends State<InboxScreen> {
   List<InboxMessage> _messages = [];
   bool _isLoading = true;
   RealtimeChannel? _subscription;
+  String? _profileId;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
+    _initAndLoad();
+  }
+
+  Future<void> _initAndLoad() async {
+    final prefs = await SharedPreferences.getInstance();
+    _profileId = prefs.getString('profile_id');
+    debugPrint('Inbox: Using profileId=$_profileId');
     _loadMessages();
     _subscribeToNotifications();
+    // Poll every 5 seconds as fallback
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) _loadMessages();
+    });
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _subscription?.unsubscribe();
     super.dispose();
   }
 
   void _subscribeToNotifications() {
-    final userId = SupabaseService.userId;
-    if (userId == null) return;
+    final userId = _profileId;
+    if (userId == null) {
+      debugPrint('Inbox: No profileId for subscription');
+      return;
+    }
 
     _subscription = SupabaseService.client
         .channel('inbox_notifications_$userId')
         .onPostgresChanges(
-          event: PostgresChangeEvent.all,
+          event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'notifications',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'user_id',
-            value: userId,
-          ),
           callback: (payload) {
-            debugPrint('Inbox: Notification update received');
-            _loadMessages();
+            debugPrint('Inbox: Notification INSERT received: ${payload.newRecord}');
+            // Check if this notification is for us
+            final newUserId = payload.newRecord['user_id'];
+            if (newUserId == userId) {
+              debugPrint('Inbox: Notification is for us, reloading');
+              _loadMessages();
+            }
           },
         )
-        .subscribe();
+        .subscribe((status, error) {
+          debugPrint('Inbox: Subscription status=$status, error=$error');
+        });
+    debugPrint('Inbox: Subscribed to notifications for $userId');
   }
 
   Future<void> _loadMessages() async {
-    if (_isLoading == false) {
-      // Silent refresh for realtime updates
-      try {
-        final messages = await SupabaseService.getInboxMessages();
-        if (mounted) {
-          setState(() {
-            _messages = messages.map((m) => InboxMessage.fromJson(m)).toList();
-          });
-        }
-      } catch (e) {
-        debugPrint('Error loading messages: $e');
+    final userId = _profileId;
+    if (userId == null) {
+      debugPrint('Inbox: No profileId, cannot load messages');
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      final response = await SupabaseService.client
+          .from('notifications')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false)
+          .limit(50);
+
+      debugPrint('Inbox: Loaded ${response.length} messages for $userId');
+
+      if (mounted) {
+        setState(() {
+          _messages = (response as List).map((m) => InboxMessage.fromJson(m)).toList();
+          _isLoading = false;
+        });
       }
-    } else {
-      // Initial load with loading state
-      try {
-        final messages = await SupabaseService.getInboxMessages();
-        if (mounted) {
-          setState(() {
-            _messages = messages.map((m) => InboxMessage.fromJson(m)).toList();
-            _isLoading = false;
-          });
-        }
-      } catch (e) {
-        if (mounted) setState(() => _isLoading = false);
-      }
+    } catch (e) {
+      debugPrint('Inbox: Error loading messages: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -275,80 +298,105 @@ class _InboxScreenState extends State<InboxScreen> {
   Widget _buildMessageCard(InboxMessage message) {
     final categoryData = _getCategoryData(message.category);
 
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        _showMessageDetail(message);
-      },
-      child: Container(
+    return Dismissible(
+      key: Key('inbox_${message.id}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
         margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: context.surfaceColor,
+          color: AppColors.error,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: message.isRead ? context.borderColor : AppColors.yellow.withValues(alpha: 0.5),
-            width: message.isRead ? 1 : 1.5,
-          ),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: categoryData['color'].withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(categoryData['icon'] as IconData, color: categoryData['color'] as Color, size: 22),
+        child: const Icon(Icons.delete, color: Colors.white),
+      ),
+      onDismissed: (_) async {
+        HapticFeedback.mediumImpact();
+        setState(() {
+          _messages.removeWhere((m) => m.id == message.id);
+        });
+        try {
+          await SupabaseService.deleteNotification(message.id);
+        } catch (e) {
+          debugPrint('Error deleting notification: $e');
+        }
+      },
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          _showMessageDetail(message);
+        },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: context.surfaceColor,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: message.isRead ? context.borderColor : AppColors.yellow.withValues(alpha: 0.5),
+              width: message.isRead ? 1 : 1.5,
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          message.title,
-                          style: TextStyle(
-                            color: context.textColor,
-                            fontSize: 15,
-                            fontWeight: message.isRead ? FontWeight.w600 : FontWeight.w700,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (!message.isRead)
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: AppColors.yellow,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    message.subtitle,
-                    style: TextStyle(color: context.mutedColor, fontSize: 13),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _formatTime(message.time),
-                    style: TextStyle(color: context.mutedColor.withValues(alpha: 0.7), fontSize: 11),
-                  ),
-                ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: categoryData['color'].withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(categoryData['icon'] as IconData, color: categoryData['color'] as Color, size: 22),
               ),
-            ),
-          ],
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            message.title,
+                            style: TextStyle(
+                              color: context.textColor,
+                              fontSize: 15,
+                              fontWeight: message.isRead ? FontWeight.w600 : FontWeight.w700,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (!message.isRead)
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: AppColors.yellow,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      message.subtitle,
+                      style: TextStyle(color: context.mutedColor, fontSize: 13),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _formatTime(message.time),
+                      style: TextStyle(color: context.mutedColor.withValues(alpha: 0.7), fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

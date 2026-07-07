@@ -20,16 +20,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   List<Map<String, dynamic>> _notifications = [];
   bool _isLoading = true;
   StreamSubscription<Map<String, dynamic>>? _notificationsSubscription;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _loadNotifications();
     _subscribeToNotifications();
+    // Poll every 5 seconds as fallback
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) _loadNotificationsSilent();
+    });
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _notificationsSubscription?.cancel();
     final driverState = Provider.of<DriverState>(context, listen: false);
     if (driverState.profileId.isNotEmpty) {
@@ -70,6 +76,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     } catch (e) {
       debugPrint('Error loading notifications: $e');
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadNotificationsSilent() async {
+    try {
+      final driverState = Provider.of<DriverState>(context, listen: false);
+      final profileId = driverState.profileId;
+      if (profileId.isNotEmpty) {
+        final notifications = await SupabaseService.getDriverNotifications(profileId);
+        if (mounted) {
+          setState(() {
+            _notifications = notifications;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading notifications: $e');
     }
   }
 

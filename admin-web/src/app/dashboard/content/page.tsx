@@ -421,60 +421,60 @@ export default function ContentPage() {
         error = res.error
         if (!error) toast.success("Push notification updated")
       } else {
-        // Log the push notification
-        const res = await supabase.from("push_notification_logs").insert({
-          title: formData.title,
-          body: formData.body,
-          target_type: formData.target_type,
-          sent_at: new Date().toISOString(),
-          sent_count: 0,
-          success_count: 0
-        })
-        error = res.error
-
-        // Also create notifications for users so they appear in Inbox
-        if (!error) {
-          try {
-            // Get target users based on target_type
-            let userIds: string[] = []
-            if (formData.target_type === "all") {
-              const { data: profiles } = await supabase
-                .from("profiles")
-                .select("id")
-                .in("role", ["customer", "driver"])
-              userIds = profiles?.map(p => p.id) || []
-            } else if (formData.target_type === "customers") {
-              const { data: profiles } = await supabase
-                .from("profiles")
-                .select("id")
-                .eq("role", "customer")
-              userIds = profiles?.map(p => p.id) || []
-            } else if (formData.target_type === "drivers") {
-              const { data: profiles } = await supabase
-                .from("profiles")
-                .select("id")
-                .eq("role", "driver")
-              userIds = profiles?.map(p => p.id) || []
-            }
-
-            // Insert notifications for each user
-            if (userIds.length > 0) {
-              const notifications = userIds.map(userId => ({
-                user_id: userId,
-                title: formData.title,
-                message: formData.body,
-                notification_type: "announcement",
-                is_read: false,
-                created_at: new Date().toISOString()
-              }))
-              await supabase.from("notifications").insert(notifications)
-            }
-
-            toast.success(`Notification sent to ${userIds.length} users`)
-          } catch (e) {
-            console.error("Error creating user notifications:", e)
-            toast.success("Push notification logged (notification delivery pending)")
+        // First get target users based on target_type
+        let userIds: string[] = []
+        try {
+          if (formData.target_type === "all") {
+            const { data: profiles } = await supabase
+              .from("profiles")
+              .select("id")
+            userIds = profiles?.map(p => p.id) || []
+          } else if (formData.target_type === "customers") {
+            const { data: profiles } = await supabase
+              .from("profiles")
+              .select("id")
+              .eq("role", "customer")
+            userIds = profiles?.map(p => p.id) || []
+          } else if (formData.target_type === "drivers") {
+            const { data: profiles } = await supabase
+              .from("profiles")
+              .select("id")
+              .eq("role", "driver")
+            userIds = profiles?.map(p => p.id) || []
           }
+
+          // Insert notifications for each user
+          let successCount = 0
+          if (userIds.length > 0) {
+            const notifications = userIds.map(userId => ({
+              user_id: userId,
+              title: formData.title,
+              message: formData.body,
+              notification_type: "announcement",
+              is_read: false,
+              created_at: new Date().toISOString()
+            }))
+            const { error: insertError } = await supabase.from("notifications").insert(notifications)
+            if (!insertError) {
+              successCount = userIds.length
+            }
+          }
+
+          // Log the push notification with correct counts
+          const res = await supabase.from("push_notification_logs").insert({
+            title: formData.title,
+            body: formData.body,
+            target_type: formData.target_type,
+            sent_at: new Date().toISOString(),
+            sent_count: userIds.length,
+            success_count: successCount
+          })
+          error = res.error
+
+          toast.success(`Notification sent to ${successCount} users`)
+        } catch (e) {
+          console.error("Error creating user notifications:", e)
+          toast.error("Failed to send notifications")
         }
       }
     } else if (dialogType === "staff") {

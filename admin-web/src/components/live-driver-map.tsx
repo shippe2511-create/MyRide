@@ -376,6 +376,7 @@ export function LiveDriverMap({
   const animationFrameRef = useRef<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const initialFitDoneRef = useRef(false)
 
   const { isLoaded } = useJsApiLoader({
     id: "google-map-script",
@@ -618,7 +619,15 @@ export function LiveDriverMap({
     filteredDrivers.forEach(driver => {
       bounds.extend({ lat: driver.lat, lng: driver.lng })
     })
-    map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 })
+    map.fitBounds(bounds, { top: 80, right: 80, bottom: 80, left: 80 })
+
+    // Cap zoom at 14 for comfortable view
+    setTimeout(() => {
+      const zoom = map.getZoom()
+      if (zoom && zoom > 14) {
+        map.setZoom(14)
+      }
+    }, 100)
   }
 
   // Zoom to specific driver
@@ -702,9 +711,10 @@ export function LiveDriverMap({
     setMap(null)
   }, [])
 
-  // Fit bounds
+  // Fit bounds only on initial load
   useEffect(() => {
     if (!map || filteredDrivers.length === 0 || selectedDriverId) return
+    if (initialFitDoneRef.current) return
 
     const validDrivers = filteredDrivers.filter(d => d.lat && d.lng)
     if (validDrivers.length === 0) return
@@ -718,12 +728,17 @@ export function LiveDriverMap({
       }
     })
 
-    map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 })
+    map.fitBounds(bounds, { top: 80, right: 80, bottom: 80, left: 80 })
 
-    const zoom = map.getZoom()
-    if (zoom && zoom > 16) {
-      map.setZoom(16)
-    }
+    // Cap zoom at 14 to keep a comfortable view - not too close
+    setTimeout(() => {
+      const zoom = map.getZoom()
+      if (zoom && zoom > 14) {
+        map.setZoom(14)
+      }
+    }, 100)
+
+    initialFitDoneRef.current = true
   }, [map, filteredDrivers, selectedDriverId])
 
   if (!isLoaded) {

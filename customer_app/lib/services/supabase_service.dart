@@ -672,14 +672,21 @@ class SupabaseService {
   // Inbox / Notifications
   static Future<List<Map<String, dynamic>>> getInboxMessages() async {
     final id = userId;
+    debugPrint('getInboxMessages: userId=$id');
     if (id == null) return [];
-    final response = await client
-        .from('notifications')
-        .select()
-        .eq('user_id', id)
-        .order('created_at', ascending: false)
-        .limit(50);
-    return List<Map<String, dynamic>>.from(response);
+    try {
+      final response = await client
+          .from('notifications')
+          .select()
+          .eq('user_id', id)
+          .order('created_at', ascending: false)
+          .limit(50);
+      debugPrint('getInboxMessages: got ${response.length} notifications');
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('getInboxMessages ERROR: $e');
+      return [];
+    }
   }
 
   static Future<void> markMessageRead(String messageId) async {

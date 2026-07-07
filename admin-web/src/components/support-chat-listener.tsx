@@ -52,8 +52,9 @@ export function SupportChatListener() {
                 .eq('id', newMessage.chat_id)
                 .single()
 
-              if (chat?.customer?.full_name) {
-                customerName = chat.customer.full_name
+              const customer = Array.isArray(chat?.customer) ? chat.customer[0] : chat?.customer
+              if (customer?.full_name) {
+                customerName = customer.full_name
               }
             } catch (e) {
               // Ignore fetch errors
@@ -66,8 +67,7 @@ export function SupportChatListener() {
               action: {
                 label: "View",
                 onClick: () => window.location.href = "/dashboard/support-chat"
-              },
-              onClick: () => window.location.href = "/dashboard/support-chat"
+              }
             })
 
             // Play notification sound

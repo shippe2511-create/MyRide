@@ -18,6 +18,7 @@ import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../services/realtime_service.dart';
 import '../services/app_settings_service.dart';
+import '../utils/marker_animation.dart';
 import '../widgets/status_animation.dart';
 import '../widgets/app_snackbar.dart';
 import 'trip_complete_screen.dart';
@@ -48,13 +49,11 @@ class TripTrackingScreen extends StatefulWidget {
 class _TripTrackingScreenState extends State<TripTrackingScreen> with TickerProviderStateMixin {
   GoogleMapController? _mapController;
   late AnimationController _markerAnimController;
+  late VehicleMarkerState _vehicleState;
 
   late LatLng _driverLocation;
-  LatLng _animatedDriverLocation = const LatLng(4.1755, 73.5093);
   late LatLng _pickupLocation;
   late LatLng _dropoffLocation;
-  double _driverHeading = 0;
-  LatLng _prevDriverLocation = const LatLng(4.1755, 73.5093);
 
   int _etaMinutes = 12;
   late String _dropoff;
@@ -107,7 +106,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> with TickerProv
         ? LatLng(dLat, dLng)
         : const LatLng(4.1755, 73.5093);
     _driverLocation = LatLng(_pickupLocation.latitude + 0.005, _pickupLocation.longitude + 0.003);
-    _animatedDriverLocation = _driverLocation;
+    _vehicleState = VehicleMarkerState(currentPosition: _driverLocation);
 
     _loadCarIcon();
     _loadPinIcons();
@@ -199,27 +198,44 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> with TickerProv
   }
 
   void _animateDriverPosition(LatLng newPosition) {
-    final startLat = _animatedDriverLocation.latitude;
-    final startLng = _animatedDriverLocation.longitude;
+    // Check if moved enough to animate
+    final distance = calculateDistance(_vehicleState.currentPosition, newPosition);
+    if (distance < 1.0) return; // Skip tiny movements
 
-    // Calculate heading
-    _driverHeading = math.atan2(
-      newPosition.longitude - _prevDriverLocation.longitude,
-      newPosition.latitude - _prevDriverLocation.latitude,
-    ) * 180 / math.pi;
+    // Update target (calculates bearing if moved enough)
+    _vehicleState.updateTarget(newPosition);
+
+    // Store start state for interpolation
+    final startPosition = _vehicleState.currentPosition;
+    final startBearing = _vehicleState.currentBearing;
+    final endPosition = _vehicleState.targetPosition;
+    final endBearing = _vehicleState.targetBearing;
 
     _markerAnimController.reset();
-    _markerAnimController.addListener(() {
-      if (mounted) {
-        setState(() {
-          _animatedDriverLocation = LatLng(
-            startLat + (_markerAnimController.value * (newPosition.latitude - startLat)),
-            startLng + (_markerAnimController.value * (newPosition.longitude - startLng)),
-          );
-        });
-      }
-    });
+    _markerAnimController.removeListener(_onAnimationTick);
+    _markerAnimController.addListener(_onAnimationTick);
+
+    // Store for listener closure
+    _animStartPos = startPosition;
+    _animEndPos = endPosition;
+    _animStartBearing = startBearing;
+    _animEndBearing = endBearing;
+
     _markerAnimController.forward();
+  }
+
+  LatLng _animStartPos = const LatLng(0, 0);
+  LatLng _animEndPos = const LatLng(0, 0);
+  double _animStartBearing = 0;
+  double _animEndBearing = 0;
+
+  void _onAnimationTick() {
+    if (!mounted) return;
+    final t = _markerAnimController.value;
+    setState(() {
+      _vehicleState.currentPosition = lerpLatLng(_animStartPos, _animEndPos, t);
+      _vehicleState.currentBearing = lerpAngle(_animStartBearing, _animEndBearing, t);
+    });
   }
 
   @override
@@ -330,7 +346,6 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> with TickerProv
         final lat = data['lat'] as double?;
         final lng = data['lng'] as double?;
         if (lat != null && lng != null && _isValidMaldivesCoord(lat, lng)) {
-          _prevDriverLocation = _driverLocation;
           _driverLocation = LatLng(lat, lng);
           // Smooth animation to new position
           _animateDriverPosition(_driverLocation);
@@ -685,9 +700,9 @@ Live tracking link: https://myride.mv/track/$rideId
               // Driver marker with custom car icon
               Marker(
                 markerId: const MarkerId('driver'),
-                position: _animatedDriverLocation,
+                position: _vehicleState.currentPosition,
                 icon: _carIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
-                rotation: _driverHeading,
+                rotation: _vehicleState.markerRotation,
                 anchor: const Offset(0.5, 0.5),
                 flat: true,
                 infoWindow: InfoWindow(title: _driverName),
@@ -715,8 +730,8 @@ Live tracking link: https://myride.mv/track/$rideId
                 points: _routePoints.isNotEmpty
                     ? _routePoints
                     : (_rideStatus == 'in_progress'
-                        ? [_animatedDriverLocation, _dropoffLocation]
-                        : [_animatedDriverLocation, _pickupLocation]),
+                        ? [_vehicleState.currentPosition, _dropoffLocation]
+                        : [_vehicleState.currentPosition, _pickupLocation]),
                 color: AppColors.yellow,
                 width: 5,
               ),
@@ -771,7 +786,7 @@ Live tracking link: https://myride.mv/track/$rideId
                 // Center on driver
                 _buildMapControl(Icons.my_location, false, () {
                   _mapController?.animateCamera(
-                    CameraUpdate.newLatLngZoom(_animatedDriverLocation, 17),
+                    CameraUpdate.newLatLngZoom(_vehicleState.currentPosition, 17),
                   );
                 }),
               ],

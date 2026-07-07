@@ -14,6 +14,7 @@ import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../services/realtime_service.dart';
+import '../utils/marker_animation.dart';
 import '../widgets/status_animation.dart';
 import '../widgets/app_notification_banner.dart';
 import '../widgets/app_snackbar.dart';
@@ -79,12 +80,14 @@ class DriverArrivingScreen extends StatefulWidget {
   State<DriverArrivingScreen> createState() => _DriverArrivingScreenState();
 }
 
-class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
+class _DriverArrivingScreenState extends State<DriverArrivingScreen> with SingleTickerProviderStateMixin {
   late Timer _etaTimer;
   Timer? _statusPollingTimer;
   int _currentEta = 0;
   late LatLng _pickupLocation;
   late LatLng _driverLocation;
+  late VehicleMarkerState _vehicleState;
+  late AnimationController _markerAnimController;
   StreamSubscription<Map<String, dynamic>>? _rideSubscription;
   StreamSubscription<Map<String, dynamic>>? _driverLocationSubscription;
   bool _driverArrived = false;
@@ -96,6 +99,12 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
   MapType _mapType = MapType.normal;
   BitmapDescriptor? _pickupIcon;
   BitmapDescriptor? _carIcon;
+
+  // Animation interpolation state
+  LatLng _animStartPos = const LatLng(0, 0);
+  LatLng _animEndPos = const LatLng(0, 0);
+  double _animStartBearing = 0;
+  double _animEndBearing = 0;
 
   bool _isValidMaldivesCoord(double lat, double lng) {
     return lat >= -0.7 && lat <= 7.1 && lng >= 72.6 && lng <= 73.8;
@@ -261,6 +270,11 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
     super.initState();
     _currentEta = widget.eta;
 
+    _markerAnimController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+
     // Use passed coordinates or default to Male center
     final pLat = widget.pickupLat ?? 4.1755;
     final pLng = widget.pickupLng ?? 73.5093;
@@ -269,6 +283,7 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
         ? LatLng(pLat, pLng)
         : const LatLng(4.1755, 73.5093);
     _driverLocation = LatLng(_pickupLocation.latitude + 0.008, _pickupLocation.longitude + 0.005);
+    _vehicleState = VehicleMarkerState(currentPosition: _driverLocation);
     _startEtaCountdown();
     _subscribeToRideUpdates();
     _subscribeToDriverLocation();
@@ -297,13 +312,13 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
         final lat = data['lat'] as double?;
         final lng = data['lng'] as double?;
         if (lat != null && lng != null && _isValidMaldivesCoord(lat, lng)) {
-          setState(() {
-            _driverLocation = LatLng(lat, lng);
-          });
+          final newPos = LatLng(lat, lng);
+          _driverLocation = newPos;
+          _animateDriverPosition(newPos);
           // Refresh route when driver moves
           _fetchRoute();
           // Move camera to follow driver
-          _mapController?.animateCamera(CameraUpdate.newLatLng(_driverLocation));
+          _mapController?.animateCamera(CameraUpdate.newLatLng(newPos));
         }
       }
     });
@@ -469,8 +484,35 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
     }
   }
 
+  void _animateDriverPosition(LatLng newPosition) {
+    final distance = calculateDistance(_vehicleState.currentPosition, newPosition);
+    if (distance < 1.0) return;
+
+    _vehicleState.updateTarget(newPosition);
+
+    _animStartPos = _vehicleState.currentPosition;
+    _animEndPos = _vehicleState.targetPosition;
+    _animStartBearing = _vehicleState.currentBearing;
+    _animEndBearing = _vehicleState.targetBearing;
+
+    _markerAnimController.reset();
+    _markerAnimController.removeListener(_onAnimationTick);
+    _markerAnimController.addListener(_onAnimationTick);
+    _markerAnimController.forward();
+  }
+
+  void _onAnimationTick() {
+    if (!mounted) return;
+    final t = _markerAnimController.value;
+    setState(() {
+      _vehicleState.currentPosition = lerpLatLng(_animStartPos, _animEndPos, t);
+      _vehicleState.currentBearing = lerpAngle(_animStartBearing, _animEndBearing, t);
+    });
+  }
+
   @override
   void dispose() {
+    _markerAnimController.dispose();
     _etaTimer.cancel();
     _statusPollingTimer?.cancel();
     _rideSubscription?.cancel();
@@ -495,8 +537,11 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
       ),
       Marker(
         markerId: const MarkerId('driver'),
-        position: _driverLocation,
+        position: _vehicleState.currentPosition,
         icon: _carIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
+        rotation: _vehicleState.markerRotation,
+        anchor: const Offset(0.5, 0.5),
+        flat: true,
         infoWindow: InfoWindow(title: widget.driverName, snippet: widget.vehicleModel),
       ),
     };
@@ -506,7 +551,7 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> {
     return {
       Polyline(
         polylineId: const PolylineId('route'),
-        points: _routePoints.isNotEmpty ? _routePoints : [_driverLocation, _pickupLocation],
+        points: _routePoints.isNotEmpty ? _routePoints : [_vehicleState.currentPosition, _pickupLocation],
         color: AppColors.yellow,
         width: 5,
       ),

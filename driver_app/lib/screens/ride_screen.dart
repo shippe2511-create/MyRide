@@ -17,6 +17,7 @@ import '../services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/notification_service.dart';
 import '../services/realtime_service.dart';
+import '../utils/marker_animation.dart';
 import '../widgets/app_snackbar.dart';
 import '../widgets/ride_request_popup.dart';
 import 'chat_screen.dart';
@@ -67,14 +68,16 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   int _elapsedSeconds = 0;
   int _etaSeconds = 0;
   bool _isSubscribed = false;
+  late VehicleMarkerState _vehicleState;
   double _driverLat = 4.2050;
   double _driverLng = 73.5380;
-  double _prevDriverLat = 4.2050;
-  double _prevDriverLng = 73.5380;
-  double _animatedDriverLat = 4.2050;
-  double _animatedDriverLng = 73.5380;
-  double _driverHeading = 0;
   double _driverSpeed = 0;
+
+  // Animation interpolation state
+  LatLng _animStartPos = const LatLng(4.2050, 73.5380);
+  LatLng _animEndPos = const LatLng(4.2050, 73.5380);
+  double _animStartBearing = 0;
+  double _animEndBearing = 0;
   List<LatLng> _routePoints = [];
   List<LatLng> _tripRoutePoints = []; // Full trip route: pickup → dropoff
   List<LatLng> _breadcrumbTrail = []; // Path already traveled
@@ -101,6 +104,9 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     _isShowingDestinationChange = false;
     _lastPendingDestination = null;
     _acceptedDestinations.clear();  // Clear so new requests can come through
+
+    // Initialize vehicle state
+    _vehicleState = VehicleMarkerState(currentPosition: const LatLng(4.2050, 73.5380));
 
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1500),
@@ -269,19 +275,30 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   }
 
   void _animateDriverPosition(double newLat, double newLng) {
-    final startLat = _animatedDriverLat;
-    final startLng = _animatedDriverLng;
+    final newPosition = LatLng(newLat, newLng);
+    final distance = calculateDistance(_vehicleState.currentPosition, newPosition);
+    if (distance < 1.0) return; // Skip tiny movements
+
+    _vehicleState.updateTarget(newPosition);
+
+    _animStartPos = _vehicleState.currentPosition;
+    _animEndPos = _vehicleState.targetPosition;
+    _animStartBearing = _vehicleState.currentBearing;
+    _animEndBearing = _vehicleState.targetBearing;
 
     _markerAnimController.reset();
-    _markerAnimController.addListener(() {
-      if (mounted) {
-        setState(() {
-          _animatedDriverLat = startLat + (_markerAnimController.value * (newLat - startLat));
-          _animatedDriverLng = startLng + (_markerAnimController.value * (newLng - startLng));
-        });
-      }
-    });
+    _markerAnimController.removeListener(_onMarkerAnimationTick);
+    _markerAnimController.addListener(_onMarkerAnimationTick);
     _markerAnimController.forward();
+  }
+
+  void _onMarkerAnimationTick() {
+    if (!mounted) return;
+    final t = _markerAnimController.value;
+    setState(() {
+      _vehicleState.currentPosition = lerpLatLng(_animStartPos, _animEndPos, t);
+      _vehicleState.currentBearing = lerpAngle(_animStartBearing, _animEndBearing, t);
+    });
   }
 
   /// Snaps GPS position to nearest point on the route polyline
@@ -637,33 +654,23 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
         );
         if (mounted) {
           final ride = context.read<DriverState>().currentRide;
-
-          // Store previous position
-          _prevDriverLat = _driverLat;
-          _prevDriverLng = _driverLng;
+          final prevLat = _driverLat;
+          final prevLng = _driverLng;
 
           // Validate GPS coordinates are in Maldives
           if (_isValidLat(position.latitude) && _isValidLng(position.longitude)) {
             _driverLat = position.latitude;
             _driverLng = position.longitude;
 
-            // Calculate heading
-            if (_prevDriverLat != _driverLat || _prevDriverLng != _driverLng) {
-              _driverHeading = math.atan2(
-                _driverLng - _prevDriverLng,
-                _driverLat - _prevDriverLat,
-              ) * 180 / math.pi;
-            }
-
             // Calculate speed
             final distanceMeters = Geolocator.distanceBetween(
-              _prevDriverLat, _prevDriverLng, _driverLat, _driverLng);
+              prevLat, prevLng, _driverLat, _driverLng);
             _driverSpeed = (distanceMeters / 3) * 3.6; // m/s to km/h
 
             // Add to breadcrumb trail
             _addToBreadcrumb(_driverLat, _driverLng);
 
-            // Smooth animation to new position
+            // Smooth animation to new position (also calculates bearing)
             _animateDriverPosition(_driverLat, _driverLng);
           }
 
@@ -673,7 +680,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
               CameraPosition(
                 target: LatLng(_driverLat, _driverLng),
                 zoom: 17,
-                bearing: _driverHeading,
+                bearing: _vehicleState.currentBearing,
                 tilt: 45,
               ),
             ));
@@ -702,26 +709,12 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
       final driverId = driverState.driverId;
       if (driverId.isEmpty) return;
 
-      // Calculate heading based on actual GPS movement
-      double heading = 0;
-      if (_prevDriverLat != _driverLat || _prevDriverLng != _driverLng) {
-        heading = math.atan2(
-          _driverLng - _prevDriverLng,
-          _driverLat - _prevDriverLat,
-        ) * 180 / math.pi;
-      }
-
-      // Calculate actual speed based on GPS distance
-      final distanceMeters = Geolocator.distanceBetween(
-        _prevDriverLat, _prevDriverLng, _driverLat, _driverLng);
-      final speed = (distanceMeters / 3) * 3.6; // m/s to km/h (3 second interval)
-
       await SupabaseService.updateLocation(
         driverId,
         _driverLat,
         _driverLng,
-        heading: heading,
-        speed: speed,
+        heading: _vehicleState.currentBearing,
+        speed: _driverSpeed,
       );
     } catch (e) {
       // Silently fail - don't interrupt the ride
@@ -884,14 +877,17 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
 
   Set<Marker> _buildMarkers(RideRequest ride, DriverState state) {
     // Snap driver position to route for smoother display
-    final snappedPos = _snapToRoute(_animatedDriverLat, _animatedDriverLng);
+    final snappedPos = _snapToRoute(
+      _vehicleState.currentPosition.latitude,
+      _vehicleState.currentPosition.longitude,
+    );
 
     return {
       Marker(
         markerId: const MarkerId('driver'),
         position: snappedPos,
         icon: _carIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
-        rotation: _driverHeading,
+        rotation: _vehicleState.markerRotation,
         anchor: const Offset(0.5, 0.5),
         flat: true,
         infoWindow: InfoWindow(

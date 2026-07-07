@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_container.dart';
@@ -66,7 +67,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _searchController.text = widget.initialDestination!;
     }
     _loadSavedPlaces();
-    _loadRecentPlaces();
+    _loadHiddenRecentPlaces().then((_) => _loadRecentPlaces());
   }
 
   void _onPickupSearchChanged() {
@@ -323,6 +324,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   List<Map<String, dynamic>> _recentPlaces = [];
   bool _loadingRecentPlaces = true;
+  Set<String> _hiddenRecentPlaces = {};
 
   final _allResults = [
     {'title': 'Hulhulé Airport', 'subtitle': 'Velana International Airport', 'highlight': true},
@@ -332,6 +334,21 @@ class _SearchScreenState extends State<SearchScreen> {
     {'title': 'Staff Housing', 'subtitle': 'Marina Walk, Block C', 'highlight': false},
     {'title': 'Data Centre', 'subtitle': 'Hulhumalé Industrial Zone', 'highlight': false},
   ];
+
+  Future<void> _loadHiddenRecentPlaces() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hidden = prefs.getStringList('hidden_recent_places') ?? [];
+    _hiddenRecentPlaces = hidden.toSet();
+  }
+
+  Future<void> _hideRecentPlace(String address) async {
+    final prefs = await SharedPreferences.getInstance();
+    _hiddenRecentPlaces.add(address);
+    await prefs.setStringList('hidden_recent_places', _hiddenRecentPlaces.toList());
+    setState(() {
+      _recentPlaces.removeWhere((p) => p['address'] == address);
+    });
+  }
 
   void _showAllRecentPlaces() {
     showModalBottomSheet(
@@ -390,49 +407,64 @@ class _SearchScreenState extends State<SearchScreen> {
                       itemCount: _recentPlaces.length,
                       itemBuilder: (_, index) {
                         final place = _recentPlaces[index];
-                        return ListTile(
-                          leading: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: AppColors.yellow.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.history, color: AppColors.yellow),
+                        final address = place['address'] ?? '';
+                        return Dismissible(
+                          key: Key('recent_all_$address'),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 20),
+                            color: AppColors.error,
+                            child: const Icon(Icons.delete, color: Colors.white),
                           ),
-                          title: Text(
-                            place['name'] ?? '',
-                            style: TextStyle(color: context.textColor, fontWeight: FontWeight.w600),
-                          ),
-                          subtitle: Text(
-                            place['address'] ?? '',
-                            style: TextStyle(color: context.mutedColor, fontSize: 12),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          trailing: Text(
-                            place['time'] ?? '',
-                            style: TextStyle(color: context.mutedColor, fontSize: 11),
-                          ),
-                          onTap: () async {
-                            Navigator.pop(ctx);
-                            final freshLoc = await LocationService.getCurrentLocation();
-                            if (mounted) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => RideConfirmScreen(
-                                    pickup: _pickupName,
-                                    dropoff: place['name'] ?? '',
-                                    pickupLat: _pickupLocation?.latitude ?? freshLoc.latitude,
-                                    pickupLng: _pickupLocation?.longitude ?? freshLoc.longitude,
-                                    dropoffLat: place['lat'] ?? 4.1755,
-                                    dropoffLng: place['lng'] ?? 73.5093,
-                                  ),
-                                ),
-                              );
-                            }
+                          onDismissed: (_) {
+                            HapticFeedback.mediumImpact();
+                            _hideRecentPlace(address);
                           },
+                          child: ListTile(
+                            leading: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: AppColors.yellow.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.history, color: AppColors.yellow),
+                            ),
+                            title: Text(
+                              place['name'] ?? '',
+                              style: TextStyle(color: context.textColor, fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              address,
+                              style: TextStyle(color: context.mutedColor, fontSize: 12),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: Text(
+                              place['time'] ?? '',
+                              style: TextStyle(color: context.mutedColor, fontSize: 11),
+                            ),
+                            onTap: () async {
+                              Navigator.pop(ctx);
+                              final freshLoc = await LocationService.getCurrentLocation();
+                              if (mounted) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => RideConfirmScreen(
+                                      pickup: _pickupName,
+                                      dropoff: place['name'] ?? '',
+                                      pickupLat: _pickupLocation?.latitude ?? freshLoc.latitude,
+                                      pickupLng: _pickupLocation?.longitude ?? freshLoc.longitude,
+                                      dropoffLat: place['lat'] ?? 4.1755,
+                                      dropoffLng: place['lng'] ?? 73.5093,
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                          ),
                         );
                       },
                     ),
@@ -472,7 +504,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
       for (final ride in rides.take(10)) {
         final dropoffName = ride['dropoff_name'] as String?;
-        if (dropoffName != null && dropoffName.isNotEmpty && !recentDestinations.containsKey(dropoffName)) {
+        // Skip hidden places and duplicates
+        if (dropoffName != null && dropoffName.isNotEmpty && !recentDestinations.containsKey(dropoffName) && !_hiddenRecentPlaces.contains(dropoffName)) {
           final createdAt = MaldivesTimezone.parse(ride['created_at']);
           String timeAgo = '';
           if (createdAt != null) {
@@ -2206,68 +2239,83 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildRecentPlaceItem(Map<String, dynamic> place, bool isDark, {bool isLast = false}) {
-    return GestureDetector(
-      onTap: () async {
-        HapticFeedback.lightImpact();
-        final freshLoc = await LocationService.getCurrentLocation();
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => RideConfirmScreen(
-              pickup: 'Current location',
-              dropoff: place['address'],
-              pickupLat: freshLoc.latitude,
-              pickupLng: freshLoc.longitude,
-              dropoffLat: place['lat'] ?? 4.1755,
-              dropoffLng: place['lng'] ?? 73.5093,
-            ),
-          ),
-        );
+    final address = place['address'] as String;
+    return Dismissible(
+      key: Key('recent_$address'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        color: AppColors.error,
+        child: const Icon(Icons.delete, color: Colors.white),
+      ),
+      onDismissed: (_) {
+        HapticFeedback.mediumImpact();
+        _hideRecentPlace(address);
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          border: isLast ? null : Border(bottom: BorderSide(color: isDark ? context.borderColor : const Color(0xFFE0E0E0))),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.surfaceDark : Colors.white,
-                borderRadius: BorderRadius.circular(12),
+      child: GestureDetector(
+        onTap: () async {
+          HapticFeedback.lightImpact();
+          final freshLoc = await LocationService.getCurrentLocation();
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RideConfirmScreen(
+                pickup: 'Current location',
+                dropoff: address,
+                pickupLat: freshLoc.latitude,
+                pickupLng: freshLoc.longitude,
+                dropoffLat: place['lat'] ?? 4.1755,
+                dropoffLng: place['lng'] ?? 73.5093,
               ),
-              child: Icon(Icons.history, color: context.mutedColor, size: 20),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    place['name'] as String,
-                    style: TextStyle(
-                      color: context.textColor,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            border: isLast ? null : Border(bottom: BorderSide(color: isDark ? context.borderColor : const Color(0xFFE0E0E0))),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.surfaceDark : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.history, color: context.mutedColor, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      place['name'] as String,
+                      style: TextStyle(
+                        color: context.textColor,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    place['address'] as String,
-                    style: TextStyle(color: context.mutedColor, fontSize: 12),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                    const SizedBox(height: 2),
+                    Text(
+                      address,
+                      style: TextStyle(color: context.mutedColor, fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Text(
-              place['time'] as String,
-              style: TextStyle(color: context.faintColor, fontSize: 11),
-            ),
-          ],
+              Text(
+                place['time'] as String,
+                style: TextStyle(color: context.faintColor, fontSize: 11),
+              ),
+            ],
+          ),
         ),
       ),
     );

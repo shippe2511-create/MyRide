@@ -130,6 +130,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
     phone: string
     employee_id: string
     department: string
+    gender: string
   }>>([])
   const [importError, setImportError] = useState<string | null>(null)
 
@@ -500,8 +501,8 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
   }
 
   const downloadTemplate = () => {
-    const headers = ["full_name", "email", "phone", "employee_id", "department"]
-    const example = ["John Doe", "john@example.com", "+9601234567", "A-1234", "IT Division"]
+    const headers = ["full_name", "email", "phone", "employee_id", "department", "gender"]
+    const example = ["John Doe", "john@example.com", "+9601234567", "A-1234", "IT Division", "male"]
     const csv = [headers.join(","), example.join(",")].join("\n")
     const blob = new Blob([csv], { type: "text/csv" })
     const url = URL.createObjectURL(blob)
@@ -532,6 +533,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
         const phoneIdx = headers.findIndex(h => h === "phone")
         const empIdIdx = headers.findIndex(h => h === "employee_id" || h === "emp_id" || h === "employeeid")
         const deptIdx = headers.findIndex(h => h === "department" || h === "dept")
+        const genderIdx = headers.findIndex(h => h === "gender" || h === "sex")
 
         if (nameIdx === -1) {
           setImportError("CSV must have a 'full_name' or 'name' column")
@@ -549,12 +551,17 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
             phone = `+960${phone}`
           }
 
+          let gender = genderIdx >= 0 ? values[genderIdx]?.toLowerCase() || "" : ""
+          if (gender === "m") gender = "male"
+          if (gender === "f") gender = "female"
+
           parsed.push({
             full_name: name,
             email: emailIdx >= 0 ? values[emailIdx] || "" : "",
             phone: phone,
             employee_id: empIdIdx >= 0 ? values[empIdIdx] || "" : "",
             department: deptIdx >= 0 ? values[deptIdx] || "" : "",
+            gender: gender,
           })
         }
 
@@ -581,6 +588,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
       phone: row.phone || null,
       employee_id: row.employee_id || null,
       department: row.department || null,
+      gender: row.gender || null,
       status: "approved",
       role: "customer",
     }))
@@ -1162,6 +1170,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                         <TableHead>Phone</TableHead>
                         <TableHead>Employee ID</TableHead>
                         <TableHead>Department</TableHead>
+                        <TableHead>Gender</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1172,6 +1181,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                           <TableCell className="text-muted-foreground">{row.phone || "-"}</TableCell>
                           <TableCell className="text-muted-foreground">{row.employee_id || "-"}</TableCell>
                           <TableCell className="text-muted-foreground">{row.department || "-"}</TableCell>
+                          <TableCell className="text-muted-foreground">{row.gender || "-"}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

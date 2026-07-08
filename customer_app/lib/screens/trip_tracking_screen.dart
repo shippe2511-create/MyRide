@@ -800,7 +800,7 @@ Live tracking link: https://myride.mv/track/$rideId
               child: Row(
                 children: [
                   GestureDetector(
-                    onTap: () => Navigator.pop(context),
+                    onTap: () => _rideStatus == 'in_progress' ? Navigator.pop(context) : _showCancelConfirmation(),
                     child: Container(
                       width: 42,
                       height: 42,
@@ -1072,6 +1072,32 @@ Live tracking link: https://myride.mv/track/$rideId
                         ),
                       ),
                     ),
+
+                    // Cancel Ride button - only show for accepted/arrived status
+                    if (_rideStatus == 'accepted' || _rideStatus == 'arrived')
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: TextButton(
+                            onPressed: () => _showCancelConfirmation(),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.error,
+                              backgroundColor: AppColors.error.withValues(alpha: 0.1),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.close_rounded, size: 20),
+                                const SizedBox(width: 8),
+                                Text('Cancel Ride', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               );
@@ -2344,6 +2370,105 @@ Location: https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocati
   void _showSOSConfirmed(String message) {
     HapticFeedback.heavyImpact();
     AppSnackbar.success(context, message);
+  }
+
+  void _showCancelConfirmation() {
+    // Don't allow cancel if trip is in progress
+    if (_rideStatus == 'in_progress') {
+      AppSnackbar.error(context, 'Cannot cancel', subtitle: 'Trip is already in progress');
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).padding.bottom + 20),
+        decoration: BoxDecoration(
+          color: ctx.isDark ? const Color(0xFF1C1C1E) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 20),
+            Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 48),
+            const SizedBox(height: 16),
+            Text('Cancel Ride?', style: TextStyle(color: ctx.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Text(
+              'Are you sure you want to cancel this ride?',
+              style: TextStyle(color: ctx.mutedColor, fontSize: 15),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: Text('Keep Ride', style: TextStyle(color: ctx.mutedColor, fontSize: 16, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _confirmCancel();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.error,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Cancel Ride', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmCancel() async {
+    final rideId = widget.tripData['rideId'] as String?;
+    if (rideId == null) {
+      Navigator.popUntil(context, (route) => route.isFirst);
+      return;
+    }
+
+    try {
+      await SupabaseService.client
+          .from('rides')
+          .update({'status': 'cancelled', 'cancelled_at': DateTime.now().toIso8601String()})
+          .eq('id', rideId);
+
+      _statusPollingTimer?.cancel();
+      _driverLocationSubscription?.cancel();
+
+      if (mounted) {
+        AppSnackbar.success(context, 'Ride cancelled');
+        Navigator.popUntil(context, (route) => route.isFirst);
+      }
+    } catch (e) {
+      debugPrint('Error cancelling ride: $e');
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to cancel ride');
+      }
+    }
   }
 }
 

@@ -849,7 +849,7 @@ ${widget.rideId != null ? 'Track: https://myride.mv/track/${widget.rideId}' : ''
 
                     // Trip route
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(color: context.isDark ? context.isDark ? AppColors.bgDark : Colors.white : Colors.white, borderRadius: BorderRadius.circular(16)),
@@ -874,6 +874,32 @@ ${widget.rideId != null ? 'Track: https://myride.mv/track/${widget.rideId}' : ''
                         ),
                       ),
                     ),
+
+                    // Cancel Ride button
+                    if (!_tripStarted)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: TextButton(
+                            onPressed: () => _showCancelConfirmation(),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.error,
+                              backgroundColor: AppColors.error.withValues(alpha: 0.1),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.close_rounded, size: 20),
+                                const SizedBox(width: 8),
+                                Text('Cancel Ride', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               );

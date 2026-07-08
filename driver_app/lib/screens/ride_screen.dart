@@ -187,6 +187,9 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
         // Handle ride cancellation by customer
         if (status == 'cancelled') {
           if (mounted) {
+            // Clear current ride from state
+            final driverState = Provider.of<DriverState>(context, listen: false);
+            driverState.clearCurrentRide();
             AppSnackbar.warning(context, 'Ride cancelled', subtitle: 'Customer cancelled the ride');
             Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
           }
@@ -399,7 +402,8 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
       }
 
       // Always get fresh ride ID from state (don't use cached)
-      final rideId = context.read<DriverState>().currentRide?.id;
+      final driverState = context.read<DriverState>();
+      final rideId = driverState.currentRide?.id;
 
       if (rideId == null) {
         debugPrint('POLL: No ride ID, skipping');
@@ -409,8 +413,36 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
       // Update cached ID
       _currentRideId = rideId;
 
+      // Check if ride was cancelled
+      await _checkRideStatus(rideId, driverState);
+
       await _checkPendingDestinationChange(rideId);
     });
+  }
+
+  Future<void> _checkRideStatus(String rideId, DriverState driverState) async {
+    try {
+      final ride = await SupabaseService.client
+          .from('rides')
+          .select('status')
+          .eq('id', rideId)
+          .maybeSingle();
+
+      if (ride == null) return;
+
+      final status = ride['status'] as String?;
+      if (status == 'cancelled') {
+        debugPrint('POLL: Ride was cancelled by customer');
+        _destinationChangeTimer?.cancel();
+        driverState.clearCurrentRide();
+        if (mounted) {
+          AppSnackbar.warning(context, 'Ride cancelled', subtitle: 'Customer cancelled the ride');
+          Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking ride status: $e');
+    }
   }
 
   Future<void> _checkPendingDestinationChange(String rideId) async {

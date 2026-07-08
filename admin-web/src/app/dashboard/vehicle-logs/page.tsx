@@ -130,14 +130,14 @@ export default function VehicleLogsPage() {
 
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const key = d.toLocaleDateString("en-US", { month: "short" })
+      const key = d.toLocaleDateString("en-US", { timeZone: "Indian/Maldives", month: "short" })
       months[key] = {}
       LOG_TYPES.forEach(t => months[key][t.value] = 0)
     }
 
     logs.forEach(log => {
       const logDate = new Date(log.log_date)
-      const monthKey = logDate.toLocaleDateString("en-US", { month: "short" })
+      const monthKey = logDate.toLocaleDateString("en-US", { timeZone: "Indian/Maldives", month: "short" })
       if (months[monthKey] && log.amount) {
         months[monthKey][log.log_type] = (months[monthKey][log.log_type] || 0) + log.amount
       }
@@ -325,6 +325,7 @@ export default function VehicleLogsPage() {
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString("en-US", {
+      timeZone: "Indian/Maldives",
       month: "short",
       day: "numeric",
       year: "numeric",

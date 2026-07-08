@@ -259,7 +259,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
 
   String _formatTime(String? dateStr) {
     if (dateStr == null) return '';
-    final date = DateTime.tryParse(dateStr);
+    final date = DateTime.tryParse(dateStr)?.toLocal();
     if (date == null) return '';
     final now = DateTime.now();
     final diff = now.difference(date);

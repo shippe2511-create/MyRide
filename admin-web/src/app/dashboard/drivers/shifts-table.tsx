@@ -359,6 +359,7 @@ export function ShiftsTable() {
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString("en-US", {
+      timeZone: "Indian/Maldives",
       weekday: "short",
       month: "short",
       day: "numeric",
@@ -625,6 +626,7 @@ export function ShiftsTable() {
                     </TableCell>
                     <TableCell>
                       {new Date(shift.shift_date + "T00:00:00").toLocaleDateString("en-US", {
+                        timeZone: "Indian/Maldives",
                         weekday: "short",
                         month: "short",
                         day: "numeric",

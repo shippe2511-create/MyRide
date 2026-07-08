@@ -29,7 +29,7 @@ class InboxMessage {
       id: json['id'],
       title: json['title'] ?? 'Notification',
       subtitle: json['message'] ?? json['body'] ?? '',
-      time: DateTime.parse(json['created_at']),
+      time: DateTime.parse(json['created_at']).toLocal(),
       isRead: json['is_read'] ?? false,
       category: _parseCategory(json['category']),
     );

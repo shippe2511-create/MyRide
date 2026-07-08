@@ -382,7 +382,7 @@ export default function RatingsPage() {
         // Busiest day of the week
         const dayCount: Record<string, number> = {}
         completedRidesList.forEach(r => {
-          const day = new Date(r.created_at).toLocaleDateString('en-US', { weekday: 'long' })
+          const day = new Date(r.created_at).toLocaleDateString('en-US', { timeZone: 'Indian/Maldives', weekday: 'long' })
           dayCount[day] = (dayCount[day] || 0) + 1
         })
         const busiestDay = Object.entries(dayCount).sort((a, b) => b[1] - a[1])[0]?.[0] || null

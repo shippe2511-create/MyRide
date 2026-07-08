@@ -139,7 +139,7 @@ class RealtimeService {
               value: rideId,
             ),
             callback: (payload) {
-              debugPrint('RealtimeService: Specific ride update for $rideId');
+              debugPrint('RealtimeService: Ride update for $rideId - status: ${payload.newRecord['status']}');
               controller.add({
                 'event': payload.eventType.name,
                 'new': payload.newRecord,
@@ -147,9 +147,12 @@ class RealtimeService {
               });
             },
           )
-          .subscribe();
+          .subscribe((status, error) {
+            debugPrint('RealtimeService: Ride subscription status=$status, error=$error');
+          });
 
       _channels[key] = channel;
+      debugPrint('RealtimeService: Created ride subscription for $rideId');
     }
 
     return controller.stream;

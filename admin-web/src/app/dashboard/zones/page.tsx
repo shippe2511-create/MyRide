@@ -406,7 +406,7 @@ export default function ZonesPage() {
       z.zone_type,
       z.priority,
       z.is_active ? "Active" : "Inactive",
-      new Date(z.created_at).toLocaleDateString()
+      new Date(z.created_at).toLocaleDateString('en-US', { timeZone: 'Indian/Maldives' })
     ])
 
     const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n")

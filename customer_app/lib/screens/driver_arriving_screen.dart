@@ -435,7 +435,7 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> with Single
     } else if (status == 'cancelled') {
       _statusPollingTimer?.cancel();
       AppSnackbar.error(context, 'Ride was cancelled');
-      Navigator.popUntil(context, (route) => route.isFirst);
+      Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
     }
   }
 
@@ -974,8 +974,8 @@ https://maps.google.com/?q=${_pickupLocation.latitude},${_pickupLocation.longitu
       await SupabaseService.cancelRide(widget.rideId!, reason: reason);
     }
     if (mounted) {
-      Navigator.popUntil(context, (route) => route.isFirst);
-      AppSnackbar.error(context, 'Ride cancelled');
+      AppSnackbar.success(context, 'Ride cancelled');
+      Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
     }
   }
 

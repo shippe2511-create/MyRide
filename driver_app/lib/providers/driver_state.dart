@@ -124,6 +124,12 @@ class DriverState extends ChangeNotifier {
   Map<String, String> get checklistIssues => _checklistIssues;
   bool get isOnHomeScreen => _isOnHomeScreen;
 
+  void clearCurrentRide() {
+    _currentRide = null;
+    notifyListeners();
+    debugPrint('clearCurrentRide: Current ride cleared');
+  }
+
   void setOnHomeScreen(bool value) {
     if (_isOnHomeScreen != value) {
       _isOnHomeScreen = value;
@@ -692,7 +698,7 @@ class DriverState extends ChangeNotifier {
           customerName: customer?['full_name'] ?? 'Customer',
           pickupLocation: ride['pickup_name'] ?? '',
           dropoffLocation: ride['dropoff_name'] ?? '',
-          tripDate: DateTime.tryParse(ride['created_at'] ?? '') ?? DateTime.now(),
+          tripDate: (DateTime.tryParse(ride['created_at'] ?? '') ?? DateTime.now()).toLocal(),
           durationMinutes: ride['duration_minutes'] ?? 0,
           distanceKm: distance,
           status: _parseStatus(ride['status']),
@@ -766,7 +772,7 @@ class DriverState extends ChangeNotifier {
           status: status == 'accepted' ? RideStatus.accepted :
                   status == 'arrived' ? RideStatus.arrivedAtPickup :
                   status == 'in_progress' ? RideStatus.inProgress : RideStatus.accepted,
-          requestTime: DateTime.tryParse(activeRide['created_at'] ?? '') ?? DateTime.now(),
+          requestTime: (DateTime.tryParse(activeRide['created_at'] ?? '') ?? DateTime.now()).toLocal(),
           seatsBooked: (activeRide['seats_booked'] as num?)?.toInt() ?? 1,
         );
 
@@ -1248,6 +1254,13 @@ class DriverState extends ChangeNotifier {
       if (rideData != null) {
         final updatedRide = _convertSupabaseRideToRequest(rideData);
         if (updatedRide != null) {
+          // Check if ride was cancelled
+          if (updatedRide.status == RideStatus.cancelled) {
+            debugPrint('refreshCurrentRide: Ride was cancelled, clearing current ride');
+            _currentRide = null;
+            notifyListeners();
+            return;
+          }
           debugPrint('refreshCurrentRide: OLD=${_currentRide!.dropoffLocation}, NEW=${updatedRide.dropoffLocation}');
           _currentRide = updatedRide;
           debugPrint('refreshCurrentRide: Calling notifyListeners()');
@@ -1256,7 +1269,10 @@ class DriverState extends ChangeNotifier {
           debugPrint('refreshCurrentRide: updatedRide is null');
         }
       } else {
-        debugPrint('refreshCurrentRide: rideData is null');
+        // No active ride found - ride may have been cancelled or completed
+        debugPrint('refreshCurrentRide: rideData is null, clearing current ride');
+        _currentRide = null;
+        notifyListeners();
       }
     } catch (e) {
       debugPrint('Error refreshing current ride: $e');
@@ -1287,7 +1303,7 @@ class DriverState extends ChangeNotifier {
         pickupLng: (ride['pickup_lng'] as num?)?.toDouble() ?? 73.5093,
         dropoffLat: (ride['dropoff_lat'] as num?)?.toDouble() ?? 4.2234,
         dropoffLng: (ride['dropoff_lng'] as num?)?.toDouble() ?? 73.5367,
-        requestTime: DateTime.tryParse(ride['created_at'] ?? '') ?? DateTime.now(),
+        requestTime: ((DateTime.tryParse(ride['created_at'] ?? '') ?? DateTime.now()).toLocal()),
         estimatedDistance: (ride['distance_km'] as num?)?.toDouble() ?? 5.0,
         estimatedDuration: (ride['duration_minutes'] as num?)?.toInt() ?? 15,
         status: status,

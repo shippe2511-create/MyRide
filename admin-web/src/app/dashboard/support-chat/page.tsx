@@ -289,7 +289,7 @@ export default function SupportChatPage() {
     if (days === 0) return formatTime(date)
     if (days === 1) return 'Yesterday'
     if (days < 7) return `${days}d ago`
-    return d.toLocaleDateString()
+    return d.toLocaleDateString('en-US', { timeZone: 'Indian/Maldives' })
   }
 
   const getStatusBadge = (status: string) => {

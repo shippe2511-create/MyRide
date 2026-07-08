@@ -2446,7 +2446,7 @@ Location: https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocati
   void _confirmCancel() async {
     final rideId = widget.tripData['rideId'] as String?;
     if (rideId == null) {
-      Navigator.popUntil(context, (route) => route.isFirst);
+      Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
       return;
     }
 
@@ -2461,7 +2461,7 @@ Location: https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocati
 
       if (mounted) {
         AppSnackbar.success(context, 'Ride cancelled');
-        Navigator.popUntil(context, (route) => route.isFirst);
+        Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
       }
     } catch (e) {
       debugPrint('Error cancelling ride: $e');

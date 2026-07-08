@@ -255,7 +255,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
     return _documents.where((doc) {
       if (doc['expiry'] == null) return false;
       try {
-        final expiry = DateTime.parse(doc['expiry']);
+        final expiry = DateTime.parse(doc['expiry']).toLocal();
         return expiry.isBefore(thirtyDaysLater) && expiry.isAfter(now);
       } catch (e) {
         return false;
@@ -268,7 +268,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
     return _documents.where((doc) {
       if (doc['expiry'] == null) return false;
       try {
-        final expiry = DateTime.parse(doc['expiry']);
+        final expiry = DateTime.parse(doc['expiry']).toLocal();
         return expiry.isBefore(now);
       } catch (e) {
         return false;
@@ -511,7 +511,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
 
     if (doc['expiry'] != null) {
       try {
-        final expiry = DateTime.parse(doc['expiry']);
+        final expiry = DateTime.parse(doc['expiry']).toLocal();
         final now = DateTime.now();
         final thirtyDaysLater = now.add(const Duration(days: 30));
 

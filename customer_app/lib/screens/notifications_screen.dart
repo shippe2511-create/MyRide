@@ -298,7 +298,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _formatTime(DateTime.parse(notification['created_at'])),
+                      _formatTime(DateTime.parse(notification['created_at']).toLocal()),
                       style: TextStyle(
                         color: context.mutedColor.withValues(alpha: 0.7),
                         fontSize: 11,
@@ -357,7 +357,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              _formatTime(DateTime.parse(notification['created_at'])),
+              _formatTime(DateTime.parse(notification['created_at']).toLocal()),
               style: TextStyle(
                 color: context.mutedColor,
                 fontSize: 13,

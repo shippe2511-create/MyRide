@@ -213,7 +213,13 @@
       "Bash(rm -rf ~/Library/Caches/*)",
       "Bash(xcodebuild -workspace Runner.xcworkspace -scheme Runner -destination 'id=00008140-0008052A2862201C' -configuration Debug build)",
       "Bash(kill 84648 10635)",
-      "mcp__claude_ai_Supabase__list_edge_functions"
+      "mcp__claude_ai_Supabase__list_edge_functions",
+      "Bash(tee /tmp/driver_debug.log)",
+      "Bash(grep -E \"\\\\.\\(png|ico|svg\\)$\")",
+      "Bash(brew list *)",
+      "Bash(python3 -c \"from PIL import Image; print\\('PIL available'\\)\")",
+      "Bash(npm ls *)",
+      "Bash(rm -rf ~/.gradle/caches/build-cache-*)"
     ],
     "additionalDirectories": [
       "/tmp"

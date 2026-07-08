@@ -420,7 +420,7 @@ class _VehicleLogsScreenState extends State<VehicleLogsScreen> with SingleTicker
     final odometer = log['odometer'];
     final notes = log['notes'] ?? '';
     final dateStr = log['log_date'] ?? '';
-    final date = DateTime.tryParse(dateStr);
+    final date = DateTime.tryParse(dateStr)?.toLocal();
 
     IconData icon;
     Color color;

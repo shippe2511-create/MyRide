@@ -132,7 +132,7 @@ class _ScheduledRidesScreenState extends State<ScheduledRidesScreen> {
   }
 
   Widget _buildRideCard(Map<String, dynamic> ride, bool isDark) {
-    final scheduledTime = DateTime.tryParse(ride['scheduled_time'] ?? '');
+    final scheduledTime = DateTime.tryParse(ride['scheduled_time'] ?? '')?.toLocal();
     final pickupName = ride['pickup_name'] ?? 'Unknown';
     final dropoffName = ride['dropoff_name'] ?? 'Unknown';
     final status = ride['status'] as String? ?? 'scheduled';

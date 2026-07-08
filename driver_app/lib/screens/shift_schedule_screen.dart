@@ -75,7 +75,7 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
       final newSchedule = List.generate(7, (_) => <String, dynamic>{'shifts': <Map<String, dynamic>>[]});
 
       for (final shift in shifts) {
-        final shiftDate = DateTime.tryParse(shift['shift_date'] ?? '');
+        final shiftDate = DateTime.tryParse(shift['shift_date'] ?? '')?.toLocal();
         if (shiftDate == null) continue;
 
         final dayIndex = shiftDate.weekday - 1;

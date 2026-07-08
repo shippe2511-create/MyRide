@@ -221,7 +221,7 @@ class NotificationService {
     } else if (title.toLowerCase().contains('success') || title.toLowerCase().contains('completed') || title.toLowerCase().contains('accepted')) {
       bannerType = NotificationType.success;
     } else if (title.toLowerCase().contains('arrived') || title.toLowerCase().contains('started')) {
-      bannerType = NotificationType.warning;
+      bannerType = NotificationType.info;
     }
 
     if (_isAppInForeground) {

@@ -449,7 +449,7 @@ class _DateFilterSheetState extends State<_DateFilterSheet> {
     if (widget.currentDateRange == null) {
       _selectedPreset = 'all';
     } else {
-      final now = DateTime.now();
+      final now = MaldivesTimezone.now();
       final today = DateTime(now.year, now.month, now.day);
       final start = widget.currentDateRange!.start;
 
@@ -466,7 +466,7 @@ class _DateFilterSheetState extends State<_DateFilterSheet> {
   }
 
   DateTimeRange? _getDateRangeForPreset(String preset) {
-    final now = DateTime.now();
+    final now = MaldivesTimezone.now();
     final today = DateTime(now.year, now.month, now.day);
 
     switch (preset) {
@@ -486,7 +486,7 @@ class _DateFilterSheetState extends State<_DateFilterSheet> {
   }
 
   Future<void> _selectCustomRange() async {
-    final now = DateTime.now();
+    final now = MaldivesTimezone.now();
     final picked = await showDateRangePicker(
       context: context,
       firstDate: now.subtract(const Duration(days: 365)),

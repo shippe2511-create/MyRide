@@ -676,7 +676,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildDateSeparator(BuildContext context, DateTime date) {
-    final now = DateTime.now();
+    final now = MaldivesTimezone.now();
     String text;
     if (date.year == now.year && date.month == now.month && date.day == now.day) {
       text = 'Today';

@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/realtime_service.dart';
+import '../utils/timezone_utils.dart';
 import '../widgets/shimmer_loading.dart';
 import '../widgets/app_snackbar.dart';
 
@@ -413,8 +414,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   String _formatTime(DateTime time) {
-    final now = DateTime.now();
+    final now = MaldivesTimezone.now();
     final diff = now.difference(time);
+
+    // Handle negative differences
+    if (diff.isNegative) return 'Just now';
 
     if (diff.inMinutes < 1) {
       return 'Just now';

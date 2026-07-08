@@ -59,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Timer? _scheduledRideTimer;
   List<Map<String, dynamic>> _announcements = [];
   List<Map<String, dynamic>> _staffPosts = [];
+  final Set<String> _notifiedScheduledRides = {}; // Track rides we've already notified about
 
   // Ongoing trip data - null by default, set when trip is active
   Map<String, dynamic>? _ongoingTrip;
@@ -262,9 +263,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         if ((status == 'scheduled' || status == 'pending') && scheduledTimeStr != null) {
           try {
             final scheduledTime = MaldivesTimezone.parse(scheduledTimeStr)!;
-            if (_scheduledTime != scheduledTime) {
-              setState(() => _scheduledTime = scheduledTime);
+            final now = MaldivesTimezone.now();
+
+            // Check if scheduled time has passed - hide badge if it has
+            if (scheduledTime.isBefore(now)) {
+              debugPrint('Scheduled time $scheduledTime has passed (now: $now), hiding badge');
+              if (_scheduledTime != null) {
+                setState(() => _scheduledTime = null);
+              }
+            } else {
+              // Scheduled time is in the future - show badge
+              if (_scheduledTime != scheduledTime) {
+                setState(() => _scheduledTime = scheduledTime);
+              }
+
+              // Check if ride is coming up soon (within 15 minutes) and notify
+              final minutesUntil = scheduledTime.difference(now).inMinutes;
+              if (minutesUntil > 0 && minutesUntil <= 15) {
+                // Show reminder notification (only once per ride)
+                final pickupName = ride['pickup_name'] as String? ?? 'pickup';
+                _showScheduledRideReminder(rideId!, minutesUntil, pickupName);
+              }
             }
+
             // Also restore pickup/dropoff addresses for the schedule dialog
             final pickupName = ride['pickup_name'] as String?;
             final dropoffName = ride['dropoff_name'] as String?;
@@ -280,6 +301,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             }
           } catch (e) {
             debugPrint('Error parsing scheduled time: $e');
+          }
+        } else if (status != 'scheduled' && status != 'pending') {
+          // Clear scheduled time badge for non-scheduled rides
+          if (_scheduledTime != null) {
+            setState(() => _scheduledTime = null);
           }
         }
 
@@ -389,6 +415,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       } catch (e) {
         debugPrint('Error checking scheduled rides: $e');
       }
+  }
+
+  void _showScheduledRideReminder(String rideId, int minutesUntil, String pickupName) {
+    // Only notify once per ride
+    if (_notifiedScheduledRides.contains(rideId)) return;
+    _notifiedScheduledRides.add(rideId);
+
+    NotificationService.showNotification(
+      title: 'Scheduled Ride Reminder',
+      body: 'Your ride from $pickupName is in $minutesUntil minutes!',
+    );
+    debugPrint('Showed scheduled ride reminder for $rideId ($minutesUntil min)');
   }
 
   Future<void> _loadContent() async {
@@ -653,7 +691,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   String _getGreeting() {
-    final hour = DateTime.now().hour;
+    final hour = MaldivesTimezone.now().hour;
     if (hour < 12) return 'Morning';
     if (hour < 17) return 'Afternoon';
     return 'Evening';
@@ -1498,7 +1536,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   String _formatScheduledTime(DateTime time) {
-    final now = DateTime.now();
+    final now = MaldivesTimezone.now();
     final isToday = time.day == now.day && time.month == now.month && time.year == now.year;
     final isTomorrow = time.day == now.day + 1 && time.month == now.month && time.year == now.year;
 
@@ -1687,7 +1725,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final allowedStartTime = AppSettingsService.scheduleStartTime;
     final allowedEndTime = AppSettingsService.scheduleEndTime;
 
-    DateTime minDateTime = DateTime.now().add(Duration(hours: minHoursAhead));
+    DateTime minDateTime = MaldivesTimezone.now().add(Duration(hours: minHoursAhead));
     DateTime selectedDate = _scheduledTime ?? minDateTime;
 
     // If selected date is before min, set to min
@@ -1984,11 +2022,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     Expanded(
                       child: GestureDetector(
                         onTap: () async {
+                          final now = MaldivesTimezone.now();
                           final date = await showDatePicker(
                             context: context,
                             initialDate: selectedDate,
-                            firstDate: DateTime.now(),
-                            lastDate: DateTime.now().add(Duration(days: maxDaysAhead)),
+                            firstDate: now,
+                            lastDate: now.add(Duration(days: maxDaysAhead)),
                             builder: (ctx, child) => Theme(
                               data: ThemeData.dark().copyWith(colorScheme: const ColorScheme.dark(primary: AppColors.yellow, onPrimary: Colors.black, surface: Color(0xFF1E1E1E))),
                               child: child!,

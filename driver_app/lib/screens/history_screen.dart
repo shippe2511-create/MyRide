@@ -7,6 +7,7 @@ import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../models/ride_request.dart';
 import '../services/realtime_service.dart';
+import '../utils/timezone_utils.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -117,9 +118,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
       body: Consumer<DriverState>(
         builder: (context, state, _) {
           final allTrips = state.completedTrips;
-          final completedCount = allTrips.where((t) => t.status == TripStatus.completed).length;
-          final cancelledCount = allTrips.where((t) => t.status == TripStatus.cancelled).length;
           final filteredTrips = _filterTrips(allTrips);
+          final filteredCompleted = filteredTrips.where((t) => t.status == TripStatus.completed).length;
+          final filteredCancelled = filteredTrips.where((t) => t.status == TripStatus.cancelled).length;
 
           return CustomScrollView(
             physics: const BouncingScrollPhysics(),
@@ -166,21 +167,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             _buildStatusTab(
                               context,
                               label: 'All',
-                              count: allTrips.length,
+                              count: filteredTrips.length,
                               isSelected: _statusFilter == null,
                               onTap: () => setState(() => _statusFilter = null),
                             ),
                             _buildStatusTab(
                               context,
                               label: 'Completed',
-                              count: completedCount,
+                              count: filteredCompleted,
                               isSelected: _statusFilter == TripStatus.completed,
                               onTap: () => setState(() => _statusFilter = TripStatus.completed),
                             ),
                             _buildStatusTab(
                               context,
                               label: 'Cancelled',
-                              count: cancelledCount,
+                              count: filteredCancelled,
                               isSelected: _statusFilter == TripStatus.cancelled,
                               onTap: () => setState(() => _statusFilter = TripStatus.cancelled),
                             ),
@@ -737,7 +738,7 @@ class _FilterSheetState extends State<_FilterSheet> {
     if (widget.currentDateRange == null) {
       _selectedPreset = 'all';
     } else {
-      final now = DateTime.now();
+      final now = MaldivesTimezone.now();
       final today = DateTime(now.year, now.month, now.day);
       final start = widget.currentDateRange!.start;
 
@@ -754,7 +755,7 @@ class _FilterSheetState extends State<_FilterSheet> {
   }
 
   DateTimeRange? _getDateRangeForPreset(String preset) {
-    final now = DateTime.now();
+    final now = MaldivesTimezone.now();
     final today = DateTime(now.year, now.month, now.day);
 
     switch (preset) {
@@ -774,25 +775,17 @@ class _FilterSheetState extends State<_FilterSheet> {
   }
 
   Future<void> _selectCustomRange() async {
-    final now = DateTime.now();
+    final now = MaldivesTimezone.now();
+    final today = DateTime(now.year, now.month, now.day);
     final picked = await showDateRangePicker(
       context: context,
-      firstDate: now.subtract(const Duration(days: 365)),
-      lastDate: now,
-      initialDateRange: _customRange,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.dark(
-              primary: AppColors.yellow,
-              onPrimary: Colors.black,
-              surface: context.cardColor,
-              onSurface: context.textColor,
-            ),
-          ),
-          child: child!,
-        );
-      },
+      firstDate: today.subtract(const Duration(days: 365)),
+      lastDate: today,
+      initialDateRange: _customRange ?? DateTimeRange(
+        start: today.subtract(const Duration(days: 7)),
+        end: today,
+      ),
+      useRootNavigator: true,
     );
     if (picked != null) {
       setState(() {

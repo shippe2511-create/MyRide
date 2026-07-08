@@ -39,6 +39,7 @@ interface AppSettings {
   notif_driver_arrived: boolean
   notif_ride_completed: boolean
   notif_promotions: boolean
+  break_reminder_minutes: number
 }
 
 interface EmergencyContact {
@@ -82,6 +83,7 @@ const defaultSettings: AppSettings = {
   notif_driver_arrived: true,
   notif_ride_completed: true,
   notif_promotions: true,
+  break_reminder_minutes: 30,
 }
 
 export default function SettingsPage() {
@@ -179,6 +181,7 @@ export default function SettingsPage() {
           notif_driver_arrived: settings.notif_driver_arrived,
           notif_ride_completed: settings.notif_ride_completed,
           notif_promotions: settings.notif_promotions,
+          break_reminder_minutes: settings.break_reminder_minutes,
           updated_at: new Date().toISOString()
         })
 
@@ -524,6 +527,17 @@ export default function SettingsPage() {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">Allow in-app chat between customer and driver</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Break Reminder (minutes)</label>
+                  <Input
+                    type="number"
+                    value={settings.break_reminder_minutes}
+                    onChange={(e) => updateSetting("break_reminder_minutes", Number(e.target.value))}
+                    min={5}
+                    max={120}
+                  />
+                  <p className="text-xs text-muted-foreground">Notify drivers after this many minutes on break to go back online</p>
                 </div>
               </div>
             </CardContent>

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/timezone_utils.dart';
 
 class SchedulesScreen extends StatefulWidget {
   const SchedulesScreen({super.key});
@@ -385,9 +386,9 @@ class _SchedulesScreenState extends State<SchedulesScreen> with SingleTickerProv
   }
 
   Widget _buildScheduleGrid(List<Map<String, dynamic>> schedules, Color color) {
-    // Group schedules by days and filter out past times
-    final today = DateTime.now();
-    final now = TimeOfDay.now();
+    // Group schedules by days and filter out past times (using Maldives time)
+    final today = MaldivesTimezone.now();
+    final now = TimeOfDay(hour: today.hour, minute: today.minute);
     final dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     final dayName = dayNames[today.weekday % 7];
 

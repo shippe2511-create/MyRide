@@ -282,10 +282,14 @@ class _StaffCornerScreenState extends State<StaffCornerScreen> {
   }
 
   String _formatDate(DateTime date) {
-    final now = DateTime.now();
+    final now = MaldivesTimezone.now();
     final diff = now.difference(date);
 
+    // Handle negative differences
+    if (diff.isNegative) return 'Just now';
+
     if (diff.inHours < 24) {
+      if (diff.inMinutes < 1) return 'Just now';
       if (diff.inHours < 1) return '${diff.inMinutes}m ago';
       return '${diff.inHours}h ago';
     } else if (diff.inDays < 7) {

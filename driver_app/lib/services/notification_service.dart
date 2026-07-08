@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -84,18 +85,70 @@ class NotificationService {
     );
   }
 
+  static const int _breakReminderNotificationId = 30001;
+  static Timer? _breakReminderTimer;
+
   void scheduleBreakReminder({required String breakType, int? delayMinutes, Duration? delay}) {
+    // Cancel any existing timer
+    cancelBreakReminder();
+
     final actualDelay = delay ?? Duration(minutes: delayMinutes ?? 30);
-    Future.delayed(actualDelay, () {
-      showNotification(
-        title: 'Break Reminder',
-        body: 'Time for your $breakType break',
-      );
+
+    _breakReminderTimer = Timer(actualDelay, () {
+      _showBreakExceededNotification(breakType);
     });
+
+    debugPrint('Break reminder scheduled for ${actualDelay.inMinutes} minutes from now');
+  }
+
+  Future<void> _showBreakExceededNotification(String breakType) async {
+    const androidDetails = AndroidNotificationDetails(
+      'break_reminder_channel',
+      'Break Reminders',
+      channelDescription: 'Reminders when break time exceeds limit',
+      importance: Importance.high,
+      priority: Priority.high,
+      showWhen: true,
+      playSound: true,
+      enableVibration: true,
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      interruptionLevel: InterruptionLevel.timeSensitive,
+    );
+
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    try {
+      await _notifications.show(
+        _breakReminderNotificationId,
+        'Break Time Exceeded',
+        'You\'ve been on $breakType break for 30+ minutes. Don\'t forget to go back online!',
+        details,
+      );
+      debugPrint('Break exceeded notification shown');
+
+      // Also show in-app banner if app is in foreground
+      showAppNotification(
+        title: 'Break Time Exceeded',
+        message: 'You\'ve been on $breakType break for 30+ minutes. Don\'t forget to go back online!',
+        type: NotificationType.warning,
+      );
+    } catch (e) {
+      debugPrint('Error showing break notification: $e');
+    }
   }
 
   void cancelBreakReminder() {
-    // Cancel any pending notifications if needed
+    _breakReminderTimer?.cancel();
+    _breakReminderTimer = null;
+    debugPrint('Break reminder cancelled');
   }
 
   void showCustomerArrivedNotification({required String customerName, String? location}) {
@@ -201,7 +254,7 @@ class NotificationService {
     } else if (title.toLowerCase().contains('completed') || title.toLowerCase().contains('accepted')) {
       bannerType = NotificationType.success;
     } else if (title.toLowerCase().contains('new ride') || title.toLowerCase().contains('request')) {
-      bannerType = NotificationType.warning;
+      bannerType = NotificationType.info;
     } else if (title.toLowerCase().contains('arrived') || title.toLowerCase().contains('started')) {
       bannerType = NotificationType.success;
     }

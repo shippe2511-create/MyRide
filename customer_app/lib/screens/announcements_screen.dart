@@ -173,7 +173,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
 
   Widget _buildAnnouncementCard(Map<String, dynamic> announcement) {
     final createdAt = MaldivesTimezone.parse(announcement['created_at']);
-    final isNew = createdAt != null && DateTime.now().difference(createdAt).inDays < 3;
+    final isNew = createdAt != null && MaldivesTimezone.now().difference(createdAt).inDays < 3;
     final priority = announcement['priority'] ?? 'normal';
     final color = priority == 'high'
         ? AppColors.error

@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../utils/timezone_utils.dart';
 import '../widgets/shimmer_loading.dart';
 
 class InboxMessage {
@@ -412,10 +413,15 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   String _formatTime(DateTime time) {
-    final now = DateTime.now();
+    final now = MaldivesTimezone.now();
     final diff = now.difference(time);
 
-    if (diff.inMinutes < 60) {
+    // Handle negative differences
+    if (diff.isNegative) return 'Just now';
+
+    if (diff.inMinutes < 1) {
+      return 'Just now';
+    } else if (diff.inMinutes < 60) {
       return '${diff.inMinutes}m ago';
     } else if (diff.inHours < 24) {
       return '${diff.inHours}h ago';

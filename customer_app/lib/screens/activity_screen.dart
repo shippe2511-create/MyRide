@@ -48,8 +48,9 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
   bool _isLoading = true;
   List<TripHistory> _trips = [];
   RealtimeChannel? _ridesChannel;
+  DateTimeRange? _customDateRange;
 
-  final List<String> _dateFilters = ['All Time', 'Today', 'This Week', 'This Month'];
+  final List<String> _dateFilters = ['All Time', 'Today', 'This Week', 'This Month', 'Custom Range'];
 
   @override
   void initState() {
@@ -119,8 +120,8 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
   List<TripHistory> _getFilteredTrips(int tabIndex) {
     List<TripHistory> filtered = _trips;
 
-    // Apply date filter
-    final now = DateTime.now();
+    // Apply date filter using Maldives time for consistency
+    final now = MaldivesTimezone.now();
     switch (_selectedDateFilter) {
       case 'Today':
         filtered = filtered.where((t) =>
@@ -128,11 +129,21 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
         ).toList();
         break;
       case 'This Week':
-        final weekStart = now.subtract(Duration(days: now.weekday - 1));
+        final weekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
         filtered = filtered.where((t) => t.date.isAfter(weekStart.subtract(const Duration(days: 1)))).toList();
         break;
       case 'This Month':
         filtered = filtered.where((t) => t.date.year == now.year && t.date.month == now.month).toList();
+        break;
+      case 'Custom Range':
+        if (_customDateRange != null) {
+          final startOfDay = DateTime(_customDateRange!.start.year, _customDateRange!.start.month, _customDateRange!.start.day);
+          final endOfDay = DateTime(_customDateRange!.end.year, _customDateRange!.end.month, _customDateRange!.end.day, 23, 59, 59);
+          filtered = filtered.where((t) =>
+            t.date.isAfter(startOfDay.subtract(const Duration(seconds: 1))) &&
+            t.date.isBefore(endOfDay.add(const Duration(seconds: 1)))
+          ).toList();
+        }
         break;
     }
 
@@ -260,9 +271,9 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
         unselectedLabelStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
         dividerColor: Colors.transparent,
         tabs: [
-          Tab(text: 'All (${_trips.length})'),
-          Tab(text: 'Completed (${_trips.where((t) => t.status == TripStatus.completed).length})'),
-          Tab(text: 'Cancelled (${_trips.where((t) => t.status == TripStatus.cancelled).length})'),
+          Tab(text: 'All (${_getFilteredTrips(0).length})'),
+          Tab(text: 'Completed (${_getFilteredTrips(1).length})'),
+          Tab(text: 'Cancelled (${_getFilteredTrips(2).length})'),
         ],
       ),
     );
@@ -456,11 +467,19 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
   }
 
   String _formatDate(DateTime date) {
-    final now = DateTime.now();
+    // Use Maldives time for consistent comparison
+    final now = MaldivesTimezone.now();
     final diff = now.difference(date);
 
+    // Handle negative differences (shouldn't happen but guard against it)
+    if (diff.isNegative) {
+      return 'Just now';
+    }
+
     if (diff.inHours < 24) {
-      if (diff.inHours < 1) {
+      if (diff.inMinutes < 1) {
+        return 'Just now';
+      } else if (diff.inHours < 1) {
         return '${diff.inMinutes} minutes ago';
       }
       return '${diff.inHours} hours ago';
@@ -478,8 +497,9 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (ctx) => Container(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(ctx).padding.bottom + 16),
         decoration: BoxDecoration(
           color: context.surfaceColor,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
@@ -511,18 +531,29 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
             ...List.generate(_dateFilters.length, (index) {
               final filter = _dateFilters[index];
               final isSelected = _selectedDateFilter == filter;
+              final isCustomRange = filter == 'Custom Range';
+
               return GestureDetector(
-                onTap: () {
+                onTap: () async {
                   HapticFeedback.lightImpact();
-                  setState(() => _selectedDateFilter = filter);
-                  Navigator.pop(ctx);
+
+                  if (isCustomRange) {
+                    Navigator.pop(ctx);
+                    await _selectCustomDateRange();
+                  } else {
+                    setState(() {
+                      _selectedDateFilter = filter;
+                      _customDateRange = null;
+                    });
+                    Navigator.pop(ctx);
+                  }
                 },
                 child: Container(
                   width: double.infinity,
                   margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
-                    color: isSelected ? AppColors.yellow.withValues(alpha: 0.15) : (context.isDark ? context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5) : const Color(0xFFF5F5F5)),
+                    color: isSelected ? AppColors.yellow.withValues(alpha: 0.15) : (context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5)),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: isSelected ? AppColors.yellow : context.borderColor,
@@ -538,27 +569,71 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          filter,
-                          style: TextStyle(
-                            color: isSelected ? AppColors.yellow : context.textColor,
-                            fontSize: 15,
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              filter,
+                              style: TextStyle(
+                                color: isSelected ? AppColors.yellow : context.textColor,
+                                fontSize: 15,
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                              ),
+                            ),
+                            if (isCustomRange && isSelected && _customDateRange != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  '${_formatDateShort(_customDateRange!.start)} - ${_formatDateShort(_customDateRange!.end)}',
+                                  style: TextStyle(
+                                    color: AppColors.yellow.withValues(alpha: 0.8),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
-                      if (isSelected)
+                      if (isCustomRange)
+                        Icon(Icons.chevron_right, color: isSelected ? AppColors.yellow : context.mutedColor, size: 20)
+                      else if (isSelected)
                         Icon(Icons.check_circle, color: AppColors.yellow, size: 20),
                     ],
                   ),
                 ),
               );
             }),
-            SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _selectCustomDateRange() async {
+    final now = MaldivesTimezone.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: today.subtract(const Duration(days: 365)),
+      lastDate: today,
+      initialDateRange: _customDateRange ?? DateTimeRange(
+        start: today.subtract(const Duration(days: 7)),
+        end: today,
+      ),
+      useRootNavigator: true,
+    );
+
+    if (picked != null) {
+      setState(() {
+        _customDateRange = picked;
+        _selectedDateFilter = 'Custom Range';
+      });
+    }
+  }
+
+  String _formatDateShort(DateTime date) {
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${date.day} ${months[date.month - 1]}';
   }
 
   IconData _getFilterIcon(String filter) {
@@ -569,6 +644,8 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
         return Icons.date_range;
       case 'This Month':
         return Icons.calendar_month;
+      case 'Custom Range':
+        return Icons.edit_calendar;
       default:
         return Icons.all_inclusive;
     }

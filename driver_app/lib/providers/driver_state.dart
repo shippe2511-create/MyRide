@@ -1363,11 +1363,8 @@ class DriverState extends ChangeNotifier {
           });
     }
 
-    // Schedule break reminder after 30 minutes (works even when app is closed)
-    NotificationService().scheduleBreakReminder(
-      breakType: type,
-      delayMinutes: 30,
-    );
+    // Schedule break reminder based on admin-configured minutes
+    _scheduleBreakReminderWithConfig(type);
 
     notifyListeners();
   }
@@ -1425,6 +1422,29 @@ class DriverState extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  Future<void> _scheduleBreakReminderWithConfig(String breakType) async {
+    // Fetch break reminder minutes from app_settings
+    int reminderMinutes = 30; // Default
+    try {
+      final settings = await SupabaseService.client
+          .from('app_settings')
+          .select('break_reminder_minutes')
+          .limit(1)
+          .maybeSingle();
+      if (settings != null && settings['break_reminder_minutes'] != null) {
+        reminderMinutes = settings['break_reminder_minutes'] as int;
+      }
+    } catch (e) {
+      debugPrint('Error fetching break reminder config: $e');
+    }
+
+    NotificationService().scheduleBreakReminder(
+      breakType: breakType,
+      delayMinutes: reminderMinutes,
+    );
+    debugPrint('Break reminder scheduled for $reminderMinutes minutes');
   }
 
   void toggleOnline() {

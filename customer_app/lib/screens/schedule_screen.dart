@@ -8,6 +8,7 @@ import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/notification_service.dart';
 import '../services/supabase_service.dart';
+import '../utils/timezone_utils.dart';
 import '../widgets/app_snackbar.dart';
 
 class ScheduleScreen extends StatefulWidget {
@@ -426,7 +427,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
   }
 
   String _getDateString() {
-    final now = DateTime.now();
+    final now = MaldivesTimezone.now();
     final days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${days[now.weekday % 7]}, ${months[now.month - 1]} ${now.day}';
@@ -666,7 +667,27 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                   HapticFeedback.lightImpact();
                   setState(() {
                     _selectedType = type['name'];
-                    _selectedRoute = '';
+                    // Auto-select first route for the new type
+                    final newFilteredRoutes = _routes.where((r) {
+                      String transportType;
+                      switch (type['name']) {
+                        case 'Internal':
+                        case 'Internal Bus':
+                          transportType = 'internal_bus';
+                          break;
+                        case 'MTCC':
+                        case 'MTCC Bus':
+                          transportType = 'mtcc_bus';
+                          break;
+                        case 'Ferry':
+                          transportType = 'ferry';
+                          break;
+                        default:
+                          transportType = type['name'];
+                      }
+                      return r['transport_type'] == transportType;
+                    }).toList();
+                    _selectedRoute = newFilteredRoutes.isNotEmpty ? (newFilteredRoutes.first['id'] ?? '') : '';
                   });
                 },
                 child: AnimatedContainer(
@@ -1465,7 +1486,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     final hour = trip['hour'] as int? ?? 0;
     final minute = trip['minute'] as int? ?? 0;
 
-    final now = DateTime.now();
+    final now = MaldivesTimezone.now();
     var scheduledTime = DateTime(now.year, now.month, now.day, hour, minute);
 
     if (scheduledTime.isBefore(now)) {
@@ -1501,7 +1522,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
     final hour = trip['hour'] as int? ?? 0;
     final minute = trip['minute'] as int? ?? 0;
 
-    final now = DateTime.now();
+    final now = MaldivesTimezone.now();
     var startTime = DateTime(now.year, now.month, now.day, hour, minute);
 
     if (startTime.isBefore(now)) {

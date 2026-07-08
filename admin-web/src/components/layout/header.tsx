@@ -72,6 +72,38 @@ export function Header() {
   useEffect(() => {
     loadProfile()
     loadNotifications()
+
+    // Subscribe to new notifications in realtime
+    const setupRealtimeNotifications = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const channel = supabase
+        .channel('admin_notifications')
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        }, () => {
+          loadNotifications()
+        })
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'profiles',
+          filter: 'status=eq.pending'
+        }, () => {
+          loadNotifications()
+        })
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
+    }
+
+    setupRealtimeNotifications()
   }, [])
 
   async function loadProfile() {
@@ -123,6 +155,32 @@ export function Header() {
       })
     }
 
+    // Load unread notifications from database
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: dbNotifs } = await supabase
+        .from("notifications")
+        .select("id, title, message, notification_type, created_at")
+        .eq("user_id", user.id)
+        .eq("is_read", false)
+        .order("created_at", { ascending: false })
+        .limit(10)
+
+      if (dbNotifs) {
+        dbNotifs.forEach(n => {
+          notifs.push({
+            id: n.id,
+            type: n.notification_type || "info",
+            title: n.title,
+            message: n.message,
+            link: n.notification_type === "registration"
+              ? "/dashboard/customers?status=pending"
+              : "/dashboard"
+          })
+        })
+      }
+    }
+
     setNotifications(notifs)
     setNotifCount(notifs.length)
   }
@@ -136,8 +194,16 @@ export function Header() {
     setShowLogoutDialog(true)
   }
 
-  const handleNotificationClick = (link: string) => {
-    router.push(link)
+  const handleNotificationClick = async (notif: Notification) => {
+    // Mark as read if it's a database notification (UUID format)
+    if (notif.id.includes('-') && notif.id.length > 20) {
+      await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("id", notif.id)
+    }
+    router.push(notif.link)
+    loadNotifications()
   }
 
   const initials = profile?.full_name
@@ -175,7 +241,7 @@ export function Header() {
                 <DropdownMenuItem
                   key={notif.id}
                   className="flex items-start gap-3 p-3 cursor-pointer"
-                  onSelect={() => handleNotificationClick(notif.link)}
+                  onSelect={() => handleNotificationClick(notif)}
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-yellow-500/10">
                     {notif.type === "pending_driver" ? (

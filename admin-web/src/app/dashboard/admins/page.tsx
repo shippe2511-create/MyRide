@@ -118,7 +118,7 @@ export default function AdminsPage() {
     const { data } = await supabase
       .from("profiles")
       .select("*")
-      .in("role", ["super-admin", "admin", "operator", "support", "viewer"])
+      .in("role", ["super-admin", "admin", "manager", "operator", "support", "viewer"])
       .order("created_at", { ascending: false })
 
     setAdmins(data || [])

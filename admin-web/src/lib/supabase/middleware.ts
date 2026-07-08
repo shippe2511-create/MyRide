@@ -1,6 +1,9 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// All roles allowed to access admin panel
+const ADMIN_ROLES = ['super-admin', 'admin', 'manager', 'operator', 'support', 'viewer']
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -57,11 +60,11 @@ export async function updateSession(request: NextRequest) {
     return profile
   }
 
-  // Check if user is admin
+  // Check if user has admin role
   if (user && request.nextUrl.pathname.startsWith('/dashboard')) {
     const profile = await findProfile()
 
-    if (!profile || !['admin', 'super-admin'].includes(profile.role) || profile.status !== 'approved') {
+    if (!profile || !ADMIN_ROLES.includes(profile.role) || profile.status !== 'approved') {
       const url = request.nextUrl.clone()
       url.pathname = '/login'
       url.searchParams.set('error', 'unauthorized')
@@ -73,7 +76,7 @@ export async function updateSession(request: NextRequest) {
   if (user && request.nextUrl.pathname === '/login') {
     const profile = await findProfile()
 
-    if (profile && ['admin', 'super-admin'].includes(profile.role) && profile.status === 'approved') {
+    if (profile && ADMIN_ROLES.includes(profile.role) && profile.status === 'approved') {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
       return NextResponse.redirect(url)

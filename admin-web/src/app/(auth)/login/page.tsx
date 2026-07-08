@@ -94,7 +94,7 @@ function LoginContent() {
           return
         }
 
-        if (!["admin", "super-admin", "operator", "support", "viewer"].includes(profile.role)) {
+        if (!["admin", "super-admin", "manager", "operator", "support", "viewer"].includes(profile.role)) {
           toast.error("Access denied. Admin privileges required.")
           await supabase.auth.signOut()
           setLoading(false)

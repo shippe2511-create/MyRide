@@ -544,22 +544,27 @@ export function LiveDriverMap({
           newTargetHeading = calculateBearing(prev, { lat: driver.lat, lng: driver.lng })
         }
 
+        // Use calculated heading - driver.heading from DB is often -1 (invalid)
+        const validDriverHeading = driver.heading != null && driver.heading >= 0 ? driver.heading : null
+
         newAnimated.set(driver.id, {
           lat: current.lat,
           lng: current.lng,
           heading: current.heading,
           targetLat: driver.lat,
           targetLng: driver.lng,
-          targetHeading: driver.heading ?? newTargetHeading,
+          targetHeading: validDriverHeading ?? newTargetHeading,
         })
       } else {
+        const validDriverHeading = driver.heading != null && driver.heading >= 0 ? driver.heading : null
+
         newAnimated.set(driver.id, {
           lat: driver.lat,
           lng: driver.lng,
           heading: current?.heading ?? 0,
           targetLat: driver.lat,
           targetLng: driver.lng,
-          targetHeading: current?.targetHeading ?? 0,
+          targetHeading: validDriverHeading ?? current?.targetHeading ?? 0,
         })
       }
 

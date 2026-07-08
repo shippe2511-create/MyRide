@@ -1352,7 +1352,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     _buildShiftStat('Rides', '${state.todayTrips}', AppColors.success),
                     Container(width: 1, height: 40, color: context.borderColor),
-                    _buildShiftStat('Hours', '${(state.todayTrips * 0.5).toStringAsFixed(1)}', AppColors.info),
+                    _buildShiftStat('Hours', '${(state.shiftDurationMinutes / 60).toStringAsFixed(1)}', AppColors.info),
                     Container(width: 1, height: 40, color: context.borderColor),
                     _buildShiftStat('Rating', state.rating.toStringAsFixed(1), AppColors.warning),
                   ],

@@ -28,7 +28,7 @@ import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { usePermissions } from "@/hooks/usePermissions"
-import { ROLE_DESCRIPTIONS, type Role, type Permission, getPermissionsForRole } from "@/lib/permissions"
+import { ROLE_DESCRIPTIONS, ROLE_COLORS, PERMISSION_CATEGORIES, type Role, type Permission, getPermissionsForRole, ALL_PERMISSIONS } from "@/lib/permissions"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -47,46 +47,13 @@ interface AdminUser {
   custom_permissions?: Record<string, boolean>
 }
 
-const ALL_PERMISSIONS: { key: Permission; label: string; category: string }[] = [
-  { key: "dashboard:view", label: "View Dashboard", category: "Dashboard" },
-  { key: "customers:view", label: "View Customers", category: "Customers" },
-  { key: "customers:manage", label: "Manage Customers", category: "Customers" },
-  { key: "drivers:view", label: "View Drivers", category: "Drivers" },
-  { key: "drivers:manage", label: "Manage Drivers", category: "Drivers" },
-  { key: "vehicles:view", label: "View Vehicles", category: "Vehicles" },
-  { key: "vehicles:manage", label: "Manage Vehicles", category: "Vehicles" },
-  { key: "rides:view", label: "View Rides", category: "Rides" },
-  { key: "rides:manage", label: "Manage Rides", category: "Rides" },
-  { key: "tracking:view", label: "View Live Tracking", category: "Tracking" },
-  { key: "schedules:view", label: "View Schedules", category: "Schedules" },
-  { key: "schedules:manage", label: "Manage Schedules", category: "Schedules" },
-  { key: "pretrip:view", label: "View Pre-trip Checks", category: "Pre-trip" },
-  { key: "pretrip:manage", label: "Manage Pre-trip Checks", category: "Pre-trip" },
-  { key: "eligibility:view", label: "View Eligibility", category: "Eligibility" },
-  { key: "eligibility:manage", label: "Manage Eligibility", category: "Eligibility" },
-  { key: "content:view", label: "View Content", category: "Content" },
-  { key: "content:manage", label: "Manage Content", category: "Content" },
-  { key: "zones:view", label: "View Service Zones", category: "Zones" },
-  { key: "zones:manage", label: "Manage Service Zones", category: "Zones" },
-  { key: "chat:view", label: "View Chat", category: "Chat" },
-  { key: "chat:manage", label: "Manage Chat", category: "Chat" },
-  { key: "sos:view", label: "View SOS Alerts", category: "SOS" },
-  { key: "sos:manage", label: "Manage SOS Alerts", category: "SOS" },
-  { key: "ratings:view", label: "View Ratings", category: "Ratings" },
-  { key: "ratings:manage", label: "Manage Ratings", category: "Ratings" },
-  { key: "reports:view", label: "View Reports", category: "Reports" },
-  { key: "admins:view", label: "View Admins", category: "Admins" },
-  { key: "admins:manage", label: "Manage Admins", category: "Admins" },
-  { key: "settings:view", label: "View Settings", category: "Settings" },
-  { key: "settings:manage", label: "Manage Settings", category: "Settings" },
-]
-
 const ROLES: { value: Role; label: string; color: string }[] = [
-  { value: "super-admin", label: "Super Admin", color: "bg-red-500" },
-  { value: "admin", label: "Admin", color: "bg-blue-500" },
-  { value: "operator", label: "Operator", color: "bg-purple-500" },
-  { value: "support", label: "Support", color: "bg-green-500" },
-  { value: "viewer", label: "Viewer", color: "bg-gray-500" },
+  { value: "super-admin", label: "Super Admin", color: ROLE_COLORS["super-admin"] },
+  { value: "admin", label: "Admin", color: ROLE_COLORS["admin"] },
+  { value: "manager", label: "Manager", color: ROLE_COLORS["manager"] },
+  { value: "operator", label: "Operator", color: ROLE_COLORS["operator"] },
+  { value: "support", label: "Support", color: ROLE_COLORS["support"] },
+  { value: "viewer", label: "Viewer", color: ROLE_COLORS["viewer"] },
 ]
 
 export default function AdminsPage() {
@@ -807,21 +774,21 @@ export default function AdminsPage() {
             </p>
             <ScrollArea className="h-[400px] pr-4">
               <div className="space-y-6">
-                {Array.from(new Set(ALL_PERMISSIONS.map(p => p.category))).map(category => (
-                  <div key={category}>
-                    <h4 className="font-medium text-sm mb-2 text-muted-foreground">{category}</h4>
+                {Object.entries(PERMISSION_CATEGORIES).map(([key, category]) => (
+                  <div key={key}>
+                    <h4 className="font-medium text-sm mb-2 text-muted-foreground">{category.label}</h4>
                     <div className="space-y-2">
-                      {ALL_PERMISSIONS.filter(p => p.category === category).map(perm => (
-                        <div key={perm.key} className="flex items-center justify-between py-1.5 px-3 rounded-md hover:bg-accent">
+                      {category.permissions.map(perm => (
+                        <div key={perm} className="flex items-center justify-between py-1.5 px-3 rounded-md hover:bg-accent">
                           <div className="flex items-center gap-2">
-                            {isCustomOverride(perm.key) && (
+                            {isCustomOverride(perm) && (
                               <div className="w-2 h-2 rounded-full bg-yellow-500" title="Custom override" />
                             )}
-                            <span className="text-sm">{perm.label}</span>
+                            <span className="text-sm">{perm.replace(":", " ").replace(/\b\w/g, l => l.toUpperCase())}</span>
                           </div>
                           <Switch
-                            checked={getEffectivePermission(perm.key)}
-                            onCheckedChange={() => togglePermission(perm.key)}
+                            checked={getEffectivePermission(perm)}
+                            onCheckedChange={() => togglePermission(perm)}
                           />
                         </div>
                       ))}

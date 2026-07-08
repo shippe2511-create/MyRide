@@ -1013,6 +1013,7 @@ export default function ReportsPage() {
   ]
 
   return (
+    <PermissionGate permission="reports:view">
     <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -1106,5 +1107,6 @@ export default function ReportsPage() {
         )
       })}
     </div>
+    </PermissionGate>
   )
 }

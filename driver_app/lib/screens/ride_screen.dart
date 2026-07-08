@@ -190,7 +190,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
             // Clear current ride from state
             final driverState = Provider.of<DriverState>(context, listen: false);
             driverState.clearCurrentRide();
-            AppSnackbar.warning(context, 'Ride cancelled', subtitle: 'Customer cancelled the ride');
+            AppSnackbar.error(context, 'Ride cancelled', subtitle: 'Customer cancelled the ride');
             Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
           }
           return;
@@ -436,7 +436,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
         _destinationChangeTimer?.cancel();
         driverState.clearCurrentRide();
         if (mounted) {
-          AppSnackbar.warning(context, 'Ride cancelled', subtitle: 'Customer cancelled the ride');
+          AppSnackbar.error(context, 'Ride cancelled', subtitle: 'Customer cancelled the ride');
           Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
         }
       }

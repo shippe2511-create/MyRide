@@ -337,10 +337,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     );
                     HapticFeedback.heavyImpact();
                   } else if (newStatus == 'arrived') {
-                    NotificationService.showNotification(
-                      title: 'Driver Arrived',
-                      body: 'Your driver has arrived at the pickup location.',
-                    );
+                    // Notification handled by driver_arriving_screen
                     HapticFeedback.heavyImpact();
                   }
 

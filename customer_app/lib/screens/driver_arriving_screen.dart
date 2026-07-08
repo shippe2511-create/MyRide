@@ -381,12 +381,7 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> with Single
     if (status == 'arrived' && !_driverArrived) {
       _etaTimer.cancel();
       // Don't cancel polling here - need to detect when trip starts
-      // Show notification
-      NotificationService().showDriverArrivedNotification(
-        driverName: widget.driverName,
-        vehicle: widget.vehicleNumber,
-      );
-      _onDriverArrived(); // This sets _driverArrived = true with setState
+      _onDriverArrived(); // This sets _driverArrived = true and shows notification
     } else if (status == 'in_progress' && !_tripStarted) {
       _tripStarted = true;
       _etaTimer.cancel();
@@ -473,13 +468,13 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> with Single
       debugPrint('Notification error: $e');
     }
 
-    // Show modern in-app banner
+    // Show modern in-app banner (blue for driver arrived)
     if (mounted) {
       AppNotificationBanner.show(
         context,
         title: 'Driver Arrived',
         message: '${widget.driverName} has arrived at pickup location',
-        type: NotificationType.success,
+        type: NotificationType.info,
       );
     }
   }

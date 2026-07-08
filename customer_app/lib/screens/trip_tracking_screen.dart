@@ -521,12 +521,8 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> with TickerProv
             final oldStatus = _rideStatus;
             setState(() => _rideStatus = status);
 
-            // Show notification when driver arrives
+            // Haptic feedback when driver arrives (notification handled elsewhere)
             if (status == 'arrived' && oldStatus != 'arrived') {
-              NotificationService.showNotification(
-                title: 'Driver Arrived',
-                body: 'Your driver has arrived at the pickup location.',
-              );
               HapticFeedback.heavyImpact();
             }
           }

@@ -620,10 +620,6 @@ export default function SchedulingPage() {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setImportDialogOpen(true)}>
-            <Upload className="h-4 w-4 mr-2" />
-            Import from Image
-          </Button>
           <Button size="sm" onClick={() => { setFormData({ ...formData, transport_type: activeTab }); setDialogOpen(true) }}>
             <Plus className="h-4 w-4 mr-2" />
             Add Route

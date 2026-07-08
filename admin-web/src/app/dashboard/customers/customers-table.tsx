@@ -59,6 +59,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  Upload,
   UserPlus,
   CheckCircle,
   XCircle,
@@ -67,6 +68,8 @@ import {
   Users,
   Mail,
   Phone,
+  FileSpreadsheet,
+  Loader2,
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
@@ -119,6 +122,16 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [importLoading, setImportLoading] = useState(false)
+  const [importPreview, setImportPreview] = useState<Array<{
+    full_name: string
+    email: string
+    phone: string
+    employee_id: string
+    department: string
+  }>>([])
+  const [importError, setImportError] = useState<string | null>(null)
 
   // Sync with server data when props change
   useEffect(() => {
@@ -486,6 +499,110 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
     a.click()
   }
 
+  const downloadTemplate = () => {
+    const headers = ["full_name", "email", "phone", "employee_id", "department"]
+    const example = ["John Doe", "john@example.com", "+9601234567", "A-1234", "IT Division"]
+    const csv = [headers.join(","), example.join(",")].join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "customer_import_template.csv"
+    a.click()
+  }
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setImportError(null)
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string
+        const lines = text.split("\n").filter(line => line.trim())
+        if (lines.length < 2) {
+          setImportError("CSV file must have a header row and at least one data row")
+          return
+        }
+
+        const headers = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/"/g, ""))
+        const nameIdx = headers.findIndex(h => h === "full_name" || h === "name")
+        const emailIdx = headers.findIndex(h => h === "email")
+        const phoneIdx = headers.findIndex(h => h === "phone")
+        const empIdIdx = headers.findIndex(h => h === "employee_id" || h === "emp_id" || h === "employeeid")
+        const deptIdx = headers.findIndex(h => h === "department" || h === "dept")
+
+        if (nameIdx === -1) {
+          setImportError("CSV must have a 'full_name' or 'name' column")
+          return
+        }
+
+        const parsed: typeof importPreview = []
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(",").map(v => v.trim().replace(/"/g, ""))
+          const name = values[nameIdx] || ""
+          if (!name) continue
+
+          let phone = phoneIdx >= 0 ? values[phoneIdx] || "" : ""
+          if (phone && !phone.startsWith("+")) {
+            phone = `+960${phone}`
+          }
+
+          parsed.push({
+            full_name: name,
+            email: emailIdx >= 0 ? values[emailIdx] || "" : "",
+            phone: phone,
+            employee_id: empIdIdx >= 0 ? values[empIdIdx] || "" : "",
+            department: deptIdx >= 0 ? values[deptIdx] || "" : "",
+          })
+        }
+
+        if (parsed.length === 0) {
+          setImportError("No valid rows found in CSV")
+          return
+        }
+
+        setImportPreview(parsed)
+      } catch {
+        setImportError("Failed to parse CSV file")
+      }
+    }
+    reader.readAsText(file)
+  }
+
+  const handleImport = async () => {
+    if (importPreview.length === 0) return
+    setImportLoading(true)
+
+    const toInsert = importPreview.map(row => ({
+      full_name: row.full_name,
+      email: row.email || null,
+      phone: row.phone || null,
+      employee_id: row.employee_id || null,
+      department: row.department || null,
+      status: "approved",
+      role: "customer",
+    }))
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .insert(toInsert)
+      .select()
+
+    if (error) {
+      toast.error("Failed to import: " + error.message)
+    } else {
+      toast.success(`Successfully imported ${data?.length || importPreview.length} customers`)
+      logActivity({ action: 'create', entityType: 'customer', details: { bulk_import: true, count: importPreview.length } })
+      setImportDialogOpen(false)
+      setImportPreview([])
+      // Refresh the page data
+      router.refresh()
+    }
+    setImportLoading(false)
+  }
+
   const getInitials = (name: string) => {
     return name
       .split(" ")
@@ -566,6 +683,10 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
           <Button variant="outline" onClick={exportCSV}>
             <Download className="mr-2 h-4 w-4" />
             Export
+          </Button>
+          <Button variant="outline" onClick={() => { setImportDialogOpen(true); setImportPreview([]); setImportError(null) }}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import
           </Button>
           <Button onClick={openAddDialog}>
             <UserPlus className="mr-2 h-4 w-4" />
@@ -995,6 +1116,94 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Import CSV Dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5" />
+              Import Customers from CSV
+            </DialogTitle>
+            <DialogDescription>
+              Upload a CSV file with customer data. Required column: full_name. Optional: email, phone, employee_id, department.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <Input
+                type="file"
+                accept=".csv"
+                onChange={handleFileUpload}
+                className="flex-1"
+              />
+              <Button variant="outline" size="sm" onClick={downloadTemplate}>
+                <Download className="mr-2 h-4 w-4" />
+                Template
+              </Button>
+            </div>
+
+            {importError && (
+              <div className="rounded-lg border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-500">
+                {importError}
+              </div>
+            )}
+
+            {importPreview.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">{importPreview.length} customers ready to import:</p>
+                <div className="max-h-64 overflow-auto rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Employee ID</TableHead>
+                        <TableHead>Department</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {importPreview.slice(0, 10).map((row, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="font-medium">{row.full_name}</TableCell>
+                          <TableCell className="text-muted-foreground">{row.email || "-"}</TableCell>
+                          <TableCell className="text-muted-foreground">{row.phone || "-"}</TableCell>
+                          <TableCell className="text-muted-foreground">{row.employee_id || "-"}</TableCell>
+                          <TableCell className="text-muted-foreground">{row.department || "-"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {importPreview.length > 10 && (
+                    <p className="p-2 text-center text-sm text-muted-foreground">
+                      ... and {importPreview.length - 10} more
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleImport} disabled={importLoading || importPreview.length === 0}>
+              {importLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import {importPreview.length} Customers
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

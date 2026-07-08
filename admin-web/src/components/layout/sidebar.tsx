@@ -145,9 +145,10 @@ const navigationSections: NavSection[] = [
 interface SidebarProps {
   collapsed?: boolean
   onCollapse?: (collapsed: boolean) => void
+  onNavigate?: () => void
 }
 
-export function Sidebar({ collapsed = false, onCollapse }: SidebarProps) {
+export function Sidebar({ collapsed = false, onCollapse, onNavigate }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -220,6 +221,7 @@ export function Sidebar({ collapsed = false, onCollapse }: SidebarProps) {
                 <Link
                   key={section.name}
                   href={section.href}
+                  onClick={onNavigate}
                   className={cn(
                     "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
                     isActive
@@ -308,6 +310,7 @@ export function Sidebar({ collapsed = false, onCollapse }: SidebarProps) {
                         <Link
                           key={item.name}
                           href={item.href}
+                          onClick={onNavigate}
                           className={cn(
                             "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors",
                             isActive

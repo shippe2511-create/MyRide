@@ -80,28 +80,30 @@ export function Header() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      channel = supabase
-        .channel('admin_notifications_' + user.id)
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`
-        }, (payload) => {
-          console.log('New notification received:', payload)
-          loadNotifications()
-        })
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'profiles'
-        }, (payload) => {
-          console.log('New profile registered:', payload)
-          loadNotifications()
-        })
-        .subscribe((status) => {
-          console.log('Realtime subscription status:', status)
-        })
+      channel = supabase.channel('admin_notifications_' + user.id)
+
+      channel.on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${user.id}`
+      }, (payload) => {
+        console.log('New notification received:', payload)
+        loadNotifications()
+      })
+
+      channel.on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'profiles'
+      }, (payload) => {
+        console.log('New profile registered:', payload)
+        loadNotifications()
+      })
+
+      channel.subscribe((status) => {
+        console.log('Realtime subscription status:', status)
+      })
     }
 
     setupRealtime()

@@ -63,6 +63,13 @@ export async function POST(request: NextRequest) {
 
     if (!authUser) {
       // User doesn't exist in auth - create them
+      // First, get the existing profile to preserve data
+      const { data: existingProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("*")
+        .eq("email", email)
+        .single()
+
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password: newPassword,
@@ -72,6 +79,26 @@ export async function POST(request: NextRequest) {
       if (createError) {
         console.error("Create user error:", createError)
         return NextResponse.json({ error: createError.message }, { status: 500 })
+      }
+
+      // If profile existed with different ID, update it to use the new auth user ID
+      if (existingProfile && newUser?.user && existingProfile.id !== newUser.user.id) {
+        // Delete old profile and create new one with correct ID
+        await supabaseAdmin.from("profiles").delete().eq("id", existingProfile.id)
+        await supabaseAdmin.from("profiles").upsert({
+          id: newUser.user.id,
+          full_name: existingProfile.full_name,
+          email: existingProfile.email,
+          phone: existingProfile.phone,
+          role: existingProfile.role,
+          status: existingProfile.status,
+          employee_id: existingProfile.employee_id,
+          department: existingProfile.department,
+          avatar_url: existingProfile.avatar_url,
+          custom_permissions: existingProfile.custom_permissions,
+          created_at: existingProfile.created_at,
+          updated_at: new Date().toISOString(),
+        })
       }
 
       return NextResponse.json({ success: true, created: true })

@@ -85,20 +85,32 @@ export default function AdminsPage() {
   useEffect(() => {
     loadAdmins()
 
+    const adminRoles = ['super-admin', 'admin', 'manager', 'operator', 'support', 'viewer']
+
     const channel = supabase
       .channel('admins_realtime')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload) => {
         const updated = payload.new as AdminUser
         // Skip if we're currently updating this admin locally
         if (updatingIdsRef.current.has(updated.id)) return
-        // Only update if it's an admin role
-        if (['super-admin', 'admin', 'operator', 'support', 'viewer'].includes(updated.role)) {
-          setAdmins(prev => prev.map(a => a.id === updated.id ? { ...a, ...updated } : a))
+
+        if (adminRoles.includes(updated.role)) {
+          // Update or add if now an admin
+          setAdmins(prev => {
+            const exists = prev.find(a => a.id === updated.id)
+            if (exists) {
+              return prev.map(a => a.id === updated.id ? { ...a, ...updated } : a)
+            }
+            return [...prev, updated]
+          })
+        } else {
+          // Remove if no longer an admin role
+          setAdmins(prev => prev.filter(a => a.id !== updated.id))
         }
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, (payload) => {
         const inserted = payload.new as AdminUser
-        if (['super-admin', 'admin', 'operator', 'support', 'viewer'].includes(inserted.role)) {
+        if (adminRoles.includes(inserted.role)) {
           setAdmins(prev => [...prev, inserted])
         }
       })

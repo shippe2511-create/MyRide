@@ -2482,7 +2482,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     if (!mounted) return;
 
     if (success) {
-      AppSnackbar.success(context, 'Trip Completed', subtitle: 'Duration: $_formattedTime');
+      // Skip banner - home screen already shows updated stats
       Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
     } else {
       AppSnackbar.error(context, 'Failed to complete trip');

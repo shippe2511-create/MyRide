@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import { QueryProvider } from "@/components/providers/query-provider";
@@ -19,18 +19,19 @@ export const metadata: Metadata = {
   title: "MyRide Admin Panel",
   description: "Admin panel for MyRide staff transport service",
   manifest: "/manifest.json",
-  themeColor: "#facc15",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "MyRide Admin",
   },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#facc15",
 };
 
 export default function RootLayout({

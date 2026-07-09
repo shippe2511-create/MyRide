@@ -225,6 +225,14 @@ class NotificationService {
     }
 
     if (_isAppInForeground) {
+      // Skip in-app banners for events that already have visual feedback on screen
+      final lowerTitle = title.toLowerCase();
+      if (lowerTitle.contains('driver accepted') || lowerTitle.contains('driver assigned') ||
+          lowerTitle.contains('arrived') || lowerTitle.contains('trip started') ||
+          lowerTitle.contains('trip completed') || lowerTitle.contains('completed')) {
+        debugPrint('NotificationService: Skipping banner - screen already shows this info');
+        return;
+      }
       // App is in foreground - show only in-app banner (less intrusive)
       debugPrint('NotificationService: Showing in-app banner only (foreground)');
       showAppNotification(title: title, message: body, type: bannerType, onTap: onTap);

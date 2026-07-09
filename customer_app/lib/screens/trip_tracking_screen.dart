@@ -845,11 +845,11 @@ Live tracking link: https://myride.mv/track/$rideId
 
           // Bottom sheet - Uber style
           DraggableScrollableSheet(
-            initialChildSize: 0.45,
-            minChildSize: 0.45,
-            maxChildSize: 0.55,
+            initialChildSize: 0.38,
+            minChildSize: 0.38,
+            maxChildSize: 0.50,
             snap: true,
-            snapSizes: const [0.45],
+            snapSizes: const [0.38],
             builder: (context, scrollController) {
               final statusColor = _rideStatus == 'in_progress' ? AppColors.success
                   : (_rideStatus == 'arrived' ? const Color(0xFF2196F3) : AppColors.yellow);

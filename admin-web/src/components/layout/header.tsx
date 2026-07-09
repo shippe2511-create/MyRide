@@ -272,10 +272,20 @@ export function Header() {
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  className="text-center text-sm text-primary cursor-pointer justify-center"
-                  onSelect={() => router.push("/dashboard")}
+                  className="text-center text-sm text-destructive cursor-pointer justify-center"
+                  onClick={async () => {
+                    const { data: { user } } = await supabase.auth.getUser()
+                    if (user) {
+                      await supabase
+                        .from("notifications")
+                        .update({ is_read: true })
+                        .eq("user_id", user.id)
+                        .eq("is_read", false)
+                    }
+                    loadNotifications()
+                  }}
                 >
-                  View Dashboard
+                  Clear All
                 </DropdownMenuItem>
               </>
             )}

@@ -182,9 +182,19 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
     router.push(`/dashboard/customers?${params.toString()}`)
   }
 
-  const handleSearch = () => {
-    updateParams("search", search)
+  const handleSearch = (value?: string) => {
+    updateParams("search", value ?? search)
   }
+
+  // Debounced live search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (search !== searchParams.get("search")) {
+        handleSearch(search)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [search])
 
   const handleStatusChange = (value: string) => {
     setStatusFilter(value)

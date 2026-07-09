@@ -69,7 +69,6 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
 
       if (mounted) {
         Navigator.pop(context);
-        AppSnackbar.success(context, 'Thanks for your feedback!');
       }
     } catch (e) {
       if (mounted) {

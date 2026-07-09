@@ -269,8 +269,6 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
                       if (!mounted) return;
                       Navigator.of(context).popUntil((route) => route.isFirst);
                       Navigator.pushReplacementNamed(context, '/home');
-
-                      AppSnackbar.info(context, 'Thanks for your feedback!');
                     } catch (e) {
                       debugPrint('Error submitting rating: $e');
                       if (mounted) {

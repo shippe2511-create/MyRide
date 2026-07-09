@@ -250,7 +250,7 @@ export function Header() {
                 <DropdownMenuItem
                   key={notif.id}
                   className="flex items-start gap-3 p-3 cursor-pointer"
-                  onSelect={() => handleNotificationClick(notif)}
+                  onClick={() => handleNotificationClick(notif)}
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-yellow-500/10">
                     {notif.type === "pending_driver" ? (

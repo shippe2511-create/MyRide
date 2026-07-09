@@ -221,7 +221,7 @@ export default function AdminsPage() {
     const idToDelete = deleteId
     setDeleteId(null)
 
-    const { error } = await supabase.from("profiles").update({ role: "user" }).eq("id", idToDelete)
+    const { error } = await supabase.from("profiles").update({ role: "customer" }).eq("id", idToDelete)
     if (error) {
       toast.error("Failed to remove admin")
     } else {

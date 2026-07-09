@@ -191,7 +191,18 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
     router.push(`/dashboard/drivers?${params.toString()}`)
   }
 
-  const handleSearch = () => updateParams("search", search)
+  const handleSearch = (value?: string) => updateParams("search", value ?? search)
+
+  // Debounced live search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (search !== searchParams.get("search")) {
+        handleSearch(search)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
   const handleStatusChange = (value: string) => {
     setStatusFilter(value)
     updateParams("status", value)

@@ -593,21 +593,37 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
       role: "customer",
     }))
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .insert(toInsert)
-      .select()
+    // Insert one by one to skip duplicates
+    let successCount = 0
+    let skipCount = 0
 
-    if (error) {
-      toast.error("Failed to import: " + error.message)
-    } else {
-      toast.success(`Successfully imported ${data?.length || importPreview.length} customers`)
-      logActivity({ action: 'create', entityType: 'customer', details: { bulk_import: true, count: importPreview.length } })
-      setImportDialogOpen(false)
-      setImportPreview([])
-      // Refresh the page data
-      router.refresh()
+    for (const customer of toInsert) {
+      const { error } = await supabase
+        .from("profiles")
+        .insert(customer)
+
+      if (error) {
+        if (error.message.includes("duplicate") || error.message.includes("unique")) {
+          skipCount++
+        } else {
+          console.error("Import error:", error)
+        }
+      } else {
+        successCount++
+      }
     }
+
+    if (successCount > 0) {
+      toast.success(`Imported ${successCount} customers${skipCount > 0 ? `, skipped ${skipCount} duplicates` : ""}`)
+      logActivity({ action: 'create', entityType: 'customer', details: { bulk_import: true, count: successCount } })
+    } else if (skipCount > 0) {
+      toast.info(`All ${skipCount} customers already exist`)
+    } else {
+      toast.error("Failed to import customers")
+    }
+    setImportDialogOpen(false)
+    setImportPreview([])
+    router.refresh()
     setImportLoading(false)
   }
 

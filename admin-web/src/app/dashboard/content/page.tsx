@@ -206,13 +206,13 @@ function ReactionsTab() {
   }
 
   useEffect(() => {
-    loadReactions()
+    loadReactions(true)
 
     // Realtime subscription
     const channel = supabase
       .channel("content_reactions_changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "content_reactions" }, () => {
-        loadReactions()
+        loadReactions(false)
       })
       .subscribe()
 
@@ -221,8 +221,8 @@ function ReactionsTab() {
     }
   }, [filter])
 
-  async function loadReactions() {
-    setLoading(true)
+  async function loadReactions(showLoading = true) {
+    if (showLoading) setLoading(true)
     let query = supabase
       .from("content_reactions")
       .select(`

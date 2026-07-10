@@ -2130,17 +2130,56 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             border: Border.all(color: AppColors.error.withValues(alpha: 0.5), width: 1.5),
                           ),
                           child: TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _scheduledTime = null;
-                                _lastPickupAddress = '';
-                                _lastDropoffAddress = '';
-                                _lastPickupLat = null;
-                                _lastPickupLng = null;
-                                _lastDropoffLat = null;
-                                _lastDropoffLng = null;
-                              });
-                              Navigator.pop(context);
+                            onPressed: () async {
+                              // Show confirmation dialog
+                              final confirmed = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  backgroundColor: context.isDark ? const Color(0xFF1C1C1E) : Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  title: Text('Cancel Scheduled Ride?', style: TextStyle(color: context.textColor)),
+                                  content: Text(
+                                    'Are you sure you want to cancel this scheduled ride?',
+                                    style: TextStyle(color: context.mutedColor),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx, false),
+                                      child: Text('No', style: TextStyle(color: context.mutedColor)),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx, true),
+                                      child: const Text('Yes, Cancel', style: TextStyle(color: Colors.red)),
+                                    ),
+                                  ],
+                                ),
+                              );
+
+                              if (confirmed == true) {
+                                // Cancel the ride in database
+                                if (_subscribedRideId != null) {
+                                  final success = await SupabaseService.cancelScheduledRide(_subscribedRideId!);
+                                  if (success && mounted) {
+                                    AppSnackbar.info(context, 'Scheduled ride cancelled');
+                                  }
+                                  // Cancel scheduled notification
+                                  if (_scheduledTime != null) {
+                                    final notifId = _scheduledTime!.subtract(const Duration(minutes: 15)).millisecondsSinceEpoch ~/ 1000;
+                                    NotificationService.cancelScheduledNotification(notifId);
+                                  }
+                                }
+                                setState(() {
+                                  _scheduledTime = null;
+                                  _lastPickupAddress = '';
+                                  _lastDropoffAddress = '';
+                                  _lastPickupLat = null;
+                                  _lastPickupLng = null;
+                                  _lastDropoffLat = null;
+                                  _lastDropoffLng = null;
+                                  _subscribedRideId = null;
+                                });
+                                Navigator.pop(context);
+                              }
                             },
                             style: TextButton.styleFrom(foregroundColor: AppColors.error, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
                             child: Row(
@@ -2172,7 +2211,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         child: ElevatedButton(
                           onPressed: (pickupAddress.isNotEmpty && dropoffAddress.isNotEmpty)
                               ? () async {
-                                  // Validate allowed time window FIRST
+                                  // Check driver availability FIRST (most important)
+                                  final hasShift = await SupabaseService.hasDriverShiftAt(selectedDate);
+                                  if (!hasShift) {
+                                    final dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][selectedDate.weekday - 1];
+                                    AppSnackbar.warning(context, 'No drivers available on $dayName');
+                                    return;
+                                  }
+
+                                  // Validate allowed time window
                                   final selectedHour = selectedTime.hour;
                                   final selectedMinute = selectedTime.minute;
                                   final selectedMinutes = selectedHour * 60 + selectedMinute;
@@ -2199,6 +2246,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                     AppSnackbar.warning(context, 'Cannot schedule more than $maxDaysAhead days ahead');
                                     return;
                                   }
+
                                   Navigator.pop(context);
                                   HapticFeedback.mediumImpact();
                                   try {
@@ -2219,6 +2267,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                       scheduledTime: scheduledUtc, customerId: appState.profileId,
                                     );
                                     setState(() => _scheduledTime = selectedDate);
+
+                                    // Schedule local notification reminder 15 minutes before ride
+                                    NotificationService().scheduleRideReminder(
+                                      pickupName: pickupAddress,
+                                      dropoffName: dropoffAddress,
+                                      scheduledTime: selectedDate,
+                                      minutesBefore: 15,
+                                    );
+
                                     if (mounted) {
                                       AppSnackbar.success(context, 'Ride scheduled for ${_formatScheduledTime(selectedDate)}');
                                     }

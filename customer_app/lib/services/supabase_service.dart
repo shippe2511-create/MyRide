@@ -2053,4 +2053,61 @@ class SupabaseService {
     }
   }
 
+  // Check if any driver has a shift on a given date and time
+  static Future<bool> hasDriverShiftAt(DateTime scheduledTime) async {
+    try {
+      final dateStr = '${scheduledTime.year}-${scheduledTime.month.toString().padLeft(2, '0')}-${scheduledTime.day.toString().padLeft(2, '0')}';
+      final timeStr = '${scheduledTime.hour.toString().padLeft(2, '0')}:${scheduledTime.minute.toString().padLeft(2, '0')}:00';
+
+      // Check for any scheduled shift on the given date where the time falls within shift hours
+      final response = await client
+          .from('shifts')
+          .select('id')
+          .eq('shift_date', dateStr)
+          .eq('status', 'scheduled')
+          .lte('start_time', timeStr)
+          .gte('end_time', timeStr)
+          .limit(1);
+
+      return (response as List).isNotEmpty;
+    } catch (e) {
+      debugPrint('Error checking driver shifts: $e');
+      // If check fails, allow the ride (fail-open for user experience)
+      return true;
+    }
+  }
+
+  // Get available shift dates (dates with at least one driver shift)
+  static Future<List<DateTime>> getAvailableShiftDates(int daysAhead) async {
+    try {
+      final now = DateTime.now();
+      final startDate = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final endDate = now.add(Duration(days: daysAhead));
+      final endDateStr = '${endDate.year}-${endDate.month.toString().padLeft(2, '0')}-${endDate.day.toString().padLeft(2, '0')}';
+
+      final response = await client
+          .from('shifts')
+          .select('shift_date')
+          .eq('status', 'scheduled')
+          .gte('shift_date', startDate)
+          .lte('shift_date', endDateStr);
+
+      final dates = <DateTime>{};
+      for (final shift in response as List) {
+        final dateStr = shift['shift_date'] as String?;
+        if (dateStr != null) {
+          final parts = dateStr.split('-');
+          if (parts.length == 3) {
+            dates.add(DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2])));
+          }
+        }
+      }
+
+      return dates.toList()..sort();
+    } catch (e) {
+      debugPrint('Error getting available shift dates: $e');
+      return [];
+    }
+  }
+
 }

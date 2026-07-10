@@ -1386,7 +1386,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           state.goOffline();
                           state.resetChecklist();
                           HapticFeedback.heavyImpact();
-                          AppSnackbar.success(context, 'Shift ended', subtitle: 'Have a great day!');
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.error,

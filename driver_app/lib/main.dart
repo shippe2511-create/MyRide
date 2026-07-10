@@ -234,6 +234,7 @@ class _GlobalNotificationBannerState extends State<_GlobalNotificationBanner>
 }
 // import 'services/firebase_service.dart'; // Disabled - requires paid Apple Developer Program
 
+// Custom page route with smooth fade + slide transition and loading indicator
 class SmoothPageRoute<T> extends PageRouteBuilder<T> {
   final Widget page;
   SmoothPageRoute({required this.page})
@@ -244,15 +245,39 @@ class SmoothPageRoute<T> extends PageRouteBuilder<T> {
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             final curve =
                 CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-            return FadeTransition(
-              opacity: curve,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0.03, 0),
-                  end: Offset.zero,
-                ).animate(curve),
-                child: child,
-              ),
+            return Stack(
+              children: [
+                FadeTransition(
+                  opacity: curve,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0.03, 0),
+                      end: Offset.zero,
+                    ).animate(curve),
+                    child: child,
+                  ),
+                ),
+                // Show loading indicator during transition
+                if (animation.status == AnimationStatus.forward && animation.value < 0.5)
+                  Positioned.fill(
+                    child: Container(
+                      color: Colors.black.withValues(alpha: 0.2 * (1 - animation.value * 2)),
+                      child: Center(
+                        child: Opacity(
+                          opacity: 1 - animation.value * 2,
+                          child: const SizedBox(
+                            width: 32,
+                            height: 32,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFACC15)),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             );
           },
         );

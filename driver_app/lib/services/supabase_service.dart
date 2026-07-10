@@ -1339,14 +1339,15 @@ class SupabaseService {
   }
 
   // Register FCM token for push notifications
-  static Future<void> registerFcmToken(String token, String? userId) async {
-    if (userId == null) return;
+  static Future<void> registerFcmToken(String token, {String? userId}) async {
+    final finalUserId = userId ?? currentUser?.id;
+    if (finalUserId == null) return;
 
     try {
       await client.from('push_tokens').upsert({
-        'user_id': userId,
+        'user_id': finalUserId,
         'token': token,
-        'platform': 'ios',
+        'platform': 'android',
         'updated_at': DateTime.now().toIso8601String(),
       }, onConflict: 'user_id');
     } catch (e) {

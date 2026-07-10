@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "127953462535",
+    "project_id": "myride-8f9d9",
+    "storage_bucket": "myride-8f9d9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:127953462535:android:4a593706a430b937d111a2",
+        "android_client_info": {
+          "package_name": "com.athifabdulla.myride"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCka5-qCrD4W-JbAj2n_GYJYYfl2HBDVyk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:127953462535:android:91119f80806079d7d111a2",
+        "android_client_info": {
+          "package_name": "com.myride.driverApp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCka5-qCrD4W-JbAj2n_GYJYYfl2HBDVyk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

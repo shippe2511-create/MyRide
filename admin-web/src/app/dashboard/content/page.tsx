@@ -28,7 +28,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { ImagePicker } from "@/components/ui/image-picker"
 import { ComboboxInput } from "@/components/ui/combobox-input"
-import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Bell, Pin, Users, FileText, Megaphone, Calendar, Download, Coffee, Quote, GripVertical } from "lucide-react"
+import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Bell, Pin, Users, FileText, Megaphone, Calendar, Download, Coffee, Quote, GripVertical, Heart } from "lucide-react"
 import { SkeletonTable } from "@/components/ui/skeleton-card"
 
 const STAFF_CATEGORIES = [
@@ -188,6 +188,169 @@ function SortableQuoteRow({ quote, onEdit, onDelete, onToggleStatus }: any) {
         </div>
       </TableCell>
     </TableRow>
+  )
+}
+
+// Reactions Tab Component
+function ReactionsTab() {
+  const supabase = createClient()
+  const [reactions, setReactions] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<"all" | "announcement" | "staff_corner">("all")
+
+  const REACTION_EMOJIS: Record<string, string> = {
+    thumbs_up: "👍",
+    heart: "❤️",
+    thumbs_down: "👎",
+    laugh: "😂",
+  }
+
+  useEffect(() => {
+    loadReactions()
+  }, [filter])
+
+  async function loadReactions() {
+    setLoading(true)
+    let query = supabase
+      .from("content_reactions")
+      .select(`
+        id,
+        content_type,
+        content_id,
+        reaction,
+        created_at,
+        user:profiles!content_reactions_user_id_fkey(id, full_name, email, phone)
+      `)
+      .order("created_at", { ascending: false })
+      .limit(100)
+
+    if (filter !== "all") {
+      query = query.eq("content_type", filter)
+    }
+
+    const { data, error } = await query
+
+    if (!error && data) {
+      // Get content titles
+      const announcementIds = [...new Set(data.filter(r => r.content_type === "announcement").map(r => r.content_id))]
+      const staffIds = [...new Set(data.filter(r => r.content_type === "staff_corner").map(r => r.content_id))]
+
+      const [{ data: announcements }, { data: staffPosts }] = await Promise.all([
+        announcementIds.length > 0
+          ? supabase.from("announcements").select("id, title").in("id", announcementIds)
+          : { data: [] },
+        staffIds.length > 0
+          ? supabase.from("staff_corner").select("id, title").in("id", staffIds)
+          : { data: [] },
+      ])
+
+      const contentTitles: Record<string, string> = {}
+      announcements?.forEach(a => { contentTitles[a.id] = a.title })
+      staffPosts?.forEach(s => { contentTitles[s.id] = s.title })
+
+      setReactions(data.map(r => ({ ...r, contentTitle: contentTitles[r.content_id] || "Unknown" })))
+    }
+    setLoading(false)
+  }
+
+  // Group reactions by content
+  const groupedByContent = reactions.reduce((acc, r) => {
+    const key = `${r.content_type}:${r.content_id}`
+    if (!acc[key]) {
+      acc[key] = {
+        contentType: r.content_type,
+        contentId: r.content_id,
+        contentTitle: r.contentTitle,
+        reactions: [],
+        counts: { thumbs_up: 0, heart: 0, thumbs_down: 0, laugh: 0 },
+      }
+    }
+    acc[key].reactions.push(r)
+    acc[key].counts[r.reaction] = (acc[key].counts[r.reaction] || 0) + 1
+    return acc
+  }, {} as Record<string, any>)
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>Content Reactions</CardTitle>
+        <Select value={filter} onValueChange={(v) => setFilter(v as any)}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Filter by type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Content</SelectItem>
+            <SelectItem value="announcement">Announcements</SelectItem>
+            <SelectItem value="staff_corner">Staff Corner</SelectItem>
+          </SelectContent>
+        </Select>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <SkeletonTable rows={5} />
+        ) : reactions.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            No reactions yet
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {Object.values(groupedByContent).map((group: any) => (
+              <div key={`${group.contentType}:${group.contentId}`} className="border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <Badge variant="outline" className="mb-1">
+                      {group.contentType === "announcement" ? "Announcement" : "Staff Corner"}
+                    </Badge>
+                    <h4 className="font-medium">{group.contentTitle}</h4>
+                  </div>
+                  <div className="flex gap-3 text-lg">
+                    {Object.entries(group.counts as Record<string, number>).map(([type, count]) => (
+                      count > 0 && (
+                        <span key={type} className="flex items-center gap-1">
+                          {REACTION_EMOJIS[type]} <span className="text-sm text-muted-foreground">{count}</span>
+                        </span>
+                      )
+                    ))}
+                  </div>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Reaction</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {group.reactions.map((r: any) => (
+                      <TableRow key={r.id}>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{r.user?.full_name || "Unknown"}</p>
+                            <p className="text-sm text-muted-foreground">{r.user?.email || r.user?.phone || "-"}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-2xl">{REACTION_EMOJIS[r.reaction]}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {new Date(r.created_at).toLocaleDateString("en-US", {
+                            timeZone: "Indian/Maldives",
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -768,6 +931,10 @@ export default function ContentPage() {
             <Quote className="h-4 w-4" />
             Quotes
           </TabsTrigger>
+          <TabsTrigger value="reactions" className="flex items-center gap-2">
+            <Heart className="h-4 w-4" />
+            Reactions
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="staff">
@@ -1079,6 +1246,10 @@ export default function ContentPage() {
               </DndContext>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="reactions">
+          <ReactionsTab />
         </TabsContent>
       </Tabs>
 

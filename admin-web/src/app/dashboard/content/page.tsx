@@ -293,61 +293,41 @@ function ReactionsTab() {
             No reactions yet
           </div>
         ) : (
-          <div className="space-y-6">
-            {Object.values(groupedByContent).map((group: any) => (
-              <div key={`${group.contentType}:${group.contentId}`} className="border rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <Badge variant="outline" className="mb-1">
-                      {group.contentType === "announcement" ? "Announcement" : "Staff Corner"}
-                    </Badge>
-                    <h4 className="font-medium">{group.contentTitle}</h4>
-                  </div>
-                  <div className="flex gap-3 text-lg">
-                    {Object.entries(group.counts as Record<string, number>).map(([type, count]) => (
-                      count > 0 && (
-                        <span key={type} className="flex items-center gap-1">
-                          {REACTION_EMOJIS[type]} <span className="text-sm text-muted-foreground">{count}</span>
-                        </span>
-                      )
-                    ))}
-                  </div>
-                </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>User</TableHead>
-                      <TableHead>Reaction</TableHead>
-                      <TableHead>Date</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {group.reactions.map((r: any) => (
-                      <TableRow key={r.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{r.user?.full_name || "Unknown"}</p>
-                            <p className="text-sm text-muted-foreground">{r.user?.email || r.user?.phone || "-"}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-2xl">{REACTION_EMOJIS[r.reaction]}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {new Date(r.created_at).toLocaleDateString("en-US", {
-                            timeZone: "Indian/Maldives",
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ))}
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Content</TableHead>
+                <TableHead>User</TableHead>
+                <TableHead className="w-16"></TableHead>
+                <TableHead>Date</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {reactions.map((r: any) => (
+                <TableRow key={r.id}>
+                  <TableCell>
+                    <div>
+                      <Badge variant="outline" className="text-xs mb-1">
+                        {r.content_type === "announcement" ? "Announcement" : "Staff"}
+                      </Badge>
+                      <p className="font-medium text-sm">{r.contentTitle}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <p className="font-medium">{r.user?.full_name || "Unknown"}</p>
+                  </TableCell>
+                  <TableCell className="text-xl">{REACTION_EMOJIS[r.reaction]}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {new Date(r.created_at).toLocaleDateString("en-US", {
+                      timeZone: "Indian/Maldives",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </CardContent>
     </Card>

@@ -1151,12 +1151,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     final a = _announcements[index];
                     final createdAt = MaldivesTimezone.parse(a['created_at']);
                     final isNew = createdAt != null && MaldivesTimezone.now().difference(createdAt).inDays < 3;
+                    // Support multiple images
+                    List<String> imageUrls = [];
+                    if (a['image_urls'] != null && (a['image_urls'] as List).isNotEmpty) {
+                      imageUrls = (a['image_urls'] as List).map((e) => e.toString()).toList();
+                    } else if (a['image_url'] != null && a['image_url'].toString().isNotEmpty) {
+                      imageUrls = [a['image_url'].toString()];
+                    }
                     return _buildAnnouncementCard(
                       context,
                       id: a['id'] ?? '',
                       title: a['title'] ?? '',
                       subtitle: a['message'] ?? '',
-                      imageUrl: a['image_url'] ?? '',
+                      imageUrls: imageUrls,
                       date: createdAt != null ? '${_monthName(createdAt.month)} ${createdAt.day}, ${createdAt.year}' : '',
                       isNew: isNew,
                     );
@@ -1177,83 +1184,99 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     required String id,
     required String title,
     required String subtitle,
-    required String imageUrl,
+    required List<String> imageUrls,
     required String date,
     required bool isNew,
   }) {
-    return ReactionPicker(
+    return ReactableCard(
       contentType: 'announcement',
       contentId: id,
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          _showAnnouncementDetail(context, title: title, subtitle: subtitle, imageUrl: imageUrl, date: date);
-        },
-        child: Container(
-          width: 280,
-          decoration: BoxDecoration(
-            color: context.surfaceColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            border: Border(
-              top: BorderSide(color: context.borderColor),
-              left: BorderSide(color: context.borderColor),
-              right: BorderSide(color: context.borderColor),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                height: 90,
-                decoration: BoxDecoration(
-                  color: AppColors.yellow.withValues(alpha: 0.2),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                ),
-                child: Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                      child: Image.network(
-                        imageUrl,
-                        width: double.infinity,
-                        height: 90,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => const Center(
-                          child: Icon(Icons.campaign, color: AppColors.yellow, size: 32),
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _showAnnouncementDetail(context, title: title, subtitle: subtitle, imageUrls: imageUrls, date: date);
+      },
+      childBuilder: (badge) => Container(
+        width: 280,
+        margin: const EdgeInsets.only(right: 12),
+        decoration: BoxDecoration(
+          color: context.surfaceColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: context.borderColor),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 90,
+              decoration: BoxDecoration(
+                color: AppColors.yellow.withValues(alpha: 0.2),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    child: imageUrls.isNotEmpty
+                        ? Image.network(
+                            imageUrls.first,
+                            width: double.infinity,
+                            height: 90,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => const Center(
+                              child: Icon(Icons.campaign, color: AppColors.yellow, size: 32),
+                            ),
+                          )
+                        : const Center(child: Icon(Icons.campaign, color: AppColors.yellow, size: 32)),
+                  ),
+                  if (isNew)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.error,
+                          borderRadius: BorderRadius.circular(8),
                         ),
+                        child: Text('NEW', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
                       ),
                     ),
-                    if (isNew)
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.error,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text('NEW', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+                  // Photo count indicator
+                  if (imageUrls.length > 1)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(12),
                         ),
+                        child: Text('1/${imageUrls.length}', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 4),
-                    Text(subtitle, style: TextStyle(color: context.mutedColor, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 6),
-                    Text(date, style: TextStyle(color: context.mutedColor.withValues(alpha: 0.7), fontSize: 10)),
-                  ],
-                ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: TextStyle(color: context.mutedColor, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(child: Text(date, style: TextStyle(color: context.mutedColor.withValues(alpha: 0.7), fontSize: 10))),
+                      if (badge != null) badge,
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1321,12 +1344,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               itemCount: _staffPosts.length,
               itemBuilder: (context, index) {
                 final post = _staffPosts[index];
+                // Support multiple images
+                List<String> imageUrls = [];
+                if (post['image_urls'] != null && (post['image_urls'] as List).isNotEmpty) {
+                  imageUrls = (post['image_urls'] as List).map((e) => e.toString()).toList();
+                } else if (post['image_url'] != null && post['image_url'].toString().isNotEmpty) {
+                  imageUrls = [post['image_url'].toString()];
+                }
+                final createdAt = MaldivesTimezone.parse(post['created_at']);
+                final dateStr = createdAt != null ? '${_monthName(createdAt.month)} ${createdAt.day}, ${createdAt.year}' : '';
                 return _buildStaffCard(
                   context,
                   id: post['id'] ?? '',
                   title: post['title'] ?? '',
                   subtitle: post['subtitle'] ?? '',
-                  imageUrl: post['image_url'] ?? '',
+                  imageUrls: imageUrls,
+                  date: dateStr,
                   category: post['category'] ?? 'General',
                   categoryColor: _parseColor(post['category_color']),
                 );
@@ -1351,80 +1384,99 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     required String id,
     required String title,
     required String subtitle,
-    required String imageUrl,
+    required List<String> imageUrls,
+    required String date,
     required String category,
     required Color categoryColor,
   }) {
-    return ReactionPicker(
+    return ReactableCard(
       contentType: 'staff_corner',
       contentId: id,
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          _showStaffCornerDetail(context, title: title, subtitle: subtitle, imageUrl: imageUrl, category: category, categoryColor: categoryColor);
-        },
-        child: Container(
-          width: 200,
-          decoration: BoxDecoration(
-            color: context.surfaceColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            border: Border(
-              top: BorderSide(color: context.borderColor),
-              left: BorderSide(color: context.borderColor),
-              right: BorderSide(color: context.borderColor),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                height: 100,
-                decoration: BoxDecoration(
-                  color: categoryColor.withValues(alpha: 0.2),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                ),
-                child: Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                      child: Image.network(
-                        imageUrl,
-                        width: double.infinity,
-                        height: 100,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Center(
-                          child: Icon(Icons.people, color: categoryColor, size: 32),
-                        ),
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _showStaffCornerDetail(context, title: title, subtitle: subtitle, imageUrls: imageUrls, category: category, categoryColor: categoryColor);
+      },
+      childBuilder: (badge) => Container(
+        width: 200,
+        margin: const EdgeInsets.only(right: 12),
+        decoration: BoxDecoration(
+          color: context.surfaceColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: context.borderColor),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 100,
+              decoration: BoxDecoration(
+                color: categoryColor.withValues(alpha: 0.2),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    child: imageUrls.isNotEmpty
+                        ? Image.network(
+                            imageUrls.first,
+                            width: double.infinity,
+                            height: 100,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Center(
+                              child: Icon(Icons.people, color: categoryColor, size: 32),
+                            ),
+                          )
+                        : Center(child: Icon(Icons.people, color: categoryColor, size: 32)),
+                  ),
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: categoryColor,
+                        borderRadius: BorderRadius.circular(8),
                       ),
+                      child: Text(category, style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
                     ),
+                  ),
+                  // Photo count indicator
+                  if (imageUrls.length > 1)
                     Positioned(
                       top: 8,
-                      left: 8,
+                      right: 8,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: categoryColor,
-                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Text(category, style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
+                        child: Text('1/${imageUrls.length}', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
                       ),
                     ),
-                  ],
-                ),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: TextStyle(color: context.textColor, fontSize: 13, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 4),
-                    Text(subtitle, style: TextStyle(color: context.mutedColor, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
-                  ],
-                ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: TextStyle(color: context.textColor, fontSize: 13, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: TextStyle(color: context.mutedColor, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(child: Text(date, style: TextStyle(color: context.mutedColor.withValues(alpha: 0.7), fontSize: 10))),
+                      if (badge != null) badge,
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1576,151 +1628,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return _formatScheduledTime(time);
   }
 
-  void _showStaffCornerDetail(BuildContext context, {required String title, required String subtitle, required String imageUrl, required String category, required Color categoryColor}) {
+  void _showStaffCornerDetail(BuildContext context, {required String title, required String subtitle, required List<String> imageUrls, required String category, required Color categoryColor}) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (ctx) => Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
-        decoration: BoxDecoration(
-          color: context.surfaceColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              height: 180,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: categoryColor.withValues(alpha: 0.2),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-              ),
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-                    child: Image.network(imageUrl, width: double.infinity, height: 180, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Center(child: Icon(Icons.people, color: categoryColor, size: 48))),
-                  ),
-                  Positioned(
-                    top: 16, left: 16,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(color: categoryColor, borderRadius: BorderRadius.circular(8)),
-                      child: Text(category, style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                  Positioned(
-                    top: 16, right: 16,
-                    child: GestureDetector(
-                      onTap: () => Navigator.pop(ctx),
-                      child: Container(
-                        width: 36, height: 36,
-                        decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                        child: Icon(Icons.close, color: Colors.white, size: 20),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 16),
-                  Text(subtitle, style: TextStyle(color: context.textColor, fontSize: 15, height: 1.5)),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.yellow, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                      child: Text('Got it', style: TextStyle(fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                  SizedBox(height: MediaQuery.of(ctx).padding.bottom),
-                ],
-              ),
-            ),
-          ],
-        ),
+      builder: (ctx) => _StaffCornerDetailSheet(
+        title: title,
+        subtitle: subtitle,
+        imageUrls: imageUrls,
+        category: category,
+        categoryColor: categoryColor,
       ),
     );
   }
 
-  void _showAnnouncementDetail(BuildContext context, {required String title, required String subtitle, required String imageUrl, required String date}) {
+  void _showAnnouncementDetail(BuildContext context, {required String title, required String subtitle, required List<String> imageUrls, required String date}) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (ctx) => Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
-        decoration: BoxDecoration(
-          color: context.surfaceColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              height: 180,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: AppColors.yellow.withValues(alpha: 0.2),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-              ),
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-                    child: Image.network(imageUrl, width: double.infinity, height: 180, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Center(child: Icon(Icons.campaign, color: AppColors.yellow, size: 48))),
-                  ),
-                  Positioned(
-                    top: 16,
-                    right: 16,
-                    child: GestureDetector(
-                      onTap: () => Navigator.pop(ctx),
-                      child: Container(
-                        width: 36, height: 36,
-                        decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                        child: Icon(Icons.close, color: Colors.white, size: 20),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
-                  Text(date, style: TextStyle(color: context.mutedColor, fontSize: 13)),
-                  const SizedBox(height: 16),
-                  Text(subtitle, style: TextStyle(color: context.textColor, fontSize: 15, height: 1.5)),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.yellow, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                      child: Text('Got it', style: TextStyle(fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                  SizedBox(height: MediaQuery.of(ctx).padding.bottom),
-                ],
-              ),
-            ),
-          ],
-        ),
+      builder: (ctx) => _AnnouncementDetailSheet(
+        title: title,
+        subtitle: subtitle,
+        imageUrls: imageUrls,
+        date: date,
       ),
     );
   }
@@ -2958,4 +2890,350 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+}
+
+class _AnnouncementDetailSheet extends StatefulWidget {
+  final String title;
+  final String subtitle;
+  final List<String> imageUrls;
+  final String date;
+
+  const _AnnouncementDetailSheet({
+    required this.title,
+    required this.subtitle,
+    required this.imageUrls,
+    required this.date,
+  });
+
+  @override
+  State<_AnnouncementDetailSheet> createState() => _AnnouncementDetailSheetState();
+}
+
+class _AnnouncementDetailSheetState extends State<_AnnouncementDetailSheet> {
+  int _currentPage = 0;
+  final PageController _pageController = PageController();
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+      decoration: BoxDecoration(
+        color: context.surfaceColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Image carousel
+          Container(
+            height: 280,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: AppColors.yellow.withValues(alpha: 0.2),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: Stack(
+              children: [
+                if (widget.imageUrls.isEmpty)
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                    child: Center(child: Icon(Icons.campaign, color: AppColors.yellow, size: 48)),
+                  )
+                else if (widget.imageUrls.length == 1)
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                    child: Image.network(
+                      widget.imageUrls.first,
+                      width: double.infinity,
+                      height: 280,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Center(child: Icon(Icons.campaign, color: AppColors.yellow, size: 48)),
+                    ),
+                  )
+                else
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                    child: PageView.builder(
+                      controller: _pageController,
+                      itemCount: widget.imageUrls.length,
+                      onPageChanged: (page) => setState(() => _currentPage = page),
+                      itemBuilder: (context, index) => Image.network(
+                        widget.imageUrls[index],
+                        width: double.infinity,
+                        height: 280,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Center(child: Icon(Icons.campaign, color: AppColors.yellow, size: 48)),
+                      ),
+                    ),
+                  ),
+                // Close button
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 36, height: 36,
+                      decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                      child: const Icon(Icons.close, color: Colors.white, size: 20),
+                    ),
+                  ),
+                ),
+                // Page indicator
+                if (widget.imageUrls.length > 1)
+                  Positioned(
+                    top: 16,
+                    right: 60,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${_currentPage + 1}/${widget.imageUrls.length}',
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                // Dot indicators
+                if (widget.imageUrls.length > 1)
+                  Positioned(
+                    bottom: 12,
+                    left: 0,
+                    right: 0,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(widget.imageUrls.length, (index) => Container(
+                        width: 8,
+                        height: 8,
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _currentPage == index ? Colors.white : Colors.white.withValues(alpha: 0.4),
+                        ),
+                      )),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.title, style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  Text(widget.date, style: TextStyle(color: context.mutedColor, fontSize: 13)),
+                  const SizedBox(height: 16),
+                  Text(widget.subtitle, style: TextStyle(color: context.textColor, fontSize: 15, height: 1.5)),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.yellow,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  SizedBox(height: MediaQuery.of(context).padding.bottom),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StaffCornerDetailSheet extends StatefulWidget {
+  final String title;
+  final String subtitle;
+  final List<String> imageUrls;
+  final String category;
+  final Color categoryColor;
+
+  const _StaffCornerDetailSheet({
+    required this.title,
+    required this.subtitle,
+    required this.imageUrls,
+    required this.category,
+    required this.categoryColor,
+  });
+
+  @override
+  State<_StaffCornerDetailSheet> createState() => _StaffCornerDetailSheetState();
+}
+
+class _StaffCornerDetailSheetState extends State<_StaffCornerDetailSheet> {
+  int _currentPage = 0;
+  final PageController _pageController = PageController();
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+      decoration: BoxDecoration(
+        color: context.surfaceColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Image carousel
+          Container(
+            height: 280,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: widget.categoryColor.withValues(alpha: 0.2),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: Stack(
+              children: [
+                if (widget.imageUrls.isEmpty)
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                    child: Center(child: Icon(Icons.people, color: widget.categoryColor, size: 48)),
+                  )
+                else if (widget.imageUrls.length == 1)
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                    child: Image.network(
+                      widget.imageUrls.first,
+                      width: double.infinity,
+                      height: 280,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Center(child: Icon(Icons.people, color: widget.categoryColor, size: 48)),
+                    ),
+                  )
+                else
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                    child: PageView.builder(
+                      controller: _pageController,
+                      itemCount: widget.imageUrls.length,
+                      onPageChanged: (page) => setState(() => _currentPage = page),
+                      itemBuilder: (context, index) => Image.network(
+                        widget.imageUrls[index],
+                        width: double.infinity,
+                        height: 280,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Center(child: Icon(Icons.people, color: widget.categoryColor, size: 48)),
+                      ),
+                    ),
+                  ),
+                // Category badge
+                Positioned(
+                  top: 16,
+                  left: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(color: widget.categoryColor, borderRadius: BorderRadius.circular(8)),
+                    child: Text(widget.category, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                // Close button
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 36, height: 36,
+                      decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                      child: const Icon(Icons.close, color: Colors.white, size: 20),
+                    ),
+                  ),
+                ),
+                // Page indicator
+                if (widget.imageUrls.length > 1)
+                  Positioned(
+                    top: 16,
+                    right: 60,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${_currentPage + 1}/${widget.imageUrls.length}',
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                // Dot indicators
+                if (widget.imageUrls.length > 1)
+                  Positioned(
+                    bottom: 12,
+                    left: 0,
+                    right: 0,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(widget.imageUrls.length, (index) => Container(
+                        width: 8,
+                        height: 8,
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _currentPage == index ? Colors.white : Colors.white.withValues(alpha: 0.4),
+                        ),
+                      )),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.title, style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 16),
+                  Text(widget.subtitle, style: TextStyle(color: context.textColor, fontSize: 15, height: 1.5)),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.yellow,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  SizedBox(height: MediaQuery.of(context).padding.bottom),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

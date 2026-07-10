@@ -282,20 +282,33 @@ function ReactionsTab() {
     return acc
   }, {} as Record<string, any>)
 
+  const filters = [
+    { value: "all", label: "All" },
+    { value: "announcement", label: "Announcements" },
+    { value: "staff_corner", label: "Staff Corner" },
+  ] as const
+
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Content Reactions</CardTitle>
-        <Select value={filter} onValueChange={(v) => setFilter(v as any)}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Content</SelectItem>
-            <SelectItem value="announcement">Announcements</SelectItem>
-            <SelectItem value="staff_corner">Staff Corner</SelectItem>
-          </SelectContent>
-        </Select>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle>Content Reactions</CardTitle>
+          <div className="flex gap-2">
+            {filters.map((f) => (
+              <button
+                key={f.value}
+                onClick={() => setFilter(f.value as any)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-full transition-all ${
+                  filter === f.value
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         {loading ? (

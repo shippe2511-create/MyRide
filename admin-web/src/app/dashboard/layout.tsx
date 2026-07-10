@@ -18,12 +18,7 @@ export default function DashboardLayout({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
-  const [isNavigating, setIsNavigating] = useState(false)
   const pathname = usePathname()
-
-  useEffect(() => {
-    setIsNavigating(false)
-  }, [pathname])
 
   // Detect mobile screen
   useEffect(() => {
@@ -67,15 +62,6 @@ export default function DashboardLayout({
       <GlobalSearch />
       <KeyboardShortcuts />
 
-      {/* Page navigation loader */}
-      {isNavigating && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 backdrop-blur-sm">
-          <div className="rounded-2xl bg-background p-6 shadow-2xl">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-yellow-400 border-t-transparent" />
-          </div>
-        </div>
-      )}
-
       {/* Mobile menu overlay */}
       {isMobile && mobileMenuOpen && (
         <div
@@ -92,10 +78,7 @@ export default function DashboardLayout({
         <Sidebar
           collapsed={isMobile ? false : sidebarCollapsed}
           onCollapse={isMobile ? () => setMobileMenuOpen(false) : handleCollapse}
-          onNavigate={() => {
-            setMobileMenuOpen(false)
-            setIsNavigating(true)
-          }}
+          onNavigate={() => setMobileMenuOpen(false)}
         />
       </div>
 

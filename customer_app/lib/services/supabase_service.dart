@@ -139,7 +139,109 @@ class SupabaseService {
   }
 
   static Future<void> signOut() async {
+    // Clear session on sign out
+    await clearSession();
     await client.auth.signOut();
+  }
+
+  // Session management for single-device login
+  static String? _sessionToken;
+  static String? get sessionToken => _sessionToken;
+
+  static Future<String> _generateSessionToken() async {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final random = DateTime.now().microsecond;
+    return 'cust_${timestamp}_$random';
+  }
+
+  static Future<String?> _getDeviceId() async {
+    // Use a simple device identifier
+    try {
+      final info = await client.from('profiles').select('id').limit(1);
+      return 'customer_app_${DateTime.now().millisecondsSinceEpoch}';
+    } catch (e) {
+      return 'customer_app_unknown';
+    }
+  }
+
+  // Register session after login - invalidates other devices
+  static Future<bool> registerSession(String oderId) async {
+    try {
+      final deviceId = await _getDeviceId();
+      _sessionToken = await _generateSessionToken();
+
+      // Upsert session - this replaces any existing session for this user+app
+      await client.from('user_sessions').upsert({
+        'user_id': oderId,
+        'device_id': deviceId,
+        'device_name': 'Customer App',
+        'app_type': 'customer',
+        'session_token': _sessionToken,
+        'last_active_at': DateTime.now().toUtc().toIso8601String(),
+      }, onConflict: 'user_id,app_type');
+
+      debugPrint('Session registered: $_sessionToken');
+      return true;
+    } catch (e) {
+      debugPrint('Error registering session: $e');
+      return false;
+    }
+  }
+
+  // Check if current session is still valid
+  static Future<bool> isSessionValid() async {
+    if (_sessionToken == null || _profileId == null) return true; // No session to validate
+
+    try {
+      final response = await client
+          .from('user_sessions')
+          .select('session_token')
+          .eq('user_id', _profileId!)
+          .eq('app_type', 'customer')
+          .maybeSingle();
+
+      if (response == null) return false;
+
+      final isValid = response['session_token'] == _sessionToken;
+      if (!isValid) {
+        debugPrint('Session invalidated - logged in from another device');
+      }
+      return isValid;
+    } catch (e) {
+      debugPrint('Error checking session: $e');
+      return true; // Don't kick user out on network errors
+    }
+  }
+
+  // Clear session on logout
+  static Future<void> clearSession() async {
+    if (_profileId == null) return;
+
+    try {
+      await client
+          .from('user_sessions')
+          .delete()
+          .eq('user_id', _profileId!)
+          .eq('app_type', 'customer');
+    } catch (e) {
+      debugPrint('Error clearing session: $e');
+    }
+    _sessionToken = null;
+  }
+
+  // Update last active time
+  static Future<void> updateSessionActivity() async {
+    if (_profileId == null || _sessionToken == null) return;
+
+    try {
+      await client
+          .from('user_sessions')
+          .update({'last_active_at': DateTime.now().toUtc().toIso8601String()})
+          .eq('user_id', _profileId!)
+          .eq('app_type', 'customer');
+    } catch (e) {
+      // Ignore errors
+    }
   }
 
   static Future<void> resetPassword(String email) async {

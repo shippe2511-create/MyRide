@@ -52,6 +52,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _unreadNotificationCount = 0;
   Timer? _notificationPollTimer;
 
+  Timer? _sessionCheckTimer;
+
   @override
   void initState() {
     super.initState();
@@ -62,6 +64,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _notificationPollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (mounted) _loadUnreadCount();
     });
+    // Check session validity periodically (every 30 seconds)
+    _startSessionCheck();
     // Mark that we're on home screen and listen for active ride
     _instance = this;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -210,6 +214,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _notificationPollTimer?.cancel();
+    _sessionCheckTimer?.cancel();
     _scrollController.dispose();
     if (_breakTipsChannel != null) SupabaseService.client.removeChannel(_breakTipsChannel!);
     if (_quotesChannel != null) SupabaseService.client.removeChannel(_quotesChannel!);
@@ -219,6 +224,27 @@ class _HomeScreenState extends State<HomeScreen> {
       context.read<DriverState>().removeListener(_onDriverStateChanged);
     } catch (_) {}
     super.dispose();
+  }
+
+  void _startSessionCheck() {
+    _sessionCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
+      final isValid = await SupabaseService.isSessionValid();
+      if (!isValid && mounted) {
+        _sessionCheckTimer?.cancel();
+        _handleSessionInvalid();
+      }
+    });
+  }
+
+  void _handleSessionInvalid() {
+    // Clear local state and redirect to login
+    final driverState = context.read<DriverState>();
+    driverState.logout();
+    SupabaseService.setDriverId(null);
+
+    AppSnackbar.error(context, 'You have been logged out because you signed in on another device');
+
+    Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
   }
 
   void _onScroll() {

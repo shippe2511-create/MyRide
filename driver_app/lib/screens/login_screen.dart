@@ -194,6 +194,13 @@ class _LoginScreenState extends State<LoginScreen> {
           employeeId: existingUser['employee_id'] ?? '',
         );
 
+        // Register session - this will sign out other devices
+        final profileId = driverProfile['profile_id'] ?? existingUser['id'];
+        if (profileId != null) {
+          SupabaseService.setDriverId(profileId);
+          await SupabaseService.registerSession(profileId);
+        }
+
         // Load today's checklist status from database
         await driverState.loadTodayChecklist();
 

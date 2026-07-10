@@ -167,6 +167,9 @@ class _LoginScreenState extends State<LoginScreen> {
         if (existingUser['id'] != null) {
           appState.setProfileId(existingUser['id']);
           SupabaseService.setProfileId(existingUser['id']);
+
+          // Register session - this will sign out other devices
+          await SupabaseService.registerSession(existingUser['id']);
         }
 
         appState.setUserData(

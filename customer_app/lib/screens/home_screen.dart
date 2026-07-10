@@ -102,6 +102,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     // Load notifications immediately and subscribe to realtime
     _loadUnreadCount();
     _subscribeToNotifications();
+
+    // Check session validity periodically (every 30 seconds)
+    _startSessionCheck();
+  }
+
+  Timer? _sessionCheckTimer;
+
+  void _startSessionCheck() {
+    _sessionCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
+      final isValid = await SupabaseService.isSessionValid();
+      if (!isValid && mounted) {
+        _sessionCheckTimer?.cancel();
+        _handleSessionInvalid();
+      }
+    });
+  }
+
+  void _handleSessionInvalid() {
+    // Clear local state and redirect to login
+    final appState = Provider.of<AppState>(context, listen: false);
+    appState.logout();
+    SupabaseService.setProfileId(null);
+
+    AppSnackbar.error(context, 'You have been logged out because you signed in on another device');
+
+    Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
   }
 
   void _checkSuspended() {
@@ -447,6 +473,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _pageController.dispose();
     _pulseController.dispose();
     _scheduledRideTimer?.cancel();
+    _sessionCheckTimer?.cancel();
     _announcementsSubscription?.unsubscribe();
     _rideStatusSubscription?.unsubscribe();
     _notificationsSubscription?.unsubscribe();

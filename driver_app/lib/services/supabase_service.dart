@@ -167,7 +167,88 @@ class SupabaseService {
   }
 
   static Future<void> signOut() async {
+    // Clear session on sign out
+    await clearSession();
     await client.auth.signOut();
+  }
+
+  // Session management for single-device login
+  static String? _sessionToken;
+  static String? get sessionToken => _sessionToken;
+
+  static Future<String> _generateSessionToken() async {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final random = DateTime.now().microsecond;
+    return 'drv_${timestamp}_$random';
+  }
+
+  static Future<String?> _getDeviceId() async {
+    return 'driver_app_${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  // Register session after login - invalidates other devices
+  static Future<bool> registerSession(String oderId) async {
+    try {
+      final deviceId = await _getDeviceId();
+      _sessionToken = await _generateSessionToken();
+
+      // Upsert session - this replaces any existing session for this user+app
+      await client.from('user_sessions').upsert({
+        'user_id': oderId,
+        'device_id': deviceId,
+        'device_name': 'Driver App',
+        'app_type': 'driver',
+        'session_token': _sessionToken,
+        'last_active_at': DateTime.now().toUtc().toIso8601String(),
+      }, onConflict: 'user_id,app_type');
+
+      debugPrint('Driver session registered: $_sessionToken');
+      return true;
+    } catch (e) {
+      debugPrint('Error registering driver session: $e');
+      return false;
+    }
+  }
+
+  // Check if current session is still valid
+  static Future<bool> isSessionValid() async {
+    if (_sessionToken == null || _driverId == null) return true; // No session to validate
+
+    try {
+      final response = await client
+          .from('user_sessions')
+          .select('session_token')
+          .eq('user_id', _driverId!)
+          .eq('app_type', 'driver')
+          .maybeSingle();
+
+      if (response == null) return false;
+
+      final isValid = response['session_token'] == _sessionToken;
+      if (!isValid) {
+        debugPrint('Driver session invalidated - logged in from another device');
+      }
+      return isValid;
+    } catch (e) {
+      debugPrint('Error checking driver session: $e');
+      return true; // Don't kick user out on network errors
+    }
+  }
+
+  // Clear session on logout
+  static Future<void> clearSession() async {
+    if (_driverId == null) return;
+
+    try {
+      await client
+          .from('user_sessions')
+          .delete()
+          .eq('user_id', _driverId!)
+          .eq('app_type', 'driver');
+    } catch (e) {
+      debugPrint('Error clearing driver session: $e');
+    }
+    _sessionToken = null;
   }
 
   // Profile methods

@@ -207,6 +207,18 @@ function ReactionsTab() {
 
   useEffect(() => {
     loadReactions()
+
+    // Realtime subscription
+    const channel = supabase
+      .channel("content_reactions_changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "content_reactions" }, () => {
+        loadReactions()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [filter])
 
   async function loadReactions() {

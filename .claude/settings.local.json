@@ -223,7 +223,8 @@
       "Skill(run)",
       "Bash(kill 37526)",
       "Bash(xcodebuild -workspace Runner.xcworkspace -scheme Runner -showBuildSettings)",
-      "Bash(xcodebuild -workspace Runner.xcworkspace -scheme Runner -destination 'generic/platform=iOS' -allowProvisioningUpdates CODE_SIGN_IDENTITY=\"Apple Development\" DEVELOPMENT_TEAM=\"W54PZDDQWK\")"
+      "Bash(xcodebuild -workspace Runner.xcworkspace -scheme Runner -destination 'generic/platform=iOS' -allowProvisioningUpdates CODE_SIGN_IDENTITY=\"Apple Development\" DEVELOPMENT_TEAM=\"W54PZDDQWK\")",
+      "mcp__claude_ai_Supabase__deploy_edge_function"
     ],
     "additionalDirectories": [
       "/tmp"

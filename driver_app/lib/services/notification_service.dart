@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz;
 import '../main.dart' show showAppNotification, navigatorKey;
 import '../widgets/app_notification_banner.dart';
 import 'supabase_service.dart';
@@ -88,68 +90,78 @@ class NotificationService {
   }
 
   static const int _breakReminderNotificationId = 30001;
-  static Timer? _breakReminderTimer;
 
-  void scheduleBreakReminder({required String breakType, int? delayMinutes, Duration? delay}) {
-    // Cancel any existing timer
-    cancelBreakReminder();
+  Future<void> scheduleBreakReminder({required String breakType, int? delayMinutes, Duration? delay}) async {
+    // Cancel any existing scheduled notification
+    await cancelBreakReminder();
 
     final actualDelay = delay ?? Duration(minutes: delayMinutes ?? 30);
+    final scheduledTime = DateTime.now().add(actualDelay);
 
-    _breakReminderTimer = Timer(actualDelay, () {
-      _showBreakExceededNotification(breakType);
-    });
+    // Use scheduled local notification (works even when app is closed)
+    await _scheduleLocalNotification(
+      id: _breakReminderNotificationId,
+      title: 'Break Time Exceeded',
+      body: 'You\'ve been on $breakType break for 30+ minutes. Don\'t forget to go back online!',
+      scheduledTime: scheduledTime,
+    );
 
-    debugPrint('Break reminder scheduled for ${actualDelay.inMinutes} minutes from now');
+    debugPrint('Break reminder scheduled for ${actualDelay.inMinutes} minutes from now (${scheduledTime.toIso8601String()})');
   }
 
-  Future<void> _showBreakExceededNotification(String breakType) async {
-    const androidDetails = AndroidNotificationDetails(
-      'break_reminder_channel',
-      'Break Reminders',
-      channelDescription: 'Reminders when break time exceeds limit',
-      importance: Importance.high,
-      priority: Priority.high,
-      showWhen: true,
-      playSound: true,
-      enableVibration: true,
-    );
-
-    const iosDetails = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-      interruptionLevel: InterruptionLevel.timeSensitive,
-    );
-
-    const details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
-
+  static Future<void> _scheduleLocalNotification({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime scheduledTime,
+  }) async {
     try {
-      await _notifications.show(
-        _breakReminderNotificationId,
-        'Break Time Exceeded',
-        'You\'ve been on $breakType break for 30+ minutes. Don\'t forget to go back online!',
-        details,
-      );
-      debugPrint('Break exceeded notification shown');
+      // Initialize timezone
+      tz.initializeTimeZones();
+      final location = tz.getLocation('Indian/Maldives');
+      final tzScheduledTime = tz.TZDateTime.from(scheduledTime, location);
 
-      // Also show in-app banner if app is in foreground
-      showAppNotification(
-        title: 'Break Time Exceeded',
-        message: 'You\'ve been on $breakType break for 30+ minutes. Don\'t forget to go back online!',
-        type: NotificationType.warning,
+      const androidDetails = AndroidNotificationDetails(
+        'break_reminder_channel',
+        'Break Reminders',
+        channelDescription: 'Reminders when break time exceeds limit',
+        importance: Importance.high,
+        priority: Priority.high,
+        showWhen: true,
+        playSound: true,
+        enableVibration: true,
       );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+        interruptionLevel: InterruptionLevel.timeSensitive,
+      );
+
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await _notifications.zonedSchedule(
+        id,
+        title,
+        body,
+        tzScheduledTime,
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      );
+
+      debugPrint('Scheduled break notification for $scheduledTime (id: $id)');
     } catch (e) {
-      debugPrint('Error showing break notification: $e');
+      debugPrint('Error scheduling break notification: $e');
     }
   }
 
-  void cancelBreakReminder() {
-    _breakReminderTimer?.cancel();
-    _breakReminderTimer = null;
+  Future<void> cancelBreakReminder() async {
+    await _notifications.cancel(_breakReminderNotificationId);
     debugPrint('Break reminder cancelled');
   }
 

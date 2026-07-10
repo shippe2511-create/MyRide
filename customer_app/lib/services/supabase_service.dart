@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseService {
@@ -155,13 +156,20 @@ class SupabaseService {
   }
 
   static Future<String?> _getDeviceId() async {
-    // Use a simple device identifier
-    try {
-      final info = await client.from('profiles').select('id').limit(1);
-      return 'customer_app_${DateTime.now().millisecondsSinceEpoch}';
-    } catch (e) {
-      return 'customer_app_unknown';
-    }
+    return 'customer_app_${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  // Save session token to persistent storage
+  static Future<void> _saveSessionToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('session_token', token);
+  }
+
+  // Load session token from persistent storage
+  static Future<void> loadSessionToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    _sessionToken = prefs.getString('session_token');
+    debugPrint('Loaded session token: $_sessionToken');
   }
 
   // Register session after login - invalidates other devices
@@ -170,15 +178,17 @@ class SupabaseService {
       final deviceId = await _getDeviceId();
       _sessionToken = await _generateSessionToken();
 
-      // Upsert session - this replaces any existing session for this user+app
-      await client.from('user_sessions').upsert({
-        'user_id': oderId,
-        'device_id': deviceId,
-        'device_name': 'Customer App',
-        'app_type': 'customer',
-        'session_token': _sessionToken,
-        'last_active_at': DateTime.now().toUtc().toIso8601String(),
-      }, onConflict: 'user_id,app_type');
+      // Use RPC function to bypass RLS
+      await client.rpc('register_user_session', params: {
+        'p_user_id': oderId,
+        'p_device_id': deviceId,
+        'p_device_name': 'Customer App',
+        'p_app_type': 'customer',
+        'p_session_token': _sessionToken,
+      });
+
+      // Save token to persistent storage
+      await _saveSessionToken(_sessionToken!);
 
       debugPrint('Session registered: $_sessionToken');
       return true;
@@ -193,20 +203,16 @@ class SupabaseService {
     if (_sessionToken == null || _profileId == null) return true; // No session to validate
 
     try {
-      final response = await client
-          .from('user_sessions')
-          .select('session_token')
-          .eq('user_id', _profileId!)
-          .eq('app_type', 'customer')
-          .maybeSingle();
+      final isValid = await client.rpc('check_session_valid', params: {
+        'p_user_id': _profileId,
+        'p_app_type': 'customer',
+        'p_session_token': _sessionToken,
+      });
 
-      if (response == null) return false;
-
-      final isValid = response['session_token'] == _sessionToken;
-      if (!isValid) {
+      if (isValid != true) {
         debugPrint('Session invalidated - logged in from another device');
       }
-      return isValid;
+      return isValid == true;
     } catch (e) {
       debugPrint('Error checking session: $e');
       return true; // Don't kick user out on network errors
@@ -218,11 +224,10 @@ class SupabaseService {
     if (_profileId == null) return;
 
     try {
-      await client
-          .from('user_sessions')
-          .delete()
-          .eq('user_id', _profileId!)
-          .eq('app_type', 'customer');
+      await client.rpc('clear_user_session', params: {
+        'p_user_id': _profileId,
+        'p_app_type': 'customer',
+      });
     } catch (e) {
       debugPrint('Error clearing session: $e');
     }

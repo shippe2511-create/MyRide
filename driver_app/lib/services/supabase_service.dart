@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseService {
@@ -186,21 +187,36 @@ class SupabaseService {
     return 'driver_app_${DateTime.now().millisecondsSinceEpoch}';
   }
 
+  // Save session token to persistent storage
+  static Future<void> _saveSessionToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('driver_session_token', token);
+  }
+
+  // Load session token from persistent storage
+  static Future<void> loadSessionToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    _sessionToken = prefs.getString('driver_session_token');
+    debugPrint('Loaded driver session token: $_sessionToken');
+  }
+
   // Register session after login - invalidates other devices
   static Future<bool> registerSession(String oderId) async {
     try {
       final deviceId = await _getDeviceId();
       _sessionToken = await _generateSessionToken();
 
-      // Upsert session - this replaces any existing session for this user+app
-      await client.from('user_sessions').upsert({
-        'user_id': oderId,
-        'device_id': deviceId,
-        'device_name': 'Driver App',
-        'app_type': 'driver',
-        'session_token': _sessionToken,
-        'last_active_at': DateTime.now().toUtc().toIso8601String(),
-      }, onConflict: 'user_id,app_type');
+      // Use RPC function to bypass RLS
+      await client.rpc('register_user_session', params: {
+        'p_user_id': oderId,
+        'p_device_id': deviceId,
+        'p_device_name': 'Driver App',
+        'p_app_type': 'driver',
+        'p_session_token': _sessionToken,
+      });
+
+      // Save token to persistent storage
+      await _saveSessionToken(_sessionToken!);
 
       debugPrint('Driver session registered: $_sessionToken');
       return true;
@@ -215,20 +231,16 @@ class SupabaseService {
     if (_sessionToken == null || _driverId == null) return true; // No session to validate
 
     try {
-      final response = await client
-          .from('user_sessions')
-          .select('session_token')
-          .eq('user_id', _driverId!)
-          .eq('app_type', 'driver')
-          .maybeSingle();
+      final isValid = await client.rpc('check_session_valid', params: {
+        'p_user_id': _driverId,
+        'p_app_type': 'driver',
+        'p_session_token': _sessionToken,
+      });
 
-      if (response == null) return false;
-
-      final isValid = response['session_token'] == _sessionToken;
-      if (!isValid) {
+      if (isValid != true) {
         debugPrint('Driver session invalidated - logged in from another device');
       }
-      return isValid;
+      return isValid == true;
     } catch (e) {
       debugPrint('Error checking driver session: $e');
       return true; // Don't kick user out on network errors
@@ -240,11 +252,10 @@ class SupabaseService {
     if (_driverId == null) return;
 
     try {
-      await client
-          .from('user_sessions')
-          .delete()
-          .eq('user_id', _driverId!)
-          .eq('app_type', 'driver');
+      await client.rpc('clear_user_session', params: {
+        'p_user_id': _driverId,
+        'p_app_type': 'driver',
+      });
     } catch (e) {
       debugPrint('Error clearing driver session: $e');
     }

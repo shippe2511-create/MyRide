@@ -115,6 +115,9 @@ class _SplashScreenState extends State<SplashScreen>
             // Store profile ID and update local state
             if (dbUser['id'] != null) {
               appState.setProfileId(dbUser['id']);
+              SupabaseService.setProfileId(dbUser['id']);
+              // Load saved session token for session validation
+              await SupabaseService.loadSessionToken();
             }
             appState.setUserData(
               name: dbUser['full_name'] ?? 'User',

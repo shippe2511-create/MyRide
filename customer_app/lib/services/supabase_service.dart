@@ -2110,4 +2110,86 @@ class SupabaseService {
     }
   }
 
+  // Content Reactions (for announcements and staff_corner)
+  static Future<Map<String, int>> getReactionCounts(String contentType, String contentId) async {
+    try {
+      final response = await client
+          .from('content_reactions')
+          .select('reaction')
+          .eq('content_type', contentType)
+          .eq('content_id', contentId);
+
+      final counts = <String, int>{
+        'thumbs_up': 0,
+        'heart': 0,
+        'thumbs_down': 0,
+        'laugh': 0,
+      };
+
+      for (final row in response as List) {
+        final reaction = row['reaction'] as String?;
+        if (reaction != null && counts.containsKey(reaction)) {
+          counts[reaction] = counts[reaction]! + 1;
+        }
+      }
+
+      return counts;
+    } catch (e) {
+      debugPrint('Error getting reaction counts: $e');
+      return {'thumbs_up': 0, 'heart': 0, 'thumbs_down': 0, 'laugh': 0};
+    }
+  }
+
+  static Future<String?> getUserReaction(String contentType, String contentId) async {
+    final uid = userId;
+    if (uid == null) return null;
+
+    try {
+      final response = await client
+          .from('content_reactions')
+          .select('reaction')
+          .eq('content_type', contentType)
+          .eq('content_id', contentId)
+          .eq('user_id', uid)
+          .maybeSingle();
+
+      return response?['reaction'] as String?;
+    } catch (e) {
+      debugPrint('Error getting user reaction: $e');
+      return null;
+    }
+  }
+
+  static Future<void> setReaction(String contentType, String contentId, String reaction) async {
+    final uid = userId;
+    if (uid == null) return;
+
+    try {
+      await client.from('content_reactions').upsert({
+        'content_type': contentType,
+        'content_id': contentId,
+        'user_id': uid,
+        'reaction': reaction,
+      }, onConflict: 'content_type,content_id,user_id');
+    } catch (e) {
+      debugPrint('Error setting reaction: $e');
+    }
+  }
+
+  static Future<void> removeReaction(String contentType, String contentId) async {
+    final uid = userId;
+    if (uid == null) return;
+
+    try {
+      await client
+          .from('content_reactions')
+          .delete()
+          .eq('content_type', contentType)
+          .eq('content_id', contentId)
+          .eq('user_id', uid);
+    } catch (e) {
+      debugPrint('Error removing reaction: $e');
+    }
+  }
+
 }

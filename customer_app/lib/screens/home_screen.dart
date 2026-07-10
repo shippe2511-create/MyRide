@@ -20,6 +20,7 @@ import '../services/location_service.dart';
 import '../services/app_settings_service.dart';
 import '../widgets/onboarding_tooltip.dart';
 import '../widgets/app_snackbar.dart';
+import '../widgets/reaction_picker.dart';
 import 'search_screen.dart';
 import 'activity_screen.dart';
 import 'inbox_screen.dart';
@@ -1152,6 +1153,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     final isNew = createdAt != null && MaldivesTimezone.now().difference(createdAt).inDays < 3;
                     return _buildAnnouncementCard(
                       context,
+                      id: a['id'] ?? '',
                       title: a['title'] ?? '',
                       subtitle: a['message'] ?? '',
                       imageUrl: a['image_url'] ?? '',
@@ -1172,78 +1174,83 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildAnnouncementCard(
     BuildContext context, {
+    required String id,
     required String title,
     required String subtitle,
     required String imageUrl,
     required String date,
     required bool isNew,
   }) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        _showAnnouncementDetail(context, title: title, subtitle: subtitle, imageUrl: imageUrl, date: date);
-      },
-      child: Container(
-        width: 280,
-        margin: const EdgeInsets.only(right: 12),
-        decoration: BoxDecoration(
-          color: context.surfaceColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: context.borderColor),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 90,
-              decoration: BoxDecoration(
-                color: AppColors.yellow.withValues(alpha: 0.2),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                    child: Image.network(
-                      imageUrl,
-                      width: double.infinity,
-                      height: 90,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => const Center(
-                        child: Icon(Icons.campaign, color: AppColors.yellow, size: 32),
-                      ),
-                    ),
-                  ),
-                  if (isNew)
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.error,
-                          borderRadius: BorderRadius.circular(8),
+    return ReactionPicker(
+      contentType: 'announcement',
+      contentId: id,
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          _showAnnouncementDetail(context, title: title, subtitle: subtitle, imageUrl: imageUrl, date: date);
+        },
+        child: Container(
+          width: 280,
+          margin: const EdgeInsets.only(right: 12),
+          decoration: BoxDecoration(
+            color: context.surfaceColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: context.borderColor),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 90,
+                decoration: BoxDecoration(
+                  color: AppColors.yellow.withValues(alpha: 0.2),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                      child: Image.network(
+                        imageUrl,
+                        width: double.infinity,
+                        height: 90,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => const Center(
+                          child: Icon(Icons.campaign, color: AppColors.yellow, size: 32),
                         ),
-                        child: Text('NEW', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
                       ),
                     ),
-                ],
+                    if (isNew)
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.error,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text('NEW', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 4),
-                  Text(subtitle, style: TextStyle(color: context.mutedColor, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 6),
-                  Text(date, style: TextStyle(color: context.mutedColor.withValues(alpha: 0.7), fontSize: 10)),
-                ],
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 4),
+                    Text(subtitle, style: TextStyle(color: context.mutedColor, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 6),
+                    Text(date, style: TextStyle(color: context.mutedColor.withValues(alpha: 0.7), fontSize: 10)),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1313,6 +1320,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 final post = _staffPosts[index];
                 return _buildStaffCard(
                   context,
+                  id: post['id'] ?? '',
                   title: post['title'] ?? '',
                   subtitle: post['subtitle'] ?? '',
                   imageUrl: post['image_url'] ?? '',
@@ -1337,75 +1345,80 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildStaffCard(
     BuildContext context, {
+    required String id,
     required String title,
     required String subtitle,
     required String imageUrl,
     required String category,
     required Color categoryColor,
   }) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        _showStaffCornerDetail(context, title: title, subtitle: subtitle, imageUrl: imageUrl, category: category, categoryColor: categoryColor);
-      },
-      child: Container(
-        width: 200,
-        margin: const EdgeInsets.only(right: 12),
-        decoration: BoxDecoration(
-          color: context.surfaceColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: context.borderColor),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 100,
-              decoration: BoxDecoration(
-                color: categoryColor.withValues(alpha: 0.2),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                    child: Image.network(
-                      imageUrl,
-                      width: double.infinity,
-                      height: 100,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Center(
-                        child: Icon(Icons.people, color: categoryColor, size: 32),
+    return ReactionPicker(
+      contentType: 'staff_corner',
+      contentId: id,
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          _showStaffCornerDetail(context, title: title, subtitle: subtitle, imageUrl: imageUrl, category: category, categoryColor: categoryColor);
+        },
+        child: Container(
+          width: 200,
+          margin: const EdgeInsets.only(right: 12),
+          decoration: BoxDecoration(
+            color: context.surfaceColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: context.borderColor),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 100,
+                decoration: BoxDecoration(
+                  color: categoryColor.withValues(alpha: 0.2),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                      child: Image.network(
+                        imageUrl,
+                        width: double.infinity,
+                        height: 100,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Center(
+                          child: Icon(Icons.people, color: categoryColor, size: 32),
+                        ),
                       ),
                     ),
-                  ),
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: categoryColor,
-                        borderRadius: BorderRadius.circular(8),
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: categoryColor,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(category, style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
                       ),
-                      child: Text(category, style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: TextStyle(color: context.textColor, fontSize: 13, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 4),
-                  Text(subtitle, style: TextStyle(color: context.mutedColor, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
-                ],
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: TextStyle(color: context.textColor, fontSize: 13, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 4),
+                    Text(subtitle, style: TextStyle(color: context.mutedColor, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

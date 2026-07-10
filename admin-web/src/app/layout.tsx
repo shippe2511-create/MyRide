@@ -1,9 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
-import { Suspense } from "react";
+import NextTopLoader from "nextjs-toploader";
 import { QueryProvider } from "@/components/providers/query-provider";
-import { NavigationProgress } from "@/components/navigation-progress";
 import Script from "next/script";
 import "./globals.css";
 
@@ -55,9 +54,18 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="h-full w-full overflow-hidden">
-        <Suspense fallback={null}>
-          <NavigationProgress />
-        </Suspense>
+        <NextTopLoader
+          color="#facc15"
+          initialPosition={0.08}
+          crawlSpeed={200}
+          height={3}
+          crawl={true}
+          showSpinner={false}
+          easing="ease"
+          speed={200}
+          shadow={false}
+          showAtBottom={false}
+        />
         <Script id="sw-register" strategy="afterInteractive">
           {`
             if ('serviceWorker' in navigator) {

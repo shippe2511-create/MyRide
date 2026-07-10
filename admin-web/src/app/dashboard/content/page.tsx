@@ -196,7 +196,8 @@ function ReactionsTab() {
   const supabase = createClient()
   const [reactions, setReactions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<"all" | "announcement" | "staff_corner">("all")
+  const [typeFilter, setTypeFilter] = useState<"all" | "announcement" | "staff_corner">("all")
+  const [reactionFilter, setReactionFilter] = useState<"all" | "thumbs_up" | "heart" | "thumbs_down" | "laugh">("all")
 
   const REACTION_EMOJIS: Record<string, string> = {
     thumbs_up: "👍",
@@ -219,7 +220,7 @@ function ReactionsTab() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [filter])
+  }, [typeFilter, reactionFilter])
 
   async function loadReactions(showLoading = true) {
     if (showLoading) setLoading(true)
@@ -236,8 +237,11 @@ function ReactionsTab() {
       .order("created_at", { ascending: false })
       .limit(100)
 
-    if (filter !== "all") {
-      query = query.eq("content_type", filter)
+    if (typeFilter !== "all") {
+      query = query.eq("content_type", typeFilter)
+    }
+    if (reactionFilter !== "all") {
+      query = query.eq("reaction", reactionFilter)
     }
 
     const { data, error } = await query
@@ -282,31 +286,57 @@ function ReactionsTab() {
     return acc
   }, {} as Record<string, any>)
 
-  const filters = [
+  const typeFilters = [
     { value: "all", label: "All" },
     { value: "announcement", label: "Announcements" },
     { value: "staff_corner", label: "Staff Corner" },
   ] as const
 
+  const reactionFilters = [
+    { value: "all", label: "All" },
+    { value: "thumbs_up", label: "👍" },
+    { value: "heart", label: "❤️" },
+    { value: "thumbs_down", label: "👎" },
+    { value: "laugh", label: "😂" },
+  ] as const
+
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <CardTitle>Content Reactions</CardTitle>
-          <div className="flex gap-2">
-            {filters.map((f) => (
-              <button
-                key={f.value}
-                onClick={() => setFilter(f.value as any)}
-                className={`px-3 py-1.5 text-sm font-medium rounded-full transition-all ${
-                  filter === f.value
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
+          <div className="flex items-center gap-4">
+            <div className="flex gap-1">
+              {reactionFilters.map((f) => (
+                <button
+                  key={f.value}
+                  onClick={() => setReactionFilter(f.value as any)}
+                  className={`px-2.5 py-1.5 text-sm rounded-full transition-all ${
+                    reactionFilter === f.value
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <div className="h-6 w-px bg-border" />
+            <div className="flex gap-1">
+              {typeFilters.map((f) => (
+                <button
+                  key={f.value}
+                  onClick={() => setTypeFilter(f.value as any)}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-full transition-all ${
+                    typeFilter === f.value
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </CardHeader>

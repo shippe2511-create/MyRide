@@ -1191,11 +1191,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         },
         child: Container(
           width: 280,
-          margin: const EdgeInsets.only(right: 12),
           decoration: BoxDecoration(
             color: context.surfaceColor,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: context.borderColor),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            border: Border(
+              top: BorderSide(color: context.borderColor),
+              left: BorderSide(color: context.borderColor),
+              right: BorderSide(color: context.borderColor),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1362,11 +1365,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         },
         child: Container(
           width: 200,
-          margin: const EdgeInsets.only(right: 12),
           decoration: BoxDecoration(
             color: context.surfaceColor,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: context.borderColor),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            border: Border(
+              top: BorderSide(color: context.borderColor),
+              left: BorderSide(color: context.borderColor),
+              right: BorderSide(color: context.borderColor),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

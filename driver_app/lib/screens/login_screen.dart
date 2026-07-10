@@ -197,7 +197,8 @@ class _LoginScreenState extends State<LoginScreen> {
         // Register session - this will sign out other devices
         final profileId = driverProfile['profile_id'] ?? existingUser['id'];
         if (profileId != null) {
-          SupabaseService.setDriverId(profileId);
+          SupabaseService.setProfileId(profileId);  // For session management
+          SupabaseService.setDriverId(driverProfile['id']);  // For driver operations
           await SupabaseService.registerSession(profileId);
         }
 

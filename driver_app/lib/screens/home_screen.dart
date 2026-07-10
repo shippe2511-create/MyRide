@@ -52,7 +52,6 @@ class _HomeScreenState extends State<HomeScreen> {
   int _unreadNotificationCount = 0;
   Timer? _notificationPollTimer;
 
-  Timer? _sessionCheckTimer;
 
   @override
   void initState() {
@@ -211,10 +210,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  RealtimeChannel? _sessionBroadcastChannel;
+
   @override
   void dispose() {
     _notificationPollTimer?.cancel();
-    _sessionCheckTimer?.cancel();
+    _sessionBroadcastChannel?.unsubscribe();
     _scrollController.dispose();
     if (_breakTipsChannel != null) SupabaseService.client.removeChannel(_breakTipsChannel!);
     if (_quotesChannel != null) SupabaseService.client.removeChannel(_quotesChannel!);
@@ -227,24 +228,53 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _startSessionCheck() {
-    _sessionCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
-      final isValid = await SupabaseService.isSessionValid();
-      if (!isValid && mounted) {
-        _sessionCheckTimer?.cancel();
-        _handleSessionInvalid();
-      }
-    });
+    final profileId = SupabaseService.profileId;
+    if (profileId == null) return;
+
+    debugPrint('Starting session broadcast listener for profileId: $profileId');
+
+    // Listen to broadcast channel for instant kick out (no RLS issues)
+    _sessionBroadcastChannel = SupabaseService.client
+        .channel('session_kick_$profileId')
+        .onBroadcast(
+          event: 'new_session',
+          callback: (payload) {
+            final newToken = payload['token'];
+            debugPrint('Received new_session broadcast: $newToken vs ${SupabaseService.sessionToken}');
+            if (newToken != SupabaseService.sessionToken && mounted) {
+              debugPrint('Driver session invalidated via broadcast');
+              _sessionBroadcastChannel?.unsubscribe();
+              _handleSessionInvalid();
+            }
+          },
+        )
+        .subscribe();
   }
 
   void _handleSessionInvalid() {
-    // Clear local state and redirect to login
-    final driverState = context.read<DriverState>();
-    driverState.logout();
+    if (!mounted) return;
+
+    // Stop session broadcast listener
+    _sessionBroadcastChannel?.unsubscribe();
+
+    // Clear local state
+    try {
+      final driverState = context.read<DriverState>();
+      driverState.logout();
+    } catch (e) {
+      debugPrint('Error during logout: $e');
+    }
     SupabaseService.setDriverId(null);
 
+    // Show message
     AppSnackbar.error(context, 'You have been logged out because you signed in on another device');
 
-    Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
+    // Navigate to login screen (driver app uses /login, not /welcome)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil('/login', (route) => false);
+      }
+    });
   }
 
   void _onScroll() {

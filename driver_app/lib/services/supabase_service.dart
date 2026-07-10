@@ -14,6 +14,11 @@ class SupabaseService {
   static void setDriverId(String? id) => _driverId = id;
   static String? get driverId => _driverId;
 
+  // Profile ID (for session management - different from driver ID)
+  static String? _profileId;
+  static void setProfileId(String? id) => _profileId = id;
+  static String? get profileId => _profileId;
+
   static Future<void> initialize() async {
     await Supabase.initialize(
       url: _supabaseUrl,
@@ -217,6 +222,12 @@ class SupabaseService {
 
       // Save token to persistent storage
       await _saveSessionToken(_sessionToken!);
+
+      // Broadcast to kick out other devices instantly
+      await client.channel('session_kick_$oderId').sendBroadcastMessage(
+        event: 'new_session',
+        payload: {'token': _sessionToken, 'app_type': 'driver'},
+      );
 
       debugPrint('Driver session registered: $_sessionToken');
       return true;

@@ -117,9 +117,14 @@ class _SplashScreenState extends State<SplashScreen>
             Navigator.pushReplacementNamed(context, '/suspended');
             return;
           }
-          // Set driver ID and load session for validation
+          // Set profile ID for session management and load session token
           if (profile['id'] != null) {
-            SupabaseService.setDriverId(profile['id']);
+            SupabaseService.setProfileId(profile['id']);
+            // Also fetch and set actual driver ID
+            final driver = await SupabaseService.getDriverByProfileId(profile['id']);
+            if (driver != null) {
+              SupabaseService.setDriverId(driver['id']);
+            }
             await SupabaseService.loadSessionToken();
           }
         } catch (e) {

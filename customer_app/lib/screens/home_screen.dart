@@ -107,27 +107,53 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _startSessionCheck();
   }
 
-  Timer? _sessionCheckTimer;
+  RealtimeChannel? _sessionBroadcastChannel;
 
   void _startSessionCheck() {
-    _sessionCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
-      final isValid = await SupabaseService.isSessionValid();
-      if (!isValid && mounted) {
-        _sessionCheckTimer?.cancel();
-        _handleSessionInvalid();
-      }
-    });
+    final profileId = SupabaseService.profileId;
+    if (profileId == null) return;
+
+    debugPrint('Starting session broadcast listener for profileId: $profileId');
+
+    // Listen to broadcast channel for instant kick out (no RLS issues)
+    _sessionBroadcastChannel = SupabaseService.client
+        .channel('session_kick_$profileId')
+        .onBroadcast(
+          event: 'new_session',
+          callback: (payload) {
+            final newToken = payload['token'];
+            debugPrint('Received new_session broadcast: $newToken vs ${SupabaseService.sessionToken}');
+            if (newToken != SupabaseService.sessionToken && mounted) {
+              debugPrint('Session invalidated via broadcast');
+              _sessionBroadcastChannel?.unsubscribe();
+              _handleSessionInvalid();
+            }
+          },
+        )
+        .subscribe();
   }
 
   void _handleSessionInvalid() {
-    // Clear local state and redirect to login
-    final appState = Provider.of<AppState>(context, listen: false);
-    appState.logout();
+    if (!mounted) return;
+
+    // Clear local state
+    try {
+      final appState = Provider.of<AppState>(context, listen: false);
+      appState.logout();
+    } catch (e) {
+      debugPrint('Error during logout: $e');
+    }
     SupabaseService.setProfileId(null);
 
+    // Show message
     AppSnackbar.error(context, 'You have been logged out because you signed in on another device');
 
-    Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
+    // Navigate immediately using root navigator
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil('/welcome', (route) => false);
+      }
+    });
   }
 
   void _checkSuspended() {
@@ -473,7 +499,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _pageController.dispose();
     _pulseController.dispose();
     _scheduledRideTimer?.cancel();
-    _sessionCheckTimer?.cancel();
+    _sessionBroadcastChannel?.unsubscribe();
     _announcementsSubscription?.unsubscribe();
     _rideStatusSubscription?.unsubscribe();
     _notificationsSubscription?.unsubscribe();

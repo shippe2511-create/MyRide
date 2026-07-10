@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../providers/driver_state.dart';
+import '../utils/timezone_utils.dart';
 import '../widgets/shimmer_loading.dart';
 import '../widgets/app_snackbar.dart';
 
@@ -249,13 +250,14 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
   }
 
   List<Map<String, dynamic>> get _expiringDocuments {
-    final now = DateTime.now();
+    final now = MaldivesTimezone.now();
     final thirtyDaysLater = now.add(const Duration(days: 30));
 
     return _documents.where((doc) {
       if (doc['expiry'] == null) return false;
       try {
-        final expiry = DateTime.parse(doc['expiry']).toLocal();
+        final expiry = MaldivesTimezone.parse(doc['expiry']);
+        if (expiry == null) return false;
         return expiry.isBefore(thirtyDaysLater) && expiry.isAfter(now);
       } catch (e) {
         return false;
@@ -264,11 +266,12 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
   }
 
   List<Map<String, dynamic>> get _expiredDocuments {
-    final now = DateTime.now();
+    final now = MaldivesTimezone.now();
     return _documents.where((doc) {
       if (doc['expiry'] == null) return false;
       try {
-        final expiry = DateTime.parse(doc['expiry']).toLocal();
+        final expiry = MaldivesTimezone.parse(doc['expiry']);
+        if (expiry == null) return false;
         return expiry.isBefore(now);
       } catch (e) {
         return false;
@@ -511,13 +514,15 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
 
     if (doc['expiry'] != null) {
       try {
-        final expiry = DateTime.parse(doc['expiry']).toLocal();
-        final now = DateTime.now();
-        final thirtyDaysLater = now.add(const Duration(days: 30));
+        final expiry = MaldivesTimezone.parse(doc['expiry']);
+        if (expiry != null) {
+          final now = MaldivesTimezone.now();
+          final thirtyDaysLater = now.add(const Duration(days: 30));
 
-        isExpired = expiry.isBefore(now);
-        isExpiringSoon = !isExpired && expiry.isBefore(thirtyDaysLater);
-        expiryDisplay = DateFormat('MMM d, yyyy').format(expiry);
+          isExpired = expiry.isBefore(now);
+          isExpiringSoon = !isExpired && expiry.isBefore(thirtyDaysLater);
+          expiryDisplay = DateFormat('MMM d, yyyy').format(expiry);
+        }
       } catch (e) {
         expiryDisplay = doc['expiry'];
       }

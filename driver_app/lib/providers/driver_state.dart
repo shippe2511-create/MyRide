@@ -9,6 +9,7 @@ import '../services/notification_service.dart';
 import '../services/supabase_service.dart';
 import '../services/voice_service.dart';
 import '../services/background_location_service.dart';
+import '../utils/timezone_utils.dart';
 
 class DriverState extends ChangeNotifier {
   bool _isDarkMode = true;
@@ -698,7 +699,7 @@ class DriverState extends ChangeNotifier {
           customerName: customer?['full_name'] ?? 'Customer',
           pickupLocation: ride['pickup_name'] ?? '',
           dropoffLocation: ride['dropoff_name'] ?? '',
-          tripDate: (DateTime.tryParse(ride['created_at'] ?? '') ?? DateTime.now()).toLocal(),
+          tripDate: MaldivesTimezone.parse(ride['created_at']) ?? MaldivesTimezone.now(),
           durationMinutes: ride['duration_minutes'] ?? 0,
           distanceKm: distance,
           status: _parseStatus(ride['status']),
@@ -772,7 +773,7 @@ class DriverState extends ChangeNotifier {
           status: status == 'accepted' ? RideStatus.accepted :
                   status == 'arrived' ? RideStatus.arrivedAtPickup :
                   status == 'in_progress' ? RideStatus.inProgress : RideStatus.accepted,
-          requestTime: (DateTime.tryParse(activeRide['created_at'] ?? '') ?? DateTime.now()).toLocal(),
+          requestTime: MaldivesTimezone.parse(activeRide['created_at']) ?? MaldivesTimezone.now(),
           seatsBooked: (activeRide['seats_booked'] as num?)?.toInt() ?? 1,
         );
 
@@ -1303,7 +1304,7 @@ class DriverState extends ChangeNotifier {
         pickupLng: (ride['pickup_lng'] as num?)?.toDouble() ?? 73.5093,
         dropoffLat: (ride['dropoff_lat'] as num?)?.toDouble() ?? 4.2234,
         dropoffLng: (ride['dropoff_lng'] as num?)?.toDouble() ?? 73.5367,
-        requestTime: ((DateTime.tryParse(ride['created_at'] ?? '') ?? DateTime.now()).toLocal()),
+        requestTime: MaldivesTimezone.parse(ride['created_at']) ?? MaldivesTimezone.now(),
         estimatedDistance: (ride['distance_km'] as num?)?.toDouble() ?? 5.0,
         estimatedDuration: (ride['duration_minutes'] as num?)?.toInt() ?? 15,
         status: status,

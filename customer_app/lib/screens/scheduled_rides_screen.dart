@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../services/supabase_service.dart';
+import '../utils/timezone_utils.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_container.dart';
 import '../widgets/primary_button.dart';
@@ -132,7 +133,7 @@ class _ScheduledRidesScreenState extends State<ScheduledRidesScreen> {
   }
 
   Widget _buildRideCard(Map<String, dynamic> ride, bool isDark) {
-    final scheduledTime = DateTime.tryParse(ride['scheduled_time'] ?? '')?.toLocal();
+    final scheduledTime = MaldivesTimezone.parse(ride['scheduled_time'] ?? '');
     final pickupName = ride['pickup_name'] ?? 'Unknown';
     final dropoffName = ride['dropoff_name'] ?? 'Unknown';
     final status = ride['status'] as String? ?? 'scheduled';

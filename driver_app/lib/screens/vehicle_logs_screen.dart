@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../utils/timezone_utils.dart';
 import '../widgets/shimmer_loading.dart';
 import '../widgets/app_snackbar.dart';
 
@@ -420,7 +421,7 @@ class _VehicleLogsScreenState extends State<VehicleLogsScreen> with SingleTicker
     final odometer = log['odometer'];
     final notes = log['notes'] ?? '';
     final dateStr = log['log_date'] ?? '';
-    final date = DateTime.tryParse(dateStr)?.toLocal();
+    final date = MaldivesTimezone.parse(dateStr);
 
     IconData icon;
     Color color;

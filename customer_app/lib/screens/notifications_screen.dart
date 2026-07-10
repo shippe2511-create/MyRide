@@ -299,7 +299,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _formatTime(DateTime.parse(notification['created_at']).toLocal()),
+                      _formatTime(MaldivesTimezone.parse(notification['created_at'])),
                       style: TextStyle(
                         color: context.mutedColor.withValues(alpha: 0.7),
                         fontSize: 11,
@@ -358,7 +358,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              _formatTime(DateTime.parse(notification['created_at']).toLocal()),
+              _formatTime(MaldivesTimezone.parse(notification['created_at'])),
               style: TextStyle(
                 color: context.mutedColor,
                 fontSize: 13,
@@ -413,7 +413,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  String _formatTime(DateTime time) {
+  String _formatTime(DateTime? time) {
+    if (time == null) return '';
     final now = MaldivesTimezone.now();
     final diff = now.difference(time);
 

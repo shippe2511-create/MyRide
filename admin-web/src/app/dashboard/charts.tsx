@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { getMaldivesDateParts } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -96,10 +97,10 @@ export function DashboardCharts() {
     let completed = 0, cancelled = 0, inProgress = 0
 
     rides.forEach(ride => {
-      const date = new Date(ride.created_at)
-      const dayIndex = date.getDay()
-      const monthIndex = date.getMonth()
-      const year = date.getFullYear()
+      const mvt = getMaldivesDateParts(ride.created_at)
+      const dayIndex = mvt.dayOfWeek
+      const monthIndex = mvt.month
+      const year = mvt.year
       const quarter = Math.floor(monthIndex / 3)
 
       weekly[dayIndex]++
@@ -107,7 +108,7 @@ export function DashboardCharts() {
       quarterly[quarter]++
       yearly[year] = (yearly[year] || 0) + 1
 
-      const hour = date.getHours()
+      const hour = mvt.hour
       hourly[hour] = (hourly[hour] || 0) + 1
 
       if (ride.status === "completed") completed++

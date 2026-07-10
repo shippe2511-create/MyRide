@@ -10,6 +10,7 @@ import '../services/push_to_talk_service.dart';
 import '../services/supabase_service.dart';
 import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
+import '../utils/timezone_utils.dart';
 import '../widgets/app_snackbar.dart';
 
 class PushToTalkScreen extends StatefulWidget {
@@ -259,9 +260,9 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
 
   String _formatTime(String? dateStr) {
     if (dateStr == null) return '';
-    final date = DateTime.tryParse(dateStr)?.toLocal();
+    final date = MaldivesTimezone.parse(dateStr);
     if (date == null) return '';
-    final now = DateTime.now();
+    final now = MaldivesTimezone.now();
     final diff = now.difference(date);
     if (diff.inMinutes < 1) return 'Just now';
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';

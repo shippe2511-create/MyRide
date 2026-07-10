@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/realtime_service.dart';
+import '../utils/timezone_utils.dart';
 import '../widgets/shimmer_loading.dart';
 
 class ShiftScheduleScreen extends StatefulWidget {
@@ -75,7 +76,7 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
       final newSchedule = List.generate(7, (_) => <String, dynamic>{'shifts': <Map<String, dynamic>>[]});
 
       for (final shift in shifts) {
-        final shiftDate = DateTime.tryParse(shift['shift_date'] ?? '')?.toLocal();
+        final shiftDate = MaldivesTimezone.parse(shift['shift_date'] ?? '');
         if (shiftDate == null) continue;
 
         final dayIndex = shiftDate.weekday - 1;

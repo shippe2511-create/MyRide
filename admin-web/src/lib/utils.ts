@@ -32,3 +32,32 @@ export function formatTime(date: string | Date) {
     minute: '2-digit',
   })
 }
+
+// Get date parts in Maldives timezone for grouping/aggregation
+export function getMaldivesDateParts(date: string | Date) {
+  const d = new Date(date)
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Indian/Maldives',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    weekday: 'short',
+  })
+  const parts = formatter.formatToParts(d)
+  const get = (type: string) => parts.find(p => p.type === type)?.value || ''
+
+  return {
+    year: parseInt(get('year')),
+    month: parseInt(get('month')) - 1, // 0-indexed like JS Date
+    day: parseInt(get('day')),
+    hour: parseInt(get('hour')),
+    weekday: get('weekday'),
+    dayOfWeek: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(get('weekday')),
+  }
+}
+
+// Get current time in Maldives
+export function getMaldivesNow() {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'Indian/Maldives' }))
+}

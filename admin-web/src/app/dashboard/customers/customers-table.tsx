@@ -117,7 +117,8 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
     department: "",
     gender: "",
     status: "approved",
-    role: "customer"
+    role: "customer",
+    emergency_contact: ""
   })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
@@ -302,8 +303,14 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
     setLoading(false)
   }
 
-  const openEditDialog = (customer: Customer) => {
+  const openEditDialog = async (customer: Customer) => {
     setSelectedCustomer(customer)
+    // Fetch emergency_contacts from DB
+    const { data } = await supabase.from("profiles").select("emergency_contacts").eq("id", customer.id).single()
+    const emergencyContacts = data?.emergency_contacts || []
+    const emergencyContact = Array.isArray(emergencyContacts) && emergencyContacts.length > 0
+      ? (emergencyContacts[0]?.phone || emergencyContacts[0] || "")
+      : ""
     setFormData({
       full_name: customer.full_name || "",
       email: customer.email || "",
@@ -312,7 +319,8 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
       department: customer.department || "",
       gender: customer.gender || "",
       status: customer.status || "approved",
-      role: customer.role || "customer"
+      role: customer.role || "customer",
+      emergency_contact: emergencyContact
     })
     setDialogType("edit")
   }
@@ -327,7 +335,8 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
       department: "",
       gender: "",
       status: "approved",
-      role: "customer"
+      role: "customer",
+      emergency_contact: ""
     })
     setDialogType("add")
   }
@@ -354,6 +363,11 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
         phone = `+960${phone}`
       }
 
+      // Format emergency contact as array
+      const emergencyContacts = formData.emergency_contact
+        ? [{ phone: formData.emergency_contact.startsWith('+') ? formData.emergency_contact : `+960${formData.emergency_contact}`, name: 'Emergency' }]
+        : []
+
       const { error } = await supabase
         .from("profiles")
         .update({
@@ -364,7 +378,8 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
           department: formData.department || null,
           gender: formData.gender || null,
           status: formData.status,
-          role: formData.role
+          role: formData.role,
+          emergency_contacts: emergencyContacts
         })
         .eq("id", selectedCustomer.id)
 
@@ -383,6 +398,11 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
         phone = `+960${phone}`
       }
 
+      // Format emergency contact as array
+      const emergencyContacts = formData.emergency_contact
+        ? [{ phone: formData.emergency_contact.startsWith('+') ? formData.emergency_contact : `+960${formData.emergency_contact}`, name: 'Emergency' }]
+        : []
+
       const { data, error } = await supabase
         .from("profiles")
         .insert({
@@ -393,7 +413,8 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
           department: formData.department || null,
           gender: formData.gender || null,
           status: formData.status,
-          role: "customer"
+          role: "customer",
+          emergency_contacts: emergencyContacts
         })
         .select()
         .single()
@@ -1080,6 +1101,14 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                   placeholder="Engineering"
                 />
               </div>
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Emergency Contact</label>
+              <Input
+                value={formData.emergency_contact}
+                onChange={(e) => setFormData({ ...formData, emergency_contact: e.target.value })}
+                placeholder="7XXXXXX"
+              />
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">

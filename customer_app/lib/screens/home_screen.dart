@@ -1194,7 +1194,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           )
         else
           SizedBox(
-            height: 200,
+            height: 210,
             child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1311,22 +1311,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 4),
-                  Text(subtitle, style: TextStyle(color: context.mutedColor, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Expanded(child: Text(date, style: TextStyle(color: context.mutedColor.withValues(alpha: 0.7), fontSize: 10))),
-                      if (badge != null) badge,
-                    ],
-                  ),
-                ],
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 4),
+                    Expanded(child: Text(subtitle, style: TextStyle(color: context.mutedColor, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis)),
+                    Row(
+                      children: [
+                        Expanded(child: Text(date, style: TextStyle(color: context.mutedColor.withValues(alpha: 0.7), fontSize: 10))),
+                        if (badge != null) badge,
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ],

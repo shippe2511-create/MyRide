@@ -42,6 +42,7 @@ interface DriverLocation {
 const mapContainerStyle = {
   width: '100%',
   height: '100%',
+  minHeight: '300px',
 };
 
 const defaultCenter = { lat: 4.1755, lng: 73.5093 }; // Maldives
@@ -288,8 +289,8 @@ export default function TrackingPage() {
       </div>
 
       {/* Map */}
-      <div className="flex-1 relative min-h-[300px]">
-        {isLoaded ? (
+      <div className="flex-1 relative min-h-[300px] bg-zinc-800">
+        {isLoaded && ride.pickup_lat && ride.pickup_lng ? (
           <GoogleMap
             mapContainerStyle={mapContainerStyle}
             center={driverLocation || { lat: ride.pickup_lat, lng: ride.pickup_lng }}

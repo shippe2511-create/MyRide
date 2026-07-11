@@ -328,7 +328,6 @@ export default function TrackingPage() {
             position={{ lat: ride.dropoff_lat, lng: ride.dropoff_lng }}
             label={{ text: 'D', color: 'white' }}
             title="Dropoff"
-            }}
           />
         </GoogleMap>
       ) : (

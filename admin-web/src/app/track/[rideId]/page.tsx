@@ -303,50 +303,26 @@ export default function TrackingPage() {
             />
           )}
 
-          {/* Driver marker */}
-          {driverLocation && (
+          {/* Driver marker - always show if location exists */}
+          {driverLocation && driverLocation.lat && driverLocation.lng && (
             <Marker
               position={{ lat: driverLocation.lat, lng: driverLocation.lng }}
-              icon={{
-                url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                  <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="24" cy="24" r="22" fill="#FACC15" stroke="#000" stroke-width="2"/>
-                    <path d="M24 12 L32 30 L24 26 L16 30 Z" fill="#000" transform="rotate(${driverLocation.heading || 0}, 24, 24)"/>
-                  </svg>
-                `),
-                scaledSize: new google.maps.Size(48, 48),
-                anchor: new google.maps.Point(24, 24),
-              }}
+              title="Driver"
             />
           )}
 
           {/* Pickup marker */}
           <Marker
             position={{ lat: ride.pickup_lat, lng: ride.pickup_lng }}
-            icon={{
-              url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                <svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="18" cy="18" r="16" fill="#22C55E" stroke="#fff" stroke-width="3"/>
-                  <circle cx="18" cy="18" r="6" fill="#fff"/>
-                </svg>
-              `),
-              scaledSize: new google.maps.Size(36, 36),
-              anchor: new google.maps.Point(18, 18),
-            }}
+            label={{ text: 'P', color: 'white' }}
+            title="Pickup"
           />
 
           {/* Dropoff marker */}
           <Marker
             position={{ lat: ride.dropoff_lat, lng: ride.dropoff_lng }}
-            icon={{
-              url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                <svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="18" cy="18" r="16" fill="#EF4444" stroke="#fff" stroke-width="3"/>
-                  <rect x="12" y="12" width="12" height="12" fill="#fff" rx="2"/>
-                </svg>
-              `),
-              scaledSize: new google.maps.Size(36, 36),
-              anchor: new google.maps.Point(18, 18),
+            label={{ text: 'D', color: 'white' }}
+            title="Dropoff"
             }}
           />
         </GoogleMap>

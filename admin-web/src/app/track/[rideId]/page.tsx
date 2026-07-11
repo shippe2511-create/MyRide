@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
+import { GoogleMap, useJsApiLoader, Marker, Polyline } from '@react-google-maps/api';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,7 +20,6 @@ interface RideData {
   dropoff_lat: number;
   dropoff_lng: number;
   driver_id: string;
-  customer_id: string;
   driver?: {
     full_name: string;
     phone: string;
@@ -31,7 +31,21 @@ interface RideData {
 interface DriverLocation {
   lat: number;
   lng: number;
+  heading?: number;
 }
+
+const darkMapStyle = [
+  { elementType: 'geometry', stylers: [{ color: '#212121' }] },
+  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#757575' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#212121' }] },
+  { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: '#2c2c2c' }] },
+  { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#373737' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#3c3c3c' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#000000' }] },
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+];
 
 export default function TrackingPage() {
   const params = useParams();
@@ -41,6 +55,18 @@ export default function TrackingPage() {
   const [driverLocation, setDriverLocation] = useState<DriverLocation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [routePath, setRoutePath] = useState<{ lat: number; lng: number }[]>([]);
+  const [eta, setEta] = useState<string>('--');
+  const mapRef = useRef<google.maps.Map | null>(null);
+
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+  });
+
+  const onMapLoad = useCallback((map: google.maps.Map) => {
+    mapRef.current = map;
+  }, []);
 
   // Fetch ride data
   useEffect(() => {
@@ -55,7 +81,6 @@ export default function TrackingPage() {
         if (rideError) throw rideError;
         if (!rideData) throw new Error('Ride not found');
 
-        // Fetch driver profile
         let driverProfile = null;
         if (rideData.driver_id) {
           const { data: driverData } = await supabase
@@ -65,32 +90,31 @@ export default function TrackingPage() {
             .single();
           driverProfile = driverData;
 
-          // Fetch driver location
           const { data: locData } = await supabase
             .from('driver_locations')
-            .select('lat, lng')
+            .select('lat, lng, heading')
             .eq('driver_id', rideData.driver_id)
             .single();
 
-          if (locData && locData.lat && locData.lng) {
+          if (locData?.lat && locData?.lng) {
             setDriverLocation({
-              lat: parseFloat(locData.lat),
-              lng: parseFloat(locData.lng),
+              lat: parseFloat(String(locData.lat)),
+              lng: parseFloat(String(locData.lng)),
+              heading: locData.heading,
             });
           }
         }
 
         setRide({
           ...rideData,
-          pickup_lat: parseFloat(rideData.pickup_lat) || 4.1755,
-          pickup_lng: parseFloat(rideData.pickup_lng) || 73.5093,
-          dropoff_lat: parseFloat(rideData.dropoff_lat) || 4.1755,
-          dropoff_lng: parseFloat(rideData.dropoff_lng) || 73.5093,
+          pickup_lat: parseFloat(String(rideData.pickup_lat)) || 4.1755,
+          pickup_lng: parseFloat(String(rideData.pickup_lng)) || 73.5093,
+          dropoff_lat: parseFloat(String(rideData.dropoff_lat)) || 4.1755,
+          dropoff_lng: parseFloat(String(rideData.dropoff_lng)) || 73.5093,
           driver: driverProfile,
         });
         setLoading(false);
       } catch (err: unknown) {
-        console.error('Tracking page error:', err);
         setError(err instanceof Error ? err.message : 'Failed to load ride');
         setLoading(false);
       }
@@ -109,11 +133,12 @@ export default function TrackingPage() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'driver_locations', filter: `driver_id=eq.${ride.driver_id}` },
         (payload) => {
-          const loc = payload.new as { lat: string; lng: string };
-          if (loc.lat && loc.lng) {
+          const loc = payload.new as { lat: string; lng: string; heading?: number };
+          if (loc?.lat && loc?.lng) {
             setDriverLocation({
-              lat: parseFloat(loc.lat),
-              lng: parseFloat(loc.lng),
+              lat: parseFloat(String(loc.lat)),
+              lng: parseFloat(String(loc.lng)),
+              heading: loc.heading,
             });
           }
         }
@@ -135,7 +160,7 @@ export default function TrackingPage() {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'rides', filter: `id=eq.${rideId}` },
         (payload) => {
-          setRide((prev) => prev ? { ...prev, ...payload.new } : null);
+          setRide((prev) => prev ? { ...prev, status: payload.new.status } : null);
         }
       )
       .subscribe();
@@ -145,70 +170,75 @@ export default function TrackingPage() {
     };
   }, [rideId]);
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'pending': return 'Waiting for driver';
-      case 'accepted': return 'Driver is on the way';
-      case 'arrived': return 'Driver has arrived';
-      case 'in_progress': return 'Trip in progress';
-      case 'completed': return 'Trip completed';
-      case 'cancelled': return 'Trip cancelled';
-      default: return status;
-    }
-  };
+  // Fetch route and ETA
+  useEffect(() => {
+    if (!ride || !driverLocation || !isLoaded || typeof google === 'undefined') return;
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-500';
-      case 'accepted': return 'bg-blue-500';
-      case 'arrived': return 'bg-green-500';
-      case 'in_progress': return 'bg-purple-500';
-      case 'completed': return 'bg-green-600';
-      case 'cancelled': return 'bg-red-500';
-      default: return 'bg-gray-500';
-    }
-  };
+    const destination = ride.status === 'in_progress'
+      ? { lat: ride.dropoff_lat, lng: ride.dropoff_lng }
+      : { lat: ride.pickup_lat, lng: ride.pickup_lng };
 
-  // Build static map URL with all markers and route
-  const getMapUrl = () => {
-    if (!ride) return '';
+    const directionsService = new google.maps.DirectionsService();
+    directionsService.route(
+      {
+        origin: { lat: driverLocation.lat, lng: driverLocation.lng },
+        destination,
+        travelMode: google.maps.TravelMode.DRIVING,
+      },
+      (result, status) => {
+        if (status === 'OK' && result) {
+          const route = result.routes[0];
+          if (route?.legs[0]) {
+            setEta(route.legs[0].duration?.text || '--');
+          }
+          const path = route.overview_path.map((p) => ({ lat: p.lat(), lng: p.lng() }));
+          setRoutePath(path);
+        }
+      }
+    );
+  }, [ride, driverLocation, isLoaded]);
 
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  // Fit map bounds
+  useEffect(() => {
+    if (!mapRef.current || !ride || !isLoaded || typeof google === 'undefined') return;
 
-    // Markers
-    let markers = `markers=color:green%7Clabel:P%7C${ride.pickup_lat},${ride.pickup_lng}`;
-    markers += `&markers=color:red%7Clabel:D%7C${ride.dropoff_lat},${ride.dropoff_lng}`;
-
+    const bounds = new google.maps.LatLngBounds();
+    bounds.extend({ lat: ride.pickup_lat, lng: ride.pickup_lng });
+    bounds.extend({ lat: ride.dropoff_lat, lng: ride.dropoff_lng });
     if (driverLocation) {
-      markers += `&markers=color:0xFACC15%7Clabel:🚗%7C${driverLocation.lat},${driverLocation.lng}`;
+      bounds.extend({ lat: driverLocation.lat, lng: driverLocation.lng });
     }
+    mapRef.current.fitBounds(bounds, { top: 100, bottom: 280, left: 20, right: 20 });
+  }, [ride, driverLocation, isLoaded]);
 
-    // Route path from pickup to dropoff
-    const path = `&path=color:0x4285F4%7Cweight:4%7C${ride.pickup_lat},${ride.pickup_lng}%7C${ride.dropoff_lat},${ride.dropoff_lng}`;
-
-    // Calculate center to fit all markers
-    const centerLat = driverLocation
-      ? driverLocation.lat
-      : (ride.pickup_lat + ride.dropoff_lat) / 2;
-    const centerLng = driverLocation
-      ? driverLocation.lng
-      : (ride.pickup_lng + ride.dropoff_lng) / 2;
-
-    return `https://maps.googleapis.com/maps/api/staticmap?center=${centerLat},${centerLng}&zoom=12&size=600x400&scale=2&maptype=roadmap&${markers}${path}&style=feature:all%7Celement:geometry%7Ccolor:0x242f3e&style=feature:water%7Ccolor:0x17263c&style=feature:road%7Celement:geometry%7Ccolor:0x38414e&key=${apiKey}`;
+  const getStatusInfo = (status: string) => {
+    switch (status) {
+      case 'pending': return { text: 'Finding driver...', color: 'bg-yellow-500', icon: '🔍' };
+      case 'accepted': return { text: 'Driver on the way', color: 'bg-blue-500', icon: '🚗' };
+      case 'arrived': return { text: 'Driver arrived', color: 'bg-green-500', icon: '📍' };
+      case 'in_progress': return { text: 'Trip in progress', color: 'bg-purple-500', icon: '🛣️' };
+      case 'completed': return { text: 'Trip completed', color: 'bg-green-600', icon: '✅' };
+      case 'cancelled': return { text: 'Trip cancelled', color: 'bg-red-500', icon: '❌' };
+      default: return { text: status, color: 'bg-gray-500', icon: '📌' };
+    }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-400"></div>
+      <div className="h-screen bg-zinc-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-400 mx-auto mb-4"></div>
+          <p className="text-zinc-400">Loading tracking...</p>
+        </div>
       </div>
     );
   }
 
   if (error || !ride) {
     return (
-      <div className="min-h-screen bg-zinc-900 flex items-center justify-center p-4">
+      <div className="h-screen bg-zinc-900 flex items-center justify-center p-4">
         <div className="bg-zinc-800 rounded-2xl p-6 text-center max-w-md">
+          <div className="text-4xl mb-4">😔</div>
           <div className="text-red-400 text-xl mb-2">Ride Not Found</div>
           <p className="text-zinc-400">{error || 'This tracking link is invalid or has expired.'}</p>
         </div>
@@ -216,91 +246,170 @@ export default function TrackingPage() {
     );
   }
 
+  const statusInfo = getStatusInfo(ride.status);
+
   return (
-    <div className="min-h-screen bg-zinc-900 flex flex-col">
-      {/* Header */}
-      <div className="bg-zinc-800 px-4 py-3 flex items-center gap-3 border-b border-zinc-700">
-        <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
-          <svg className="w-6 h-6 text-zinc-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
+    <div className="h-screen w-screen overflow-hidden bg-zinc-900 relative">
+      {/* Full Screen Map */}
+      {isLoaded ? (
+        <GoogleMap
+          mapContainerStyle={{ width: '100%', height: '100%' }}
+          center={driverLocation || { lat: ride.pickup_lat, lng: ride.pickup_lng }}
+          zoom={14}
+          onLoad={onMapLoad}
+          options={{
+            styles: darkMapStyle,
+            disableDefaultUI: true,
+            zoomControl: false,
+            mapTypeControl: false,
+            scaleControl: false,
+            streetViewControl: false,
+            rotateControl: false,
+            fullscreenControl: false,
+          }}
+        >
+          {/* Route polyline */}
+          {routePath.length > 0 && (
+            <Polyline
+              path={routePath}
+              options={{
+                strokeColor: '#FACC15',
+                strokeOpacity: 1,
+                strokeWeight: 5,
+              }}
+            />
+          )}
+
+          {/* Driver marker */}
+          {driverLocation && (
+            <Marker
+              position={{ lat: driverLocation.lat, lng: driverLocation.lng }}
+              icon={{
+                url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                  <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="24" cy="24" r="22" fill="#FACC15" stroke="#000" stroke-width="2"/>
+                    <path d="M24 12 L32 30 L24 26 L16 30 Z" fill="#000" transform="rotate(${driverLocation.heading || 0}, 24, 24)"/>
+                  </svg>
+                `),
+                scaledSize: new google.maps.Size(48, 48),
+                anchor: new google.maps.Point(24, 24),
+              }}
+            />
+          )}
+
+          {/* Pickup marker */}
+          <Marker
+            position={{ lat: ride.pickup_lat, lng: ride.pickup_lng }}
+            icon={{
+              url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                <svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="18" cy="18" r="16" fill="#22C55E" stroke="#fff" stroke-width="3"/>
+                  <circle cx="18" cy="18" r="6" fill="#fff"/>
+                </svg>
+              `),
+              scaledSize: new google.maps.Size(36, 36),
+              anchor: new google.maps.Point(18, 18),
+            }}
+          />
+
+          {/* Dropoff marker */}
+          <Marker
+            position={{ lat: ride.dropoff_lat, lng: ride.dropoff_lng }}
+            icon={{
+              url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                <svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="18" cy="18" r="16" fill="#EF4444" stroke="#fff" stroke-width="3"/>
+                  <rect x="12" y="12" width="12" height="12" fill="#fff" rx="2"/>
+                </svg>
+              `),
+              scaledSize: new google.maps.Size(36, 36),
+              anchor: new google.maps.Point(18, 18),
+            }}
+          />
+        </GoogleMap>
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-yellow-400"></div>
         </div>
-        <div>
-          <h1 className="text-white font-semibold">MyRide Live Tracking</h1>
-          <p className="text-zinc-400 text-sm">Ride #{rideId.slice(0, 8)}</p>
+      )}
+
+      {/* Top Status Bar */}
+      <div className="absolute top-0 left-0 right-0 p-4 z-10">
+        <div className={`${statusInfo.color} text-white px-4 py-3 rounded-2xl flex items-center justify-between shadow-lg`}>
+          <div className="flex items-center gap-2">
+            <span className="text-xl">{statusInfo.icon}</span>
+            <span className="font-semibold">{statusInfo.text}</span>
+          </div>
+          {eta !== '--' && ride.status !== 'completed' && ride.status !== 'cancelled' && (
+            <div className="bg-white/20 px-3 py-1 rounded-full text-sm">
+              ETA: {eta}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Status */}
-      <div className="px-4 py-2">
-        <div className={`${getStatusColor(ride.status)} text-white px-4 py-2 rounded-full text-center font-medium`}>
-          {getStatusText(ride.status)}
-        </div>
-      </div>
-
-      {/* Map */}
-      <div className="flex-1 min-h-[50vh] relative">
-        <img
-          src={getMapUrl()}
-          alt="Route map"
-          className="w-full h-full object-cover"
-        />
-        {driverLocation && (
-          <div className="absolute top-2 left-2 bg-black/70 px-3 py-1 rounded-full text-white text-sm">
-            🚗 Driver location updating live
+      {/* Bottom Card */}
+      <div className="absolute bottom-0 left-0 right-0 z-10">
+        <div className="bg-zinc-900 rounded-t-3xl shadow-2xl border-t border-zinc-800">
+          {/* Handle bar */}
+          <div className="flex justify-center py-2">
+            <div className="w-12 h-1 bg-zinc-700 rounded-full"></div>
           </div>
-        )}
-      </div>
 
-      {/* Info panel */}
-      <div className="bg-zinc-800 p-4 space-y-4 border-t border-zinc-700">
-        {/* Driver info */}
-        {ride.driver && (
-          <div className="flex items-center gap-3 bg-zinc-900 rounded-xl p-3">
-            <div className="w-12 h-12 bg-zinc-700 rounded-full flex items-center justify-center">
-              <svg className="w-6 h-6 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <p className="text-white font-medium">{ride.driver.full_name}</p>
-              <p className="text-zinc-400 text-sm">{ride.driver.vehicle_model} • {ride.driver.vehicle_number}</p>
-            </div>
-            <a
-              href={`tel:${ride.driver.phone}`}
-              className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center"
-            >
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-              </svg>
-            </a>
-          </div>
-        )}
+          <div className="px-4 pb-6 space-y-4">
+            {/* Driver info */}
+            {ride.driver && (
+              <div className="flex items-center gap-3 bg-zinc-800 rounded-2xl p-3">
+                <div className="w-14 h-14 bg-yellow-400 rounded-full flex items-center justify-center">
+                  <span className="text-2xl">🚗</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-semibold truncate">{ride.driver.full_name}</p>
+                  <p className="text-zinc-400 text-sm">{ride.driver.vehicle_model} • {ride.driver.vehicle_number}</p>
+                </div>
+                <a
+                  href={`tel:${ride.driver.phone}`}
+                  className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0"
+                >
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                </a>
+              </div>
+            )}
 
-        {/* Locations */}
-        <div className="bg-zinc-900 rounded-xl p-3 space-y-3">
-          <div className="flex items-start gap-3">
-            <div className="w-3 h-3 bg-green-500 rounded-full mt-1.5"></div>
-            <div>
-              <p className="text-zinc-400 text-xs">PICKUP</p>
-              <p className="text-white">{ride.pickup_name}</p>
+            {/* Route info */}
+            <div className="bg-zinc-800 rounded-2xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex flex-col items-center">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <div className="w-0.5 h-8 bg-zinc-600 my-1"></div>
+                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                </div>
+                <div className="flex-1 space-y-4">
+                  <div>
+                    <p className="text-zinc-500 text-xs font-medium">PICKUP</p>
+                    <p className="text-white font-medium">{ride.pickup_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-zinc-500 text-xs font-medium">DROPOFF</p>
+                    <p className="text-white font-medium">{ride.dropoff_name}</p>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="ml-1.5 border-l-2 border-dashed border-zinc-600 h-4"></div>
-          <div className="flex items-start gap-3">
-            <div className="w-3 h-3 bg-red-500 rounded-full mt-1.5"></div>
-            <div>
-              <p className="text-zinc-400 text-xs">DROPOFF</p>
-              <p className="text-white">{ride.dropoff_name}</p>
+
+            {/* Branding */}
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <div className="w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center">
+                <svg className="w-4 h-4 text-black" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+                </svg>
+              </div>
+              <span className="text-zinc-500 text-sm font-medium">MyRide Live Tracking</span>
             </div>
           </div>
         </div>
-
-        {/* Footer */}
-        <p className="text-center text-zinc-500 text-xs">
-          Powered by MyRide
-        </p>
       </div>
     </div>
   );

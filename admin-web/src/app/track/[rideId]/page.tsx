@@ -57,7 +57,7 @@ export default function TrackingPage() {
   const [loading, setLoading] = useState(true);
   const [eta, setEta] = useState<string>('--');
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [routePath, setRoutePath] = useState<google.maps.LatLngLiteral[]>([]);
+  const [routePath, setRoutePath] = useState<{lat: number; lng: number}[]>([]);
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',

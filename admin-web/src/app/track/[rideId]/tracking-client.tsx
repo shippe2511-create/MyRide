@@ -29,7 +29,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const GOOGLE_MAPS_KEY = 'AIzaSyBZ7HVy2dUvTCC5SZkz0MaFCBON2QorFbI';
 
 export default function TrackingClient({ rideId, initialData }: Props) {
-  const [ride] = useState<RideData>(initialData);
+  const [ride, setRide] = useState<RideData>(initialData);
   const [driverLat, setDriverLat] = useState<number | null>(initialData.driverLat);
   const [driverLng, setDriverLng] = useState<number | null>(initialData.driverLng);
 
@@ -59,26 +59,39 @@ export default function TrackingClient({ rideId, initialData }: Props) {
       }
     };
 
-    fetchDriverLocation();
+    // Poll every 5 seconds
     const interval = setInterval(fetchDriverLocation, 5000);
     return () => clearInterval(interval);
   }, [ride.driver_id]);
 
-  // Build Static Map URL - simple version
-  const markers: string[] = [];
+  // Build Static Map URL
+  let mapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=640x480&scale=2&maptype=roadmap`;
 
-  // Pickup marker (green)
-  markers.push(`markers=color:green%7Clabel:P%7C${ride.pickup_lat},${ride.pickup_lng}`);
+  // Add pickup marker (green)
+  mapUrl += `&markers=color:green|label:P|${ride.pickup_lat},${ride.pickup_lng}`;
 
-  // Dropoff marker (red)
-  markers.push(`markers=color:red%7Clabel:D%7C${ride.dropoff_lat},${ride.dropoff_lng}`);
+  // Add dropoff marker (red)
+  mapUrl += `&markers=color:red|label:D|${ride.dropoff_lat},${ride.dropoff_lng}`;
 
-  // Driver marker (yellow)
+  // Add driver marker (yellow) if available
   if (driverLat && driverLng) {
-    markers.push(`markers=color:0xFFCC00%7Clabel:C%7C${driverLat},${driverLng}`);
+    mapUrl += `&markers=color:yellow|label:C|${driverLat},${driverLng}`;
+
+    // Add path from driver to destination
+    const targetLat = ride.status === 'in_progress' ? ride.dropoff_lat : ride.pickup_lat;
+    const targetLng = ride.status === 'in_progress' ? ride.dropoff_lng : ride.pickup_lng;
+    mapUrl += `&path=color:0xFFCC00FF|weight:4|${driverLat},${driverLng}|${targetLat},${targetLng}`;
   }
 
-  const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=640x400&scale=2&maptype=roadmap&${markers.join('&')}&key=${GOOGLE_MAPS_KEY}`;
+  // Dark map style
+  mapUrl += `&style=feature:all|element:geometry|color:0x242f3e`;
+  mapUrl += `&style=feature:all|element:labels.text.stroke|color:0x242f3e`;
+  mapUrl += `&style=feature:all|element:labels.text.fill|color:0x746855`;
+  mapUrl += `&style=feature:water|element:geometry|color:0x17263c`;
+  mapUrl += `&style=feature:road|element:geometry|color:0x38414e`;
+  mapUrl += `&style=feature:road|element:geometry.stroke|color:0x212a37`;
+
+  mapUrl += `&key=${GOOGLE_MAPS_KEY}`;
 
   const statusColors: Record<string, string> = {
     pending: 'bg-yellow-500',
@@ -122,7 +135,7 @@ export default function TrackingClient({ rideId, initialData }: Props) {
         {statusText[ride.status] || ride.status}
       </div>
 
-      {/* Map */}
+      {/* Map - Takes remaining space */}
       <div className="flex-1 relative min-h-0">
         <img
           src={mapUrl}

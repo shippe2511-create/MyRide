@@ -41,7 +41,7 @@ export default async function TrackingPage({ params }: PageProps) {
     // driver_id references drivers table
     const { data: driver } = await supabase
       .from('drivers')
-      .select('id, profile_id, vehicle_model, vehicle_number')
+      .select('id, profile_id')
       .eq('id', rideData.driver_id)
       .single();
 
@@ -57,19 +57,30 @@ export default async function TrackingPage({ params }: PageProps) {
         driverName = profile.full_name || 'Driver';
         driverPhone = profile.phone || '';
       }
-      vehicleInfo = `${driver.vehicle_model || ''} ${driver.vehicle_number || ''}`.trim();
-    }
 
-    // Get driver location
-    const { data: loc } = await supabase
-      .from('driver_locations')
-      .select('lat, lng')
-      .eq('driver_id', rideData.driver_id)
-      .single();
+      // Get vehicle info
+      const { data: vehicle } = await supabase
+        .from('vehicles')
+        .select('vehicle_model, vehicle_number, vehicle_color')
+        .eq('driver_id', driver.id)
+        .eq('is_active', true)
+        .single();
 
-    if (loc?.lat && loc?.lng) {
-      driverLat = parseFloat(String(loc.lat));
-      driverLng = parseFloat(String(loc.lng));
+      if (vehicle) {
+        vehicleInfo = `${vehicle.vehicle_color || ''} ${vehicle.vehicle_model || ''} - ${vehicle.vehicle_number || ''}`.trim();
+      }
+
+      // Get driver location
+      const { data: loc } = await supabase
+        .from('driver_locations')
+        .select('lat, lng')
+        .eq('driver_id', driver.id)
+        .single();
+
+      if (loc?.lat && loc?.lng) {
+        driverLat = parseFloat(String(loc.lat));
+        driverLng = parseFloat(String(loc.lng));
+      }
     }
   }
 

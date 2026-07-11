@@ -90,11 +90,14 @@ export default function TrackingPage() {
             .single();
           driverProfile = driverData;
 
-          const { data: locData } = await supabase
+          const { data: locData, error: locError } = await supabase
             .from('driver_locations')
             .select('lat, lng, heading')
             .eq('driver_id', rideData.driver_id)
             .single();
+
+          console.log('Driver ID:', rideData.driver_id);
+          console.log('Location query result:', locData, 'Error:', locError);
 
           if (locData?.lat && locData?.lng) {
             const driverLoc = {
@@ -102,8 +105,10 @@ export default function TrackingPage() {
               lng: parseFloat(String(locData.lng)),
               heading: parseFloat(String(locData.heading || 0)),
             };
-            console.log('Driver location loaded:', driverLoc);
+            console.log('Driver location SET:', driverLoc);
             setDriverLocation(driverLoc);
+          } else {
+            console.log('No valid driver location found');
           }
         }
 
@@ -359,12 +364,18 @@ export default function TrackingPage() {
             {/* Driver info */}
             {ride.driver && (
               <div className="flex items-center gap-3 bg-zinc-800 rounded-2xl p-3">
-                <div className="w-14 h-14 bg-yellow-400 rounded-full flex items-center justify-center">
+                <div className="w-14 h-14 bg-yellow-400 rounded-full flex items-center justify-center relative">
                   <span className="text-2xl">🚗</span>
+                  {driverLocation && (
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-zinc-800"></div>
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-white font-semibold truncate">{ride.driver.full_name}</p>
-                  <p className="text-zinc-400 text-sm">{ride.driver.vehicle_model} • {ride.driver.vehicle_number}</p>
+                  <p className="text-zinc-400 text-sm">
+                    {ride.driver.vehicle_model} • {ride.driver.vehicle_number}
+                    {driverLocation && <span className="text-green-400 ml-2">● Live</span>}
+                  </p>
                 </div>
                 <a
                   href={`tel:${ride.driver.phone}`}

@@ -64,21 +64,27 @@ export default function TrackingClient({ rideId, initialData }: Props) {
     return () => clearInterval(interval);
   }, [ride.driver_id]);
 
-  // Build Static Map URL - simple version
-  const markers: string[] = [];
+  // Validate coordinates - use defaults if invalid
+  const pickupLat = isNaN(ride.pickup_lat) ? 4.1753 : ride.pickup_lat;
+  const pickupLng = isNaN(ride.pickup_lng) ? 73.5093 : ride.pickup_lng;
+  const dropoffLat = isNaN(ride.dropoff_lat) ? 4.2156 : ride.dropoff_lat;
+  const dropoffLng = isNaN(ride.dropoff_lng) ? 73.5438 : ride.dropoff_lng;
+
+  // Build Static Map URL with proper encoding
+  let mapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=640x400&scale=2&maptype=roadmap`;
 
   // Pickup marker (green)
-  markers.push(`markers=color:green%7Clabel:P%7C${ride.pickup_lat},${ride.pickup_lng}`);
+  mapUrl += `&markers=color:green%7Clabel:P%7C${pickupLat},${pickupLng}`;
 
   // Dropoff marker (red)
-  markers.push(`markers=color:red%7Clabel:D%7C${ride.dropoff_lat},${ride.dropoff_lng}`);
+  mapUrl += `&markers=color:red%7Clabel:D%7C${dropoffLat},${dropoffLng}`;
 
   // Driver marker (yellow)
-  if (driverLat && driverLng) {
-    markers.push(`markers=color:0xFFCC00%7Clabel:C%7C${driverLat},${driverLng}`);
+  if (driverLat && driverLng && !isNaN(driverLat) && !isNaN(driverLng)) {
+    mapUrl += `&markers=color:yellow%7Clabel:C%7C${driverLat},${driverLng}`;
   }
 
-  const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=640x400&scale=2&maptype=roadmap&${markers.join('&')}&key=${GOOGLE_MAPS_KEY}`;
+  mapUrl += `&key=${GOOGLE_MAPS_KEY}`;
 
   const statusColors: Record<string, string> = {
     pending: 'bg-yellow-500',

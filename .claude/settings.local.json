@@ -227,7 +227,8 @@
       "mcp__claude_ai_Supabase__deploy_edge_function",
       "Bash(rm -rf ios/Pods ios/.symlinks)",
       "Bash(sudo rm -rf build ios/Pods ios/.symlinks ios/Podfile.lock)",
-      "Bash(vercel --version)"
+      "Bash(vercel --version)",
+      "Bash(git revert *)"
     ],
     "additionalDirectories": [
       "/tmp"

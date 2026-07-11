@@ -288,7 +288,7 @@ export default function TrackingPage() {
       </div>
 
       {/* Map */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative min-h-[300px]">
         {isLoaded ? (
           <GoogleMap
             mapContainerStyle={mapContainerStyle}
@@ -370,9 +370,13 @@ export default function TrackingPage() {
             )}
           </GoogleMap>
         ) : (
-          <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-yellow-400"></div>
-          </div>
+          <iframe
+            width="100%"
+            height="100%"
+            style={{ border: 0, filter: 'invert(90%) hue-rotate(180deg)' }}
+            loading="lazy"
+            src={`https://www.google.com/maps/embed/v1/directions?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&origin=${ride.pickup_lat},${ride.pickup_lng}&destination=${ride.dropoff_lat},${ride.dropoff_lng}&mode=driving`}
+          />
         )}
 
         {/* Status badge */}

@@ -302,58 +302,44 @@ export default function TrackingClient({ rideId, initialData }: Props) {
         )}
       </div>
 
-      {/* Bottom Sheet */}
-      <div className="bg-zinc-900 rounded-t-3xl shrink-0 shadow-2xl pb-safe">
+      {/* Bottom Sheet - Compact */}
+      <div className="bg-zinc-900 rounded-t-2xl shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}>
         {/* Handle */}
-        <div className="flex justify-center py-2">
-          <div className="w-10 h-1 bg-zinc-700 rounded-full"></div>
+        <div className="flex justify-center pt-2 pb-1">
+          <div className="w-8 h-1 bg-zinc-700 rounded-full"></div>
         </div>
 
-        {/* Content */}
-        <div className="px-4 pb-6">
-          {/* Driver Info */}
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center text-xl shrink-0">
+        {/* Driver + Route in one row */}
+        <div className="px-3 pb-3">
+          <div className="flex items-center gap-3">
+            {/* Driver avatar */}
+            <div className="w-11 h-11 bg-yellow-400 rounded-full flex items-center justify-center text-lg shrink-0">
               🚗
             </div>
+
+            {/* Driver info + Route */}
             <div className="flex-1 min-w-0">
-              <p className="text-white font-bold truncate">{ride.driverName}</p>
-              <p className="text-zinc-400 text-sm truncate">{ride.vehicleInfo || 'Vehicle assigned'}</p>
+              <p className="text-white font-semibold text-sm truncate">{ride.driverName}</p>
+              <div className="flex items-center gap-1 text-xs text-zinc-400 mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                <span className="truncate max-w-[80px]">{ride.pickup_name}</span>
+                <span className="text-zinc-600 mx-1">→</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                <span className="truncate">{ride.dropoff_name}</span>
+              </div>
             </div>
+
+            {/* Call button */}
             {ride.driverPhone && (
               <a
                 href={`tel:${ride.driverPhone}`}
-                className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center shrink-0"
+                className="w-11 h-11 bg-green-500 rounded-full flex items-center justify-center shrink-0"
               >
-                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
                 </svg>
               </a>
             )}
-          </div>
-
-          {/* Route Info */}
-          <div className="bg-zinc-800 rounded-xl p-3">
-            <div className="flex gap-3">
-              {/* Timeline */}
-              <div className="flex flex-col items-center pt-1">
-                <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
-                <div className="w-0.5 h-6 bg-zinc-600"></div>
-                <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
-              </div>
-
-              {/* Locations */}
-              <div className="flex-1 space-y-3">
-                <div>
-                  <p className="text-zinc-500 text-xs">PICKUP</p>
-                  <p className="text-white text-sm truncate">{ride.pickup_name}</p>
-                </div>
-                <div>
-                  <p className="text-zinc-500 text-xs">DROP-OFF</p>
-                  <p className="text-white text-sm truncate">{ride.dropoff_name}</p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>

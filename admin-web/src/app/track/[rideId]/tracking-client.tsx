@@ -70,18 +70,18 @@ export default function TrackingClient({ rideId, initialData }: Props) {
   const dropoffLat = isNaN(ride.dropoff_lat) ? 4.2156 : ride.dropoff_lat;
   const dropoffLng = isNaN(ride.dropoff_lng) ? 73.5438 : ride.dropoff_lng;
 
-  // Build Static Map URL with proper encoding
+  // Build Static Map URL - browser handles encoding automatically
   let mapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=640x400&scale=2&maptype=roadmap`;
 
   // Pickup marker (green)
-  mapUrl += `&markers=color:green%7Clabel:P%7C${pickupLat},${pickupLng}`;
+  mapUrl += `&markers=color:green|label:P|${pickupLat},${pickupLng}`;
 
   // Dropoff marker (red)
-  mapUrl += `&markers=color:red%7Clabel:D%7C${dropoffLat},${dropoffLng}`;
+  mapUrl += `&markers=color:red|label:D|${dropoffLat},${dropoffLng}`;
 
   // Driver marker (yellow)
   if (driverLat && driverLng && !isNaN(driverLat) && !isNaN(driverLng)) {
-    mapUrl += `&markers=color:yellow%7Clabel:C%7C${driverLat},${driverLng}`;
+    mapUrl += `&markers=color:yellow|label:C|${driverLat},${driverLng}`;
   }
 
   mapUrl += `&key=${GOOGLE_MAPS_KEY}`;

@@ -370,13 +370,14 @@ export default function TrackingPage() {
             )}
           </GoogleMap>
         ) : (
-          <iframe
-            width="100%"
-            height="100%"
-            style={{ border: 0, filter: 'invert(90%) hue-rotate(180deg)' }}
-            loading="lazy"
-            src={`https://www.google.com/maps/embed/v1/directions?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&origin=${ride.pickup_lat},${ride.pickup_lng}&destination=${ride.dropoff_lat},${ride.dropoff_lng}&mode=driving`}
-          />
+          <div className="w-full h-full bg-zinc-800 flex items-center justify-center flex-col gap-4">
+            <img
+              src={`https://maps.googleapis.com/maps/api/staticmap?center=${ride.pickup_lat},${ride.pickup_lng}&zoom=13&size=600x400&maptype=roadmap&markers=color:green%7C${ride.pickup_lat},${ride.pickup_lng}&markers=color:red%7C${ride.dropoff_lat},${ride.dropoff_lng}&path=color:0xfacc15%7Cweight:4%7C${ride.pickup_lat},${ride.pickup_lng}%7C${ride.dropoff_lat},${ride.dropoff_lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&style=feature:all%7Celement:geometry%7Ccolor:0x212121&style=feature:water%7Ccolor:0x000000`}
+              alt="Route map"
+              className="w-full max-w-md rounded-lg"
+            />
+            <p className="text-zinc-500 text-sm">Loading live map...</p>
+          </div>
         )}
 
         {/* Status badge */}

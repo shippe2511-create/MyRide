@@ -71,28 +71,51 @@ export default function TrackingPage() {
   useEffect(() => {
     async function fetchRide() {
       try {
-        const { data, error } = await supabase
+        // First fetch the ride
+        const { data: rideData, error: rideError } = await supabase
           .from('rides')
-          .select(`
-            *,
-            driver:profiles!driver_id(full_name, phone, vehicle_number, vehicle_model),
-            customer:profiles!customer_id(full_name)
-          `)
+          .select('*')
           .eq('id', rideId)
           .single();
 
-        if (error) throw error;
-        if (!data) throw new Error('Ride not found');
+        if (rideError) throw rideError;
+        if (!rideData) throw new Error('Ride not found');
 
-        setRide(data);
+        // Fetch driver profile if exists
+        let driverProfile = null;
+        if (rideData.driver_id) {
+          const { data: driverData } = await supabase
+            .from('profiles')
+            .select('full_name, phone, vehicle_number, vehicle_model')
+            .eq('id', rideData.driver_id)
+            .single();
+          driverProfile = driverData;
+        }
+
+        // Fetch customer profile if exists
+        let customerProfile = null;
+        if (rideData.customer_id) {
+          const { data: customerData } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', rideData.customer_id)
+            .single();
+          customerProfile = customerData;
+        }
+
+        setRide({
+          ...rideData,
+          driver: driverProfile,
+          customer: customerProfile,
+        });
         setLoading(false);
 
         // Fetch initial driver location
-        if (data.driver_id) {
+        if (rideData.driver_id) {
           const { data: locData } = await supabase
             .from('driver_locations')
             .select('latitude, longitude, heading, updated_at')
-            .eq('driver_id', data.driver_id)
+            .eq('driver_id', rideData.driver_id)
             .single();
 
           if (locData) {
@@ -105,6 +128,7 @@ export default function TrackingPage() {
           }
         }
       } catch (err: unknown) {
+        console.error('Tracking page error:', err);
         setError(err instanceof Error ? err.message : 'Failed to load ride');
         setLoading(false);
       }

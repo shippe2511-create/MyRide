@@ -97,11 +97,13 @@ export default function TrackingPage() {
             .single();
 
           if (locData?.lat && locData?.lng) {
-            setDriverLocation({
+            const driverLoc = {
               lat: parseFloat(String(locData.lat)),
               lng: parseFloat(String(locData.lng)),
-              heading: locData.heading,
-            });
+              heading: parseFloat(String(locData.heading || 0)),
+            };
+            console.log('Driver location loaded:', driverLoc);
+            setDriverLocation(driverLoc);
           }
         }
 
@@ -170,7 +172,23 @@ export default function TrackingPage() {
     };
   }, [rideId]);
 
-  // Fetch route and ETA
+  // Set simple route path (straight line as fallback)
+  useEffect(() => {
+    if (!ride || !driverLocation) return;
+
+    const destination = ride.status === 'in_progress'
+      ? { lat: ride.dropoff_lat, lng: ride.dropoff_lng }
+      : { lat: ride.pickup_lat, lng: ride.pickup_lng };
+
+    // Simple straight line route
+    setRoutePath([
+      { lat: driverLocation.lat, lng: driverLocation.lng },
+      destination
+    ]);
+    console.log('Route set from driver to destination');
+  }, [ride, driverLocation]);
+
+  // Fetch ETA using Directions API
   useEffect(() => {
     if (!ride || !driverLocation || !isLoaded || typeof google === 'undefined') return;
 
@@ -178,24 +196,29 @@ export default function TrackingPage() {
       ? { lat: ride.dropoff_lat, lng: ride.dropoff_lng }
       : { lat: ride.pickup_lat, lng: ride.pickup_lng };
 
-    const directionsService = new google.maps.DirectionsService();
-    directionsService.route(
-      {
-        origin: { lat: driverLocation.lat, lng: driverLocation.lng },
-        destination,
-        travelMode: google.maps.TravelMode.DRIVING,
-      },
-      (result, status) => {
-        if (status === 'OK' && result) {
-          const route = result.routes[0];
-          if (route?.legs[0]) {
-            setEta(route.legs[0].duration?.text || '--');
+    try {
+      const directionsService = new google.maps.DirectionsService();
+      directionsService.route(
+        {
+          origin: { lat: driverLocation.lat, lng: driverLocation.lng },
+          destination,
+          travelMode: google.maps.TravelMode.DRIVING,
+        },
+        (result, status) => {
+          if (status === 'OK' && result) {
+            const route = result.routes[0];
+            if (route?.legs[0]) {
+              setEta(route.legs[0].duration?.text || '--');
+            }
+            // Use actual route path instead of straight line
+            const path = route.overview_path.map((p) => ({ lat: p.lat(), lng: p.lng() }));
+            setRoutePath(path);
           }
-          const path = route.overview_path.map((p) => ({ lat: p.lat(), lng: p.lng() }));
-          setRoutePath(path);
         }
-      }
-    );
+      );
+    } catch (e) {
+      console.error('Directions API error:', e);
+    }
   }, [ride, driverLocation, isLoaded]);
 
   // Fit map bounds

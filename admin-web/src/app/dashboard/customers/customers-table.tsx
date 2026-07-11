@@ -1102,14 +1102,6 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                 />
               </div>
             </div>
-            <div className="grid gap-2">
-              <label className="text-sm font-medium">Emergency Contact</label>
-              <Input
-                value={formData.emergency_contact}
-                onChange={(e) => setFormData({ ...formData, emergency_contact: e.target.value })}
-                placeholder="7XXXXXX"
-              />
-            </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Gender</label>
@@ -1152,6 +1144,14 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Emergency Contact</label>
+              <Input
+                value={formData.emergency_contact}
+                onChange={(e) => setFormData({ ...formData, emergency_contact: e.target.value })}
+                placeholder="7XXXXXX"
+              />
             </div>
           </div>
           <DialogFooter>

@@ -18,6 +18,7 @@ import 'profile_screen.dart';
 import 'ride_screen.dart';
 import 'chat_screen.dart';
 import '../services/supabase_service.dart';
+import '../services/notification_service.dart';
 import '../services/background_location_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -482,6 +483,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           setState(() => _isPopupMinimized = false);
                           final result = await state.acceptRide(state.incomingRequests.first);
                           if (result['success'] == true) {
+                            // Subscribe to chat notifications for this ride
+                            final rideId = state.currentRide?.id;
+                            if (rideId != null) {
+                              NotificationService.subscribeToChatMessages(rideId, state.profileId);
+                            }
                             if (mounted) {
                               Navigator.push(
                                 context,

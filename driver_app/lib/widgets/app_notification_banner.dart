@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 
-enum NotificationType { success, error, warning, info }
+enum NotificationType { success, error, warning, info, chat }
 
 class AppNotificationBanner {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -174,6 +174,8 @@ class _NotificationBannerWidgetState extends State<_NotificationBannerWidget>
         return AppColors.yellow;
       case NotificationType.info:
         return const Color(0xFF2979FF);
+      case NotificationType.chat:
+        return const Color(0xFF1E1E1E); // Dark background for chat
     }
   }
 
@@ -187,6 +189,8 @@ class _NotificationBannerWidgetState extends State<_NotificationBannerWidget>
         return Colors.black.withOpacity(0.15);
       case NotificationType.info:
         return Colors.white.withOpacity(0.25);
+      case NotificationType.chat:
+        return AppColors.yellow; // Yellow icon bg for chat
     }
   }
 
@@ -205,6 +209,8 @@ class _NotificationBannerWidgetState extends State<_NotificationBannerWidget>
         return Icons.warning_amber_rounded;
       case NotificationType.info:
         return Icons.info_rounded;
+      case NotificationType.chat:
+        return Icons.chat_bubble_rounded;
     }
   }
 

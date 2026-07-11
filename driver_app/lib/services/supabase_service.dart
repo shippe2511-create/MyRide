@@ -1092,6 +1092,10 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(response);
   }
 
+  // Store active chat channel for broadcasting
+  static RealtimeChannel? _activeChatChannel;
+  static String? _activeChatRideId;
+
   static Future<void> sendChatMessage({
     required String rideId,
     required String message,
@@ -1104,13 +1108,26 @@ class SupabaseService {
       throw Exception('No sender ID available');
     }
     try {
-      await client.from('chat_messages').insert({
+      final result = await client.from('chat_messages').insert({
         'ride_id': rideId,
         'sender_id': id,
         'sender_type': senderType,
         'message': message,
         'created_at': DateTime.now().toIso8601String(),
-      });
+      }).select().single();
+
+      // Always broadcast the message for other devices to receive
+      try {
+        final broadcastChannel = client.channel('chat_broadcast_$rideId');
+        await broadcastChannel.subscribe();
+        await broadcastChannel.sendBroadcastMessage(
+          event: 'new_message',
+          payload: result,
+        );
+        debugPrint('SupabaseService: Broadcasted chat message for ride $rideId');
+      } catch (e) {
+        debugPrint('SupabaseService: Error broadcasting: $e');
+      }
 
       // Queue push notification for customer
       try {
@@ -1158,22 +1175,26 @@ class SupabaseService {
     String rideId,
     void Function(Map<String, dynamic>) onNewMessage,
   ) {
-    return client
-        .channel('chat_$rideId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'public',
-          table: 'chat_messages',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'ride_id',
-            value: rideId,
-          ),
+    debugPrint('SupabaseService: Creating chat broadcast subscription for ride $rideId');
+    _activeChatRideId = rideId;
+    _activeChatChannel = client
+        .channel('chat_broadcast_$rideId')
+        .onBroadcast(
+          event: 'new_message',
           callback: (payload) {
-            onNewMessage(payload.newRecord);
+            debugPrint('SupabaseService: Chat message received via broadcast: $payload');
+            onNewMessage(payload);
           },
         )
-        .subscribe();
+        .subscribe((status, error) {
+          debugPrint('SupabaseService: Chat broadcast subscription status=$status, error=$error');
+        });
+    return _activeChatChannel!;
+  }
+
+  static void clearChatChannel() {
+    _activeChatChannel = null;
+    _activeChatRideId = null;
   }
 
   // Check for destination change status (driver polls this)

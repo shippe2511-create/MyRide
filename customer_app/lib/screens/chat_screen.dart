@@ -97,10 +97,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   int _recordingSeconds = 0;
   Timer? _typingTimer;
   Timer? _recordingTimer;
+  Timer? _pollTimer;
   late AnimationController _recordingController;
   late Animation<double> _recordingAnimation;
   RealtimeChannel? _chatChannel;
   String? _myProfileId;
+  final Set<String> _seenMessageIds = {};
 
 
   final List<_QuickReply> _quickReplies = [
@@ -129,6 +131,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       if (widget.rideId != null) {
         _loadMessages();
         _subscribeToMessages();
+        _startPolling();
       }
       // No mock messages - show empty chat when no ride
     });
@@ -137,27 +140,31 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   Future<void> _loadMessages() async {
     if (widget.rideId == null) return;
-    debugPrint('ChatScreen: Loading messages for rideId=${widget.rideId}');
     final appState = Provider.of<AppState>(context, listen: false);
     try {
       final messages = await SupabaseService.getChatMessages(widget.rideId!);
-      debugPrint('ChatScreen: Loaded ${messages.length} messages');
-      if (mounted) {
-        setState(() {
-          _messages.clear();
-          for (final msg in messages) {
-            final isCustomer = msg['sender_type'] == 'customer';
-            _messages.add(ChatMessage(
-              id: msg['id'].toString(),
-              text: msg['message'] ?? '',
-              isCustomer: isCustomer,
-              time: MaldivesTimezone.parse(msg['created_at']) ?? MaldivesTimezone.now(),
-              status: msg['is_read'] == true ? MessageStatus.read : MessageStatus.delivered,
-            ));
-          }
-        });
-        _scrollToBottom();
+      if (!mounted) return;
+
+      // Track all message IDs (no notification needed when IN chat screen - messages appear directly)
+      for (final msg in messages) {
+        final msgId = msg['id'].toString();
+        _seenMessageIds.add(msgId);
       }
+
+      setState(() {
+        _messages.clear();
+        for (final msg in messages) {
+          final isCustomer = msg['sender_type'] == 'customer';
+          _messages.add(ChatMessage(
+            id: msg['id'].toString(),
+            text: msg['message'] ?? '',
+            isCustomer: isCustomer,
+            time: MaldivesTimezone.parse(msg['created_at']) ?? MaldivesTimezone.now(),
+            status: msg['is_read'] == true ? MessageStatus.read : MessageStatus.delivered,
+          ));
+        }
+      });
+      _scrollToBottom();
       await SupabaseService.markMessagesAsRead(widget.rideId!, userId: appState.profileId);
     } catch (e) {
       debugPrint('Error loading messages: $e');
@@ -172,12 +179,18 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       (newMessage) {
         debugPrint('ChatScreen: Received realtime message: $newMessage');
         final isFromCustomer = newMessage['sender_type'] == 'customer';
-        if (mounted && !isFromCustomer) {
+        final msgId = newMessage['id']?.toString() ?? '';
+
+        // Check for duplicates
+        final isDuplicate = _messages.any((m) => m.id == msgId);
+        debugPrint('ChatScreen: isFromCustomer=$isFromCustomer, isDuplicate=$isDuplicate, msgId=$msgId');
+
+        if (mounted && !isFromCustomer && !isDuplicate) {
           debugPrint('ChatScreen: Adding driver message to UI');
           setState(() {
             _driverTyping = false;
             _messages.add(ChatMessage(
-              id: newMessage['id'].toString(),
+              id: msgId,
               text: newMessage['message'] ?? '',
               isCustomer: false,
               time: MaldivesTimezone.parse(newMessage['created_at']) ?? MaldivesTimezone.now(),
@@ -200,10 +213,17 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     }
   }
 
+  void _startPolling() {
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      _loadMessages();
+    });
+  }
+
   @override
   void dispose() {
     NotificationService.setChatScreenOpen(false);
     _chatChannel?.unsubscribe();
+    _pollTimer?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();

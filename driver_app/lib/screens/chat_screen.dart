@@ -96,8 +96,10 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   bool _isRecording = false;
   int _recordingSeconds = 0;
   Timer? _recordingTimer;
+  Timer? _pollTimer;
   late AnimationController _recordingController;
   late Animation<double> _recordingAnimation;
+  final Set<String> _seenMessageIds = {};
 
 
   final List<_QuickReply> _quickReplies = [
@@ -127,6 +129,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       if (widget.rideId != null) {
         _loadMessages();
         _subscribeToMessages();
+        _startPolling();
       } else {
         // No mock messages - show empty chat when no ride
         setState(() {});
@@ -138,11 +141,17 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   Future<void> _loadMessages() async {
     if (widget.rideId == null) return;
 
-    setState(() {});
     try {
       final messages = await SupabaseService.getChatMessages(widget.rideId!);
-      _messages.clear();
+      if (!mounted) return;
 
+      // Track all message IDs (no notification needed when IN chat screen - messages appear directly)
+      for (final msg in messages) {
+        final msgId = msg['id']?.toString() ?? '';
+        _seenMessageIds.add(msgId);
+      }
+
+      _messages.clear();
       for (final msg in messages) {
         final isDriver = msg['sender_type'] == 'driver';
         _messages.add(ChatMessage(
@@ -159,7 +168,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     } catch (e) {
       debugPrint('Error loading messages: $e');
     }
-    setState(() {});
+    if (mounted) setState(() {});
     _scrollToBottom();
   }
 
@@ -206,9 +215,16 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     }
   }
 
+  void _startPolling() {
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      _loadMessages();
+    });
+  }
+
   @override
   void dispose() {
     NotificationService.setChatScreenOpen(false);
+    _pollTimer?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();

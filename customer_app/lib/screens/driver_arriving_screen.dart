@@ -83,6 +83,8 @@ class DriverArrivingScreen extends StatefulWidget {
 class _DriverArrivingScreenState extends State<DriverArrivingScreen> with SingleTickerProviderStateMixin {
   late Timer _etaTimer;
   Timer? _statusPollingTimer;
+  Timer? _chatPollingTimer;
+  String? _lastDriverMsgId;
   int _currentEta = 0;
   late LatLng _pickupLocation;
   late LatLng _driverLocation;
@@ -292,13 +294,61 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> with Single
     _loadPickupIcon();
     _loadCarIcon();
 
-    // Subscribe to chat notifications
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final appState = Provider.of<AppState>(context, listen: false);
-      if (widget.rideId != null && appState.profileId != null) {
-        NotificationService.subscribeToChatMessages(widget.rideId!, appState.profileId!);
+    // Poll for chat messages directly
+    if (widget.rideId != null) {
+      _loadInitialChatState();
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) _startChatPolling();
+      });
+    }
+  }
+
+  void _startChatPolling() {
+    _chatPollingTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+      if (widget.rideId == null) return;
+      try {
+        final messages = await SupabaseService.getChatMessages(widget.rideId!);
+
+        // Find latest driver message
+        String? latestId;
+        String? latestText;
+        for (final msg in messages) {
+          if (msg['sender_type'] == 'driver') {
+            latestId = msg['id']?.toString();
+            latestText = msg['message'] as String?;
+          }
+        }
+
+        // If new driver message found
+        if (latestId != null && latestId != _lastDriverMsgId && latestText != null && latestText.isNotEmpty && mounted) {
+          _lastDriverMsgId = latestId;
+          NotificationService.showNotification(
+            title: 'New message from Driver',
+            body: latestText,
+          );
+        }
+      } catch (e) {
+        // ignore
       }
     });
+
+    // Load initial last message ID
+    _loadInitialChatState();
+  }
+
+  Future<void> _loadInitialChatState() async {
+    if (widget.rideId == null) return;
+    try {
+      final messages = await SupabaseService.getChatMessages(widget.rideId!);
+      for (final msg in messages.reversed) {
+        if (msg['sender_type'] == 'driver') {
+          _lastDriverMsgId = msg['id']?.toString();
+          break;
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
   }
 
   void _subscribeToDriverLocation() async {
@@ -510,6 +560,7 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> with Single
     _markerAnimController.dispose();
     _etaTimer.cancel();
     _statusPollingTimer?.cancel();
+    _chatPollingTimer?.cancel();
     _rideSubscription?.cancel();
     _driverLocationSubscription?.cancel();
     if (widget.rideId != null) {

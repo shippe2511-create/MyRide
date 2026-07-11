@@ -142,6 +142,8 @@ class _GlobalNotificationBannerState extends State<_GlobalNotificationBanner>
         return Colors.orange;
       case NotificationType.info:
         return Colors.blue;
+      case NotificationType.chat:
+        return const Color(0xFF1E1E1E);
     }
   }
 
@@ -155,6 +157,8 @@ class _GlobalNotificationBannerState extends State<_GlobalNotificationBanner>
         return Icons.warning;
       case NotificationType.info:
         return Icons.info;
+      case NotificationType.chat:
+        return Icons.chat_bubble;
     }
   }
 

@@ -311,13 +311,16 @@ class NotificationService {
 
     // Determine notification type for in-app banner
     NotificationType bannerType = NotificationType.info;
-    if (title.toLowerCase().contains('error') || title.toLowerCase().contains('cancelled')) {
+    final lowerTitle = title.toLowerCase();
+    if (lowerTitle.contains('error') || lowerTitle.contains('cancelled')) {
       bannerType = NotificationType.error;
-    } else if (title.toLowerCase().contains('completed') || title.toLowerCase().contains('accepted')) {
+    } else if (lowerTitle.contains('completed') || lowerTitle.contains('accepted')) {
       bannerType = NotificationType.success;
-    } else if (title.toLowerCase().contains('new ride') || title.toLowerCase().contains('request')) {
+    } else if (lowerTitle.contains('message') || lowerTitle.contains('chat')) {
+      bannerType = NotificationType.chat; // Dark bg with chat icon
+    } else if (lowerTitle.contains('new ride') || lowerTitle.contains('request')) {
       bannerType = NotificationType.info;
-    } else if (title.toLowerCase().contains('arrived') || title.toLowerCase().contains('started')) {
+    } else if (lowerTitle.contains('arrived') || lowerTitle.contains('started')) {
       bannerType = NotificationType.success;
     }
 
@@ -472,62 +475,92 @@ class NotificationService {
     debugPrint('NotificationService: Chat screen open = $isOpen');
   }
 
+  static Timer? _chatPollTimer;
+  static String? _lastCustomerMessageId;
+  static Set<String> _seenChatMessageIds = {};
+
   static void subscribeToChatMessages(String rideId, String myUserId) {
-    if (_currentRideId == rideId && _chatChannel != null) return;
+    if (_currentRideId == rideId && _chatPollTimer != null) return;
 
     _unsubscribeChat();
     _currentRideId = rideId;
+    _lastCustomerMessageId = null;
+    _seenChatMessageIds.clear();
 
-    debugPrint('NotificationService: Subscribing to chat notifications for ride $rideId, myUserId=$myUserId');
+    debugPrint('NotificationService: subscribeToChatMessages rideId=$rideId');
 
-    final channel = Supabase.instance.client.channel('driver_notif_chat_$rideId');
+    // Initial load to seed seen messages
+    _initializeChatPolling(rideId);
+  }
 
-    channel.onPostgresChanges(
-      event: PostgresChangeEvent.insert,
-      schema: 'public',
-      table: 'chat_messages',
-      filter: PostgresChangeFilter(
-        type: PostgresChangeFilterType.eq,
-        column: 'ride_id',
-        value: rideId,
-      ),
-      callback: (payload) {
-        final data = payload.newRecord;
-        final senderId = data['sender_id'] as String?;
-        final senderType = data['sender_type'] as String?;
-        final message = data['message'] as String?;
+  static Future<void> _initializeChatPolling(String rideId) async {
+    // Load existing messages first
+    try {
+      final messages = await SupabaseService.getChatMessages(rideId);
+      for (final msg in messages) {
+        final msgId = msg['id']?.toString();
+        if (msgId != null) {
+          _seenChatMessageIds.add(msgId);
+        }
+        if (msg['sender_type'] == 'customer') {
+          _lastCustomerMessageId = msgId;
+        }
+      }
+      debugPrint('NotificationService: Initialized with ${_seenChatMessageIds.length} existing messages, lastCustomerId=$_lastCustomerMessageId');
+    } catch (e) {
+      debugPrint('NotificationService: Error loading initial messages: $e');
+    }
 
-        debugPrint('NotificationService: Chat message received - isChatOpen=$_isChatScreenOpen, senderId=$senderId, myId=$myUserId, senderType=$senderType, message=$message');
+    // Start polling
+    _chatPollTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      _pollChatMessages(rideId);
+    });
+  }
 
-        // Show notification if message is from other party
-        if (senderId != myUserId && message != null && message.isNotEmpty) {
-          final senderName = senderType == 'customer' ? 'Customer' : 'Driver';
-          debugPrint('NotificationService: SHOWING notification for message from $senderName: $message');
+  static Future<void> _pollChatMessages(String rideId) async {
+    // Don't show notifications if chat screen is open
+    if (_isChatScreenOpen) return;
+
+    try {
+      final messages = await SupabaseService.getChatMessages(rideId);
+
+      for (final msg in messages) {
+        final msgId = msg['id']?.toString();
+        final senderType = msg['sender_type'] as String?;
+        final msgText = msg['message'] as String? ?? '';
+
+        // Skip if already seen or empty
+        if (msgId == null || _seenChatMessageIds.contains(msgId) || msgText.isEmpty) continue;
+
+        // Mark as seen
+        _seenChatMessageIds.add(msgId);
+
+        // Only notify for customer messages
+        if (senderType == 'customer') {
+          debugPrint('NotificationService: NEW customer message detected: $msgText');
           showNotification(
-            title: 'New message from $senderName',
-            body: message,
+            title: 'New message from Customer',
+            body: msgText,
             payload: 'chat_$rideId',
             onTap: () {
               _navigateToRideChat(rideId);
             },
           );
-        } else {
-          debugPrint('NotificationService: NOT showing notification - senderId=$senderId vs myUserId=$myUserId, message=$message');
         }
-      },
-    );
-
-    channel.subscribe((status, error) {
-      debugPrint('NotificationService: Chat subscription status=$status, error=$error');
-    });
-
-    _chatChannel = channel;
+      }
+    } catch (e) {
+      debugPrint('NotificationService: Poll error: $e');
+    }
   }
 
   static void _unsubscribeChat() {
+    _chatPollTimer?.cancel();
+    _chatPollTimer = null;
     _chatChannel?.unsubscribe();
     _chatChannel = null;
     _currentRideId = null;
+    _lastCustomerMessageId = null;
+    _seenChatMessageIds.clear();
   }
 
   static void dispose() {

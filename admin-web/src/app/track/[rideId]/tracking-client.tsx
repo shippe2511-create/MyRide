@@ -28,13 +28,6 @@ const SUPABASE_URL = 'https://lwkndyyfmmrzazdvrsnk.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3a25keXlmbW1yemF6ZHZyc25rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTM0NzAsImV4cCI6MjA5NTg4OTQ3MH0.hIcx_gway6VJrTYV1MAXAbcapgTfxo4zYOwgmS2uChg';
 const GOOGLE_MAPS_KEY = 'AIzaSyBZ7HVy2dUvTCC5SZkz0MaFCBON2QorFbI';
 
-declare global {
-  interface Window {
-    google: typeof google;
-    initMap: () => void;
-  }
-}
-
 export default function TrackingClient({ rideId, initialData }: Props) {
   const [ride] = useState<RideData>(initialData);
   const [driverLat, setDriverLat] = useState<number | null>(initialData.driverLat);
@@ -43,7 +36,7 @@ export default function TrackingClient({ rideId, initialData }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const driverMarkerRef = useRef<google.maps.Marker | null>(null);
-  const routeLineRef = useRef<google.maps.Polyline | null>(null);
+  const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
 
   // Load Google Maps script
   useEffect(() => {
@@ -61,7 +54,9 @@ export default function TrackingClient({ rideId, initialData }: Props) {
     document.head.appendChild(script);
 
     return () => {
-      document.head.removeChild(script);
+      if (document.head.contains(script)) {
+        document.head.removeChild(script);
+      }
     };
   }, []);
 
@@ -76,93 +71,136 @@ export default function TrackingClient({ rideId, initialData }: Props) {
       center: { lat: centerLat, lng: centerLng },
       zoom: 13,
       styles: [
-        { elementType: 'geometry', stylers: [{ color: '#242f3e' }] },
-        { elementType: 'labels.text.stroke', stylers: [{ color: '#242f3e' }] },
-        { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] },
-        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#17263c' }] },
-        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#38414e' }] },
-        { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#212a37' }] },
+        { elementType: 'geometry', stylers: [{ color: '#1a1a2e' }] },
+        { elementType: 'labels.text.stroke', stylers: [{ color: '#1a1a2e' }] },
+        { elementType: 'labels.text.fill', stylers: [{ color: '#8a8a8a' }] },
+        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f0f1a' }] },
+        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2a2a3e' }] },
+        { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1a1a2e' }] },
+        { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#3a3a4e' }] },
+        { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+        { featureType: 'transit', stylers: [{ visibility: 'off' }] },
       ],
       disableDefaultUI: true,
       zoomControl: true,
+      zoomControlOptions: {
+        position: window.google.maps.ControlPosition.RIGHT_CENTER,
+      },
     });
 
     mapInstanceRef.current = map;
 
-    // Pickup marker (green)
+    // Pickup marker (red pin with B)
     new window.google.maps.Marker({
       position: { lat: ride.pickup_lat, lng: ride.pickup_lng },
       map,
       title: 'Pickup',
       icon: {
-        path: window.google.maps.SymbolPath.CIRCLE,
-        scale: 12,
-        fillColor: '#22c55e',
-        fillOpacity: 1,
-        strokeColor: '#fff',
-        strokeWeight: 3,
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="36" height="48" viewBox="0 0 36 48">
+            <path d="M18 0C8 0 0 8 0 18c0 14 18 30 18 30s18-16 18-30C36 8 28 0 18 0z" fill="#ef4444"/>
+            <circle cx="18" cy="16" r="10" fill="#fff"/>
+            <text x="18" y="21" text-anchor="middle" font-size="14" font-weight="bold" fill="#ef4444">B</text>
+          </svg>
+        `),
+        scaledSize: new window.google.maps.Size(36, 48),
+        anchor: new window.google.maps.Point(18, 48),
       },
     });
 
-    // Dropoff marker (red)
+    // Dropoff marker (green circle with A)
     new window.google.maps.Marker({
       position: { lat: ride.dropoff_lat, lng: ride.dropoff_lng },
       map,
       title: 'Dropoff',
       icon: {
-        path: window.google.maps.SymbolPath.CIRCLE,
-        scale: 12,
-        fillColor: '#ef4444',
-        fillOpacity: 1,
-        strokeColor: '#fff',
-        strokeWeight: 3,
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+            <circle cx="20" cy="20" r="18" fill="#22c55e" stroke="#fff" stroke-width="3"/>
+            <text x="20" y="26" text-anchor="middle" font-size="16" font-weight="bold" fill="#fff">A</text>
+          </svg>
+        `),
+        scaledSize: new window.google.maps.Size(40, 40),
+        anchor: new window.google.maps.Point(20, 20),
       },
     });
+
+    // Initialize directions renderer for road route
+    directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
+      map,
+      suppressMarkers: true,
+      polylineOptions: {
+        strokeColor: '#facc15',
+        strokeWeight: 6,
+        strokeOpacity: 1,
+      },
+    });
+
+    // Add driver marker if location available
+    if (driverLat && driverLng) {
+      createDriverMarker(map, driverLat, driverLng);
+      calculateRoute(driverLat, driverLng);
+    }
 
     // Fit bounds
     const bounds = new window.google.maps.LatLngBounds();
     bounds.extend({ lat: ride.pickup_lat, lng: ride.pickup_lng });
     bounds.extend({ lat: ride.dropoff_lat, lng: ride.dropoff_lng });
-
-    // Add driver marker if location available
     if (driverLat && driverLng) {
-      driverMarkerRef.current = new window.google.maps.Marker({
-        position: { lat: driverLat, lng: driverLng },
-        map,
-        title: 'Driver',
-        icon: {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
-              <circle cx="24" cy="24" r="20" fill="#facc15" stroke="#fff" stroke-width="4"/>
-              <text x="24" y="32" text-anchor="middle" font-size="20">🚗</text>
-            </svg>
-          `),
-          scaledSize: new window.google.maps.Size(48, 48),
-          anchor: new window.google.maps.Point(24, 24),
-        },
-      });
-
-      // Route line
-      const targetLat = ride.status === 'in_progress' ? ride.dropoff_lat : ride.pickup_lat;
-      const targetLng = ride.status === 'in_progress' ? ride.dropoff_lng : ride.pickup_lng;
-
-      routeLineRef.current = new window.google.maps.Polyline({
-        path: [
-          { lat: driverLat, lng: driverLng },
-          { lat: targetLat, lng: targetLng },
-        ],
-        geodesic: true,
-        strokeColor: '#facc15',
-        strokeOpacity: 1.0,
-        strokeWeight: 5,
-        map,
-      });
-
       bounds.extend({ lat: driverLat, lng: driverLng });
     }
-
     map.fitBounds(bounds, 60);
   }, [mapLoaded, ride, driverLat, driverLng]);
+
+  const createDriverMarker = (map: google.maps.Map, lat: number, lng: number) => {
+    if (driverMarkerRef.current) {
+      driverMarkerRef.current.setPosition({ lat, lng });
+      return;
+    }
+
+    driverMarkerRef.current = new window.google.maps.Marker({
+      position: { lat, lng },
+      map,
+      title: 'Driver',
+      icon: {
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 50 50">
+            <circle cx="25" cy="25" r="22" fill="#facc15" stroke="#fff" stroke-width="3"/>
+            <g transform="translate(12, 12) scale(0.5)">
+              <path d="M47.5 25h-5V15c0-1.4-1.1-2.5-2.5-2.5H10c-1.4 0-2.5 1.1-2.5 2.5v10h-5c-1.4 0-2.5 1.1-2.5 2.5v15c0 1.4 1.1 2.5 2.5 2.5h5v2.5c0 1.4 1.1 2.5 2.5 2.5h5c1.4 0 2.5-1.1 2.5-2.5V45h15v2.5c0 1.4 1.1 2.5 2.5 2.5h5c1.4 0 2.5-1.1 2.5-2.5V45h5c1.4 0 2.5-1.1 2.5-2.5v-15c0-1.4-1.1-2.5-2.5-2.5zM12.5 37.5c-2.8 0-5-2.2-5-5s2.2-5 5-5 5 2.2 5 5-2.2 5-5 5zm25 0c-2.8 0-5-2.2-5-5s2.2-5 5-5 5 2.2 5 5-2.2 5-5 5zM40 25H10v-7.5h30V25z" fill="#000"/>
+            </g>
+          </svg>
+        `),
+        scaledSize: new window.google.maps.Size(50, 50),
+        anchor: new window.google.maps.Point(25, 25),
+      },
+      zIndex: 1000,
+    });
+  };
+
+  const calculateRoute = useCallback((fromLat: number, fromLng: number) => {
+    if (!window.google || !directionsRendererRef.current) return;
+
+    const directionsService = new window.google.maps.DirectionsService();
+
+    // Route from driver to destination (dropoff for in_progress, pickup otherwise)
+    const destination = ride.status === 'in_progress'
+      ? { lat: ride.dropoff_lat, lng: ride.dropoff_lng }
+      : { lat: ride.pickup_lat, lng: ride.pickup_lng };
+
+    directionsService.route(
+      {
+        origin: { lat: fromLat, lng: fromLng },
+        destination,
+        travelMode: window.google.maps.TravelMode.DRIVING,
+      },
+      (result, status) => {
+        if (status === 'OK' && result) {
+          directionsRendererRef.current?.setDirections(result);
+        }
+      }
+    );
+  }, [ride]);
 
   // Update driver marker
   const updateDriverMarker = useCallback((lat: number, lng: number) => {
@@ -171,46 +209,11 @@ export default function TrackingClient({ rideId, initialData }: Props) {
     if (driverMarkerRef.current) {
       driverMarkerRef.current.setPosition({ lat, lng });
     } else {
-      driverMarkerRef.current = new window.google.maps.Marker({
-        position: { lat, lng },
-        map: mapInstanceRef.current,
-        title: 'Driver',
-        icon: {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
-              <circle cx="24" cy="24" r="20" fill="#facc15" stroke="#fff" stroke-width="4"/>
-              <text x="24" y="32" text-anchor="middle" font-size="20">🚗</text>
-            </svg>
-          `),
-          scaledSize: new window.google.maps.Size(48, 48),
-          anchor: new window.google.maps.Point(24, 24),
-        },
-      });
+      createDriverMarker(mapInstanceRef.current, lat, lng);
     }
 
-    // Update route line
-    const targetLat = ride.status === 'in_progress' ? ride.dropoff_lat : ride.pickup_lat;
-    const targetLng = ride.status === 'in_progress' ? ride.dropoff_lng : ride.pickup_lng;
-
-    if (routeLineRef.current) {
-      routeLineRef.current.setPath([
-        { lat, lng },
-        { lat: targetLat, lng: targetLng },
-      ]);
-    } else {
-      routeLineRef.current = new window.google.maps.Polyline({
-        path: [
-          { lat, lng },
-          { lat: targetLat, lng: targetLng },
-        ],
-        geodesic: true,
-        strokeColor: '#facc15',
-        strokeOpacity: 1.0,
-        strokeWeight: 5,
-        map: mapInstanceRef.current,
-      });
-    }
-  }, [ride]);
+    calculateRoute(lat, lng);
+  }, [calculateRoute]);
 
   // Poll for driver location
   useEffect(() => {
@@ -266,81 +269,68 @@ export default function TrackingClient({ rideId, initialData }: Props) {
   };
 
   return (
-    <div className="h-screen bg-zinc-900 flex flex-col overflow-hidden">
+    <div className="h-screen bg-black flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="bg-zinc-800 p-3 flex items-center gap-3 shrink-0">
-        <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
-          <span className="text-xl">🚕</span>
+      <div className="bg-zinc-900 p-3 flex items-center gap-3 shrink-0">
+        <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center">
+          <span className="text-2xl">🚕</span>
         </div>
         <div className="flex-1">
           <h1 className="text-white font-bold text-lg">MyRide Live</h1>
-          <p className="text-zinc-400 text-xs">#{rideId.slice(0, 8)}</p>
+          <p className="text-zinc-500 text-xs">#{rideId.slice(0, 8)}</p>
         </div>
         {driverLat && driverLng && (
-          <div className="flex items-center gap-1 bg-green-500/20 px-2 py-1 rounded-full">
+          <div className="flex items-center gap-1.5 bg-green-500/20 border border-green-500/50 px-3 py-1.5 rounded-full">
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-            <span className="text-green-400 text-xs font-medium">LIVE</span>
+            <span className="text-green-400 text-sm font-semibold">LIVE</span>
           </div>
         )}
       </div>
 
       {/* Status Bar */}
-      <div className={`${statusColors[ride.status] || 'bg-gray-500'} text-white text-center py-2 font-semibold shrink-0`}>
+      <div className={`${statusColors[ride.status] || 'bg-gray-500'} text-white text-center py-2.5 font-bold text-sm shrink-0`}>
         {statusText[ride.status] || ride.status}
       </div>
 
-      {/* Map */}
+      {/* Map - Full screen */}
       <div className="flex-1 relative min-h-0">
         <div ref={mapRef} className="w-full h-full" />
         {!mapLoaded && (
-          <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
-            <div className="animate-spin h-8 w-8 border-4 border-yellow-400 border-t-transparent rounded-full"></div>
+          <div className="absolute inset-0 flex items-center justify-center bg-black">
+            <div className="animate-spin h-10 w-10 border-4 border-yellow-400 border-t-transparent rounded-full"></div>
           </div>
         )}
       </div>
 
-      {/* Bottom Card */}
-      <div className="bg-zinc-800 rounded-t-2xl p-4 space-y-3 shrink-0">
-        {/* Driver Info */}
-        <div className="flex items-center gap-3 bg-zinc-900 rounded-xl p-3">
-          <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center text-2xl">
+      {/* Bottom Card - Compact */}
+      <div className="bg-zinc-900 p-4 shrink-0">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 bg-yellow-400 rounded-full flex items-center justify-center text-2xl shrink-0">
             🚗
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white font-semibold truncate">{ride.driverName}</p>
+            <p className="text-white font-bold text-lg truncate">{ride.driverName}</p>
             <p className="text-zinc-400 text-sm truncate">{ride.vehicleInfo || 'Vehicle assigned'}</p>
           </div>
           {ride.driverPhone && (
             <a
               href={`tel:${ride.driverPhone}`}
-              className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center shrink-0"
+              className="w-14 h-14 bg-green-500 rounded-full flex items-center justify-center shrink-0 shadow-lg shadow-green-500/30"
             >
-              <span className="text-white text-lg">📞</span>
+              <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
+              </svg>
             </a>
           )}
-        </div>
-
-        {/* Route Info */}
-        <div className="bg-zinc-900 rounded-xl p-3">
-          <div className="flex items-start gap-3">
-            <div className="flex flex-col items-center py-1">
-              <div className="w-2.5 h-2.5 bg-green-500 rounded-full"></div>
-              <div className="w-0.5 h-8 bg-zinc-600"></div>
-              <div className="w-2.5 h-2.5 bg-red-500 rounded-full"></div>
-            </div>
-            <div className="flex-1 min-w-0 space-y-3">
-              <div>
-                <p className="text-zinc-500 text-xs">PICKUP</p>
-                <p className="text-white text-sm truncate">{ride.pickup_name}</p>
-              </div>
-              <div>
-                <p className="text-zinc-500 text-xs">DROP-OFF</p>
-                <p className="text-white text-sm truncate">{ride.dropoff_name}</p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
   );
+}
+
+declare global {
+  interface Window {
+    google: typeof google;
+    initMap: () => void;
+  }
 }

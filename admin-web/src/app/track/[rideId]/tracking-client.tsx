@@ -130,6 +130,10 @@ export default function TrackingClient({ rideId, initialData }: Props) {
 
       {/* Map */}
       <div className="flex-1 relative min-h-0">
+        {/* Debug: show coordinates */}
+        <div className="absolute top-0 right-0 bg-red-500 text-white text-xs p-1 z-50">
+          P:{pickupLat},{pickupLng} D:{dropoffLat},{dropoffLng}
+        </div>
         <img
           src={mapUrl}
           alt="Live tracking map"

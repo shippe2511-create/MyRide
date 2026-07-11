@@ -123,10 +123,10 @@ export default function TrackingPage() {
             .eq('driver_id', rideData.driver_id)
             .single();
 
-          if (locData) {
+          if (locData && locData.lat && locData.lng) {
             setDriverLocation({
-              lat: locData.lat,
-              lng: locData.lng,
+              lat: parseFloat(locData.lat),
+              lng: parseFloat(locData.lng),
               heading: locData.heading,
               updated_at: locData.last_updated,
             });
@@ -172,13 +172,15 @@ export default function TrackingPage() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'driver_locations', filter: `driver_id=eq.${ride.driver_id}` },
         (payload) => {
-          const loc = payload.new as { lat: number; lng: number; heading?: number; last_updated?: string };
-          setDriverLocation({
-            lat: loc.lat,
-            lng: loc.lng,
-            heading: loc.heading,
-            updated_at: loc.last_updated,
-          });
+          const loc = payload.new as { lat: string; lng: string; heading?: number; last_updated?: string };
+          if (loc.lat && loc.lng) {
+            setDriverLocation({
+              lat: parseFloat(loc.lat),
+              lng: parseFloat(loc.lng),
+              heading: loc.heading,
+              updated_at: loc.last_updated,
+            });
+          }
         }
       )
       .subscribe();
@@ -289,7 +291,7 @@ export default function TrackingPage() {
       </div>
 
       {/* Map */}
-      <div className="flex-1 relative min-h-[300px] bg-zinc-800">
+      <div className="flex-1 relative min-h-[50vh] bg-zinc-800">
         {isLoaded && ride.pickup_lat && ride.pickup_lng ? (
           <GoogleMap
             mapContainerStyle={mapContainerStyle}

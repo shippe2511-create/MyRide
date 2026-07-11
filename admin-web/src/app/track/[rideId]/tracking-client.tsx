@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 
 interface RideData {
   id: string;
@@ -28,11 +28,191 @@ const SUPABASE_URL = 'https://lwkndyyfmmrzazdvrsnk.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3a25keXlmbW1yemF6ZHZyc25rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTM0NzAsImV4cCI6MjA5NTg4OTQ3MH0.hIcx_gway6VJrTYV1MAXAbcapgTfxo4zYOwgmS2uChg';
 const GOOGLE_MAPS_KEY = 'AIzaSyBZ7HVy2dUvTCC5SZkz0MaFCBON2QorFbI';
 
+declare global {
+  interface Window {
+    google: typeof google;
+    initMap: () => void;
+  }
+}
+
 export default function TrackingClient({ rideId, initialData }: Props) {
   const [ride] = useState<RideData>(initialData);
   const [driverLat, setDriverLat] = useState<number | null>(initialData.driverLat);
   const [driverLng, setDriverLng] = useState<number | null>(initialData.driverLng);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const driverMarkerRef = useRef<google.maps.Marker | null>(null);
+  const routeLineRef = useRef<google.maps.Polyline | null>(null);
 
+  // Load Google Maps script
+  useEffect(() => {
+    if (window.google) {
+      setMapLoaded(true);
+      return;
+    }
+
+    window.initMap = () => setMapLoaded(true);
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_KEY}&callback=initMap`;
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+
+    return () => {
+      document.head.removeChild(script);
+    };
+  }, []);
+
+  // Initialize map when loaded
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current || !window.google) return;
+
+    const centerLat = (ride.pickup_lat + ride.dropoff_lat) / 2;
+    const centerLng = (ride.pickup_lng + ride.dropoff_lng) / 2;
+
+    const map = new window.google.maps.Map(mapRef.current, {
+      center: { lat: centerLat, lng: centerLng },
+      zoom: 13,
+      styles: [
+        { elementType: 'geometry', stylers: [{ color: '#242f3e' }] },
+        { elementType: 'labels.text.stroke', stylers: [{ color: '#242f3e' }] },
+        { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] },
+        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#17263c' }] },
+        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#38414e' }] },
+        { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#212a37' }] },
+      ],
+      disableDefaultUI: true,
+      zoomControl: true,
+    });
+
+    mapInstanceRef.current = map;
+
+    // Pickup marker (green)
+    new window.google.maps.Marker({
+      position: { lat: ride.pickup_lat, lng: ride.pickup_lng },
+      map,
+      title: 'Pickup',
+      icon: {
+        path: window.google.maps.SymbolPath.CIRCLE,
+        scale: 12,
+        fillColor: '#22c55e',
+        fillOpacity: 1,
+        strokeColor: '#fff',
+        strokeWeight: 3,
+      },
+    });
+
+    // Dropoff marker (red)
+    new window.google.maps.Marker({
+      position: { lat: ride.dropoff_lat, lng: ride.dropoff_lng },
+      map,
+      title: 'Dropoff',
+      icon: {
+        path: window.google.maps.SymbolPath.CIRCLE,
+        scale: 12,
+        fillColor: '#ef4444',
+        fillOpacity: 1,
+        strokeColor: '#fff',
+        strokeWeight: 3,
+      },
+    });
+
+    // Fit bounds
+    const bounds = new window.google.maps.LatLngBounds();
+    bounds.extend({ lat: ride.pickup_lat, lng: ride.pickup_lng });
+    bounds.extend({ lat: ride.dropoff_lat, lng: ride.dropoff_lng });
+
+    // Add driver marker if location available
+    if (driverLat && driverLng) {
+      driverMarkerRef.current = new window.google.maps.Marker({
+        position: { lat: driverLat, lng: driverLng },
+        map,
+        title: 'Driver',
+        icon: {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+              <circle cx="24" cy="24" r="20" fill="#facc15" stroke="#fff" stroke-width="4"/>
+              <text x="24" y="32" text-anchor="middle" font-size="20">🚗</text>
+            </svg>
+          `),
+          scaledSize: new window.google.maps.Size(48, 48),
+          anchor: new window.google.maps.Point(24, 24),
+        },
+      });
+
+      // Route line
+      const targetLat = ride.status === 'in_progress' ? ride.dropoff_lat : ride.pickup_lat;
+      const targetLng = ride.status === 'in_progress' ? ride.dropoff_lng : ride.pickup_lng;
+
+      routeLineRef.current = new window.google.maps.Polyline({
+        path: [
+          { lat: driverLat, lng: driverLng },
+          { lat: targetLat, lng: targetLng },
+        ],
+        geodesic: true,
+        strokeColor: '#facc15',
+        strokeOpacity: 1.0,
+        strokeWeight: 5,
+        map,
+      });
+
+      bounds.extend({ lat: driverLat, lng: driverLng });
+    }
+
+    map.fitBounds(bounds, 60);
+  }, [mapLoaded, ride, driverLat, driverLng]);
+
+  // Update driver marker
+  const updateDriverMarker = useCallback((lat: number, lng: number) => {
+    if (!window.google || !mapInstanceRef.current) return;
+
+    if (driverMarkerRef.current) {
+      driverMarkerRef.current.setPosition({ lat, lng });
+    } else {
+      driverMarkerRef.current = new window.google.maps.Marker({
+        position: { lat, lng },
+        map: mapInstanceRef.current,
+        title: 'Driver',
+        icon: {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+              <circle cx="24" cy="24" r="20" fill="#facc15" stroke="#fff" stroke-width="4"/>
+              <text x="24" y="32" text-anchor="middle" font-size="20">🚗</text>
+            </svg>
+          `),
+          scaledSize: new window.google.maps.Size(48, 48),
+          anchor: new window.google.maps.Point(24, 24),
+        },
+      });
+    }
+
+    // Update route line
+    const targetLat = ride.status === 'in_progress' ? ride.dropoff_lat : ride.pickup_lat;
+    const targetLng = ride.status === 'in_progress' ? ride.dropoff_lng : ride.pickup_lng;
+
+    if (routeLineRef.current) {
+      routeLineRef.current.setPath([
+        { lat, lng },
+        { lat: targetLat, lng: targetLng },
+      ]);
+    } else {
+      routeLineRef.current = new window.google.maps.Polyline({
+        path: [
+          { lat, lng },
+          { lat: targetLat, lng: targetLng },
+        ],
+        geodesic: true,
+        strokeColor: '#facc15',
+        strokeOpacity: 1.0,
+        strokeWeight: 5,
+        map: mapInstanceRef.current,
+      });
+    }
+  }, [ride]);
+
+  // Poll for driver location
   useEffect(() => {
     if (!ride.driver_id) return;
 
@@ -50,8 +230,11 @@ export default function TrackingClient({ rideId, initialData }: Props) {
         if (res.ok) {
           const locs = await res.json();
           if (locs && locs.length > 0) {
-            setDriverLat(parseFloat(String(locs[0].lat)));
-            setDriverLng(parseFloat(String(locs[0].lng)));
+            const newLat = parseFloat(String(locs[0].lat));
+            const newLng = parseFloat(String(locs[0].lng));
+            setDriverLat(newLat);
+            setDriverLng(newLng);
+            updateDriverMarker(newLat, newLng);
           }
         }
       } catch (e) {
@@ -60,31 +243,9 @@ export default function TrackingClient({ rideId, initialData }: Props) {
     };
 
     fetchDriverLocation();
-    const interval = setInterval(fetchDriverLocation, 5000);
+    const interval = setInterval(fetchDriverLocation, 3000);
     return () => clearInterval(interval);
-  }, [ride.driver_id]);
-
-  // Validate coordinates - use defaults if invalid
-  const pickupLat = isNaN(ride.pickup_lat) ? 4.1753 : ride.pickup_lat;
-  const pickupLng = isNaN(ride.pickup_lng) ? 73.5093 : ride.pickup_lng;
-  const dropoffLat = isNaN(ride.dropoff_lat) ? 4.2156 : ride.dropoff_lat;
-  const dropoffLng = isNaN(ride.dropoff_lng) ? 73.5438 : ride.dropoff_lng;
-
-  // Build Static Map URL - browser handles encoding automatically
-  let mapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=640x400&scale=2&maptype=roadmap`;
-
-  // Pickup marker (green)
-  mapUrl += `&markers=color:green|label:P|${pickupLat},${pickupLng}`;
-
-  // Dropoff marker (red)
-  mapUrl += `&markers=color:red|label:D|${dropoffLat},${dropoffLng}`;
-
-  // Driver marker (yellow)
-  if (driverLat && driverLng && !isNaN(driverLat) && !isNaN(driverLng)) {
-    mapUrl += `&markers=color:yellow|label:C|${driverLat},${driverLng}`;
-  }
-
-  mapUrl += `&key=${GOOGLE_MAPS_KEY}`;
+  }, [ride.driver_id, updateDriverMarker]);
 
   const statusColors: Record<string, string> = {
     pending: 'bg-yellow-500',
@@ -130,43 +291,12 @@ export default function TrackingClient({ rideId, initialData }: Props) {
 
       {/* Map */}
       <div className="flex-1 relative min-h-0">
-        {/* Debug: show coordinates */}
-        <div className="absolute top-0 right-0 bg-red-500 text-white text-xs p-1 z-50">
-          P:{pickupLat},{pickupLng} D:{dropoffLat},{dropoffLng}
-        </div>
-        <img
-          src={mapUrl}
-          alt="Live tracking map"
-          className="w-full h-full object-cover"
-        />
-
-        {/* Driver coordinates overlay */}
-        {driverLat && driverLng && (
-          <div className="absolute top-2 left-2 right-2 bg-black/80 text-yellow-400 px-3 py-2 rounded-lg text-sm">
-            <div className="flex items-center gap-2">
-              <span>🚗</span>
-              <span>Driver: {driverLat.toFixed(5)}, {driverLng.toFixed(5)}</span>
-            </div>
+        <div ref={mapRef} className="w-full h-full" />
+        {!mapLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
+            <div className="animate-spin h-8 w-8 border-4 border-yellow-400 border-t-transparent rounded-full"></div>
           </div>
         )}
-
-        {/* Legend */}
-        <div className="absolute bottom-2 left-2 bg-black/80 px-3 py-2 rounded-lg text-xs space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 bg-green-500 rounded-full"></span>
-            <span className="text-white">Pickup</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 bg-red-500 rounded-full"></span>
-            <span className="text-white">Dropoff</span>
-          </div>
-          {driverLat && driverLng && (
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 bg-yellow-400 rounded-full"></span>
-              <span className="text-white">Driver</span>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Bottom Card */}

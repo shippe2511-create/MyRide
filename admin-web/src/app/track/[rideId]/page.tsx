@@ -119,16 +119,16 @@ export default function TrackingPage() {
         if (rideData.driver_id) {
           const { data: locData } = await supabase
             .from('driver_locations')
-            .select('latitude, longitude, heading, updated_at')
+            .select('lat, lng, heading, last_updated')
             .eq('driver_id', rideData.driver_id)
             .single();
 
           if (locData) {
             setDriverLocation({
-              lat: locData.latitude,
-              lng: locData.longitude,
+              lat: locData.lat,
+              lng: locData.lng,
               heading: locData.heading,
-              updated_at: locData.updated_at,
+              updated_at: locData.last_updated,
             });
           }
         }
@@ -172,12 +172,12 @@ export default function TrackingPage() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'driver_locations', filter: `driver_id=eq.${ride.driver_id}` },
         (payload) => {
-          const loc = payload.new as { latitude: number; longitude: number; heading?: number; updated_at?: string };
+          const loc = payload.new as { lat: number; lng: number; heading?: number; last_updated?: string };
           setDriverLocation({
-            lat: loc.latitude,
-            lng: loc.longitude,
+            lat: loc.lat,
+            lng: loc.lng,
             heading: loc.heading,
-            updated_at: loc.updated_at,
+            updated_at: loc.last_updated,
           });
         }
       )

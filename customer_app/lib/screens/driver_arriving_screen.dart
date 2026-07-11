@@ -640,7 +640,7 @@ ETA: $_currentEta min
 Pickup: ${widget.pickup}
 Destination: ${widget.dropoff}
 
-${widget.rideId != null ? 'Track: https://myride.mv/track/${widget.rideId}' : ''}
+${widget.rideId != null ? 'Track: https://my-ride-ashen.vercel.app/track/${widget.rideId}' : ''}
 ''';
 
     Share.share(shareText, subject: 'Track My MyRide');

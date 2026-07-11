@@ -672,7 +672,7 @@ Driver: $_driverName
 Destination: $_dropoff
 ETA: $_etaMinutes min
 
-Live tracking link: https://myride.mv/track/$rideId
+Live tracking link: https://my-ride-ashen.vercel.app/track/$rideId
 ''';
 
     Share.share(shareText, subject: 'Track My MyRide Trip');

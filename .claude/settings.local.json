@@ -226,7 +226,8 @@
       "Bash(xcodebuild -workspace Runner.xcworkspace -scheme Runner -destination 'generic/platform=iOS' -allowProvisioningUpdates CODE_SIGN_IDENTITY=\"Apple Development\" DEVELOPMENT_TEAM=\"W54PZDDQWK\")",
       "mcp__claude_ai_Supabase__deploy_edge_function",
       "Bash(rm -rf ios/Pods ios/.symlinks)",
-      "Bash(sudo rm -rf build ios/Pods ios/.symlinks ios/Podfile.lock)"
+      "Bash(sudo rm -rf build ios/Pods ios/.symlinks ios/Podfile.lock)",
+      "Bash(vercel --version)"
     ],
     "additionalDirectories": [
       "/tmp"

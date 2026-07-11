@@ -105,6 +105,10 @@ export default function TrackingPage() {
 
         setRide({
           ...rideData,
+          pickup_lat: parseFloat(rideData.pickup_lat) || 4.1755,
+          pickup_lng: parseFloat(rideData.pickup_lng) || 73.5093,
+          dropoff_lat: parseFloat(rideData.dropoff_lat) || 4.1755,
+          dropoff_lng: parseFloat(rideData.dropoff_lng) || 73.5093,
           driver: driverProfile,
           customer: customerProfile,
         });

@@ -303,15 +303,16 @@ export default function TrackingClient({ rideId, initialData }: Props) {
       </div>
 
       {/* Bottom Sheet */}
-      <div className="bg-zinc-900 rounded-t-3xl shrink-0 shadow-2xl">
+      <div className="bg-zinc-900 rounded-t-3xl shrink-0 shadow-2xl pb-safe">
         {/* Handle */}
         <div className="flex justify-center py-2">
           <div className="w-10 h-1 bg-zinc-700 rounded-full"></div>
         </div>
 
-        {/* Driver Info */}
-        <div className="px-4 pb-3">
-          <div className="flex items-center gap-3">
+        {/* Content */}
+        <div className="px-4 pb-6">
+          {/* Driver Info */}
+          <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center text-xl shrink-0">
               🚗
             </div>
@@ -330,30 +331,27 @@ export default function TrackingClient({ rideId, initialData }: Props) {
               </a>
             )}
           </div>
-        </div>
 
-        {/* Divider */}
-        <div className="h-px bg-zinc-800 mx-4"></div>
-
-        {/* Route Info */}
-        <div className="p-4">
-          <div className="flex gap-3">
-            {/* Timeline */}
-            <div className="flex flex-col items-center pt-1">
-              <div className="w-3 h-3 rounded-full bg-green-500 border-2 border-white"></div>
-              <div className="w-0.5 h-8 bg-zinc-700"></div>
-              <div className="w-3 h-3 rounded-full bg-red-500 border-2 border-white"></div>
-            </div>
-
-            {/* Locations */}
-            <div className="flex-1 space-y-4">
-              <div>
-                <p className="text-zinc-500 text-xs font-medium">PICKUP</p>
-                <p className="text-white text-sm">{ride.pickup_name}</p>
+          {/* Route Info */}
+          <div className="bg-zinc-800 rounded-xl p-3">
+            <div className="flex gap-3">
+              {/* Timeline */}
+              <div className="flex flex-col items-center pt-1">
+                <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                <div className="w-0.5 h-6 bg-zinc-600"></div>
+                <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
               </div>
-              <div>
-                <p className="text-zinc-500 text-xs font-medium">DROP-OFF</p>
-                <p className="text-white text-sm">{ride.dropoff_name}</p>
+
+              {/* Locations */}
+              <div className="flex-1 space-y-3">
+                <div>
+                  <p className="text-zinc-500 text-xs">PICKUP</p>
+                  <p className="text-white text-sm truncate">{ride.pickup_name}</p>
+                </div>
+                <div>
+                  <p className="text-zinc-500 text-xs">DROP-OFF</p>
+                  <p className="text-white text-sm truncate">{ride.dropoff_name}</p>
+                </div>
               </div>
             </div>
           </div>

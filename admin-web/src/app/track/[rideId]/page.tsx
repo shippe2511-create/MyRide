@@ -169,19 +169,24 @@ export default function TrackingPage() {
     }
   };
 
-  // Build static map URL with all markers
+  // Build static map URL with all markers and route
   const getMapUrl = () => {
     if (!ride) return '';
 
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+    // Markers
     let markers = `markers=color:green%7Clabel:P%7C${ride.pickup_lat},${ride.pickup_lng}`;
     markers += `&markers=color:red%7Clabel:D%7C${ride.dropoff_lat},${ride.dropoff_lng}`;
 
     if (driverLocation) {
-      markers += `&markers=color:yellow%7Clabel:C%7C${driverLocation.lat},${driverLocation.lng}`;
+      markers += `&markers=color:0xFACC15%7Clabel:🚗%7C${driverLocation.lat},${driverLocation.lng}`;
     }
 
-    // Calculate center
+    // Route path from pickup to dropoff
+    const path = `&path=color:0x4285F4%7Cweight:4%7C${ride.pickup_lat},${ride.pickup_lng}%7C${ride.dropoff_lat},${ride.dropoff_lng}`;
+
+    // Calculate center to fit all markers
     const centerLat = driverLocation
       ? driverLocation.lat
       : (ride.pickup_lat + ride.dropoff_lat) / 2;
@@ -189,7 +194,7 @@ export default function TrackingPage() {
       ? driverLocation.lng
       : (ride.pickup_lng + ride.dropoff_lng) / 2;
 
-    return `https://maps.googleapis.com/maps/api/staticmap?center=${centerLat},${centerLng}&zoom=13&size=600x400&scale=2&maptype=roadmap&${markers}&style=feature:all%7Celement:geometry%7Ccolor:0x242f3e&style=feature:water%7Ccolor:0x17263c&style=feature:road%7Celement:geometry%7Ccolor:0x38414e&key=${apiKey}`;
+    return `https://maps.googleapis.com/maps/api/staticmap?center=${centerLat},${centerLng}&zoom=12&size=600x400&scale=2&maptype=roadmap&${markers}${path}&style=feature:all%7Celement:geometry%7Ccolor:0x242f3e&style=feature:water%7Ccolor:0x17263c&style=feature:road%7Celement:geometry%7Ccolor:0x38414e&key=${apiKey}`;
   };
 
   if (loading) {

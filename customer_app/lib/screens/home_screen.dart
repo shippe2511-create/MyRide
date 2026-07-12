@@ -2316,6 +2316,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     bool showSearchResults = false;
     bool isSearching = false;
     List<Map<String, dynamic>> searchResults = [];
+    // ignore: unused_local_variable - used in StatefulBuilder for map centering
+    LatLng userLocation = selectedLocation;
     Timer? debounceTimer;
     MapType mapType = MapType.normal;
     bool trafficEnabled = false;

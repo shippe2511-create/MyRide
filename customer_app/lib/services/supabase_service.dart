@@ -1145,6 +1145,8 @@ class SupabaseService {
 
   // Store active chat channel for broadcasting
   static RealtimeChannel? _activeChatChannel;
+  // ignore: unused_field - tracks current chat ride for channel management
+  static String? _activeChatRideId;
 
   static Future<void> sendChatMessage({
     required String rideId,

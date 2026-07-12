@@ -81,9 +81,13 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   List<LatLng> _routePoints = [];
   List<LatLng> _tripRoutePoints = []; // Full trip route: pickup → dropoff
   List<LatLng> _breadcrumbTrail = []; // Path already traveled
+  // ignore: unused_field - route tracking state
+  int _currentRouteIndex = 0;
   bool _isQueueExpanded = false;
   bool _isPanelExpanded = true;
   bool _isNavigatingAway = false;
+  // ignore: unused_field - ride session tracking
+  String? _currentRideId;
   bool _trafficEnabled = false;
   bool _is3DMode = false;
   bool _headingUpMode = false;
@@ -91,6 +95,10 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   BitmapDescriptor? _carIcon;
   BitmapDescriptor? _pickupIcon;
   BitmapDescriptor? _dropoffIcon;
+  // ignore: unused_field - parsed from route API
+  String? _nextTurnInstruction;
+  // ignore: unused_field - parsed from route API
+  String? _nextTurnDistance;
 
   @override
   void initState() {

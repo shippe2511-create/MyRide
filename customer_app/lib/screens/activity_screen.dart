@@ -870,6 +870,7 @@ $status
 🚗 ${trip.driverName} (${trip.vehicleNumber})
 
 _Complimentary ride by MyRide_
+_Thank you for riding with us!_
 ''';
 
     Share.share(receipt, subject: 'MyRide Trip Receipt');

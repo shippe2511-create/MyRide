@@ -28,15 +28,24 @@ const SUPABASE_URL = 'https://lwkndyyfmmrzazdvrsnk.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3a25keXlmbW1yemF6ZHZyc25rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTM0NzAsImV4cCI6MjA5NTg4OTQ3MH0.hIcx_gway6VJrTYV1MAXAbcapgTfxo4zYOwgmS2uChg';
 const GOOGLE_MAPS_KEY = 'AIzaSyBZ7HVy2dUvTCC5SZkz0MaFCBON2QorFbI';
 
+declare global {
+  interface Window {
+    google: typeof google;
+    initMap: () => void;
+  }
+}
+
 export default function TrackingClient({ rideId, initialData }: Props) {
   const [ride] = useState<RideData>(initialData);
   const [driverLat, setDriverLat] = useState<number | null>(initialData.driverLat);
   const [driverLng, setDriverLng] = useState<number | null>(initialData.driverLng);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapInitialized, setMapInitialized] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const driverMarkerRef = useRef<google.maps.Marker | null>(null);
   const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+  const lastRouteRef = useRef<string>('');
 
   // Load Google Maps script
   useEffect(() => {
@@ -60,9 +69,9 @@ export default function TrackingClient({ rideId, initialData }: Props) {
     };
   }, []);
 
-  // Initialize map when loaded
+  // Initialize map ONCE when loaded
   useEffect(() => {
-    if (!mapLoaded || !mapRef.current || !window.google) return;
+    if (!mapLoaded || !mapRef.current || !window.google || mapInitialized) return;
 
     const centerLat = (ride.pickup_lat + ride.dropoff_lat) / 2;
     const centerLng = (ride.pickup_lng + ride.dropoff_lng) / 2;
@@ -125,7 +134,7 @@ export default function TrackingClient({ rideId, initialData }: Props) {
       },
     });
 
-    // Initialize directions renderer for road route
+    // Initialize directions renderer
     directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
       map,
       suppressMarkers: true,
@@ -136,88 +145,81 @@ export default function TrackingClient({ rideId, initialData }: Props) {
       },
     });
 
-    // Add driver marker if location available
-    if (driverLat && driverLng) {
-      createDriverMarker(map, driverLat, driverLng);
-      calculateRoute(driverLat, driverLng);
-    }
-
     // Fit bounds
     const bounds = new window.google.maps.LatLngBounds();
     bounds.extend({ lat: ride.pickup_lat, lng: ride.pickup_lng });
     bounds.extend({ lat: ride.dropoff_lat, lng: ride.dropoff_lng });
-    if (driverLat && driverLng) {
-      bounds.extend({ lat: driverLat, lng: driverLng });
+    if (initialData.driverLat && initialData.driverLng) {
+      bounds.extend({ lat: initialData.driverLat, lng: initialData.driverLng });
     }
     map.fitBounds(bounds, 60);
-  }, [mapLoaded, ride, driverLat, driverLng]);
 
-  const createDriverMarker = (map: google.maps.Map, lat: number, lng: number) => {
-    if (driverMarkerRef.current) {
-      driverMarkerRef.current.setPosition({ lat, lng });
-      return;
-    }
+    setMapInitialized(true);
+  }, [mapLoaded, mapInitialized, ride, initialData.driverLat, initialData.driverLng]);
 
-    driverMarkerRef.current = new window.google.maps.Marker({
-      position: { lat, lng },
-      map,
-      title: 'Driver',
-      icon: {
-        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-          <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 50 50">
-            <circle cx="25" cy="25" r="22" fill="#facc15" stroke="#fff" stroke-width="3"/>
-            <g transform="translate(12, 12) scale(0.5)">
-              <path d="M47.5 25h-5V15c0-1.4-1.1-2.5-2.5-2.5H10c-1.4 0-2.5 1.1-2.5 2.5v10h-5c-1.4 0-2.5 1.1-2.5 2.5v15c0 1.4 1.1 2.5 2.5 2.5h5v2.5c0 1.4 1.1 2.5 2.5 2.5h5c1.4 0 2.5-1.1 2.5-2.5V45h15v2.5c0 1.4 1.1 2.5 2.5 2.5h5c1.4 0 2.5-1.1 2.5-2.5V45h5c1.4 0 2.5-1.1 2.5-2.5v-15c0-1.4-1.1-2.5-2.5-2.5zM12.5 37.5c-2.8 0-5-2.2-5-5s2.2-5 5-5 5 2.2 5 5-2.2 5-5 5zm25 0c-2.8 0-5-2.2-5-5s2.2-5 5-5 5 2.2 5 5-2.2 5-5 5zM40 25H10v-7.5h30V25z" fill="#000"/>
-            </g>
-          </svg>
-        `),
-        scaledSize: new window.google.maps.Size(50, 50),
-        anchor: new window.google.maps.Point(25, 25),
-      },
-      zIndex: 1000,
-    });
-  };
-
-  const calculateRoute = useCallback((fromLat: number, fromLng: number) => {
-    if (!window.google || !directionsRendererRef.current) return;
-
-    const directionsService = new window.google.maps.DirectionsService();
-
-    // Route from driver to destination (dropoff for in_progress, pickup otherwise)
-    const destination = ride.status === 'in_progress'
-      ? { lat: ride.dropoff_lat, lng: ride.dropoff_lng }
-      : { lat: ride.pickup_lat, lng: ride.pickup_lng };
-
-    directionsService.route(
-      {
-        origin: { lat: fromLat, lng: fromLng },
-        destination,
-        travelMode: window.google.maps.TravelMode.DRIVING,
-      },
-      (result, status) => {
-        if (status === 'OK' && result) {
-          directionsRendererRef.current?.setDirections(result);
-        }
-      }
-    );
-  }, [ride]);
-
-  // Update driver marker
-  const updateDriverMarker = useCallback((lat: number, lng: number) => {
+  // Create or update driver marker
+  const updateDriverOnMap = useCallback((lat: number, lng: number) => {
     if (!window.google || !mapInstanceRef.current) return;
 
+    // Update or create marker
     if (driverMarkerRef.current) {
       driverMarkerRef.current.setPosition({ lat, lng });
     } else {
-      createDriverMarker(mapInstanceRef.current, lat, lng);
+      driverMarkerRef.current = new window.google.maps.Marker({
+        position: { lat, lng },
+        map: mapInstanceRef.current,
+        title: 'Driver',
+        icon: {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 50 50">
+              <circle cx="25" cy="25" r="22" fill="#facc15" stroke="#fff" stroke-width="3"/>
+              <g transform="translate(12, 12) scale(0.5)">
+                <path d="M47.5 25h-5V15c0-1.4-1.1-2.5-2.5-2.5H10c-1.4 0-2.5 1.1-2.5 2.5v10h-5c-1.4 0-2.5 1.1-2.5 2.5v15c0 1.4 1.1 2.5 2.5 2.5h5v2.5c0 1.4 1.1 2.5 2.5 2.5h5c1.4 0 2.5-1.1 2.5-2.5V45h15v2.5c0 1.4 1.1 2.5 2.5 2.5h5c1.4 0 2.5-1.1 2.5-2.5V45h5c1.4 0 2.5-1.1 2.5-2.5v-15c0-1.4-1.1-2.5-2.5-2.5zM12.5 37.5c-2.8 0-5-2.2-5-5s2.2-5 5-5 5 2.2 5 5-2.2 5-5 5zm25 0c-2.8 0-5-2.2-5-5s2.2-5 5-5 5 2.2 5 5-2.2 5-5 5zM40 25H10v-7.5h30V25z" fill="#000"/>
+              </g>
+            </svg>
+          `),
+          scaledSize: new window.google.maps.Size(50, 50),
+          anchor: new window.google.maps.Point(25, 25),
+        },
+        zIndex: 1000,
+      });
     }
 
-    calculateRoute(lat, lng);
-  }, [calculateRoute]);
+    // Only recalculate route if driver moved significantly (> 50m)
+    const routeKey = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+    if (routeKey !== lastRouteRef.current && directionsRendererRef.current) {
+      lastRouteRef.current = routeKey;
 
-  // Poll for driver location
+      const directionsService = new window.google.maps.DirectionsService();
+      const destination = ride.status === 'in_progress'
+        ? { lat: ride.dropoff_lat, lng: ride.dropoff_lng }
+        : { lat: ride.pickup_lat, lng: ride.pickup_lng };
+
+      directionsService.route(
+        {
+          origin: { lat, lng },
+          destination,
+          travelMode: window.google.maps.TravelMode.DRIVING,
+        },
+        (result, status) => {
+          if (status === 'OK' && result) {
+            directionsRendererRef.current?.setDirections(result);
+          }
+        }
+      );
+    }
+  }, [ride]);
+
+  // Set initial driver marker after map is ready
   useEffect(() => {
-    if (!ride.driver_id) return;
+    if (mapInitialized && initialData.driverLat && initialData.driverLng) {
+      updateDriverOnMap(initialData.driverLat, initialData.driverLng);
+    }
+  }, [mapInitialized, initialData.driverLat, initialData.driverLng, updateDriverOnMap]);
+
+  // Poll for driver location updates
+  useEffect(() => {
+    if (!ride.driver_id || !mapInitialized) return;
 
     const fetchDriverLocation = async () => {
       try {
@@ -228,6 +230,7 @@ export default function TrackingClient({ rideId, initialData }: Props) {
               'apikey': SUPABASE_ANON_KEY,
               'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
             },
+            cache: 'no-store',
           }
         );
         if (res.ok) {
@@ -235,9 +238,13 @@ export default function TrackingClient({ rideId, initialData }: Props) {
           if (locs && locs.length > 0) {
             const newLat = parseFloat(String(locs[0].lat));
             const newLng = parseFloat(String(locs[0].lng));
-            setDriverLat(newLat);
-            setDriverLng(newLng);
-            updateDriverMarker(newLat, newLng);
+
+            // Only update if position changed
+            if (newLat !== driverLat || newLng !== driverLng) {
+              setDriverLat(newLat);
+              setDriverLng(newLng);
+              updateDriverOnMap(newLat, newLng);
+            }
           }
         }
       } catch (e) {
@@ -245,10 +252,13 @@ export default function TrackingClient({ rideId, initialData }: Props) {
       }
     };
 
+    // Fetch immediately
     fetchDriverLocation();
-    const interval = setInterval(fetchDriverLocation, 3000);
+
+    // Then poll every 2 seconds
+    const interval = setInterval(fetchDriverLocation, 2000);
     return () => clearInterval(interval);
-  }, [ride.driver_id, updateDriverMarker]);
+  }, [ride.driver_id, mapInitialized, driverLat, driverLng, updateDriverOnMap]);
 
   const statusColors: Record<string, string> = {
     pending: 'bg-yellow-500',
@@ -345,11 +355,4 @@ export default function TrackingClient({ rideId, initialData }: Props) {
       </div>
     </div>
   );
-}
-
-declare global {
-  interface Window {
-    google: typeof google;
-    initMap: () => void;
-  }
 }

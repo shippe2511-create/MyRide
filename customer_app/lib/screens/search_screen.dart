@@ -16,7 +16,6 @@ import '../widgets/primary_button.dart';
 import '../widgets/app_snackbar.dart';
 import '../services/supabase_service.dart';
 import '../services/location_service.dart';
-import 'driver_matching_screen.dart';
 import 'ride_confirm_screen.dart';
 import '../config/app_config.dart';
 import '../utils/timezone_utils.dart';

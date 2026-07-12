@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
-import 'dart:io';
 import '../theme/app_theme.dart';
 import '../providers/driver_state.dart';
 import '../services/notification_service.dart';

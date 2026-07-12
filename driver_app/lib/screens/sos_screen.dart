@@ -7,7 +7,6 @@ import 'package:share_plus/share_plus.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
-import '../services/notification_service.dart';
 import '../providers/driver_state.dart';
 import '../widgets/app_snackbar.dart';
 

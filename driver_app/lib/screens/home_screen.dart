@@ -19,9 +19,7 @@ import 'ride_screen.dart';
 import 'chat_screen.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
-import '../services/background_location_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:geolocator/geolocator.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

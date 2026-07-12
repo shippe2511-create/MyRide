@@ -16,7 +16,6 @@ import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../widgets/app_snackbar.dart';
 import '../config/app_config.dart';
-import 'chat_screen.dart';
 import 'support_chat_screen.dart';
 
 class ProfileScreen extends StatefulWidget {

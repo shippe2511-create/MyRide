@@ -125,7 +125,7 @@ class _TopNotificationState extends State<_TopNotification> with SingleTickerPro
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
+                      color: Colors.black.withValues(alpha: 0.3),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -136,7 +136,7 @@ class _TopNotificationState extends State<_TopNotification> with SingleTickerPro
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(widget.icon, color: Colors.white, size: 22),
@@ -160,7 +160,7 @@ class _TopNotificationState extends State<_TopNotification> with SingleTickerPro
                             Text(
                               widget.subtitle!,
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.9),
+                                color: Colors.white.withValues(alpha: 0.9),
                                 fontSize: 13,
                               ),
                             ),

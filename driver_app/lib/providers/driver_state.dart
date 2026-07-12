@@ -879,8 +879,10 @@ class DriverState extends ChangeNotifier {
     try {
       // Get real GPS location with shorter timeout for emulator compatibility
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
-        timeLimit: const Duration(seconds: 5),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 5),
+        ),
       ).timeout(
         const Duration(seconds: 6),
         onTimeout: () => throw TimeoutException('Location timeout'),

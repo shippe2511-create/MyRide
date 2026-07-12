@@ -651,8 +651,10 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
       if (permission == LocationPermission.deniedForever) return;
 
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
       );
 
       if (mounted) {
@@ -684,8 +686,10 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
       // Only use real GPS location - no simulation
       try {
         final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.best,
-          timeLimit: const Duration(seconds: 10),
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.best,
+            timeLimit: Duration(seconds: 10),
+          ),
         );
         if (mounted) {
           final ride = context.read<DriverState>().currentRide;
@@ -964,7 +968,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
       polylines.add(Polyline(
         polylineId: const PolylineId('breadcrumb'),
         points: _breadcrumbTrail,
-        color: AppColors.yellow.withOpacity(0.5),
+        color: AppColors.yellow.withValues(alpha: 0.5),
         width: 6,
         startCap: Cap.roundCap,
         endCap: Cap.roundCap,
@@ -985,7 +989,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
         polylines.add(Polyline(
           polylineId: const PolylineId('trip_route'),
           points: _tripRoutePoints,
-          color: AppColors.yellow.withOpacity(0.4),
+          color: AppColors.yellow.withValues(alpha: 0.4),
           width: 4,
           patterns: [PatternItem.dash(20), PatternItem.gap(10)],
         ));
@@ -1487,7 +1491,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.8),
+                        color: Colors.black.withValues(alpha: 0.8),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: AppColors.yellow, width: 1.5),
                       ),

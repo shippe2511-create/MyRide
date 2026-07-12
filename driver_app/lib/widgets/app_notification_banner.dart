@@ -182,13 +182,13 @@ class _NotificationBannerWidgetState extends State<_NotificationBannerWidget>
   Color get _iconBgColor {
     switch (widget.type) {
       case NotificationType.success:
-        return Colors.white.withOpacity(0.25);
+        return Colors.white.withValues(alpha: 0.25);
       case NotificationType.error:
-        return Colors.white.withOpacity(0.25);
+        return Colors.white.withValues(alpha: 0.25);
       case NotificationType.warning:
-        return Colors.black.withOpacity(0.15);
+        return Colors.black.withValues(alpha: 0.15);
       case NotificationType.info:
-        return Colors.white.withOpacity(0.25);
+        return Colors.white.withValues(alpha: 0.25);
       case NotificationType.chat:
         return AppColors.yellow; // Yellow icon bg for chat
     }
@@ -246,19 +246,19 @@ class _NotificationBannerWidgetState extends State<_NotificationBannerWidget>
                       end: Alignment.bottomRight,
                       colors: [
                         _backgroundColor,
-                        _backgroundColor.withOpacity(0.85),
+                        _backgroundColor.withValues(alpha: 0.85),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: _backgroundColor.withOpacity(0.35),
+                        color: _backgroundColor.withValues(alpha: 0.35),
                         blurRadius: 24,
                         offset: const Offset(0, 10),
                         spreadRadius: -4,
                       ),
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
+                        color: Colors.black.withValues(alpha: 0.15),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -295,7 +295,7 @@ class _NotificationBannerWidgetState extends State<_NotificationBannerWidget>
                               Text(
                                 widget.message!,
                                 style: TextStyle(
-                                  color: _textColor.withOpacity(0.9),
+                                  color: _textColor.withValues(alpha: 0.9),
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
                                   height: 1.3,
@@ -312,12 +312,12 @@ class _NotificationBannerWidgetState extends State<_NotificationBannerWidget>
                         width: 28,
                         height: 28,
                         decoration: BoxDecoration(
-                          color: _textColor.withOpacity(0.15),
+                          color: _textColor.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
                           Icons.close_rounded,
-                          color: _textColor.withOpacity(0.8),
+                          color: _textColor.withValues(alpha: 0.8),
                           size: 16,
                         ),
                       ),

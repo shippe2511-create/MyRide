@@ -231,7 +231,8 @@
       "Bash(git revert *)",
       "Bash(cat .env.local)",
       "Bash(cat .env)",
-      "Bash(grep -rn \"debugPrint.*\\\\$\" --include=\"*.dart\" /Users/athifabdulla/Downloads/MyRide/customer_app/lib/)"
+      "Bash(grep -rn \"debugPrint.*\\\\$\" --include=\"*.dart\" /Users/athifabdulla/Downloads/MyRide/customer_app/lib/)",
+      "Bash(perl *)"
     ],
     "additionalDirectories": [
       "/tmp"

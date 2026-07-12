@@ -270,6 +270,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           HapticFeedback.selectionClick();
                           state.toggleDarkMode();
                         },
+                        activeTrackColor: AppColors.yellow,
                         activeColor: AppColors.yellow,
                       ),
                     ),
@@ -283,6 +284,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           HapticFeedback.selectionClick();
                           state.toggleFaceId(value);
                         },
+                        activeTrackColor: AppColors.yellow,
                         activeColor: AppColors.yellow,
                       ),
                     ),

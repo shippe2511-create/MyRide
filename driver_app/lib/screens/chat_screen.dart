@@ -342,7 +342,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   Future<void> _sendLocation() async {
     HapticFeedback.mediumImpact();
     try {
-      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
       final mapUrl = 'https://maps.google.com/?q=${position.latitude},${position.longitude}';
       _sendMessage(
         "📍 My location: $mapUrl",

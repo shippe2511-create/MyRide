@@ -304,13 +304,13 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
     final textColor = isDark ? Colors.white : Colors.black;
     final subtitleColor = isDark ? Colors.white54 : Colors.black54;
     final bgColor = isDark ? const Color(0xFF0A0A0A) : Colors.white;
-    final buttonBgColor = isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05);
+    final buttonBgColor = isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: bgColor,
-        border: Border(bottom: BorderSide(color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1))),
+        border: Border(bottom: BorderSide(color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.1))),
       ),
       child: Row(
         children: [
@@ -330,7 +330,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [AppColors.yellow, AppColors.yellow.withOpacity(0.7)],
+                colors: [AppColors.yellow, AppColors.yellow.withValues(alpha: 0.7)],
               ),
               borderRadius: BorderRadius.circular(10),
             ),
@@ -378,7 +378,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
   Widget _buildEmptyState() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : Colors.black;
-    final subtitleColor = isDark ? Colors.white.withOpacity(0.5) : Colors.black.withOpacity(0.5);
+    final subtitleColor = isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.5);
 
     return Center(
       child: Column(
@@ -387,13 +387,13 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: AppColors.yellow.withOpacity(0.1),
+              color: AppColors.yellow.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.headset_mic_rounded,
               size: 48,
-              color: AppColors.yellow.withOpacity(0.5),
+              color: AppColors.yellow.withValues(alpha: 0.5),
             ),
           ),
           const SizedBox(height: 24),
@@ -475,8 +475,8 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isFromAdmin
-              ? AppColors.yellow.withOpacity(0.3)
-              : Colors.blue.withOpacity(0.3),
+              ? AppColors.yellow.withValues(alpha: 0.3)
+              : Colors.blue.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -497,14 +497,14 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
                     gradient: LinearGradient(
                       colors: isPlaying
                           ? [Colors.red, Colors.red.shade700]
-                          : [AppColors.yellow, AppColors.yellow.withOpacity(0.8)],
+                          : [AppColors.yellow, AppColors.yellow.withValues(alpha: 0.8)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: (isPlaying ? Colors.red : AppColors.yellow).withOpacity(0.4),
+                        color: (isPlaying ? Colors.red : AppColors.yellow).withValues(alpha: 0.4),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -536,7 +536,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: AppColors.yellow.withOpacity(0.2),
+                                color: AppColors.yellow.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -564,18 +564,18 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          Icon(Icons.graphic_eq_rounded, size: 16, color: Colors.white.withOpacity(0.5)),
+                          Icon(Icons.graphic_eq_rounded, size: 16, color: Colors.white.withValues(alpha: 0.5)),
                           const SizedBox(width: 4),
                           Text(
                             _formatDuration(duration),
-                            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13, fontFamily: 'monospace'),
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13, fontFamily: 'monospace'),
                           ),
                           const SizedBox(width: 16),
-                          Icon(Icons.access_time_rounded, size: 14, color: Colors.white.withOpacity(0.4)),
+                          Icon(Icons.access_time_rounded, size: 14, color: Colors.white.withValues(alpha: 0.4)),
                           const SizedBox(width: 4),
                           Text(
                             _formatTime(message['created_at']),
-                            style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
                           ),
                         ],
                       ),
@@ -655,7 +655,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: baseColor.withOpacity(0.25),
+                              color: baseColor.withValues(alpha: 0.25),
                               width: 1.5,
                             ),
                           ),
@@ -670,7 +670,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: baseColor.withOpacity(0.4),
+                              color: baseColor.withValues(alpha: 0.4),
                               width: 2,
                             ),
                           ),
@@ -683,12 +683,12 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: baseColor.withOpacity(0.5),
+                            color: baseColor.withValues(alpha: 0.5),
                             width: 2.5,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: baseColor.withOpacity(0.3),
+                              color: baseColor.withValues(alpha: 0.3),
                               blurRadius: 15,
                               spreadRadius: 2,
                             ),
@@ -703,8 +703,8 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
                           shape: BoxShape.circle,
                           gradient: RadialGradient(
                             colors: [
-                              baseColor.withOpacity(0.5),
-                              baseColor.withOpacity(0.1),
+                              baseColor.withValues(alpha: 0.5),
+                              baseColor.withValues(alpha: 0.1),
                             ],
                           ),
                         ),
@@ -717,8 +717,8 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
                           shape: BoxShape.circle,
                           gradient: LinearGradient(
                             colors: [
-                              baseColor.withOpacity(0.6),
-                              baseColor.withOpacity(0.3),
+                              baseColor.withValues(alpha: 0.6),
+                              baseColor.withValues(alpha: 0.3),
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -737,7 +737,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: baseColor.withOpacity(0.8),
+                                color: baseColor.withValues(alpha: 0.8),
                                 blurRadius: 30,
                                 spreadRadius: _isRecording ? 10 : 5,
                               ),
@@ -762,7 +762,7 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
           Text(
             _isRecording ? 'Release to send' : 'Hold to talk',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
               fontSize: 14,
               fontWeight: FontWeight.w500,
             ),

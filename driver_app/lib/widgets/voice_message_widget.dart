@@ -71,7 +71,7 @@ class _VoiceMessageWidgetState extends State<VoiceMessageWidget> {
         color: Colors.grey[900],
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isPlayed ? Colors.grey[800]! : Colors.yellow.withOpacity(0.5),
+          color: isPlayed ? Colors.grey[800]! : Colors.yellow.withValues(alpha: 0.5),
           width: isPlayed ? 1 : 2,
         ),
       ),
@@ -116,7 +116,7 @@ class _VoiceMessageWidgetState extends State<VoiceMessageWidget> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.yellow.withOpacity(0.2),
+                          color: Colors.yellow.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: const Text(

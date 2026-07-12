@@ -151,7 +151,7 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
     try {
       // Try current position first with longer timeout
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       ).timeout(const Duration(seconds: 15));
       lat = position.latitude;
       lng = position.longitude;
@@ -559,7 +559,9 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
   Future<void> _shareLocation(BuildContext context) async {
     HapticFeedback.mediumImpact();
     try {
-      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
       final mapUrl = 'https://maps.google.com/?q=${position.latitude},${position.longitude}';
       final message = '''🆘 EMERGENCY - I need help!
 
@@ -570,7 +572,7 @@ Coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStr
 
 Sent via MyRide Driver SOS''';
 
-      await Share.share(message, subject: 'Emergency - My Location');
+      await SharePlus.instance.share(ShareParams(text: message, subject: 'Emergency - My Location'));
 
       if (context.mounted) {
         AppSnackbar.success(context, 'Location ready to share');

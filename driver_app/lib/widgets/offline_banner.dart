@@ -60,7 +60,7 @@ class _OfflineBannerState extends State<OfflineBanner> with SingleTickerProvider
       children: [
         SizeTransition(
           sizeFactor: _animation,
-          axisAlignment: -1,
+          fixedCrossAxisSizeFactor: 1.0,
           child: Container(
             width: double.infinity,
             padding: EdgeInsets.only(

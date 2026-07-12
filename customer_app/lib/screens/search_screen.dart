@@ -1256,61 +1256,6 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildMapButton(IconData icon, VoidCallback onTap, bool isDark, {bool isHighlighted = false}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: isHighlighted ? AppColors.yellow : context.surfaceColor,
-          borderRadius: BorderRadius.circular(12),
-          border: isHighlighted ? Border.all(color: AppColors.yellow, width: 2) : null,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 8,
-            ),
-          ],
-        ),
-        child: Icon(
-          icon,
-          color: isHighlighted ? Colors.black : context.textColor,
-          size: 22,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEnhancedMapButton(IconData icon, String tooltip, VoidCallback onTap, bool isDark, {bool isHighlighted = false, bool isFirst = false, bool isLast = false}) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.vertical(
-          top: isFirst ? const Radius.circular(12) : Radius.zero,
-          bottom: isLast ? const Radius.circular(12) : Radius.zero,
-        ),
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: isHighlighted ? AppColors.yellow : Colors.transparent,
-            borderRadius: BorderRadius.vertical(
-              top: isFirst ? const Radius.circular(12) : Radius.zero,
-              bottom: isLast ? const Radius.circular(12) : Radius.zero,
-            ),
-          ),
-          child: Icon(
-            icon,
-            color: isHighlighted ? Colors.black : (isDark ? Colors.white70 : Colors.black54),
-            size: 20,
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildMapControlButton(IconData icon, VoidCallback onTap, bool isDark, {bool isActive = false}) {
     return GestureDetector(
       onTap: onTap,
@@ -1469,34 +1414,6 @@ class _SearchScreenState extends State<SearchScreen> {
                     ],
                   ),
                 ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRouteField(String label, String value, bool isEditable, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: context.faintColor,
-              fontSize: 10,
-              letterSpacing: 1,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: TextStyle(
-              color: context.textColor,
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
         ],
       ),
     );

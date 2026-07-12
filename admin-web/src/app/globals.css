@@ -22,28 +22,31 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 215 20% 65%;
     --radius: 0.5rem;
+    --sidebar: 0 0% 98%;
   }
 
   .dark {
-    --background: 0 0% 7%;
+    /* Modern dark blue-gray theme */
+    --background: 214 20% 8%;          /* #0f1419 - Main background */
     --foreground: 210 40% 98%;
-    --card: 0 0% 12%;
+    --card: 214 18% 12%;               /* #1c2128 - Cards */
     --card-foreground: 210 40% 98%;
-    --popover: 0 0% 12%;
+    --popover: 214 18% 12%;
     --popover-foreground: 210 40% 98%;
-    --primary: 50 100% 52%;
+    --primary: 48 96% 53%;             /* Yellow - kept */
     --primary-foreground: 0 0% 0%;
-    --secondary: 217.2 32.6% 17.5%;
+    --secondary: 215 19% 15%;          /* #21262d - Secondary elements */
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
+    --muted: 215 19% 15%;
+    --muted-foreground: 215 15% 55%;
+    --accent: 215 19% 18%;             /* Hover states */
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 20% 20%;
-    --input: 217.2 32.6% 45%;
-    --ring: 215 20% 65%;
+    --border: 215 14% 20%;             /* #30363d - Borders */
+    --input: 215 19% 25%;
+    --ring: 48 96% 53%;                /* Yellow ring */
+    --sidebar: 214 19% 10%;            /* #161b22 - Sidebar */
   }
 }
 
@@ -67,6 +70,7 @@
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
+  --color-sidebar: hsl(var(--sidebar));
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --radius-sm: calc(var(--radius) - 4px);

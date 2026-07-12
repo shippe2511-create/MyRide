@@ -192,7 +192,7 @@ export function Sidebar({ collapsed = false, onCollapse, onNavigate }: SidebarPr
 
   return (
     <div className={cn(
-      "flex h-full flex-col bg-card transition-all duration-300",
+      "flex h-full flex-col bg-sidebar border-r border-border transition-all duration-300",
       collapsed ? "w-16 overflow-visible" : "w-56"
     )}>
       <div className="flex h-14 items-center justify-between px-3">

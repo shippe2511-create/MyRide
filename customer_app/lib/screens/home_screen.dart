@@ -165,8 +165,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _loadUnreadCount() async {
-    // Hardcoded ID that we know works
-    const userId = 'c716ae79-56d9-4f95-aef8-052d24e137b6';
+    final userId = SupabaseService.userId;
+    if (userId == null) return;
 
     try {
       final response = await SupabaseService.client
@@ -185,7 +185,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _subscribeToNotifications() {
-    const userId = 'c716ae79-56d9-4f95-aef8-052d24e137b6';
+    final userId = SupabaseService.userId;
+    if (userId == null) return;
     debugPrint('Subscribing to notifications for user: $userId');
 
     _notificationsSubscription = SupabaseService.client

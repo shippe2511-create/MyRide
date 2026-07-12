@@ -58,8 +58,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _loadNotifications() async {
-    // Use same hardcoded ID that works on home screen
-    const userId = 'c716ae79-56d9-4f95-aef8-052d24e137b6';
+    final userId = SupabaseService.userId;
+    if (userId == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
 
     setState(() => _isLoading = true);
     try {
@@ -395,8 +398,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   void _markAllAsRead() async {
     HapticFeedback.mediumImpact();
-    // Use hardcoded ID since SupabaseService.userId may be null
-    const userId = 'c716ae79-56d9-4f95-aef8-052d24e137b6';
+    final userId = SupabaseService.userId;
+    if (userId == null) return;
     try {
       await SupabaseService.client
           .from('notifications')

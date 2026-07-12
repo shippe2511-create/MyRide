@@ -228,7 +228,10 @@
       "Bash(rm -rf ios/Pods ios/.symlinks)",
       "Bash(sudo rm -rf build ios/Pods ios/.symlinks ios/Podfile.lock)",
       "Bash(vercel --version)",
-      "Bash(git revert *)"
+      "Bash(git revert *)",
+      "Bash(cat .env.local)",
+      "Bash(cat .env)",
+      "Bash(grep -rn \"debugPrint.*\\\\$\" --include=\"*.dart\" /Users/athifabdulla/Downloads/MyRide/customer_app/lib/)"
     ],
     "additionalDirectories": [
       "/tmp"

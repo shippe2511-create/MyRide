@@ -839,11 +839,9 @@ class _SearchScreenState extends State<SearchScreen> {
     String locationName = 'Velana International Airport';
     String locationAddress = 'Velana International Airport';
 
-    // Load service zones and admin locations
+    // Load service zones
     List<Map<String, dynamic>> serviceZones = [];
-    List<Map<String, dynamic>> adminLocations = [];
     Set<Polygon> zonePolygons = {};
-    Set<Marker> locationMarkers = {};
 
     try {
       // Fetch service zones
@@ -885,10 +883,6 @@ class _SearchScreenState extends State<SearchScreen> {
           }
         }
       }
-
-      // Fetch admin locations (for chip row and search, not markers)
-      final locationsRes = await SupabaseService.getLocations();
-      adminLocations = List<Map<String, dynamic>>.from(locationsRes);
     } catch (e) {
       debugPrint('Error loading zones/locations: $e');
     }

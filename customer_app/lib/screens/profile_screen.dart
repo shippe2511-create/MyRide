@@ -1503,38 +1503,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showPermissions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          bool locationEnabled = true;
-          bool cameraEnabled = false;
-          bool contactsEnabled = false;
-          return Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(color: context.surfaceColor, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2)))),
-                const SizedBox(height: 24),
-                Text('App Permissions', style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 20),
-                _buildSwitchItem('Location Access', locationEnabled, (v) => setSheetState(() => locationEnabled = v)),
-                _buildSwitchItem('Camera Access', cameraEnabled, (v) => setSheetState(() => cameraEnabled = v)),
-                _buildSwitchItem('Contacts Access', contactsEnabled, (v) => setSheetState(() => contactsEnabled = v)),
-                SizedBox(height: MediaQuery.of(context).padding.bottom),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   void _showDeleteAccount(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -1643,7 +1611,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
-          String selectedLang = 'English';
           return Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(color: context.surfaceColor, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
@@ -1659,50 +1626,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   appState.setCurrentLanguage('en');
                   Navigator.pop(ctx);
                   AppSnackbar.success(context, 'Language set to English');
-                }),
-                SizedBox(height: MediaQuery.of(context).padding.bottom),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  void _showAppearanceSettings(BuildContext context) {
-    final appState = Provider.of<AppState>(context, listen: false);
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          String selectedTheme = appState.isDarkMode ? 'Dark Mode' : 'Light Mode';
-          return Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(color: context.surfaceColor, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2)))),
-                const SizedBox(height: 24),
-                Text('Appearance', style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 20),
-                _buildSelectableOption('Dark Mode', selectedTheme == 'Dark Mode', () {
-                  setSheetState(() => selectedTheme = 'Dark Mode');
-                  appState.toggleDarkMode(true);
-                  Navigator.pop(ctx);
-                  AppSnackbar.success(context, 'Dark mode enabled');
-                }),
-                _buildSelectableOption('Light Mode', selectedTheme == 'Light Mode', () {
-                  setSheetState(() => selectedTheme = 'Light Mode');
-                  appState.toggleDarkMode(false);
-                  Navigator.pop(ctx);
-                  AppSnackbar.success(context, 'Light mode enabled');
-                }),
-                _buildSelectableOption('System Default', false, () {
-                  Navigator.pop(ctx);
-                  AppSnackbar.success(context, 'System default enabled');
                 }),
                 SizedBox(height: MediaQuery.of(context).padding.bottom),
               ],
@@ -1879,47 +1802,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(width: 14),
           Expanded(child: Text(text, style: TextStyle(color: context.textColor, fontSize: 14))),
         ],
-      ),
-    );
-  }
-
-  void _showPaymentHelp(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(color: context.surfaceColor, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2))),
-            const SizedBox(height: 24),
-            Container(
-              width: 72, height: 72,
-              decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
-              child: Icon(Icons.check_circle, color: AppColors.success, size: 40),
-            ),
-            const SizedBox(height: 20),
-            Text('No Payment Required!', style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 12),
-            Text(
-              'MyRide is a free staff transportation service. All rides are complimentary - no payment or wallet setup needed.',
-              style: TextStyle(color: context.mutedColor, fontSize: 14),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.yellow, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                child: Text('Got it!', style: TextStyle(fontWeight: FontWeight.w600)),
-              ),
-            ),
-            SizedBox(height: MediaQuery.of(context).padding.bottom),
-          ],
-        ),
       ),
     );
   }
@@ -2421,32 +2303,6 @@ We retain your data for the duration of your account and as required by law.
 
 7. CONTACT
 For privacy concerns, contact privacy@myride.mv
-''';
-
-  static const String _cookiePolicy = '''
-COOKIE POLICY
-
-Last updated: June 2024
-
-1. WHAT ARE COOKIES?
-Cookies are small data files stored on your device when you use our app.
-
-2. HOW WE USE COOKIES
-- Essential cookies: Required for app functionality
-- Analytics cookies: Help us understand app usage
-- Preference cookies: Remember your settings
-
-3. MANAGING COOKIES
-You can manage cookie preferences in your device settings.
-
-4. THIRD-PARTY COOKIES
-We may use third-party analytics services that set their own cookies.
-
-5. CHANGES TO THIS POLICY
-We may update this policy periodically. Check back for updates.
-
-6. CONTACT
-For questions about cookies, contact support@myride.mv
 ''';
 
   Widget _buildSocialIcon(IconData icon) {

@@ -537,31 +537,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     AppSnackbar.info(context, 'Voice messages coming soon');
   }
 
-  void _startRecording() {
-    HapticFeedback.heavyImpact();
-    setState(() {
-      _isRecording = true;
-      _recordingSeconds = 0;
-    });
-    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
-        setState(() => _recordingSeconds++);
-      }
-    });
-  }
-
-  void _stopRecording() {
-    _recordingTimer?.cancel();
-    final duration = _recordingSeconds;
-    setState(() {
-      _isRecording = false;
-      _recordingSeconds = 0;
-    });
-    if (duration >= 1) {
-      _sendMessage("Voice message", type: MessageType.voice, voiceDuration: duration);
-    }
-  }
-
   void _cancelRecording() {
     HapticFeedback.mediumImpact();
     _recordingTimer?.cancel();

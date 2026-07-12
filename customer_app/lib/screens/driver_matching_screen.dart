@@ -381,32 +381,6 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
     });
   }
 
-  void _subscribeToRideUpdates() {
-    if (_rideId == null) return;
-
-    _rideSubscription = _realtimeService.subscribeToRide(_rideId!).listen((update) {
-      if (!mounted || _driverFound) return;
-
-      final status = update['status'] as String?;
-      debugPrint('Ride status updated: $status');
-
-      if (status == 'accepted' || status == 'arrived' || status == 'in_progress') {
-        _matchTimer.cancel();
-
-        // Show notification when driver accepts
-        if (status == 'accepted') {
-          NotificationService.showNotification(
-            title: 'Driver Found!',
-            body: 'A driver has accepted your ride request.',
-          );
-          HapticFeedback.heavyImpact();
-        }
-
-        _onDriverFound();
-      }
-    });
-  }
-
   void _startMatching() {
     _matchTimer = Timer.periodic(const Duration(milliseconds: 800), (timer) {
       if (!mounted) return;

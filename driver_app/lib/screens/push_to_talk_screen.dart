@@ -434,23 +434,6 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
     );
   }
 
-  Future<void> _deleteMessage(String messageId) async {
-    try {
-      await SupabaseService.client
-          .from('voice_messages')
-          .delete()
-          .eq('id', messageId);
-
-      setState(() {
-        _messages.removeWhere((m) => m['id'] == messageId);
-      });
-      _showSnackBar('Message deleted');
-    } catch (e) {
-      debugPrint('Error deleting message: $e');
-      _showSnackBar('Failed to delete message', isError: true);
-    }
-  }
-
   Widget _buildMessageCard(Map<String, dynamic> message) {
     final isPlaying = _playingId == message['id'];
     final isPlayed = message['is_played'] == true;

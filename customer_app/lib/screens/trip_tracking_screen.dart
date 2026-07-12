@@ -63,14 +63,18 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> with TickerProv
   final _realtimeService = RealtimeService();
   String? _driverId;
   List<LatLng> _routePoints = [];
+  // ignore: unused_field - parsed from route API, display UI pending
   String? _routeEta;
+  // ignore: unused_field - parsed from route API, display UI pending
   String? _routeDistance;
   bool _trafficEnabled = false;
   MapType _mapType = MapType.normal;
   BitmapDescriptor? _carIcon;
   BitmapDescriptor? _pickupIcon;
   BitmapDescriptor? _dropoffIcon;
+  // ignore: unused_field - parsed from route API, display UI pending
   String? _nextTurnInstruction;
+  // ignore: unused_field - parsed from route API, display UI pending
   String? _nextTurnDistance;
 
   @override
@@ -1131,23 +1135,6 @@ Live tracking link: https://my-ride-ashen.vercel.app/track/$rideId
     );
   }
 
-  void _shareTripDetails() {
-    final driverName = _driverName;
-    final vehicleNumber = widget.tripData['vehicleNumber'] ?? 'Unknown';
-    final message = '''I'm on a trip with MyRide 🚕
-
-Driver: $driverName
-Vehicle: $vehicleNumber
-From: ${widget.tripData['pickup'] ?? 'Current location'}
-To: $_dropoff
-ETA: $_etaMinutes min
-
-Track my location:
-https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitude}''';
-
-    SharePlus.instance.share(ShareParams(text: message, subject: 'My Trip Details'));
-  }
-
   void _showChangeDestinationSheet() async {
     String? selectedDestination;
     String? selectedName;
@@ -1155,10 +1142,8 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
     double? selectedLng;
     String searchQuery = '';
     bool showMap = false;
-    bool isLoading = true;
     LatLng mapLocation = const LatLng(4.1755, 73.5093);
     final searchController = TextEditingController();
-    GoogleMapController? googleMapController;
 
     List<Map<String, dynamic>> allPlaces = [];
 
@@ -1218,7 +1203,6 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
     } catch (e) {
       debugPrint('Error loading places: $e');
     }
-    isLoading = false;
 
     if (!mounted) return;
 
@@ -1439,7 +1423,6 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
                                 children: [
                                   GoogleMap(
                                     initialCameraPosition: CameraPosition(target: mapLocation, zoom: 14),
-                                    onMapCreated: (controller) => googleMapController = controller,
                                     onTap: (point) {
                                       HapticFeedback.lightImpact();
                                       String nearestName = 'Custom Location';

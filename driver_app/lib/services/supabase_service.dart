@@ -1094,7 +1094,6 @@ class SupabaseService {
 
   // Store active chat channel for broadcasting
   static RealtimeChannel? _activeChatChannel;
-  static String? _activeChatRideId;
 
   static Future<void> sendChatMessage({
     required String rideId,
@@ -1176,7 +1175,6 @@ class SupabaseService {
     void Function(Map<String, dynamic>) onNewMessage,
   ) {
     debugPrint('SupabaseService: Creating chat broadcast subscription for ride $rideId');
-    _activeChatRideId = rideId;
     _activeChatChannel = client
         .channel('chat_broadcast_$rideId')
         .onBroadcast(
@@ -1194,7 +1192,6 @@ class SupabaseService {
 
   static void clearChatChannel() {
     _activeChatChannel = null;
-    _activeChatRideId = null;
   }
 
   // Check for destination change status (driver polls this)

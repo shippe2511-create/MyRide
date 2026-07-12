@@ -273,15 +273,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _scrollToBottom();
   }
 
-  void _updateMessageStatus(String id, MessageStatus status) {
-    setState(() {
-      final index = _messages.indexWhere((m) => m.id == id);
-      if (index != -1) {
-        _messages[index] = _messages[index].copyWith(status: status);
-      }
-    });
-  }
-
   void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {

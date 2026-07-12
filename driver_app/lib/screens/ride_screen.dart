@@ -81,11 +81,9 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   List<LatLng> _routePoints = [];
   List<LatLng> _tripRoutePoints = []; // Full trip route: pickup → dropoff
   List<LatLng> _breadcrumbTrail = []; // Path already traveled
-  int _currentRouteIndex = 0;
   bool _isQueueExpanded = false;
   bool _isPanelExpanded = true;
   bool _isNavigatingAway = false;
-  String? _currentRideId;
   bool _trafficEnabled = false;
   bool _is3DMode = false;
   bool _headingUpMode = false;
@@ -93,8 +91,6 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   BitmapDescriptor? _carIcon;
   BitmapDescriptor? _pickupIcon;
   BitmapDescriptor? _dropoffIcon;
-  String? _nextTurnInstruction;
-  String? _nextTurnDistance;
 
   @override
   void initState() {
@@ -902,18 +898,6 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
     return html.replaceAll(RegExp(r'<[^>]*>'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
   }
 
-  IconData _getTurnIcon(String? instruction) {
-    if (instruction == null) return Icons.straight;
-    final lower = instruction.toLowerCase();
-    if (lower.contains('left')) return Icons.turn_left;
-    if (lower.contains('right')) return Icons.turn_right;
-    if (lower.contains('u-turn')) return Icons.u_turn_left;
-    if (lower.contains('roundabout')) return Icons.roundabout_left;
-    if (lower.contains('merge')) return Icons.merge;
-    if (lower.contains('exit')) return Icons.exit_to_app;
-    return Icons.straight;
-  }
-
   Set<Marker> _buildMarkers(RideRequest ride, DriverState state) {
     // Snap driver position to route for smoother display
     final snappedPos = _snapToRoute(
@@ -1513,57 +1497,6 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                     ),
 
                     const Spacer(),
-
-                    // New ride button (for pooling - hidden for now)
-                    if (false && state.incomingRequests.isNotEmpty && state.hasAvailableSeats)
-                      GestureDetector(
-                        onTap: () => _showNewRequestSheet(state, state.incomingRequests.first),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: AppColors.yellow,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.yellow.withValues(alpha: 0.4),
-                                blurRadius: 10,
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 18,
-                                height: 18,
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.2),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '${state.incomingRequests.length}',
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              const Text(
-                                'New',
-                                style: TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),
@@ -2418,66 +2351,6 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
             child: const Text('Yes, Cancel'),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showNewRequestSheet(DriverState state, RideRequest request) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).padding.bottom + 20),
-        decoration: BoxDecoration(
-          color: context.cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: AppColors.yellow,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(Icons.person, color: Colors.black, size: 28),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(request.customerName, style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w700)),
-                      Text('${request.pickupLocation} → ${request.dropoffLocation}', style: TextStyle(color: context.mutedColor, fontSize: 13)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  state.addToQueue(request);
-                  Navigator.pop(ctx);
-                  AppSnackbar.success(context, 'Added to queue', subtitle: request.customerName);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.yellow,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Add to Queue', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

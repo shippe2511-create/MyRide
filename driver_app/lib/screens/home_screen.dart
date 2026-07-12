@@ -207,12 +207,6 @@ class _HomeScreenState extends State<HomeScreen> {
         });
   }
 
-  void _onBreakStateChanged(bool isOnBreak) {
-    if (isOnBreak) {
-      _loadBreakContent();
-    }
-  }
-
   RealtimeChannel? _sessionBroadcastChannel;
 
   @override

@@ -1094,6 +1094,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     return SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
+                        // ignore: dead_code
                         onPressed: isSaving ? null : () async {
                           if (nameController.text.isEmpty || phoneController.text.isEmpty) return;
                           setSaveState(() => isSaving = true);
@@ -1975,6 +1976,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     return SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
+                        // ignore: dead_code
                         onPressed: isSubmitting ? null : () async {
                           if (descriptionController.text.isEmpty) {
                             AppSnackbar.error(context, 'Please describe your issue');
@@ -2452,7 +2454,6 @@ class _AddPlaceScreenState extends State<_AddPlaceScreen> {
 
   LatLng _selectedLocation = const LatLng(4.1755, 73.5093); // Male, Maldives
   String _selectedAddress = '';
-  bool _isSearching = false;
   List<Map<String, dynamic>> _searchResults = [];
 
   static const String _darkMapStyle = '''
@@ -2488,14 +2489,9 @@ class _AddPlaceScreenState extends State<_AddPlaceScreen> {
 
   void _searchPlaces(String query) {
     if (query.isEmpty) {
-      setState(() {
-        _searchResults = [];
-        _isSearching = false;
-      });
+      setState(() => _searchResults = []);
       return;
     }
-
-    setState(() => _isSearching = true);
 
     final results = _popularPlaces.where((place) {
       final name = place['name'].toString().toLowerCase();
@@ -2504,10 +2500,7 @@ class _AddPlaceScreenState extends State<_AddPlaceScreen> {
       return name.contains(q) || address.contains(q);
     }).toList();
 
-    setState(() {
-      _searchResults = results;
-      _isSearching = false;
-    });
+    setState(() => _searchResults = results);
   }
 
   void _selectPlace(Map<String, dynamic> place) {
@@ -2871,8 +2864,6 @@ class _AddressPickerScreenState extends State<_AddressPickerScreen> {
 
   LatLng _selectedLocation = const LatLng(4.1755, 73.5093);
   String _selectedAddress = '';
-  bool _isSearching = false;
-  bool _isLoadingLocation = true;
   List<Map<String, dynamic>> _searchResults = [];
   Timer? _debounce;
 
@@ -2914,20 +2905,12 @@ class _AddressPickerScreenState extends State<_AddressPickerScreen> {
       if (mounted) {
         if (position.latitude >= -1 && position.latitude <= 8 &&
             position.longitude >= 72 && position.longitude <= 74) {
-          setState(() {
-            _selectedLocation = LatLng(position.latitude, position.longitude);
-            _isLoadingLocation = false;
-          });
+          setState(() => _selectedLocation = LatLng(position.latitude, position.longitude));
           _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_selectedLocation, 16));
-        } else {
-          setState(() => _isLoadingLocation = false);
         }
       }
     } catch (e) {
       debugPrint('Error getting location: $e');
-      if (mounted) {
-        setState(() => _isLoadingLocation = false);
-      }
     }
   }
 
@@ -2947,14 +2930,9 @@ class _AddressPickerScreenState extends State<_AddressPickerScreen> {
 
   Future<void> _searchPlaces(String query) async {
     if (query.isEmpty || query.length < 2) {
-      setState(() {
-        _searchResults = [];
-        _isSearching = false;
-      });
+      setState(() => _searchResults = []);
       return;
     }
-
-    setState(() => _isSearching = true);
 
     try {
       // Restricted to Male/Hulhumale area (15km radius)
@@ -2980,21 +2958,14 @@ class _AddressPickerScreenState extends State<_AddressPickerScreen> {
               'address': p['structured_formatting']?['secondary_text'] ?? '',
               'full_address': p['description'],
             }).toList();
-            _isSearching = false;
           });
         } else {
-          setState(() {
-            _searchResults = [];
-            _isSearching = false;
-          });
+          setState(() => _searchResults = []);
         }
       }
     } catch (e) {
       debugPrint('Error searching places: $e');
-      setState(() {
-        _searchResults = [];
-        _isSearching = false;
-      });
+      setState(() => _searchResults = []);
     }
   }
 

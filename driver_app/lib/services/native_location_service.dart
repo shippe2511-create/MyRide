@@ -11,7 +11,6 @@ class NativeLocationService {
   static const _channel = MethodChannel('com.myride.driver/location');
   bool _isInitialized = false;
   bool _isTracking = false;
-  String? _driverId;
 
   bool get isTracking => _isTracking;
 
@@ -55,7 +54,6 @@ class NativeLocationService {
     }
 
     await initialize();
-    _driverId = driverId;
 
     try {
       final result = await _channel.invokeMethod('startTracking', {
@@ -74,7 +72,6 @@ class NativeLocationService {
     try {
       await _channel.invokeMethod('stopTracking');
       _isTracking = false;
-      _driverId = null;
       debugPrint('NativeLocation: Stopped');
     } catch (e) {
       debugPrint('NativeLocation: Error stopping - $e');

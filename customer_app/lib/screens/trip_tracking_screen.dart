@@ -646,18 +646,6 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> with TickerProv
     return html.replaceAll(RegExp(r'<[^>]*>'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
   }
 
-  IconData _getTurnIcon(String? instruction) {
-    if (instruction == null) return Icons.straight;
-    final lower = instruction.toLowerCase();
-    if (lower.contains('left')) return Icons.turn_left;
-    if (lower.contains('right')) return Icons.turn_right;
-    if (lower.contains('u-turn')) return Icons.u_turn_left;
-    if (lower.contains('roundabout')) return Icons.roundabout_left;
-    if (lower.contains('merge')) return Icons.merge;
-    if (lower.contains('exit')) return Icons.exit_to_app;
-    return Icons.straight;
-  }
-
   void _shareLiveLocation() {
     final rideId = widget.tripData['rideId'] as String?;
     if (rideId == null) return;
@@ -1115,71 +1103,6 @@ Live tracking link: https://my-ride-ashen.vercel.app/track/$rideId
           shape: BoxShape.circle,
         ),
         child: Icon(icon, color: context.textColor, size: 22),
-      ),
-    );
-  }
-
-  Widget _buildActionButton(IconData icon, String label) {
-    final Color buttonColor = label == 'Call' ? AppColors.success
-        : (label == 'Message' ? AppColors.yellow : const Color(0xFF6366F1));
-
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        if (label == 'Call') {
-          _callDriver();
-        } else if (label == 'Message') {
-          _messageDriver();
-        } else if (label == 'Share') {
-          _shareTripDetails();
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: context.isDark
-                ? [const Color(0xFF1E1E22), const Color(0xFF252528)]
-                : [Colors.white, const Color(0xFFF8F8FA)],
-          ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: context.isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 12,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [buttonColor, buttonColor.withValues(alpha: 0.8)],
-                ),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: buttonColor.withValues(alpha: 0.4),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Icon(icon, color: Colors.white, size: 24),
-            ),
-            const SizedBox(height: 10),
-            Text(label, style: TextStyle(color: context.textColor, fontSize: 13, fontWeight: FontWeight.w600)),
-          ],
-        ),
       ),
     );
   }

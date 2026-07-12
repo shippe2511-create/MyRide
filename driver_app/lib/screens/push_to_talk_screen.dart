@@ -459,8 +459,6 @@ class _PushToTalkScreenState extends State<PushToTalkScreen> with SingleTickerPr
     final senderName = message['sender']?['full_name'] ?? (isFromAdmin ? 'Dispatch' : 'You');
     final recipientType = message['recipient_type'] ?? '';
     final duration = message['duration_seconds'] ?? 0;
-    final driverState = context.read<DriverState>();
-    final isOwnMessage = message['sender_id'] == driverState.profileId;
 
     final card = Container(
       margin: const EdgeInsets.only(bottom: 12),

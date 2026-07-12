@@ -49,6 +49,7 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _isSearchingPickup = false;
   bool _editingPickup = false;
   Timer? _debounce;
+  // ignore: unused_field
   LatLng _currentLocation = const LatLng(4.1755, 73.5093);
   LatLng? _pickupLocation;
   String _pickupName = 'Current location';

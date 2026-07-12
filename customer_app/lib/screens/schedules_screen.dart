@@ -63,7 +63,6 @@ class _SchedulesScreenState extends State<SchedulesScreen> with SingleTickerProv
   Future<void> _loadData({bool showLoading = true}) async {
     if (showLoading) setState(() => _isLoading = true);
     try {
-      final types = await SupabaseService.getTransportTypes();
       final routes = await SupabaseService.getRoutes();
       final schedules = await SupabaseService.getSchedules();
 
@@ -187,19 +186,6 @@ class _SchedulesScreenState extends State<SchedulesScreen> with SingleTickerProv
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.schedule, size: 64, color: context.textColor.withValues(alpha: 0.3)),
-          const SizedBox(height: 16),
-          Text('No schedules available', style: TextStyle(color: context.textColor.withValues(alpha: 0.6))),
-        ],
       ),
     );
   }
@@ -532,11 +518,5 @@ class _SchedulesScreenState extends State<SchedulesScreen> with SingleTickerProv
       default:
         return Icons.directions_bus_rounded;
     }
-  }
-
-  Color _hexToColor(String hex) {
-    hex = hex.replaceAll('#', '');
-    if (hex.length == 6) hex = 'FF$hex';
-    return Color(int.parse(hex, radix: 16));
   }
 }

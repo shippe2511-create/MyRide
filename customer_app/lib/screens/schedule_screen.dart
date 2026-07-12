@@ -656,7 +656,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
         height: 120,
         child: Row(
           children: _transportTypes.map((type) {
-            final isActive = _selectedType == type['name'];
             final icon = _getTypeIcon(type['name']);
             // Use color from database if available
             final colorHex = type['color'] as String? ?? '#FFD60A';

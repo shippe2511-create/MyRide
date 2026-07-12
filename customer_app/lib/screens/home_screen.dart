@@ -1675,13 +1675,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  String _formatScheduledTimeFromString(String? timeStr) {
-    if (timeStr == null) return '';
-    final time = MaldivesTimezone.parse(timeStr);
-    if (time == null) return timeStr;
-    return _formatScheduledTime(time);
-  }
-
   void _showStaffCornerDetail(BuildContext context, {required String title, required String subtitle, required List<String> imageUrls, required String category, required Color categoryColor}) {
     showModalBottomSheet(
       context: context,

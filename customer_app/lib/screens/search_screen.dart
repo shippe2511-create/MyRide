@@ -745,6 +745,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                         });
                                       } else {
                                         final freshLoc = await LocationService.getCurrentLocation();
+                                        if (!mounted) return;
                                         final pickupLat = _pickupLocation?.latitude ?? freshLoc.latitude;
                                         final pickupLng = _pickupLocation?.longitude ?? freshLoc.longitude;
                                         Navigator.push(
@@ -776,6 +777,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                         } else {
                                           // Get fresh GPS location before navigating
                                           final freshLoc = await LocationService.getCurrentLocation();
+                                          if (!mounted) return;
                                           final pickupLat = _pickupLocation?.latitude ?? freshLoc.latitude;
                                           final pickupLng = _pickupLocation?.longitude ?? freshLoc.longitude;
                                           Navigator.push(
@@ -796,6 +798,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     } else {
                                       // Non-place result - use current location
                                       final freshLoc = await LocationService.getCurrentLocation();
+                                      if (!mounted) return;
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
@@ -1217,6 +1220,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           onPressed: () async {
                             Navigator.pop(ctx);
                             final freshLoc = await LocationService.getCurrentLocation();
+                            if (!mounted) return;
                             Navigator.push(
                               context,
                               MaterialPageRoute(builder: (_) => RideConfirmScreen(
@@ -1677,6 +1681,7 @@ class _SearchScreenState extends State<SearchScreen> {
       onTap: () async {
         HapticFeedback.mediumImpact();
         final freshLoc = await LocationService.getCurrentLocation();
+        if (!mounted) return;
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -1812,6 +1817,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       final placeId = place['id'];
                       if (placeId != null) {
                         final deleted = await SupabaseService.deleteSavedPlace(placeId);
+                        if (!mounted) return;
                         if (deleted) {
                           setState(() {
                             _savedPlaces.removeAt(index);
@@ -1977,6 +1983,7 @@ class _SearchScreenState extends State<SearchScreen> {
           lat: lat,
           lng: lng,
         );
+        if (!mounted) return;
         if (success) {
           setState(() {
             _savedPlaces[index] = {
@@ -1994,7 +2001,7 @@ class _SearchScreenState extends State<SearchScreen> {
       }
     } catch (e) {
       debugPrint('Update place location error: $e');
-      AppSnackbar.error(context, 'Failed to update location');
+      if (mounted) AppSnackbar.error(context, 'Failed to update location');
     }
   }
 
@@ -2257,6 +2264,7 @@ class _SearchScreenState extends State<SearchScreen> {
         onTap: () async {
           HapticFeedback.lightImpact();
           final freshLoc = await LocationService.getCurrentLocation();
+          if (!mounted) return;
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -2576,6 +2584,7 @@ class _SearchScreenState extends State<SearchScreen> {
                             profileId: appState.profileId,
                           );
 
+                          if (!mounted) return;
                           if (success) {
                             setState(() {
                               _savedPlaces.add({
@@ -2589,9 +2598,9 @@ class _SearchScreenState extends State<SearchScreen> {
                             });
                             Navigator.pop(ctx);
                             HapticFeedback.mediumImpact();
-                            AppSnackbar.success(this.context, '${nameController.text} added to saved places');
+                            AppSnackbar.success(context, '${nameController.text} added to saved places');
                           } else {
-                            AppSnackbar.error(this.context, 'Failed to save place. Please try again.');
+                            AppSnackbar.error(context, 'Failed to save place. Please try again.');
                           }
                         }
                       },
@@ -2632,6 +2641,7 @@ class _SearchScreenState extends State<SearchScreen> {
     } catch (e) {
       debugPrint('Error getting location: $e');
     }
+    if (!mounted) return null;
     final searchController = TextEditingController();
     String addressText = '';
     String selectedName = 'Pinned Location';

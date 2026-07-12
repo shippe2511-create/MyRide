@@ -615,11 +615,11 @@ class _DriverArrivingScreenState extends State<DriverArrivingScreen> with Single
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: showYellow ? AppColors.yellow : Colors.black.withOpacity(0.7),
+          color: showYellow ? AppColors.yellow : Colors.black.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withValues(alpha: 0.2),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -643,7 +643,7 @@ Destination: ${widget.dropoff}
 ${widget.rideId != null ? 'Track: https://my-ride-ashen.vercel.app/track/${widget.rideId}' : ''}
 ''';
 
-    Share.share(shareText, subject: 'Track My MyRide');
+    SharePlus.instance.share(ShareParams(text: shareText, subject: 'Track My MyRide'));
     HapticFeedback.mediumImpact();
   }
 
@@ -1010,7 +1010,7 @@ ETA: $_currentEta min
 Track my location:
 https://maps.google.com/?q=${_pickupLocation.latitude},${_pickupLocation.longitude}''';
 
-    Share.share(message, subject: 'My Ride Details');
+    SharePlus.instance.share(ShareParams(text: message, subject: 'My Ride Details'));
   }
 
   void _confirmCancel(String reason) async {
@@ -1215,7 +1215,7 @@ https://maps.google.com/?q=${_pickupLocation.latitude},${_pickupLocation.longitu
 
 Please contact me or emergency services (119) if needed.''';
 
-    Share.share(message, subject: 'Emergency - My Location');
+    SharePlus.instance.share(ShareParams(text: message, subject: 'Emergency - My Location'));
     _showSOSConfirmed('Location shared');
   }
 

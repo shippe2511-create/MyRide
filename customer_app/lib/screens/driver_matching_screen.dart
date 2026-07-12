@@ -343,16 +343,12 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
         dropoffLng: widget.dropoffLng,
       );
 
-      if (rideData != null) {
-        _rideId = rideData['id'];
-        debugPrint('Ride request created: $_rideId');
-        _startStatusPolling();
-      } else {
-        debugPrint('Failed to create ride');
-        if (mounted) Navigator.pop(context);
-      }
+      _rideId = rideData['id'];
+      debugPrint('Ride request created: $_rideId');
+      _startStatusPolling();
     } catch (e) {
       debugPrint('Error creating ride: $e');
+      if (mounted) Navigator.pop(context);
     }
   }
 

@@ -567,7 +567,7 @@ Coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStr
 
 Sent via MyRide SOS''';
 
-      await Share.share(message, subject: 'Emergency - My Location');
+      await SharePlus.instance.share(ShareParams(text: message, subject: 'Emergency - My Location'));
 
       if (context.mounted) {
         AppSnackbar.success(context, 'Location ready to share');

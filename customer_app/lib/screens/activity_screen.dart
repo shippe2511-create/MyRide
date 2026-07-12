@@ -873,6 +873,6 @@ _Complimentary ride by MyRide_
 _Thank you for riding with us!_
 ''';
 
-    Share.share(receipt, subject: 'MyRide Trip Receipt');
+    SharePlus.instance.share(ShareParams(text: receipt, subject: 'MyRide Trip Receipt'));
   }
 }

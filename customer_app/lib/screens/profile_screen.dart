@@ -1181,10 +1181,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: ElevatedButton.icon(
                 onPressed: () {
                   Navigator.pop(ctx);
-                  Share.share(
-                    'Join MyRide for free staff transportation! Use my referral code: $referralCode\n\nDownload the app now!',
+                  SharePlus.instance.share(ShareParams(
+                    text: 'Join MyRide for free staff transportation! Use my referral code: $referralCode\n\nDownload the app now!',
                     subject: 'Join MyRide',
-                  );
+                  ));
                 },
                 icon: const Icon(Icons.share, size: 18),
                 label: const Text('Share Invite Link'),
@@ -1484,7 +1484,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               try {
                 final data = await SupabaseService.exportUserData();
                 if (context.mounted) {
-                  await Share.share(data, subject: 'My MyRide Data Export');
+                  await SharePlus.instance.share(ShareParams(text: data, subject: 'My MyRide Data Export'));
                 }
               } catch (e) {
                 if (context.mounted) {
@@ -2510,7 +2510,7 @@ For questions about cookies, contact support@myride.mv
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: TextStyle(color: context.textColor, fontSize: 15)),
-          Switch(value: value, onChanged: onChanged, activeColor: AppColors.yellow),
+          Switch(value: value, onChanged: onChanged, activeTrackColor: AppColors.yellow, activeColor: AppColors.yellow),
         ],
       ),
     );

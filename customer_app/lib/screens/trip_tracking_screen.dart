@@ -675,7 +675,7 @@ ETA: $_etaMinutes min
 Live tracking link: https://my-ride-ashen.vercel.app/track/$rideId
 ''';
 
-    Share.share(shareText, subject: 'Track My MyRide Trip');
+    SharePlus.instance.share(ShareParams(text: shareText, subject: 'Track My MyRide Trip'));
     HapticFeedback.mediumImpact();
   }
 
@@ -1225,7 +1225,7 @@ ETA: $_etaMinutes min
 Track my location:
 https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitude}''';
 
-    Share.share(message, subject: 'My Trip Details');
+    SharePlus.instance.share(ShareParams(text: message, subject: 'My Trip Details'));
   }
 
   void _showChangeDestinationSheet() async {
@@ -2229,7 +2229,7 @@ https://maps.google.com/?q=${_driverLocation.latitude},${_driverLocation.longitu
 
 Please contact me or emergency services (119) if needed.''';
 
-    Share.share(message, subject: 'Emergency - My Location');
+    SharePlus.instance.share(ShareParams(text: message, subject: 'Emergency - My Location'));
     _showSOSConfirmed('Location shared');
   }
 

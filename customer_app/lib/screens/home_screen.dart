@@ -405,7 +405,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               .subscribe();
 
           // Subscribe to chat notifications for this active ride
-          NotificationService.subscribeToChatMessages(rideId, profileId!);
+          NotificationService.subscribeToChatMessages(rideId, profileId);
         }
 
         // Update ongoing trip for banner display

@@ -25,10 +25,7 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   static void switchToHomeTab() {
-    _HomeScreenState._instance?.setState(() {
-      _HomeScreenState._instance?._selectedTab = 0;
-      _HomeScreenState._instance?._isPopupMinimized = false;
-    });
+    _HomeScreenState._instance?._switchToHome();
   }
 
   @override
@@ -39,6 +36,13 @@ class _HomeScreenState extends State<HomeScreen> {
   static _HomeScreenState? _instance;
   int _selectedTab = 0;
   bool _isPopupMinimized = false;
+
+  void _switchToHome() {
+    setState(() {
+      _selectedTab = 0;
+      _isPopupMinimized = false;
+    });
+  }
   bool _hasNavigatedToActiveRide = false;
   bool _isNavVisible = true;
   final ScrollController _scrollController = ScrollController();

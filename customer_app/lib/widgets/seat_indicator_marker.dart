@@ -188,7 +188,6 @@ class LiveSeatIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final booked = totalSeats - availableSeats;
     final hasSeats = availableSeats > 0;
 
     return GestureDetector(

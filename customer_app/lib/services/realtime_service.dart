@@ -369,10 +369,6 @@ class RealtimeService {
     });
   }
 
-  void _resetReconnectAttempts(String key) {
-    _reconnectAttempts.remove(key);
-  }
-
   /// Check if a subscription exists
   bool isSubscribed(String key) => _channels.containsKey(key);
 

@@ -628,11 +628,4 @@ class NotificationService {
     }
   }
 
-  static void _navigateToRideChat(String rideId) {
-    // For ride chat, navigate to home which shows active ride with chat button
-    final nav = navigatorKey.currentState;
-    if (nav != null) {
-      nav.popUntil((route) => route.isFirst);
-    }
-  }
 }

@@ -851,50 +851,46 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
   void _exportTripReceipt(TripHistory trip) {
     Navigator.pop(context);
 
-    final months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    final dateStr = '${trip.date.day} ${months[trip.date.month - 1]} ${trip.date.year}';
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final weekday = weekdays[trip.date.weekday - 1];
+    final dateStr = '$weekday, ${trip.date.day} ${months[trip.date.month - 1]} ${trip.date.year}';
     final timeStr = '${trip.date.hour.toString().padLeft(2, '0')}:${trip.date.minute.toString().padLeft(2, '0')}';
+    final statusEmoji = trip.status == TripStatus.completed ? '✅' : '❌';
+    final statusText = trip.status == TripStatus.completed ? 'Completed' : 'Cancelled';
 
     final receipt = '''
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
-       MYRIDE TRIP RECEIPT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚕 *MYRIDE TRIP RECEIPT*
+━━━━━━━━━━━━━━━━━━━━━
 
-Trip ID: ${trip.id.substring(0, 8).toUpperCase()}
-Date: $dateStr
-Time: $timeStr
-Status: ${trip.status == TripStatus.completed ? 'Completed' : 'Cancelled'}
+🎫 *Trip #${trip.id.substring(0, 8).toUpperCase()}*
+📅 $dateStr
+🕐 $timeStr
+$statusEmoji $statusText
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
-         TRIP DETAILS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━
 
-📍 Pickup:
-   ${trip.pickup}
+📍 *ROUTE*
 
-📍 Dropoff:
-   ${trip.dropoff}
+🟢 *From:* ${trip.pickup}
+🔴 *To:* ${trip.dropoff}
 
-⏱️ Duration: ${trip.duration} minutes
-📏 Distance: ${trip.distance} km
+⏱ *Duration:* ${trip.duration} min
+📏 *Distance:* ${trip.distance} km
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        DRIVER DETAILS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━
 
-Driver: ${trip.driverName}
-Vehicle: ${trip.vehicleNumber}
+🚗 *DRIVER*
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 ${trip.driverName}
+🚙 ${trip.vehicleNumber}
 
-This is a complimentary ride provided
-by your organization through MyRide.
+━━━━━━━━━━━━━━━━━━━━━
 
-Thank you for riding with us!
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
+_Complimentary ride by MyRide_
+_Thank you for riding with us! 🙏_
 ''';
 
-    Share.share(receipt, subject: 'MyRide Trip Receipt - ${trip.id.substring(0, 8).toUpperCase()}');
+    Share.share(receipt, subject: 'MyRide Trip #${trip.id.substring(0, 8).toUpperCase()}');
   }
 }

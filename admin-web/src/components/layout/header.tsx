@@ -88,7 +88,6 @@ export function Header() {
         table: 'notifications',
         filter: `user_id=eq.${user.id}`
       }, (payload) => {
-        console.log('New notification received:', payload)
         loadNotifications()
       })
 
@@ -97,12 +96,10 @@ export function Header() {
         schema: 'public',
         table: 'profiles'
       }, (payload) => {
-        console.log('New profile registered:', payload)
         loadNotifications()
       })
 
       channel.subscribe((status) => {
-        console.log('Realtime subscription status:', status)
       })
     }
 

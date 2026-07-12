@@ -15,7 +15,6 @@ export function SupportChatListener() {
       Notification.requestPermission()
     }
 
-    console.log('SupportChatListener: Setting up subscription, pathname:', pathname)
 
     const channel = supabase
       .channel('support_chat_notifications')
@@ -27,11 +26,9 @@ export function SupportChatListener() {
           table: 'support_chat_messages'
         },
         async (payload) => {
-          console.log('SupportChatListener: Received message:', payload)
 
           // Don't show notification if already on support chat page
           if (pathname === '/dashboard/support-chat') {
-            console.log('SupportChatListener: On support chat page, skipping notification')
             return
           }
 
@@ -75,10 +72,8 @@ export function SupportChatListener() {
               const audio = new Audio('/notification.mp3')
               audio.volume = 0.5
               audio.play().catch((err) => {
-                console.log('Audio play blocked:', err)
               })
             } catch (err) {
-              console.log('Audio error:', err)
             }
 
             // Show browser notification when on different tab
@@ -96,9 +91,7 @@ export function SupportChatListener() {
         }
       )
       .subscribe((status) => {
-        console.log('SupportChatListener: Subscription status:', status)
         if (status === 'SUBSCRIBED') {
-          console.log('SupportChatListener: Ready to receive messages!')
         }
       })
 

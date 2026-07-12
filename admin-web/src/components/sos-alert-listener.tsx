@@ -84,7 +84,6 @@ export function SOSAlertListener() {
   }, [])
 
   useEffect(() => {
-    console.log('SOSAlertListener: Setting up realtime subscription...')
 
     // Request notification permission on mount
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
@@ -101,10 +100,8 @@ export function SOSAlertListener() {
           table: 'sos_alerts'
         },
         (payload) => {
-          console.log('SOSAlertListener: Received SOS alert:', payload)
           const newAlert = payload.new as { status?: string; user_id?: string }
           if (newAlert && newAlert.status === 'active') {
-            console.log('SOSAlertListener: Active SOS - showing alert!')
             playAlarmSound()
             toast.error("🚨 EMERGENCY SOS ALERT!", {
               duration: 30000,
@@ -118,11 +115,9 @@ export function SOSAlertListener() {
         }
       )
       .subscribe((status, err) => {
-        console.log('SOSAlertListener: Subscription status:', status, err)
       })
 
     return () => {
-      console.log('SOSAlertListener: Cleaning up subscription')
       supabase.removeChannel(channel)
     }
   }, [playAlarmSound, supabase])

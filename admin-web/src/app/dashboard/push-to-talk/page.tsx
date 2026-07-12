@@ -125,11 +125,9 @@ export default function PushToTalkPage() {
         schema: 'public',
         table: 'voice_messages'
       }, (payload) => {
-        console.log('Voice message change:', payload.eventType)
         fetchMessages()
       })
       .subscribe((status) => {
-        console.log('Voice messages subscription:', status)
       })
 
     // Polling fallback every 5 seconds
@@ -175,7 +173,6 @@ export default function PushToTalkPage() {
       console.error("Error fetching messages:", error)
       return
     }
-    console.log("Fetched messages:", data?.length)
     if (data) setMessages(data)
   }
 
@@ -216,7 +213,6 @@ export default function PushToTalkPage() {
       }
 
       mediaRecorder.onstop = async () => {
-        console.log("Recording stopped, sending message...")
         stream.getTracks().forEach(track => track.stop())
         await sendVoiceMessage()
       }
@@ -252,9 +248,7 @@ export default function PushToTalkPage() {
   }
 
   const sendVoiceMessage = async () => {
-    console.log("sendVoiceMessage called, chunks:", audioChunksRef.current.length)
     if (audioChunksRef.current.length === 0) {
-      console.log("No audio chunks, skipping")
       return
     }
 

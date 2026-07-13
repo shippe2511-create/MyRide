@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../widgets/app_snackbar.dart';
+import '../widgets/cached_avatar.dart';
 
 class RateDriverScreen extends StatefulWidget {
   final String rideId;
@@ -112,13 +113,12 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    CircleAvatar(
+                    CachedAvatar(
+                      imageUrl: widget.driverPhoto,
                       radius: 50,
                       backgroundColor: AppColors.yellow.withValues(alpha: 0.2),
-                      backgroundImage: widget.driverPhoto != null ? NetworkImage(widget.driverPhoto!) : null,
-                      child: widget.driverPhoto == null
-                          ? Text(widget.driverName[0], style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.yellow))
-                          : null,
+                      fallbackIcon: Icons.person,
+                      iconColor: AppColors.yellow,
                     ),
                     const SizedBox(height: 16),
                     Text(

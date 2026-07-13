@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/ride_request.dart';
 import '../theme/app_theme.dart';
 
@@ -50,16 +51,20 @@ class RideRequestCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.yellow,
                     borderRadius: BorderRadius.circular(12),
-                    image: request.customerPhoto != null
-                        ? DecorationImage(
-                            image: NetworkImage(request.customerPhoto!),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
                   ),
-                  child: request.customerPhoto == null
-                      ? const Icon(Icons.person, color: Colors.black, size: 28)
-                      : null,
+                  child: request.customerPhoto != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: CachedNetworkImage(
+                            imageUrl: request.customerPhoto!,
+                            width: 50,
+                            height: 50,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => const Icon(Icons.person, color: Colors.black, size: 28),
+                            errorWidget: (_, __, ___) => const Icon(Icons.person, color: Colors.black, size: 28),
+                          ),
+                        )
+                      : const Icon(Icons.person, color: Colors.black, size: 28),
                 ),
                 const SizedBox(width: 12),
                 Expanded(

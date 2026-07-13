@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../providers/driver_state.dart';
 import '../services/supabase_service.dart';
 import '../widgets/app_snackbar.dart';
+import '../utils/image_utils.dart';
 
 class VehicleChecklistScreen extends StatefulWidget {
   final bool isPostShift;
@@ -1060,10 +1061,15 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                           ),
                         );
                         if (source != null) {
-                          final picked = await _picker.pickImage(source: source, imageQuality: 80);
+                          final picked = await _picker.pickImage(source: source);
                           if (picked != null) {
+                            // Compress vehicle image before adding
+                            final compressed = await ImageUtils.compressImage(
+                              picked.path,
+                              type: ImageType.vehicle,
+                            );
                             setModalState(() {
-                              tempPhotos.add(File(picked.path));
+                              tempPhotos.add(compressed ?? File(picked.path));
                             });
                           }
                         }

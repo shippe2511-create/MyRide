@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/realtime_service.dart';
 import '../widgets/shimmer_loading.dart';
+import '../widgets/cached_avatar.dart';
 import '../utils/timezone_utils.dart';
 
 class AnnouncementsScreen extends StatefulWidget {
@@ -211,12 +212,12 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                   if (announcement['image_url'] != null && announcement['image_url'].toString().isNotEmpty)
                     ClipRRect(
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                      child: Image.network(
-                        announcement['image_url'],
+                      child: CachedImage(
+                        imageUrl: announcement['image_url'],
                         width: double.infinity,
                         height: 160,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Center(child: Icon(Icons.campaign, color: color.withValues(alpha: 0.5), size: 50)),
+                        errorWidget: Center(child: Icon(Icons.campaign, color: color.withValues(alpha: 0.5), size: 50)),
                       ),
                     )
                   else
@@ -349,12 +350,12 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
               const SizedBox(height: 16),
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Image.network(
-                  announcement['image_url'],
+                child: CachedImage(
+                  imageUrl: announcement['image_url'],
                   width: double.infinity,
                   height: 180,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  errorWidget: const SizedBox.shrink(),
                 ),
               ),
             ],

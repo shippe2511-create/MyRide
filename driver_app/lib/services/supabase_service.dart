@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/image_utils.dart';
 
 class SupabaseService {
   static const String _supabaseUrl = 'https://lwkndyyfmmrzazdvrsnk.supabase.co';
@@ -1274,14 +1275,19 @@ class SupabaseService {
     required String driverId,
   }) async {
     try {
-      final file = File(filePath);
       if (driverId.isEmpty) {
         debugPrint('Error: driverId is empty');
         return null;
       }
 
-      final extension = filePath.split('.').last.toLowerCase();
-      final fileName = '$driverId/${documentType}_${DateTime.now().millisecondsSinceEpoch}.$extension';
+      // Compress document image before upload
+      final compressed = await ImageUtils.compressImage(
+        filePath,
+        type: ImageType.document,
+      );
+      final file = compressed ?? File(filePath);
+
+      final fileName = '$driverId/${documentType}_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
       await client.storage.from('documents').upload(
         fileName,
@@ -1302,7 +1308,12 @@ class SupabaseService {
   // Avatar/Profile Photo Storage
   static Future<String?> uploadAvatar(String filePath, String userId) async {
     try {
-      final file = File(filePath);
+      // Compress avatar before upload (400x400, 80% quality)
+      final compressed = await ImageUtils.compressImage(
+        filePath,
+        type: ImageType.avatar,
+      );
+      final file = compressed ?? File(filePath);
       final fileName = 'driver_avatar_$userId.jpg';
 
       await client.storage.from('avatars').upload(
@@ -1664,17 +1675,32 @@ class SupabaseService {
 
       double fuelTotal = 0;
       double maintenanceTotal = 0;
+      double repairTotal = 0;
+      double cleaningTotal = 0;
       int fuelCount = 0;
       int maintenanceCount = 0;
+      int repairCount = 0;
+      int cleaningCount = 0;
 
       for (final log in logs) {
         final amount = (log['amount'] ?? 0).toDouble();
-        if (log['log_type'] == 'fuel') {
-          fuelTotal += amount;
-          fuelCount++;
-        } else {
-          maintenanceTotal += amount;
-          maintenanceCount++;
+        switch (log['log_type']) {
+          case 'fuel':
+            fuelTotal += amount;
+            fuelCount++;
+            break;
+          case 'maintenance':
+            maintenanceTotal += amount;
+            maintenanceCount++;
+            break;
+          case 'repair':
+            repairTotal += amount;
+            repairCount++;
+            break;
+          case 'cleaning':
+            cleaningTotal += amount;
+            cleaningCount++;
+            break;
         }
       }
 
@@ -1683,7 +1709,11 @@ class SupabaseService {
         'fuel_count': fuelCount,
         'maintenance_total': maintenanceTotal,
         'maintenance_count': maintenanceCount,
-        'total': fuelTotal + maintenanceTotal,
+        'repair_total': repairTotal,
+        'repair_count': repairCount,
+        'cleaning_total': cleaningTotal,
+        'cleaning_count': cleaningCount,
+        'total': fuelTotal + maintenanceTotal + repairTotal + cleaningTotal,
       };
     } catch (e) {
       debugPrint('Error getting vehicle log stats: $e');
@@ -1901,16 +1931,30 @@ class SupabaseService {
     }
   }
 
-  // Generic file upload to storage
+  // Generic file upload to storage (with optional compression)
   static Future<String?> uploadFile({
     required String bucket,
     required String path,
     required File file,
+    ImageType? imageType,
   }) async {
     try {
+      File uploadFile = file;
+
+      // Compress if image type specified
+      if (imageType != null) {
+        final compressed = await ImageUtils.compressImage(
+          file.path,
+          type: imageType,
+        );
+        if (compressed != null) {
+          uploadFile = compressed;
+        }
+      }
+
       await client.storage.from(bucket).upload(
         path,
-        file,
+        uploadFile,
         fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
       );
       final url = client.storage.from(bucket).getPublicUrl(path);

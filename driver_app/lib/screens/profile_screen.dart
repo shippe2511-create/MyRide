@@ -9,6 +9,7 @@ import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../widgets/app_snackbar.dart';
+import '../widgets/cached_avatar.dart';
 import 'stats_screen.dart';
 import 'vehicle_logs_screen.dart';
 import 'push_to_talk_screen.dart';
@@ -614,16 +615,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildProfileImage(DriverState state) {
     // Priority: avatarUrl > local file > initials
     if (state.avatarUrl.isNotEmpty) {
-      // Use avatar cache key for immediate refresh on change
-      final avatarUrlWithCache = state.avatarUrl.contains('?')
-          ? '${state.avatarUrl}&t=${state.avatarCacheKey}'
-          : '${state.avatarUrl}?t=${state.avatarCacheKey}';
-      return Image.network(
-        avatarUrlWithCache,
+      return CachedImage(
+        imageUrl: state.avatarUrl,
         width: 110,
         height: 110,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _buildFallbackImage(state),
+        errorWidget: _buildFallbackImage(state),
       );
     } else if (state.profileImagePath.isNotEmpty) {
       return Image.file(

@@ -20,6 +20,7 @@ import '../services/app_settings_service.dart';
 import '../widgets/onboarding_tooltip.dart';
 import '../widgets/app_snackbar.dart';
 import '../widgets/reaction_picker.dart';
+import '../widgets/cached_avatar.dart';
 import 'search_screen.dart';
 import 'activity_screen.dart';
 import 'inbox_screen.dart';
@@ -692,33 +693,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildProfileAvatar(AppState appState) {
     // Priority: avatarUrl (cloud) > profilePhotoPath (local) > icon
     if (appState.avatarUrl != null && appState.avatarUrl!.isNotEmpty) {
-      // Use avatar cache key for immediate refresh on change
-      final avatarUrlWithCache = appState.avatarUrl!.contains('?')
-          ? '${appState.avatarUrl!}&t=${appState.avatarCacheKey}'
-          : '${appState.avatarUrl!}?t=${appState.avatarCacheKey}';
       return ClipRRect(
         borderRadius: BorderRadius.circular(14),
-        child: Image.network(
-          avatarUrlWithCache,
+        child: CachedImage(
+          imageUrl: appState.avatarUrl,
           width: 52,
           height: 52,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) {
-            // Fall back to local file or icon
-            if (appState.profilePhotoPath != null) {
-              final file = File(appState.profilePhotoPath!);
-              if (file.existsSync()) {
-                return Image.file(
-                  file,
-                  width: 52,
-                  height: 52,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Icon(Icons.person, color: Colors.black, size: 28),
-                );
-              }
-            }
-            return Icon(Icons.person, color: Colors.black, size: 28);
-          },
+          errorWidget: Icon(Icons.person, color: Colors.black, size: 28),
         ),
       );
     } else if (appState.profilePhotoPath != null) {
@@ -1270,12 +1252,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                     child: imageUrls.isNotEmpty
-                        ? Image.network(
-                            imageUrls.first,
+                        ? CachedImage(
+                            imageUrl: imageUrls.first,
                             width: double.infinity,
                             height: 90,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => const Center(
+                            errorWidget: const Center(
                               child: Icon(Icons.campaign, color: AppColors.yellow, size: 32),
                             ),
                           )
@@ -1472,12 +1454,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                     child: imageUrls.isNotEmpty
-                        ? Image.network(
-                            imageUrls.first,
+                        ? CachedImage(
+                            imageUrl: imageUrls.first,
                             width: double.infinity,
                             height: 100,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Center(
+                            errorWidget: Center(
                               child: Icon(Icons.people, color: categoryColor, size: 32),
                             ),
                           )
@@ -2996,12 +2978,12 @@ class _AnnouncementDetailSheetState extends State<_AnnouncementDetailSheet> {
                 else if (widget.imageUrls.length == 1)
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-                    child: Image.network(
-                      widget.imageUrls.first,
+                    child: CachedImage(
+                      imageUrl: widget.imageUrls.first,
                       width: double.infinity,
                       height: 280,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Center(child: Icon(Icons.campaign, color: AppColors.yellow, size: 48)),
+                      errorWidget: Center(child: Icon(Icons.campaign, color: AppColors.yellow, size: 48)),
                     ),
                   )
                 else
@@ -3011,12 +2993,12 @@ class _AnnouncementDetailSheetState extends State<_AnnouncementDetailSheet> {
                       controller: _pageController,
                       itemCount: widget.imageUrls.length,
                       onPageChanged: (page) => setState(() => _currentPage = page),
-                      itemBuilder: (context, index) => Image.network(
-                        widget.imageUrls[index],
+                      itemBuilder: (context, index) => CachedImage(
+                        imageUrl: widget.imageUrls[index],
                         width: double.infinity,
                         height: 280,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Center(child: Icon(Icons.campaign, color: AppColors.yellow, size: 48)),
+                        errorWidget: Center(child: Icon(Icons.campaign, color: AppColors.yellow, size: 48)),
                       ),
                     ),
                   ),
@@ -3166,12 +3148,12 @@ class _StaffCornerDetailSheetState extends State<_StaffCornerDetailSheet> {
                 else if (widget.imageUrls.length == 1)
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-                    child: Image.network(
-                      widget.imageUrls.first,
+                    child: CachedImage(
+                      imageUrl: widget.imageUrls.first,
                       width: double.infinity,
                       height: 280,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Center(child: Icon(Icons.people, color: widget.categoryColor, size: 48)),
+                      errorWidget: Center(child: Icon(Icons.people, color: widget.categoryColor, size: 48)),
                     ),
                   )
                 else
@@ -3181,12 +3163,12 @@ class _StaffCornerDetailSheetState extends State<_StaffCornerDetailSheet> {
                       controller: _pageController,
                       itemCount: widget.imageUrls.length,
                       onPageChanged: (page) => setState(() => _currentPage = page),
-                      itemBuilder: (context, index) => Image.network(
-                        widget.imageUrls[index],
+                      itemBuilder: (context, index) => CachedImage(
+                        imageUrl: widget.imageUrls[index],
                         width: double.infinity,
                         height: 280,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Center(child: Icon(Icons.people, color: widget.categoryColor, size: 48)),
+                        errorWidget: Center(child: Icon(Icons.people, color: widget.categoryColor, size: 48)),
                       ),
                     ),
                   ),

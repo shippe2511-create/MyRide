@@ -15,6 +15,7 @@ import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../widgets/app_snackbar.dart';
+import '../widgets/cached_avatar.dart';
 import '../config/app_config.dart';
 import 'support_chat_screen.dart';
 
@@ -780,28 +781,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildProfileAvatar(AppState appState, double size, double iconSize) {
     // Priority: avatarUrl (cloud) > profilePhotoPath (local) > icon
     if (appState.avatarUrl != null && appState.avatarUrl!.isNotEmpty) {
-      // Use avatar cache key for immediate refresh on change
-      final avatarUrlWithCache = appState.avatarUrl!.contains('?')
-          ? '${appState.avatarUrl!}&t=${appState.avatarCacheKey}'
-          : '${appState.avatarUrl!}?t=${appState.avatarCacheKey}';
-      return Image.network(
-        avatarUrlWithCache,
+      return CachedImage(
+        imageUrl: appState.avatarUrl,
         width: size,
         height: size,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) {
-          // Fall back to local file or icon
-          if (appState.profilePhotoPath != null) {
-            return Image.file(
-              File(appState.profilePhotoPath!),
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Icon(Icons.person, color: Colors.black, size: iconSize),
-            );
-          }
-          return Icon(Icons.person, color: Colors.black, size: iconSize);
-        },
+        errorWidget: Icon(Icons.person, color: Colors.black, size: iconSize),
       );
     } else if (appState.profilePhotoPath != null) {
       return Image.file(

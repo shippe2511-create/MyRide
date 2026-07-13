@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/ride_request.dart';
 import '../theme/app_theme.dart';
 import '../screens/navigation_screen.dart';
@@ -279,16 +280,20 @@ class ActiveRideCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.yellow,
                     borderRadius: BorderRadius.circular(14),
-                    image: ride.customerPhoto != null
-                        ? DecorationImage(
-                            image: NetworkImage(ride.customerPhoto!),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
                   ),
-                  child: ride.customerPhoto == null
-                      ? const Icon(Icons.person, color: Colors.black, size: 32)
-                      : null,
+                  child: ride.customerPhoto != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: CachedNetworkImage(
+                            imageUrl: ride.customerPhoto!,
+                            width: 56,
+                            height: 56,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => const Icon(Icons.person, color: Colors.black, size: 32),
+                            errorWidget: (_, __, ___) => const Icon(Icons.person, color: Colors.black, size: 32),
+                          ),
+                        )
+                      : const Icon(Icons.person, color: Colors.black, size: 32),
                 ),
                 const SizedBox(width: 14),
                 Expanded(

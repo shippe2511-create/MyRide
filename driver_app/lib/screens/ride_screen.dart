@@ -20,6 +20,7 @@ import '../services/realtime_service.dart';
 import '../utils/marker_animation.dart';
 import '../widgets/app_snackbar.dart';
 import '../widgets/ride_request_popup.dart';
+import '../widgets/cached_avatar.dart';
 import 'chat_screen.dart';
 import '../services/app_settings_service.dart';
 
@@ -1769,17 +1770,13 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                       ),
                       shape: BoxShape.circle,
                     ),
-                    child: ride.customerPhoto != null && ride.customerPhoto!.isNotEmpty
-                        ? ClipOval(
-                            child: Image.network(
-                              ride.customerPhoto!,
-                              width: 60,
-                              height: 60,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.black, size: 32),
-                            ),
-                          )
-                        : const Icon(Icons.person, color: Colors.black, size: 32),
+                    child: CachedAvatar(
+                      imageUrl: ride.customerPhoto,
+                      radius: 30,
+                      backgroundColor: AppColors.yellow,
+                      fallbackIcon: Icons.person,
+                      iconColor: Colors.black,
+                    ),
                   ),
                 ],
               ),

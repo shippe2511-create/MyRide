@@ -667,6 +667,9 @@ class DriverState extends ChangeNotifier {
       // Subscribe to ride requests
       _subscribeToRideRequests();
 
+      // Immediately check for any pending rides
+      await _loadPendingRides();
+
       // Start polling for pending rides
       _startRidePolling();
     }

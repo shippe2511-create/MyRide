@@ -11,6 +11,7 @@ import '../providers/driver_state.dart';
 import '../utils/timezone_utils.dart';
 import '../widgets/shimmer_loading.dart';
 import '../widgets/app_snackbar.dart';
+import '../widgets/cached_avatar.dart';
 
 class DocumentsScreen extends StatefulWidget {
   const DocumentsScreen({super.key});
@@ -940,22 +941,13 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
           child: fileUrl != null && fileUrl.isNotEmpty
               ? ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    fileUrl,
+                  child: CachedImage(
+                    imageUrl: fileUrl,
                     fit: BoxFit.contain,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                              : null,
-                          color: AppColors.yellow,
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) => Center(
+                    placeholder: Center(
+                      child: CircularProgressIndicator(color: AppColors.yellow),
+                    ),
+                    errorWidget: Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [

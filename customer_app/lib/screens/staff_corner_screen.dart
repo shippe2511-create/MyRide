@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../utils/timezone_utils.dart';
+import '../widgets/cached_avatar.dart';
 
 class StaffCornerScreen extends StatefulWidget {
   const StaffCornerScreen({super.key});
@@ -172,12 +173,12 @@ class _StaffCornerScreenState extends State<StaffCornerScreen> {
             if (imageUrl.isNotEmpty)
               ClipRRect(
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                child: Image.network(
-                  imageUrl,
+                child: CachedImage(
+                  imageUrl: imageUrl,
                   height: 180,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
+                  errorWidget: Container(
                     height: 180,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -331,12 +332,12 @@ class _StaffCornerScreenState extends State<StaffCornerScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (imageUrl.isNotEmpty)
-                      Image.network(
-                        imageUrl,
+                      CachedImage(
+                        imageUrl: imageUrl,
                         height: 250,
                         width: double.infinity,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
+                        errorWidget: Container(
                           height: 200,
                           color: context.isDark ? AppColors.bgDark : Colors.white,
                           child: Center(child: Icon(Icons.image, color: context.mutedColor, size: 50)),

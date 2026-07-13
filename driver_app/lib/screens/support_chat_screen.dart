@@ -9,6 +9,8 @@ import '../theme/app_theme.dart';
 import '../providers/driver_state.dart';
 import '../services/notification_service.dart';
 import '../utils/timezone_utils.dart';
+import '../utils/image_utils.dart';
+import '../widgets/cached_avatar.dart';
 
 class SupportChatMessage {
   final String id;
@@ -275,22 +277,21 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     try {
       final XFile? image = await _imagePicker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 80,
       );
 
       if (image == null) return;
 
       setState(() => _isUploading = true);
 
+      // Compress image before upload
       final bytes = await image.readAsBytes();
+      final compressed = await ImageUtils.compressImageBytes(bytes, type: ImageType.chat);
       final fileName = 'support_${_chatId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final path = 'support-chat/$fileName';
 
       await _supabase.storage.from('chat-images').uploadBinary(
         path,
-        bytes,
+        compressed ?? bytes,
         fileOptions: const FileOptions(contentType: 'image/jpeg'),
       );
 
@@ -315,22 +316,21 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     try {
       final XFile? image = await _imagePicker.pickImage(
         source: ImageSource.camera,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 80,
       );
 
       if (image == null) return;
 
       setState(() => _isUploading = true);
 
+      // Compress image before upload
       final bytes = await image.readAsBytes();
+      final compressed = await ImageUtils.compressImageBytes(bytes, type: ImageType.chat);
       final fileName = 'support_${_chatId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final path = 'support-chat/$fileName';
 
       await _supabase.storage.from('chat-images').uploadBinary(
         path,
-        bytes,
+        compressed ?? bytes,
         fileOptions: const FileOptions(contentType: 'image/jpeg'),
       );
 
@@ -642,20 +642,17 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                   if (message.hasImage) ...[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        message.imageUrl!,
+                      child: CachedImage(
+                        imageUrl: message.imageUrl,
                         width: double.infinity,
                         fit: BoxFit.cover,
-                        loadingBuilder: (context, child, progress) {
-                          if (progress == null) return child;
-                          return Container(
-                            height: 150,
-                            color: context.cardColor,
-                            child: const Center(
-                              child: CircularProgressIndicator(color: AppColors.yellow),
-                            ),
-                          );
-                        },
+                        placeholder: Container(
+                          height: 150,
+                          color: context.cardColor,
+                          child: const Center(
+                            child: CircularProgressIndicator(color: AppColors.yellow),
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 8),

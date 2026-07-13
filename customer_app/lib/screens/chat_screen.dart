@@ -12,6 +12,8 @@ import '../services/notification_service.dart';
 import '../providers/app_state.dart';
 import '../widgets/app_snackbar.dart';
 import '../utils/timezone_utils.dart';
+import '../utils/image_utils.dart';
+import '../widgets/cached_avatar.dart';
 
 enum MessageType { text, voice, location, image }
 enum MessageStatus { sending, sent, delivered, read }
@@ -439,6 +441,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         bucket: 'chat-images',
         path: path,
         file: file,
+        imageType: ImageType.chat,
       );
 
       if (imageUrl != null) {
@@ -627,7 +630,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 child: widget.driverPhoto != null
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(16),
-                        child: Image.network(widget.driverPhoto!, fit: BoxFit.cover),
+                        child: CachedImage(imageUrl: widget.driverPhoto, fit: BoxFit.cover),
                       )
                     : Icon(Icons.person, color: Colors.white, size: 28),
               ),

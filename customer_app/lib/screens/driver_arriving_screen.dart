@@ -18,6 +18,7 @@ import '../utils/marker_animation.dart';
 import '../widgets/status_animation.dart';
 import '../widgets/app_notification_banner.dart';
 import '../widgets/app_snackbar.dart';
+import '../widgets/cached_avatar.dart';
 import 'trip_tracking_screen.dart';
 import 'trip_complete_screen.dart';
 import 'chat_screen.dart';
@@ -835,20 +836,12 @@ ${widget.rideId != null ? 'Track: https://my-ride-ashen.vercel.app/track/${widge
                                           border: Border.all(color: Colors.white, width: 2),
                                           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 6)],
                                         ),
-                                        child: ClipOval(
-                                          child: widget.driverPhoto != null && widget.driverPhoto!.isNotEmpty
-                                              ? Image.network(
-                                                  widget.driverPhoto!,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (_, __, ___) => Container(
-                                                    color: AppColors.yellow,
-                                                    child: Icon(Icons.person, color: Colors.black87, size: 28),
-                                                  ),
-                                                )
-                                              : Container(
-                                                  color: AppColors.yellow,
-                                                  child: Icon(Icons.person, color: Colors.black87, size: 28),
-                                                ),
+                                        child: CachedAvatar(
+                                          imageUrl: widget.driverPhoto,
+                                          radius: 28,
+                                          backgroundColor: AppColors.yellow,
+                                          fallbackIcon: Icons.person,
+                                          iconColor: Colors.black87,
                                         ),
                                       ),
                                     ],

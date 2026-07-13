@@ -12,6 +12,7 @@ import '../widgets/status_toggle.dart';
 import '../widgets/ride_request_popup.dart';
 import '../widgets/break_timer.dart';
 import '../widgets/app_snackbar.dart';
+import '../widgets/cached_avatar.dart';
 import 'vehicle_checklist_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
@@ -792,27 +793,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildProfileAvatar(DriverState state, double size) {
     // Priority: avatarUrl (cloud) > profileImagePath (local) > initials
     if (state.avatarUrl.isNotEmpty) {
-      // Use avatar cache key for immediate refresh on change
-      final avatarUrlWithCache = state.avatarUrl.contains('?')
-          ? '${state.avatarUrl}&t=${state.avatarCacheKey}'
-          : '${state.avatarUrl}?t=${state.avatarCacheKey}';
-      return Image.network(
-        avatarUrlWithCache,
+      return CachedImage(
+        imageUrl: state.avatarUrl,
         width: size,
         height: size,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) {
-          if (state.profileImagePath.isNotEmpty) {
-            return Image.file(
-              File(state.profileImagePath),
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _buildInitialsAvatar(state.driverName, size),
-            );
-          }
-          return _buildInitialsAvatar(state.driverName, size);
-        },
+        errorWidget: _buildInitialsAvatar(state.driverName, size),
       );
     } else if (state.profileImagePath.isNotEmpty) {
       return Image.file(

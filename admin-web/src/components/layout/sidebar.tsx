@@ -91,6 +91,7 @@ const navigationSections: NavSection[] = [
       { name: "Vehicles", href: "/dashboard/vehicles", icon: CarFront, permission: "vehicles:view" },
       { name: "Vehicle Logs", href: "/dashboard/vehicle-logs", icon: Fuel, permission: "vehicles:view" },
       { name: "Pre-trip Checks", href: "/dashboard/checklists", icon: ClipboardCheck, permission: "pretrip:view" },
+      { name: "Vehicle Reports", href: "/dashboard/vehicle-reports", icon: FileText, permission: "pretrip:view" },
     ]
   },
   {

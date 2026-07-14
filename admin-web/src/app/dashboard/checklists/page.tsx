@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -27,7 +28,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { DialogFooter } from "@/components/ui/dialog"
 import {
   ClipboardCheck, AlertTriangle, CheckCircle, XCircle, Car,
-  Loader2, RefreshCw, Download, MoreHorizontal, Pencil, Trash2, Search, Eye, Flag, X
+  Loader2, RefreshCw, Download, MoreHorizontal, Pencil, Trash2, Search, Eye, Flag, X, FileText
 } from "lucide-react"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
@@ -49,6 +50,10 @@ interface VehicleChecklist {
   all_items: Record<string, boolean> | null
   checked_at: string
   remarks: string | null
+  resolution_status: 'pending' | 'fixed' | 'deferred' | 'not_applicable' | null
+  resolved_at: string | null
+  resolved_by: string | null
+  resolution_notes: string | null
 }
 
 const ITEM_LABELS: Record<string, string> = {
@@ -301,10 +306,18 @@ export default function ChecklistsPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Driver vehicle inspections</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => loadChecklists()}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/dashboard/vehicle-reports">
+              <FileText className="h-4 w-4 mr-2" />
+              Issue Reports
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => loadChecklists()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3 grid-cols-3">

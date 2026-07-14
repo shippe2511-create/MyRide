@@ -98,6 +98,7 @@ export function DocumentsTable() {
   const [updating, setUpdating] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
+  const [driverFilter, setDriverFilter] = useState("all")
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
   useEffect(() => {
@@ -139,13 +140,23 @@ export function DocumentsTable() {
     if (showLoading) setLoading(false)
   }
 
+  // Get unique drivers for filter dropdown
+  const uniqueDrivers = Array.from(
+    new Map(
+      documents
+        .filter(doc => doc.driver?.profile?.full_name)
+        .map(doc => [doc.driver_id, { id: doc.driver_id, name: doc.driver?.profile?.full_name || "" }])
+    ).values()
+  ).sort((a, b) => a.name.localeCompare(b.name))
+
   const filteredDocuments = documents.filter(doc => {
     const matchesSearch = search === "" ||
       doc.driver?.profile?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
       doc.document_type.toLowerCase().includes(search.toLowerCase())
     const matchesStatus = statusFilter === "all" || doc.status === statusFilter
     const matchesType = typeFilter === "all" || doc.document_type === typeFilter
-    return matchesSearch && matchesStatus && matchesType
+    const matchesDriver = driverFilter === "all" || doc.driver_id === driverFilter
+    return matchesSearch && matchesStatus && matchesType && matchesDriver
   })
 
   const handleApprove = async (doc: Document) => {
@@ -380,6 +391,17 @@ export function DocumentsTable() {
               <SelectItem value="all">All Types</SelectItem>
               {DOCUMENT_TYPES.map(type => (
                 <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={driverFilter} onValueChange={setDriverFilter}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Driver" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Drivers</SelectItem>
+              {uniqueDrivers.map(driver => (
+                <SelectItem key={driver.id} value={driver.id}>{driver.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>

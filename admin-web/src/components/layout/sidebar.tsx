@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
@@ -198,9 +199,13 @@ export function Sidebar({ collapsed = false, onCollapse, onNavigate }: SidebarPr
     )}>
       <div className="flex h-14 items-center justify-between px-3">
         <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary flex-shrink-0">
-            <Car className="h-5 w-5 text-primary-foreground" />
-          </div>
+          <Image
+            src="/icon-192.png"
+            alt="MyRide"
+            width={32}
+            height={32}
+            className="rounded-lg flex-shrink-0"
+          />
           {!collapsed && <span className="font-bold">MyRide</span>}
         </Link>
         <button

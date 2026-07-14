@@ -8,24 +8,21 @@ const ROLE_CACHE_KEY = "myride_admin_role"
 const PERMS_CACHE_KEY = "myride_admin_custom_perms"
 
 export function usePermissions() {
-  const [role, setRole] = useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      return sessionStorage.getItem(ROLE_CACHE_KEY)
-    }
-    return null
-  })
-  const [customPermissions, setCustomPermissions] = useState<Record<string, boolean>>(() => {
-    if (typeof window !== "undefined") {
-      const cached = sessionStorage.getItem(PERMS_CACHE_KEY)
-      return cached ? JSON.parse(cached) : {}
-    }
-    return {}
-  })
-  const [loading, setLoading] = useState(!role)
+  const [role, setRole] = useState<string | null>(null)
+  const [customPermissions, setCustomPermissions] = useState<Record<string, boolean>>({})
+  const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
   useEffect(() => {
-    if (!role) {
+    // Check sessionStorage first
+    const cachedRole = sessionStorage.getItem(ROLE_CACHE_KEY)
+    const cachedPerms = sessionStorage.getItem(PERMS_CACHE_KEY)
+
+    if (cachedRole) {
+      setRole(cachedRole)
+      setCustomPermissions(cachedPerms ? JSON.parse(cachedPerms) : {})
+      setLoading(false)
+    } else {
       loadRole()
     }
   }, [])

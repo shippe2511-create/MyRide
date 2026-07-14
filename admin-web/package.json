@@ -41,6 +41,8 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.4.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "leaflet-draw": "^1.0.4",
     "leaflet.heat": "^0.2.0",
     "lucide-react": "^1.17.0",

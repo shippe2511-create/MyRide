@@ -27,7 +27,7 @@ function useDriversData(search?: string, status?: string, page: number = 1) {
         .from("profiles")
         .select("*", { count: "exact" })
         .eq("role", "driver")
-        .order("created_at", { ascending: false })
+        .order("full_name", { ascending: true })
 
       if (search) {
         query = query.or(`full_name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`)

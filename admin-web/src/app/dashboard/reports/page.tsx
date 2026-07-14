@@ -105,6 +105,15 @@ const reportTypes = [
   { id: "announcements", name: "Announcements", description: "All announcements with engagement", icon: Bell },
   { id: "activity_logs", name: "Activity Logs", description: "Admin and system activity", icon: Activity },
   { id: "chat_messages", name: "Chat Messages", description: "Customer-driver chat history", icon: MessagesSquare },
+  { id: "scheduled_rides", name: "Scheduled Rides", description: "Upcoming pre-booked rides", icon: Calendar },
+  { id: "recurring_rides", name: "Recurring Rides", description: "Regular ride patterns", icon: Clock },
+  { id: "cancellations", name: "Cancellations", description: "Cancelled rides with reasons", icon: AlertTriangle },
+  { id: "peak_hours", name: "Peak Hours", description: "Ride distribution by hour", icon: TrendingUp },
+  { id: "popular_routes", name: "Popular Routes", description: "Most common pickup/dropoff", icon: Car },
+  { id: "customer_loyalty", name: "Customer Loyalty", description: "Top customers by ride count", icon: Users },
+  { id: "service_zones", name: "Service Zones", description: "Zone coverage and activity", icon: Truck },
+  { id: "driver_availability", name: "Driver Availability", description: "Online/offline time per driver", icon: Activity },
+  { id: "favorite_drivers", name: "Favorite Drivers", description: "Most favorited drivers", icon: Star },
 ]
 
 // Friendly column names mapping (cleaned - no internal UUIDs)
@@ -273,6 +282,71 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Message": "message",
     "Date": "date",
     "Time": "time",
+  },
+  scheduled_rides: {
+    "Customer": "customer_name",
+    "Pickup": "pickup_name",
+    "Dropoff": "dropoff_name",
+    "Scheduled For": "scheduled_time",
+    "Status": "status",
+    "Created": "created_at",
+  },
+  recurring_rides: {
+    "Customer": "customer_name",
+    "Pickup": "pickup_name",
+    "Dropoff": "dropoff_name",
+    "Days": "days",
+    "Time": "time",
+    "Status": "status",
+  },
+  cancellations: {
+    "Customer": "customer_name",
+    "Driver": "driver_name",
+    "Pickup": "pickup_name",
+    "Cancelled By": "cancelled_by",
+    "Reason": "reason",
+    "Date": "date",
+  },
+  peak_hours: {
+    "Hour": "hour",
+    "Rides": "ride_count",
+    "Completed": "completed",
+    "Cancelled": "cancelled",
+    "Avg Duration": "avg_duration",
+  },
+  popular_routes: {
+    "Pickup": "pickup_name",
+    "Dropoff": "dropoff_name",
+    "Rides": "ride_count",
+    "Avg Distance": "avg_distance",
+    "Avg Duration": "avg_duration",
+  },
+  customer_loyalty: {
+    "Customer": "customer_name",
+    "Phone": "phone",
+    "Total Rides": "total_rides",
+    "Completed": "completed",
+    "Cancelled": "cancelled",
+    "Last Ride": "last_ride",
+  },
+  service_zones: {
+    "Zone": "zone_name",
+    "Status": "status",
+    "Rides": "ride_count",
+    "Drivers": "driver_count",
+  },
+  driver_availability: {
+    "Driver": "driver_name",
+    "Total Hours": "total_hours",
+    "Online Hours": "online_hours",
+    "Offline Hours": "offline_hours",
+    "Availability %": "availability",
+  },
+  favorite_drivers: {
+    "Driver": "driver_name",
+    "Rating": "rating",
+    "Favorites": "favorite_count",
+    "Total Rides": "total_rides",
   },
 }
 
@@ -967,6 +1041,233 @@ export default function ReportsPage() {
           break
         }
 
+        case "scheduled_rides": {
+          let query = supabase
+            .from("scheduled_rides")
+            .select(`id, pickup_name, dropoff_name, scheduled_time, status, created_at, customer:profiles!scheduled_rides_customer_id_fkey(full_name)`)
+            .order("scheduled_time", { ascending: true })
+          if (dateFilter) {
+            query = query.gte("scheduled_time", dateFilter.start).lte("scheduled_time", dateFilter.end + "T23:59:59")
+          }
+          const { data: rides } = await query
+          rows = (rides || []).map((r: Record<string, unknown>) => {
+            const customer = r.customer as Record<string, unknown> | null
+            return {
+              "Customer": String(customer?.full_name || "-"),
+              "Pickup": String(r.pickup_name || "-"),
+              "Dropoff": String(r.dropoff_name || "-"),
+              "Scheduled For": formatDateTime(String(r.scheduled_time || "")),
+              "Status": formatStatus(String(r.status || "")),
+              "Created": formatDate(String(r.created_at || "")),
+            }
+          })
+          filename = `scheduled_rides_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "recurring_rides": {
+          const { data: rides } = await supabase
+            .from("recurring_rides")
+            .select(`id, pickup_name, dropoff_name, days_of_week, pickup_time, is_active, customer:profiles!recurring_rides_customer_id_fkey(full_name)`)
+            .order("created_at", { ascending: false })
+          rows = (rides || []).map((r: Record<string, unknown>) => {
+            const customer = r.customer as Record<string, unknown> | null
+            const days = r.days_of_week as string[] | null
+            return {
+              "Customer": String(customer?.full_name || "-"),
+              "Pickup": String(r.pickup_name || "-"),
+              "Dropoff": String(r.dropoff_name || "-"),
+              "Days": days ? days.join(", ") : "-",
+              "Time": String(r.pickup_time || "-"),
+              "Status": r.is_active ? "Active" : "Inactive",
+            }
+          })
+          filename = `recurring_rides_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "cancellations": {
+          let query = supabase
+            .from("rides")
+            .select(`id, pickup_name, status, cancelled_by, cancellation_reason, created_at, customer:profiles!rides_customer_id_fkey(full_name), driver:drivers!rides_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`)
+            .eq("status", "cancelled")
+            .order("created_at", { ascending: false })
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          const { data: rides } = await query
+          rows = (rides || []).map((r: Record<string, unknown>) => {
+            const customer = r.customer as Record<string, unknown> | null
+            const driver = r.driver as Record<string, unknown> | null
+            const driverProfile = driver?.profile as Record<string, unknown> | null
+            return {
+              "Customer": String(customer?.full_name || "-"),
+              "Driver": String(driverProfile?.full_name || "-"),
+              "Pickup": String(r.pickup_name || "-"),
+              "Cancelled By": formatStatus(String(r.cancelled_by || "-")),
+              "Reason": String(r.cancellation_reason || "-"),
+              "Date": formatDate(String(r.created_at || "")),
+            }
+          })
+          filename = `cancellations_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "peak_hours": {
+          let query = supabase.from("rides").select("created_at, status, duration_minutes")
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          const { data: rides } = await query
+          const hourStats: Record<number, { total: number; completed: number; cancelled: number; totalDuration: number }> = {}
+          for (let i = 0; i < 24; i++) hourStats[i] = { total: 0, completed: 0, cancelled: 0, totalDuration: 0 }
+          ;(rides || []).forEach((r) => {
+            const hour = new Date(r.created_at).getHours()
+            hourStats[hour].total++
+            if (r.status === "completed") {
+              hourStats[hour].completed++
+              hourStats[hour].totalDuration += r.duration_minutes || 0
+            }
+            if (r.status === "cancelled") hourStats[hour].cancelled++
+          })
+          rows = Object.entries(hourStats).map(([hour, stats]) => ({
+            "Hour": `${hour.padStart(2, "0")}:00`,
+            "Rides": String(stats.total),
+            "Completed": String(stats.completed),
+            "Cancelled": String(stats.cancelled),
+            "Avg Duration": stats.completed > 0 ? `${Math.round(stats.totalDuration / stats.completed)} mins` : "-",
+          }))
+          filename = `peak_hours_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "popular_routes": {
+          let query = supabase.from("rides").select("pickup_name, dropoff_name, distance_km, duration_minutes, status")
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          const { data: rides } = await query
+          const routeStats: Record<string, { count: number; totalDistance: number; totalDuration: number }> = {}
+          ;(rides || []).filter(r => r.status === "completed").forEach((r) => {
+            const key = `${r.pickup_name || "Unknown"}|${r.dropoff_name || "Unknown"}`
+            if (!routeStats[key]) routeStats[key] = { count: 0, totalDistance: 0, totalDuration: 0 }
+            routeStats[key].count++
+            routeStats[key].totalDistance += r.distance_km || 0
+            routeStats[key].totalDuration += r.duration_minutes || 0
+          })
+          rows = Object.entries(routeStats)
+            .sort((a, b) => b[1].count - a[1].count)
+            .slice(0, 50)
+            .map(([route, stats]) => {
+              const [pickup, dropoff] = route.split("|")
+              return {
+                "Pickup": pickup,
+                "Dropoff": dropoff,
+                "Rides": String(stats.count),
+                "Avg Distance": `${(stats.totalDistance / stats.count).toFixed(1)} km`,
+                "Avg Duration": `${Math.round(stats.totalDuration / stats.count)} mins`,
+              }
+            })
+          filename = `popular_routes_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "customer_loyalty": {
+          let query = supabase.from("rides").select("customer_id, status, created_at")
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          const { data: rides } = await query
+          const customerStats: Record<string, { total: number; completed: number; cancelled: number; lastRide: string }> = {}
+          ;(rides || []).forEach((r) => {
+            const cid = r.customer_id
+            if (!cid) return
+            if (!customerStats[cid]) customerStats[cid] = { total: 0, completed: 0, cancelled: 0, lastRide: "" }
+            customerStats[cid].total++
+            if (r.status === "completed") customerStats[cid].completed++
+            if (r.status === "cancelled") customerStats[cid].cancelled++
+            if (!customerStats[cid].lastRide || r.created_at > customerStats[cid].lastRide) {
+              customerStats[cid].lastRide = r.created_at
+            }
+          })
+          const customerIds = Object.keys(customerStats)
+          const { data: profiles } = await supabase.from("profiles").select("id, full_name, phone").in("id", customerIds)
+          const profileMap: Record<string, { full_name: string; phone: string }> = {}
+          ;(profiles || []).forEach((p) => { profileMap[p.id] = { full_name: p.full_name, phone: p.phone } })
+          rows = Object.entries(customerStats)
+            .sort((a, b) => b[1].total - a[1].total)
+            .slice(0, 100)
+            .map(([cid, stats]) => ({
+              "Customer": profileMap[cid]?.full_name || "-",
+              "Phone": formatPhone(profileMap[cid]?.phone || null),
+              "Total Rides": String(stats.total),
+              "Completed": String(stats.completed),
+              "Cancelled": String(stats.cancelled),
+              "Last Ride": formatDate(stats.lastRide),
+            }))
+          filename = `customer_loyalty_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "service_zones": {
+          const { data: zones } = await supabase.from("service_zones").select("id, name, is_active")
+          rows = (zones || []).map((z: Record<string, unknown>) => ({
+            "Zone": String(z.name || "-"),
+            "Status": z.is_active ? "Active" : "Inactive",
+            "Rides": "-",
+            "Drivers": "-",
+          }))
+          filename = `service_zones_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "driver_availability": {
+          const { data: drivers } = await supabase.from("drivers").select(`id, is_online, profile:profiles!drivers_profile_id_fkey(full_name)`)
+          rows = (drivers || []).map((d: Record<string, unknown>) => {
+            const profile = Array.isArray(d.profile) ? d.profile[0] : d.profile
+            return {
+              "Driver": String(profile?.full_name || "-"),
+              "Total Hours": "-",
+              "Online Hours": "-",
+              "Offline Hours": "-",
+              "Availability %": d.is_online ? "Online Now" : "Offline",
+            }
+          })
+          filename = `driver_availability_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "favorite_drivers": {
+          const { data: favorites } = await supabase
+            .from("favorite_drivers")
+            .select(`driver_id, driver:drivers!favorite_drivers_driver_id_fkey(rating, total_trips, profile:profiles!drivers_profile_id_fkey(full_name))`)
+          const driverCounts: Record<string, { name: string; rating: number; trips: number; count: number }> = {}
+          ;(favorites || []).forEach((f: Record<string, unknown>) => {
+            const driver = f.driver as Record<string, unknown> | null
+            const profile = driver?.profile as Record<string, unknown> | null
+            const did = String(f.driver_id)
+            if (!driverCounts[did]) {
+              driverCounts[did] = {
+                name: String(profile?.full_name || "-"),
+                rating: Number(driver?.rating || 0),
+                trips: Number(driver?.total_trips || 0),
+                count: 0,
+              }
+            }
+            driverCounts[did].count++
+          })
+          rows = Object.values(driverCounts)
+            .sort((a, b) => b.count - a.count)
+            .map((d) => ({
+              "Driver": d.name,
+              "Rating": d.rating ? `${d.rating}/5` : "-",
+              "Favorites": String(d.count),
+              "Total Rides": String(d.trips),
+            }))
+          filename = `favorite_drivers_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
         default: {
           toast.error(`Unknown report type: ${reportType}`)
           if (showLoading) setLoading(null)
@@ -1398,6 +1699,151 @@ export default function ReportsPage() {
           }))
           break
         }
+        case "scheduled_rides": {
+          let query = supabase.from("scheduled_rides").select(`pickup_name, dropoff_name, scheduled_time, status, created_at, customer:profiles!scheduled_rides_customer_id_fkey(full_name)`).order("scheduled_time", { ascending: true })
+          if (dateFilter) query = query.gte("scheduled_time", dateFilter.start).lte("scheduled_time", dateFilter.end + "T23:59:59")
+          const { data: rides } = await query
+          rows = (rides || []).map((r: Record<string, unknown>) => {
+            const customer = r.customer as Record<string, unknown> | null
+            return {
+              "Customer": String(customer?.full_name || "-"),
+              "Pickup": String(r.pickup_name || "-"),
+              "Dropoff": String(r.dropoff_name || "-"),
+              "Scheduled For": formatDateTime(String(r.scheduled_time || "")),
+              "Status": formatStatus(String(r.status || "")),
+              "Created": formatDate(String(r.created_at || "")),
+            }
+          })
+          break
+        }
+        case "recurring_rides": {
+          const { data: rides } = await supabase.from("recurring_rides").select(`pickup_name, dropoff_name, days_of_week, pickup_time, is_active, customer:profiles!recurring_rides_customer_id_fkey(full_name)`).order("created_at", { ascending: false })
+          rows = (rides || []).map((r: Record<string, unknown>) => {
+            const customer = r.customer as Record<string, unknown> | null
+            const days = r.days_of_week as string[] | null
+            return {
+              "Customer": String(customer?.full_name || "-"),
+              "Pickup": String(r.pickup_name || "-"),
+              "Dropoff": String(r.dropoff_name || "-"),
+              "Days": days ? days.join(", ") : "-",
+              "Time": String(r.pickup_time || "-"),
+              "Status": r.is_active ? "Active" : "Inactive",
+            }
+          })
+          break
+        }
+        case "cancellations": {
+          let query = supabase.from("rides").select(`pickup_name, cancelled_by, cancellation_reason, created_at, customer:profiles!rides_customer_id_fkey(full_name), driver:drivers!rides_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`).eq("status", "cancelled").order("created_at", { ascending: false })
+          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          const { data: rides } = await query
+          rows = (rides || []).map((r: Record<string, unknown>) => {
+            const customer = r.customer as Record<string, unknown> | null
+            const driver = r.driver as Record<string, unknown> | null
+            const driverProfile = driver?.profile as Record<string, unknown> | null
+            return {
+              "Customer": String(customer?.full_name || "-"),
+              "Driver": String(driverProfile?.full_name || "-"),
+              "Pickup": String(r.pickup_name || "-"),
+              "Cancelled By": formatStatus(String(r.cancelled_by || "-")),
+              "Reason": String(r.cancellation_reason || "-"),
+              "Date": formatDate(String(r.created_at || "")),
+            }
+          })
+          break
+        }
+        case "peak_hours": {
+          let query = supabase.from("rides").select("created_at, status, duration_minutes")
+          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          const { data: rides } = await query
+          const hourStats: Record<number, { total: number; completed: number; cancelled: number; totalDuration: number }> = {}
+          for (let i = 0; i < 24; i++) hourStats[i] = { total: 0, completed: 0, cancelled: 0, totalDuration: 0 }
+          ;(rides || []).forEach((r) => {
+            const hour = new Date(r.created_at).getHours()
+            hourStats[hour].total++
+            if (r.status === "completed") { hourStats[hour].completed++; hourStats[hour].totalDuration += r.duration_minutes || 0 }
+            if (r.status === "cancelled") hourStats[hour].cancelled++
+          })
+          rows = Object.entries(hourStats).map(([hour, stats]) => ({
+            "Hour": `${hour.padStart(2, "0")}:00`,
+            "Rides": String(stats.total),
+            "Completed": String(stats.completed),
+            "Cancelled": String(stats.cancelled),
+            "Avg Duration": stats.completed > 0 ? `${Math.round(stats.totalDuration / stats.completed)} mins` : "-",
+          }))
+          break
+        }
+        case "popular_routes": {
+          let query = supabase.from("rides").select("pickup_name, dropoff_name, distance_km, duration_minutes, status")
+          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          const { data: rides } = await query
+          const routeStats: Record<string, { count: number; totalDistance: number; totalDuration: number }> = {}
+          ;(rides || []).filter(r => r.status === "completed").forEach((r) => {
+            const key = `${r.pickup_name || "Unknown"}|${r.dropoff_name || "Unknown"}`
+            if (!routeStats[key]) routeStats[key] = { count: 0, totalDistance: 0, totalDuration: 0 }
+            routeStats[key].count++
+            routeStats[key].totalDistance += r.distance_km || 0
+            routeStats[key].totalDuration += r.duration_minutes || 0
+          })
+          rows = Object.entries(routeStats).sort((a, b) => b[1].count - a[1].count).slice(0, 50).map(([route, stats]) => {
+            const [pickup, dropoff] = route.split("|")
+            return { "Pickup": pickup, "Dropoff": dropoff, "Rides": String(stats.count), "Avg Distance": `${(stats.totalDistance / stats.count).toFixed(1)} km`, "Avg Duration": `${Math.round(stats.totalDuration / stats.count)} mins` }
+          })
+          break
+        }
+        case "customer_loyalty": {
+          let query = supabase.from("rides").select("customer_id, status, created_at")
+          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          const { data: rides } = await query
+          const customerStats: Record<string, { total: number; completed: number; cancelled: number; lastRide: string }> = {}
+          ;(rides || []).forEach((r) => {
+            const cid = r.customer_id
+            if (!cid) return
+            if (!customerStats[cid]) customerStats[cid] = { total: 0, completed: 0, cancelled: 0, lastRide: "" }
+            customerStats[cid].total++
+            if (r.status === "completed") customerStats[cid].completed++
+            if (r.status === "cancelled") customerStats[cid].cancelled++
+            if (!customerStats[cid].lastRide || r.created_at > customerStats[cid].lastRide) customerStats[cid].lastRide = r.created_at
+          })
+          const customerIds = Object.keys(customerStats)
+          const { data: profiles } = await supabase.from("profiles").select("id, full_name, phone").in("id", customerIds)
+          const profileMap: Record<string, { full_name: string; phone: string }> = {}
+          ;(profiles || []).forEach((p) => { profileMap[p.id] = { full_name: p.full_name, phone: p.phone } })
+          rows = Object.entries(customerStats).sort((a, b) => b[1].total - a[1].total).slice(0, 100).map(([cid, stats]) => ({
+            "Customer": profileMap[cid]?.full_name || "-",
+            "Phone": formatPhone(profileMap[cid]?.phone || null),
+            "Total Rides": String(stats.total),
+            "Completed": String(stats.completed),
+            "Cancelled": String(stats.cancelled),
+            "Last Ride": formatDate(stats.lastRide),
+          }))
+          break
+        }
+        case "service_zones": {
+          const { data: zones } = await supabase.from("service_zones").select("name, is_active")
+          rows = (zones || []).map((z: Record<string, unknown>) => ({ "Zone": String(z.name || "-"), "Status": z.is_active ? "Active" : "Inactive", "Rides": "-", "Drivers": "-" }))
+          break
+        }
+        case "driver_availability": {
+          const { data: drivers } = await supabase.from("drivers").select(`is_online, profile:profiles!drivers_profile_id_fkey(full_name)`)
+          rows = (drivers || []).map((d: Record<string, unknown>) => {
+            const profile = Array.isArray(d.profile) ? d.profile[0] : d.profile
+            return { "Driver": String(profile?.full_name || "-"), "Total Hours": "-", "Online Hours": "-", "Offline Hours": "-", "Availability %": d.is_online ? "Online Now" : "Offline" }
+          })
+          break
+        }
+        case "favorite_drivers": {
+          const { data: favorites } = await supabase.from("favorite_drivers").select(`driver_id, driver:drivers!favorite_drivers_driver_id_fkey(rating, total_trips, profile:profiles!drivers_profile_id_fkey(full_name))`)
+          const driverCounts: Record<string, { name: string; rating: number; trips: number; count: number }> = {}
+          ;(favorites || []).forEach((f: Record<string, unknown>) => {
+            const driver = f.driver as Record<string, unknown> | null
+            const profile = driver?.profile as Record<string, unknown> | null
+            const did = String(f.driver_id)
+            if (!driverCounts[did]) driverCounts[did] = { name: String(profile?.full_name || "-"), rating: Number(driver?.rating || 0), trips: Number(driver?.total_trips || 0), count: 0 }
+            driverCounts[did].count++
+          })
+          rows = Object.values(driverCounts).sort((a, b) => b.count - a.count).map((d) => ({ "Driver": d.name, "Rating": d.rating ? `${d.rating}/5` : "-", "Favorites": String(d.count), "Total Rides": String(d.trips) }))
+          break
+        }
         default: {
           toast.error("PDF not available for this report type")
           setLoading(null)
@@ -1477,14 +1923,15 @@ export default function ReportsPage() {
   }, [])
 
   const categories = [
-    { name: "People", reports: ["customers", "drivers", "driver_performance"] },
-    { name: "Operations", reports: ["rides", "shifts", "break_history", "quota_usage"] },
+    { name: "People", reports: ["customers", "drivers", "driver_performance", "customer_loyalty", "favorite_drivers"] },
+    { name: "Operations", reports: ["rides", "scheduled_rides", "recurring_rides", "cancellations", "shifts", "break_history", "quota_usage"] },
     { name: "Feedback", reports: ["ratings", "support_tickets"] },
     { name: "Safety", reports: ["sos_alerts", "incidents"] },
     { name: "Vehicles", reports: ["vehicles", "vehicle_checks", "vehicle_logs"] },
+    { name: "Fleet", reports: ["service_zones", "driver_availability"] },
     { name: "Documents", reports: ["documents"] },
     { name: "Communications", reports: ["announcements", "chat_messages"] },
-    { name: "Analytics", reports: ["usage", "activity_logs"] },
+    { name: "Analytics", reports: ["usage", "activity_logs", "peak_hours", "popular_routes"] },
   ]
 
   return (

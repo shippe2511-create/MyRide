@@ -75,37 +75,36 @@ export function Header() {
 
     // Set up realtime subscriptions
     let channel: ReturnType<typeof supabase.channel> | null = null
+    let isMounted = true
 
     const setupRealtime = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user || !isMounted) return
 
-      channel = supabase.channel('admin_notifications_' + user.id)
-
-      channel.on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${user.id}`
-      }, (payload) => {
-        loadNotifications()
-      })
-
-      channel.on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'profiles'
-      }, (payload) => {
-        loadNotifications()
-      })
-
-      channel.subscribe((status) => {
-      })
+      const channelName = 'admin_notifications_' + user.id + '_' + Date.now()
+      channel = supabase.channel(channelName)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        }, () => {
+          if (isMounted) loadNotifications()
+        })
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'profiles'
+        }, () => {
+          if (isMounted) loadNotifications()
+        })
+        .subscribe()
     }
 
     setupRealtime()
 
     return () => {
+      isMounted = false
       if (channel) {
         supabase.removeChannel(channel)
       }

@@ -935,8 +935,8 @@ export default function RatingsPage() {
       </AlertDialog>
 
       {/* Clean Modern Driver Dialog */}
-      <Dialog open={!!selectedDriver} onOpenChange={() => setSelectedDriver(null)}>
-        <DialogContent className="max-w-xl p-6">
+      <Dialog open={!!selectedDriver} onOpenChange={() => setSelectedDriver(null)} modal={true}>
+        <DialogContent className="max-w-xl p-6 max-h-[90vh] overflow-y-auto z-50">
           {loadingDetails ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

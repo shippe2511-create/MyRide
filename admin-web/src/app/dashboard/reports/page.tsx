@@ -9,7 +9,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import { Download, FileSpreadsheet, FileText, Loader2, Calendar, Users, Car, Star, BarChart3, TrendingUp, Package, AlertTriangle, Shield, ClipboardCheck, Fuel, Coffee, Clock, MessageSquare, Ticket, FileCheck, Truck, Bell, Activity, MessagesSquare, FileDown } from "lucide-react"
+import { Download, FileSpreadsheet, FileText, Loader2, Calendar, Users, Car, Star, BarChart3, TrendingUp, Package, AlertTriangle, Shield, ClipboardCheck, Fuel, Coffee, Clock, MessageSquare, Ticket, FileCheck, Truck, Bell, Activity, MessagesSquare, FileDown, CheckCircle } from "lucide-react"
 import { toast } from "sonner"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -114,6 +114,13 @@ const reportTypes = [
   { id: "service_zones", name: "Service Zones", description: "Zone coverage and activity", icon: Truck },
   { id: "driver_availability", name: "Driver Availability", description: "Online/offline time per driver", icon: Activity },
   { id: "favorite_drivers", name: "Favorite Drivers", description: "Most favorited drivers", icon: Star },
+  { id: "fleet_health", name: "Fleet Health Summary", description: "Vehicle health scores and status", icon: Activity },
+  { id: "vehicle_issues", name: "All Vehicle Issues", description: "Complete issue history across vehicles", icon: AlertTriangle },
+  { id: "issue_breakdown", name: "Issue Breakdown", description: "Issues categorized by type", icon: BarChart3 },
+  { id: "pending_issues", name: "Pending Issues", description: "Unresolved vehicle issues", icon: Clock },
+  { id: "resolved_issues", name: "Resolved Issues", description: "Fixed issues with resolution notes", icon: CheckCircle },
+  { id: "vehicle_lifespan", name: "Vehicle Lifespan", description: "Vehicle age and replacement recommendations", icon: TrendingUp },
+  { id: "vehicle_history", name: "Vehicle Change History", description: "All vehicle changes, assignments, and logs", icon: Activity },
 ]
 
 // Friendly column names mapping (cleaned - no internal UUIDs)
@@ -347,6 +354,59 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Rating": "rating",
     "Favorites": "favorite_count",
     "Total Rides": "total_rides",
+  },
+  fleet_health: {
+    "Vehicle": "vehicle_number",
+    "Health Score": "health_score",
+    "Status": "status",
+    "Days Active": "days_in_service",
+    "Total Checks": "total_checks",
+    "Total Issues": "total_issues",
+    "Pending": "pending_issues",
+    "Fixed": "fixed_issues",
+    "Common Issue": "most_common_issue",
+  },
+  vehicle_issues: {
+    "Date": "date",
+    "Vehicle": "vehicle_number",
+    "Driver": "driver_name",
+    "Issues": "issues",
+    "Status": "resolution_status",
+    "Resolution": "resolution_notes",
+  },
+  issue_breakdown: {
+    "Issue Type": "issue_type",
+    "Occurrences": "count",
+    "Vehicles Affected": "vehicles_affected",
+  },
+  pending_issues: {
+    "Date": "date",
+    "Vehicle": "vehicle_number",
+    "Driver": "driver_name",
+    "Issues": "issues",
+    "Status": "resolution_status",
+  },
+  resolved_issues: {
+    "Date": "date",
+    "Vehicle": "vehicle_number",
+    "Driver": "driver_name",
+    "Issues": "issues",
+    "Resolution": "resolution_notes",
+    "Resolved": "resolved_at",
+  },
+  vehicle_lifespan: {
+    "Vehicle": "vehicle_number",
+    "Days Active": "days_in_service",
+    "Health Score": "health_score",
+    "Issue Rate": "issue_rate",
+    "Recommendation": "recommendation",
+  },
+  vehicle_history: {
+    "Date": "date",
+    "Vehicle": "vehicle_number",
+    "Event": "event_type",
+    "Driver": "driver_name",
+    "Details": "details",
   },
 }
 
@@ -1268,6 +1328,206 @@ export default function ReportsPage() {
           break
         }
 
+        case "fleet_health":
+        case "vehicle_issues":
+        case "issue_breakdown":
+        case "pending_issues":
+        case "resolved_issues":
+        case "vehicle_lifespan": {
+          const [vehiclesRes, checklistsRes] = await Promise.all([
+            supabase.from("vehicle_types").select("plate_no, display_name, is_active, created_at").eq("is_active", true),
+            supabase.from("vehicle_checklists").select("*").order("checked_at", { ascending: false }),
+          ])
+          const vehicles = vehiclesRes.data || []
+          const checklists = checklistsRes.data || []
+
+          const ITEM_LABELS: Record<string, string> = {
+            fuel: "Fuel Level", tires: "Tires", lights: "Lights", body: "Body Condition",
+            ac: "A/C", safety: "Safety Kit", documents: "Documents", seatbelts: "Seatbelts", cleanliness: "Cleanliness",
+          }
+
+          const vehicleMap = new Map<string, { vehicle_number: string; total_checks: number; total_issues: number; pending_issues: number; fixed_issues: number; deferred_issues: number; first_check: string | null; most_common_issue: string | null; issue_breakdown: Record<string, number>; health_score: number; days_in_service: number }>()
+          for (const v of vehicles) {
+            if (!v.plate_no) continue
+            vehicleMap.set(v.plate_no, {
+              vehicle_number: v.plate_no,
+              total_checks: 0, total_issues: 0, pending_issues: 0, fixed_issues: 0, deferred_issues: 0,
+              first_check: v.created_at, most_common_issue: null, issue_breakdown: {}, health_score: 100,
+              days_in_service: v.created_at ? Math.ceil((Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60 * 24)) : 0,
+            })
+          }
+
+          for (const c of checklists) {
+            const vn = c.vehicle_number
+            if (!vn || !vehicleMap.has(vn)) continue
+            const h = vehicleMap.get(vn)!
+            h.total_checks++
+            if (c.has_issues) {
+              h.total_issues++
+              if (c.resolution_status === "pending" || !c.resolution_status) h.pending_issues++
+              else if (c.resolution_status === "fixed") h.fixed_issues++
+              else if (c.resolution_status === "deferred") h.deferred_issues++
+              if (c.issues) {
+                for (const key of Object.keys(c.issues)) {
+                  h.issue_breakdown[key] = (h.issue_breakdown[key] || 0) + 1
+                }
+              }
+            }
+          }
+
+          for (const h of vehicleMap.values()) {
+            let maxCount = 0, mostCommon: string | null = null
+            for (const [issue, count] of Object.entries(h.issue_breakdown)) {
+              if (count > maxCount) { maxCount = count; mostCommon = issue }
+            }
+            h.most_common_issue = mostCommon
+            const issueRate = h.total_checks > 0 ? (h.total_issues / h.total_checks) * 100 : 0
+            h.health_score = Math.max(0, Math.min(100, Math.round(100 - issueRate * 2 - h.pending_issues * 10)))
+          }
+
+          const getHealthLabel = (score: number) => score >= 80 ? "Excellent" : score >= 60 ? "Good" : score >= 40 ? "Fair" : "Poor"
+          const healthData = Array.from(vehicleMap.values())
+
+          if (reportType === "fleet_health") {
+            rows = healthData.map(v => ({
+              "Vehicle": v.vehicle_number,
+              "Health Score": `${v.health_score}%`,
+              "Status": getHealthLabel(v.health_score),
+              "Days Active": String(v.days_in_service),
+              "Total Checks": String(v.total_checks),
+              "Total Issues": String(v.total_issues),
+              "Pending": String(v.pending_issues),
+              "Fixed": String(v.fixed_issues),
+              "Common Issue": v.most_common_issue ? (ITEM_LABELS[v.most_common_issue] || v.most_common_issue) : "-",
+            }))
+            filename = `fleet_health_${new Date().toISOString().split("T")[0]}.csv`
+          } else if (reportType === "vehicle_issues") {
+            rows = checklists.filter((c: Record<string, unknown>) => c.has_issues).map((c: Record<string, unknown>) => ({
+              "Date": formatDate(String(c.checked_at)),
+              "Vehicle": String(c.vehicle_number || "-"),
+              "Driver": String(c.driver_name || "-"),
+              "Issues": c.issues ? Object.keys(c.issues as Record<string, unknown>).map(k => ITEM_LABELS[k] || k).join(", ") : "-",
+              "Status": String(c.resolution_status || "pending"),
+              "Resolution": String(c.resolution_notes || "-"),
+            }))
+            filename = `vehicle_issues_${new Date().toISOString().split("T")[0]}.csv`
+          } else if (reportType === "issue_breakdown") {
+            const breakdown: Record<string, { count: number; vehicles: Set<string> }> = {}
+            checklists.forEach((c: Record<string, unknown>) => {
+              if (c.issues) {
+                Object.keys(c.issues as Record<string, unknown>).forEach(key => {
+                  if (!breakdown[key]) breakdown[key] = { count: 0, vehicles: new Set() }
+                  breakdown[key].count++
+                  breakdown[key].vehicles.add(String(c.vehicle_number))
+                })
+              }
+            })
+            rows = Object.entries(breakdown).map(([key, val]) => ({
+              "Issue Type": ITEM_LABELS[key] || key,
+              "Occurrences": String(val.count),
+              "Vehicles Affected": String(val.vehicles.size),
+            })).sort((a, b) => parseInt(b["Occurrences"]) - parseInt(a["Occurrences"]))
+            filename = `issue_breakdown_${new Date().toISOString().split("T")[0]}.csv`
+          } else if (reportType === "pending_issues") {
+            rows = checklists.filter((c: Record<string, unknown>) => c.has_issues && (!c.resolution_status || c.resolution_status === "pending")).map((c: Record<string, unknown>) => ({
+              "Date": formatDate(String(c.checked_at)),
+              "Vehicle": String(c.vehicle_number || "-"),
+              "Driver": String(c.driver_name || "-"),
+              "Issues": c.issues ? Object.keys(c.issues as Record<string, unknown>).map(k => ITEM_LABELS[k] || k).join(", ") : "-",
+              "Status": "Pending",
+            }))
+            filename = `pending_issues_${new Date().toISOString().split("T")[0]}.csv`
+          } else if (reportType === "resolved_issues") {
+            rows = checklists.filter((c: Record<string, unknown>) => c.has_issues && c.resolution_status === "fixed").map((c: Record<string, unknown>) => ({
+              "Date": formatDate(String(c.checked_at)),
+              "Vehicle": String(c.vehicle_number || "-"),
+              "Driver": String(c.driver_name || "-"),
+              "Issues": c.issues ? Object.keys(c.issues as Record<string, unknown>).map(k => ITEM_LABELS[k] || k).join(", ") : "-",
+              "Resolution": String(c.resolution_notes || "-"),
+              "Resolved": c.resolved_at ? formatDate(String(c.resolved_at)) : "-",
+            }))
+            filename = `resolved_issues_${new Date().toISOString().split("T")[0]}.csv`
+          } else if (reportType === "vehicle_lifespan") {
+            rows = healthData.map(v => ({
+              "Vehicle": v.vehicle_number,
+              "Days Active": String(v.days_in_service),
+              "Health Score": `${v.health_score}%`,
+              "Issue Rate": v.total_checks > 0 ? `${Math.round((v.total_issues / v.total_checks) * 100)}%` : "0%",
+              "Recommendation": v.health_score < 40 ? "Consider Replacement" : "Keep",
+            })).sort((a, b) => parseInt(a["Health Score"]) - parseInt(b["Health Score"]))
+            filename = `vehicle_lifespan_${new Date().toISOString().split("T")[0]}.csv`
+          }
+          break
+        }
+
+        case "vehicle_history": {
+          // Fetch vehicle logs, checklists, and driver assignments
+          const [logsRes, checklistsRes, driversRes] = await Promise.all([
+            supabase.from("vehicle_logs").select(`*, driver:drivers!vehicle_logs_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`).order("created_at", { ascending: false }),
+            supabase.from("vehicle_checklists").select("*").order("checked_at", { ascending: false }),
+            supabase.from("drivers").select(`vehicle_id, profile:profiles!drivers_profile_id_fkey(full_name), vehicle:vehicle_types!drivers_vehicle_id_fkey(plate_no)`).not("vehicle_id", "is", null),
+          ])
+
+          const logs = logsRes.data || []
+          const checklists = checklistsRes.data || []
+          const ITEM_LABELS: Record<string, string> = { fuel: "Fuel Level", tires: "Tires", lights: "Lights", body: "Body Condition", ac: "A/C", safety: "Safety Kit", documents: "Documents", seatbelts: "Seatbelts", cleanliness: "Cleanliness" }
+
+          const historyRows: { date: string; vehicle: string; event: string; driver: string; details: string; timestamp: number }[] = []
+
+          // Add vehicle logs (fuel, maintenance, etc.)
+          logs.forEach((log: Record<string, unknown>) => {
+            const driver = log.driver as Record<string, unknown> | null
+            const profile = driver?.profile as Record<string, unknown> | null
+            historyRows.push({
+              date: formatDate(String(log.created_at)),
+              vehicle: String(log.vehicle_number || "-"),
+              event: String(log.log_type || "Log Entry"),
+              driver: String(profile?.full_name || "-"),
+              details: `Odometer: ${log.odometer_reading || "-"}, Fuel: ${log.fuel_amount || "-"}L, Notes: ${log.notes || "-"}`,
+              timestamp: new Date(String(log.created_at)).getTime(),
+            })
+          })
+
+          // Add pre-trip checks
+          checklists.forEach((c: Record<string, unknown>) => {
+            const event = c.has_issues ? "Pre-trip Check (Issues Found)" : "Pre-trip Check (Passed)"
+            const issues = c.issues ? Object.keys(c.issues as Record<string, unknown>).map(k => ITEM_LABELS[k] || k).join(", ") : "All OK"
+            historyRows.push({
+              date: formatDate(String(c.checked_at)),
+              vehicle: String(c.vehicle_number || "-"),
+              event: event,
+              driver: String(c.driver_name || "-"),
+              details: c.has_issues ? `Issues: ${issues}` : "All items passed",
+              timestamp: new Date(String(c.checked_at)).getTime(),
+            })
+
+            // Add resolution as separate event if exists
+            if (c.resolution_status === "fixed" && c.resolved_at) {
+              historyRows.push({
+                date: formatDate(String(c.resolved_at)),
+                vehicle: String(c.vehicle_number || "-"),
+                event: "Issue Resolved",
+                driver: "-",
+                details: String(c.resolution_notes || "Issue fixed"),
+                timestamp: new Date(String(c.resolved_at)).getTime(),
+              })
+            }
+          })
+
+          // Sort by date (newest first)
+          historyRows.sort((a, b) => b.timestamp - a.timestamp)
+
+          rows = historyRows.map(h => ({
+            "Date": h.date,
+            "Vehicle": h.vehicle,
+            "Event": h.event,
+            "Driver": h.driver,
+            "Details": h.details,
+          }))
+          filename = `vehicle_history_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
         default: {
           toast.error(`Unknown report type: ${reportType}`)
           if (showLoading) setLoading(null)
@@ -1842,6 +2102,58 @@ export default function ReportsPage() {
             driverCounts[did].count++
           })
           rows = Object.values(driverCounts).sort((a, b) => b.count - a.count).map((d) => ({ "Driver": d.name, "Rating": d.rating ? `${d.rating}/5` : "-", "Favorites": String(d.count), "Total Rides": String(d.trips) }))
+          break
+        }
+        case "fleet_health":
+        case "vehicle_issues":
+        case "issue_breakdown":
+        case "pending_issues":
+        case "resolved_issues":
+        case "vehicle_lifespan": {
+          const [vehiclesRes, checklistsRes] = await Promise.all([
+            supabase.from("vehicle_types").select("plate_no, display_name, is_active, created_at").eq("is_active", true),
+            supabase.from("vehicle_checklists").select("*").order("checked_at", { ascending: false }),
+          ])
+          const vehicles = vehiclesRes.data || []
+          const checklists = checklistsRes.data || []
+          const ITEM_LABELS: Record<string, string> = { fuel: "Fuel Level", tires: "Tires", lights: "Lights", body: "Body Condition", ac: "A/C", safety: "Safety Kit", documents: "Documents", seatbelts: "Seatbelts", cleanliness: "Cleanliness" }
+          const vehicleMap = new Map<string, { vehicle_number: string; total_checks: number; total_issues: number; pending_issues: number; fixed_issues: number; deferred_issues: number; most_common_issue: string | null; issue_breakdown: Record<string, number>; health_score: number; days_in_service: number }>()
+          for (const v of vehicles) {
+            if (!v.plate_no) continue
+            vehicleMap.set(v.plate_no, { vehicle_number: v.plate_no, total_checks: 0, total_issues: 0, pending_issues: 0, fixed_issues: 0, deferred_issues: 0, most_common_issue: null, issue_breakdown: {}, health_score: 100, days_in_service: v.created_at ? Math.ceil((Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60 * 24)) : 0 })
+          }
+          for (const c of checklists) {
+            const vn = c.vehicle_number; if (!vn || !vehicleMap.has(vn)) continue
+            const h = vehicleMap.get(vn)!; h.total_checks++
+            if (c.has_issues) { h.total_issues++; if (c.resolution_status === "pending" || !c.resolution_status) h.pending_issues++; else if (c.resolution_status === "fixed") h.fixed_issues++; if (c.issues) { for (const key of Object.keys(c.issues)) { h.issue_breakdown[key] = (h.issue_breakdown[key] || 0) + 1 } } }
+          }
+          for (const h of vehicleMap.values()) {
+            let maxCount = 0, mostCommon: string | null = null; for (const [issue, count] of Object.entries(h.issue_breakdown)) { if (count > maxCount) { maxCount = count; mostCommon = issue } }; h.most_common_issue = mostCommon
+            const issueRate = h.total_checks > 0 ? (h.total_issues / h.total_checks) * 100 : 0; h.health_score = Math.max(0, Math.min(100, Math.round(100 - issueRate * 2 - h.pending_issues * 10)))
+          }
+          const getHealthLabel = (score: number) => score >= 80 ? "Excellent" : score >= 60 ? "Good" : score >= 40 ? "Fair" : "Poor"
+          const healthData = Array.from(vehicleMap.values())
+          if (reportType === "fleet_health") { rows = healthData.map(v => ({ "Vehicle": v.vehicle_number, "Health Score": `${v.health_score}%`, "Status": getHealthLabel(v.health_score), "Days Active": String(v.days_in_service), "Total Checks": String(v.total_checks), "Total Issues": String(v.total_issues), "Pending": String(v.pending_issues), "Fixed": String(v.fixed_issues), "Common Issue": v.most_common_issue ? (ITEM_LABELS[v.most_common_issue] || v.most_common_issue) : "-" })) }
+          else if (reportType === "vehicle_issues") { rows = checklists.filter((c: Record<string, unknown>) => c.has_issues).map((c: Record<string, unknown>) => ({ "Date": formatDate(String(c.checked_at)), "Vehicle": String(c.vehicle_number || "-"), "Driver": String(c.driver_name || "-"), "Issues": c.issues ? Object.keys(c.issues as Record<string, unknown>).map(k => ITEM_LABELS[k] || k).join(", ") : "-", "Status": String(c.resolution_status || "pending"), "Resolution": String(c.resolution_notes || "-") })) }
+          else if (reportType === "issue_breakdown") { const breakdown: Record<string, { count: number; vehicles: Set<string> }> = {}; checklists.forEach((c: Record<string, unknown>) => { if (c.issues) { Object.keys(c.issues as Record<string, unknown>).forEach(key => { if (!breakdown[key]) breakdown[key] = { count: 0, vehicles: new Set() }; breakdown[key].count++; breakdown[key].vehicles.add(String(c.vehicle_number)) }) } }); rows = Object.entries(breakdown).map(([key, val]) => ({ "Issue Type": ITEM_LABELS[key] || key, "Occurrences": String(val.count), "Vehicles Affected": String(val.vehicles.size) })).sort((a, b) => parseInt(b["Occurrences"]) - parseInt(a["Occurrences"])) }
+          else if (reportType === "pending_issues") { rows = checklists.filter((c: Record<string, unknown>) => c.has_issues && (!c.resolution_status || c.resolution_status === "pending")).map((c: Record<string, unknown>) => ({ "Date": formatDate(String(c.checked_at)), "Vehicle": String(c.vehicle_number || "-"), "Driver": String(c.driver_name || "-"), "Issues": c.issues ? Object.keys(c.issues as Record<string, unknown>).map(k => ITEM_LABELS[k] || k).join(", ") : "-", "Status": "Pending" })) }
+          else if (reportType === "resolved_issues") { rows = checklists.filter((c: Record<string, unknown>) => c.has_issues && c.resolution_status === "fixed").map((c: Record<string, unknown>) => ({ "Date": formatDate(String(c.checked_at)), "Vehicle": String(c.vehicle_number || "-"), "Driver": String(c.driver_name || "-"), "Issues": c.issues ? Object.keys(c.issues as Record<string, unknown>).map(k => ITEM_LABELS[k] || k).join(", ") : "-", "Resolution": String(c.resolution_notes || "-"), "Resolved": c.resolved_at ? formatDate(String(c.resolved_at)) : "-" })) }
+          else if (reportType === "vehicle_lifespan") { rows = healthData.map(v => ({ "Vehicle": v.vehicle_number, "Days Active": String(v.days_in_service), "Health Score": `${v.health_score}%`, "Issue Rate": v.total_checks > 0 ? `${Math.round((v.total_issues / v.total_checks) * 100)}%` : "0%", "Recommendation": v.health_score < 40 ? "Consider Replacement" : "Keep" })).sort((a, b) => parseInt(a["Health Score"]) - parseInt(b["Health Score"])) }
+          break
+        }
+        case "vehicle_history": {
+          const [logsRes, checklistsRes] = await Promise.all([
+            supabase.from("vehicle_logs").select(`*, driver:drivers!vehicle_logs_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`).order("created_at", { ascending: false }),
+            supabase.from("vehicle_checklists").select("*").order("checked_at", { ascending: false }),
+          ])
+          const logs = logsRes.data || []
+          const checklists = checklistsRes.data || []
+          const ITEM_LABELS: Record<string, string> = { fuel: "Fuel Level", tires: "Tires", lights: "Lights", body: "Body Condition", ac: "A/C", safety: "Safety Kit", documents: "Documents", seatbelts: "Seatbelts", cleanliness: "Cleanliness" }
+          const historyRows: { date: string; vehicle: string; event: string; driver: string; details: string; timestamp: number }[] = []
+          logs.forEach((log: Record<string, unknown>) => { const driver = log.driver as Record<string, unknown> | null; const profile = driver?.profile as Record<string, unknown> | null; historyRows.push({ date: formatDate(String(log.created_at)), vehicle: String(log.vehicle_number || "-"), event: String(log.log_type || "Log Entry"), driver: String(profile?.full_name || "-"), details: `Odometer: ${log.odometer_reading || "-"}, Fuel: ${log.fuel_amount || "-"}L`, timestamp: new Date(String(log.created_at)).getTime() }) })
+          checklists.forEach((c: Record<string, unknown>) => { const event = c.has_issues ? "Pre-trip Check (Issues)" : "Pre-trip Check (Passed)"; const issues = c.issues ? Object.keys(c.issues as Record<string, unknown>).map(k => ITEM_LABELS[k] || k).join(", ") : "All OK"; historyRows.push({ date: formatDate(String(c.checked_at)), vehicle: String(c.vehicle_number || "-"), event: event, driver: String(c.driver_name || "-"), details: c.has_issues ? `Issues: ${issues}` : "All items passed", timestamp: new Date(String(c.checked_at)).getTime() }); if (c.resolution_status === "fixed" && c.resolved_at) { historyRows.push({ date: formatDate(String(c.resolved_at)), vehicle: String(c.vehicle_number || "-"), event: "Issue Resolved", driver: "-", details: String(c.resolution_notes || "Fixed"), timestamp: new Date(String(c.resolved_at)).getTime() }) } })
+          historyRows.sort((a, b) => b.timestamp - a.timestamp)
+          rows = historyRows.map(h => ({ "Date": h.date, "Vehicle": h.vehicle, "Event": h.event, "Driver": h.driver, "Details": h.details }))
           break
         }
         default: {

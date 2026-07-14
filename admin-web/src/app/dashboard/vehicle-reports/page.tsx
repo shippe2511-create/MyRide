@@ -9,8 +9,11 @@ import {
   Car, AlertTriangle, CheckCircle, Clock,
   Search, FileText, TrendingUp, Wrench,
   Activity, BarChart3, FileDown, FileSpreadsheet,
-  AlertCircle, Truck, ClipboardCheck, Info,
+  AlertCircle, Truck, ClipboardCheck, Info, X, Eye,
 } from "lucide-react"
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { PermissionGate } from "@/components/permission-gate"
 import { cn } from "@/lib/utils"
@@ -92,10 +95,16 @@ export default function VehicleReportsPage() {
     d.setMonth(d.getMonth() - 1)
     return d.toISOString().split("T")[0]
   })
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().split("T")[0])
+  const [endDate, setEndDate] = useState(() => {
+    // Set end date to tomorrow to include all of today
+    const d = new Date()
+    d.setDate(d.getDate() + 1)
+    return d.toISOString().split("T")[0]
+  })
 
   const [vehicleHealthData, setVehicleHealthData] = useState<VehicleHealth[]>([])
   const [allChecklists, setAllChecklists] = useState<VehicleChecklist[]>([])
+  const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null)
   const [stats, setStats] = useState({
     totalVehicles: 0,
     totalIssues: 0,
@@ -106,10 +115,28 @@ export default function VehicleReportsPage() {
 
   useEffect(() => {
     loadData()
+
+    // Realtime subscription for vehicle_checklists
+    const channel = supabase
+      .channel('vehicle_reports_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_checklists' }, () => {
+        // Auto-update end date to today if behind
+        const today = new Date().toISOString().split("T")[0]
+        setEndDate(prev => prev < today ? today : prev)
+        loadData(false)
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_types' }, () => {
+        loadData(false)
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
-  const loadData = async () => {
-    setLoading(true)
+  const loadData = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
 
     const [vehiclesRes, checklistsRes] = await Promise.all([
       supabase.from("vehicle_types").select("plate_no, display_name, is_active, created_at").eq("is_active", true),
@@ -698,8 +725,17 @@ export default function VehicleReportsPage() {
                 </thead>
                 <tbody className="divide-y">
                   {selectedReport === "fleet-health" && vehicleHealthData.map((v) => (
-                    <tr key={v.vehicle_number} className="hover:bg-muted/30">
-                      <td className="px-4 py-3 font-medium">{v.vehicle_number}</td>
+                    <tr
+                      key={v.vehicle_number}
+                      className="hover:bg-muted/30 cursor-pointer group"
+                      onClick={() => setSelectedVehicle(v.vehicle_number)}
+                    >
+                      <td className="px-4 py-3 font-medium">
+                        <div className="flex items-center gap-2">
+                          {v.vehicle_number}
+                          <Eye className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </td>
                       <td className={cn("px-4 py-3 font-bold", getHealthColor(v.health_score))}>{v.health_score}%</td>
                       <td className="px-4 py-3">
                         <Badge variant={v.health_score >= 80 ? "default" : v.health_score >= 60 ? "secondary" : "destructive"}>
@@ -735,7 +771,7 @@ export default function VehicleReportsPage() {
                       <td className="px-4 py-3 font-medium">{c.vehicle_number}</td>
                       <td className="px-4 py-3">{c.driver_name}</td>
                       <td className="px-4 py-3">
-                        <Badge variant={c.has_issues ? "destructive" : "default"}>
+                        <Badge className={c.has_issues ? "bg-red-500" : "bg-green-500"}>
                           {c.has_issues ? "Issue" : "OK"}
                         </Badge>
                       </td>
@@ -754,8 +790,17 @@ export default function VehicleReportsPage() {
 
                   {selectedReport === "vehicle-lifespan" &&
                     (getReportData() as (VehicleHealth & { issue_rate: number, needs_replacement: boolean })[]).map((v) => (
-                    <tr key={v.vehicle_number} className="hover:bg-muted/30">
-                      <td className="px-4 py-3 font-medium">{v.vehicle_number}</td>
+                    <tr
+                      key={v.vehicle_number}
+                      className="hover:bg-muted/30 cursor-pointer group"
+                      onClick={() => setSelectedVehicle(v.vehicle_number)}
+                    >
+                      <td className="px-4 py-3 font-medium">
+                        <div className="flex items-center gap-2">
+                          {v.vehicle_number}
+                          <Eye className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </td>
                       <td className="px-4 py-3">{v.days_in_service} days</td>
                       <td className={cn("px-4 py-3 font-bold", getHealthColor(v.health_score))}>{v.health_score}%</td>
                       <td className="px-4 py-3">{v.issue_rate}%</td>
@@ -786,6 +831,129 @@ export default function VehicleReportsPage() {
           </div>
         </div>
       </div>
+
+      {/* Vehicle History Dialog */}
+      <Dialog open={!!selectedVehicle} onOpenChange={() => setSelectedVehicle(null)}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Car className="h-5 w-5" />
+              Vehicle History: {selectedVehicle}
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedVehicle && (() => {
+            const vehicleHealth = vehicleHealthData.find(v => v.vehicle_number === selectedVehicle)
+            const vehicleChecklists = allChecklists.filter(c => c.vehicle_number === selectedVehicle)
+
+            return (
+              <div className="flex-1 overflow-y-auto space-y-4">
+                {/* Summary Stats */}
+                {vehicleHealth && (
+                  <div className="grid grid-cols-4 gap-3">
+                    <div className="p-3 rounded-lg bg-muted/50 text-center">
+                      <p className={cn("text-2xl font-bold", getHealthColor(vehicleHealth.health_score))}>
+                        {vehicleHealth.health_score}%
+                      </p>
+                      <p className="text-xs text-muted-foreground">Health Score</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/50 text-center">
+                      <p className="text-2xl font-bold">{vehicleHealth.total_checks}</p>
+                      <p className="text-xs text-muted-foreground">Total Checks</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/50 text-center">
+                      <p className="text-2xl font-bold text-orange-500">{vehicleHealth.total_issues}</p>
+                      <p className="text-xs text-muted-foreground">Total Issues</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/50 text-center">
+                      <p className="text-2xl font-bold text-yellow-500">{vehicleHealth.pending_issues}</p>
+                      <p className="text-xs text-muted-foreground">Pending</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Issue Breakdown */}
+                {vehicleHealth && Object.keys(vehicleHealth.issue_breakdown).length > 0 && (
+                  <div className="p-4 rounded-lg border">
+                    <h3 className="font-medium mb-3 flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4" />
+                      Issue Breakdown
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(vehicleHealth.issue_breakdown)
+                        .sort(([, a], [, b]) => b - a)
+                        .map(([issue, count]) => (
+                          <Badge key={issue} variant="outline" className="text-sm">
+                            {ITEM_LABELS[issue] || issue}: {count}
+                          </Badge>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Check History */}
+                <div className="rounded-lg border overflow-hidden">
+                  <div className="px-4 py-3 bg-muted/50 border-b">
+                    <h3 className="font-medium flex items-center gap-2">
+                      <ClipboardCheck className="h-4 w-4" />
+                      Pre-trip Check History ({vehicleChecklists.length})
+                    </h3>
+                  </div>
+                  <div className="max-h-[300px] overflow-y-auto">
+                    <table className="w-full">
+                      <thead className="bg-muted/30 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Date</th>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Driver</th>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Status</th>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Issues</th>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Resolution</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {vehicleChecklists.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                              No pre-trip checks recorded for this vehicle
+                            </td>
+                          </tr>
+                        ) : (
+                          vehicleChecklists.map(check => (
+                            <tr key={check.id} className={check.has_issues ? "bg-red-500/5" : ""}>
+                              <td className="px-4 py-2 text-sm">{formatDateTime(check.checked_at)}</td>
+                              <td className="px-4 py-2 text-sm">{check.driver_name}</td>
+                              <td className="px-4 py-2">
+                                <Badge className={cn("text-xs", check.has_issues ? "bg-red-500" : "bg-green-500")}>
+                                  {check.has_issues ? "Issue" : "OK"}
+                                </Badge>
+                              </td>
+                              <td className="px-4 py-2 text-sm text-muted-foreground">
+                                {check.issues
+                                  ? Object.keys(check.issues).map(k => ITEM_LABELS[k] || k).join(", ")
+                                  : "-"}
+                              </td>
+                              <td className="px-4 py-2">
+                                {check.has_issues && (
+                                  <Badge
+                                    variant={check.resolution_status === "fixed" ? "default" : "secondary"}
+                                    className="text-xs"
+                                  >
+                                    {check.resolution_status || "Pending"}
+                                  </Badge>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+        </DialogContent>
+      </Dialog>
     </PermissionGate>
   )
 }

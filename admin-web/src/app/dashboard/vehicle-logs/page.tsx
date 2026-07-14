@@ -445,7 +445,8 @@ export default function VehicleLogsPage() {
               <Users className="h-4 w-4 text-purple-500" />
             </div>
             <div className="min-w-0">
-              <p className="text-lg font-bold tracking-tight text-purple-500 truncate">{topDrivers[0]?.[0] || "N/A"}</p>
+              <p className="text-xs text-muted-foreground mb-0.5">Top Spender</p>
+              <p className="text-base font-bold tracking-tight text-purple-500 truncate">{topDrivers[0]?.[0] || "N/A"}</p>
               <p className="text-xs text-muted-foreground truncate">MVR {(topDrivers[0]?.[1] || 0).toLocaleString()}</p>
             </div>
           </div>

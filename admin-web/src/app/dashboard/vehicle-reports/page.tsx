@@ -14,6 +14,8 @@ import {
 import { toast } from "sonner"
 import { PermissionGate } from "@/components/permission-gate"
 import { cn } from "@/lib/utils"
+import jsPDF from "jspdf"
+import autoTable from "jspdf-autotable"
 
 interface IssueDetail {
   note: string
@@ -312,130 +314,115 @@ export default function VehicleReportsPage() {
       minute: "2-digit",
     })
 
-    let tableRows = ""
-    let tableHeaders = ""
+    let headers: string[] = []
+    let rows: string[][] = []
 
     switch (selectedReport) {
       case "fleet-health":
-        tableHeaders = "<tr><th>Vehicle</th><th>Health</th><th>Status</th><th>Checks</th><th>Issues</th><th>Pending</th><th>Fixed</th></tr>"
-        tableRows = (data as VehicleHealth[]).map(v => `
-          <tr>
-            <td><strong>${v.vehicle_number}</strong></td>
-            <td class="${getHealthColor(v.health_score).replace('text-', 'color-')}">${v.health_score}%</td>
-            <td><span class="badge badge-${getHealthLabel(v.health_score).toLowerCase()}">${getHealthLabel(v.health_score)}</span></td>
-            <td>${v.total_checks}</td>
-            <td>${v.total_issues}</td>
-            <td class="pending">${v.pending_issues}</td>
-            <td class="fixed">${v.fixed_issues}</td>
-          </tr>
-        `).join("")
+        headers = ["Vehicle", "Health", "Status", "Checks", "Issues", "Pending", "Fixed"]
+        rows = (data as VehicleHealth[]).map(v => [
+          v.vehicle_number,
+          `${v.health_score}%`,
+          getHealthLabel(v.health_score),
+          String(v.total_checks),
+          String(v.total_issues),
+          String(v.pending_issues),
+          String(v.fixed_issues),
+        ])
         break
       case "all-issues":
       case "pending-issues":
       case "resolved-issues":
-        tableHeaders = "<tr><th>Date</th><th>Vehicle</th><th>Driver</th><th>Issues</th><th>Status</th><th>Resolution</th></tr>"
-        tableRows = (data as VehicleChecklist[]).map(c => `
-          <tr>
-            <td>${formatDateTime(c.checked_at)}</td>
-            <td><strong>${c.vehicle_number}</strong></td>
-            <td>${c.driver_name}</td>
-            <td>${c.issues ? Object.keys(c.issues).map(k => ITEM_LABELS[k] || k).join(", ") : "-"}</td>
-            <td><span class="badge badge-${c.resolution_status || 'pending'}">${c.resolution_status || "Pending"}</span></td>
-            <td>${c.resolution_notes || "-"}</td>
-          </tr>
-        `).join("")
+        headers = ["Date", "Vehicle", "Driver", "Issues", "Status", "Resolution"]
+        rows = (data as VehicleChecklist[]).map(c => [
+          formatDateTime(c.checked_at),
+          c.vehicle_number,
+          c.driver_name,
+          c.issues ? Object.keys(c.issues).map(k => ITEM_LABELS[k] || k).join(", ") : "-",
+          c.resolution_status || "Pending",
+          c.resolution_notes || "-",
+        ])
         break
       case "vehicle-checks":
-        tableHeaders = "<tr><th>Date</th><th>Vehicle</th><th>Driver</th><th>Status</th><th>Issues</th></tr>"
-        tableRows = (data as VehicleChecklist[]).map(c => `
-          <tr>
-            <td>${formatDateTime(c.checked_at)}</td>
-            <td><strong>${c.vehicle_number}</strong></td>
-            <td>${c.driver_name}</td>
-            <td><span class="badge badge-${c.has_issues ? 'issue' : 'ok'}">${c.has_issues ? "Issue" : "OK"}</span></td>
-            <td>${c.issues ? Object.keys(c.issues).map(k => ITEM_LABELS[k] || k).join(", ") : "-"}</td>
-          </tr>
-        `).join("")
+        headers = ["Date", "Vehicle", "Driver", "Status", "Issues"]
+        rows = (data as VehicleChecklist[]).map(c => [
+          formatDateTime(c.checked_at),
+          c.vehicle_number,
+          c.driver_name,
+          c.has_issues ? "Issue" : "OK",
+          c.issues ? Object.keys(c.issues).map(k => ITEM_LABELS[k] || k).join(", ") : "-",
+        ])
         break
       case "issue-breakdown":
-        tableHeaders = "<tr><th>Issue Type</th><th>Occurrences</th><th>Vehicles Affected</th></tr>"
-        tableRows = (data as { issue_type: string, count: number, vehicles_affected: number }[]).map(d => `
-          <tr>
-            <td><strong>${d.issue_type}</strong></td>
-            <td>${d.count}</td>
-            <td>${d.vehicles_affected}</td>
-          </tr>
-        `).join("")
+        headers = ["Issue Type", "Occurrences", "Vehicles Affected"]
+        rows = (data as { issue_type: string, count: number, vehicles_affected: number }[]).map(d => [
+          d.issue_type,
+          String(d.count),
+          String(d.vehicles_affected),
+        ])
         break
       case "vehicle-lifespan":
-        tableHeaders = "<tr><th>Vehicle</th><th>Days Active</th><th>Health</th><th>Issue Rate</th><th>Recommendation</th></tr>"
-        tableRows = (data as (VehicleHealth & { issue_rate: number, needs_replacement: boolean })[]).map(v => `
-          <tr>
-            <td><strong>${v.vehicle_number}</strong></td>
-            <td>${v.days_in_service}</td>
-            <td class="${getHealthColor(v.health_score).replace('text-', 'color-')}">${v.health_score}%</td>
-            <td>${v.issue_rate}%</td>
-            <td>${v.needs_replacement ? '<span class="badge badge-poor">Replace</span>' : '<span class="badge badge-excellent">Keep</span>'}</td>
-          </tr>
-        `).join("")
+        headers = ["Vehicle", "Days Active", "Health", "Issue Rate", "Recommendation"]
+        rows = (data as (VehicleHealth & { issue_rate: number, needs_replacement: boolean })[]).map(v => [
+          v.vehicle_number,
+          String(v.days_in_service),
+          `${v.health_score}%`,
+          `${v.issue_rate}%`,
+          v.needs_replacement ? "Replace" : "Keep",
+        ])
         break
     }
 
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>${selectedReportInfo?.name || "Report"}</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1a1a1a; }
-    .header { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 3px solid #f59e0b; }
-    .logo { font-size: 24px; font-weight: 700; color: #f59e0b; }
-    .report-title { font-size: 20px; font-weight: 600; margin-top: 8px; }
-    .report-meta { font-size: 13px; color: #666; margin-top: 4px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e5e5; }
-    th { background: #f8f9fa; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #666; }
-    .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-    .badge-excellent, .badge-ok, .badge-fixed { background: #dcfce7; color: #166534; }
-    .badge-good { background: #fef9c3; color: #854d0e; }
-    .badge-fair, .badge-pending { background: #ffedd5; color: #9a3412; }
-    .badge-poor, .badge-issue { background: #fee2e2; color: #991b1b; }
-    .color-green-500 { color: #16a34a; }
-    .color-yellow-500 { color: #ca8a04; }
-    .color-orange-500 { color: #ea580c; }
-    .color-red-500 { color: #dc2626; }
-    .pending { color: #ca8a04; }
-    .fixed { color: #16a34a; }
-    .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e5e5; text-align: center; color: #666; font-size: 11px; }
-    @media print { body { padding: 20px; } }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div class="logo">MyRide</div>
-    <div class="report-title">${selectedReportInfo?.name || "Report"}</div>
-    <div class="report-meta">Generated ${reportDate} • Date Range: ${formatDate(startDate)} to ${formatDate(endDate)}</div>
-  </div>
-  <table>
-    <thead>${tableHeaders}</thead>
-    <tbody>${tableRows}</tbody>
-  </table>
-  <div class="footer">
-    <p><strong>MyRide Fleet Management</strong></p>
-    <p>This report is automatically generated and intended for internal use only.</p>
-  </div>
-</body>
-</html>`
+    // Generate PDF using jsPDF
+    const doc = new jsPDF()
 
-    const blob = new Blob([html], { type: "text/html" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${selectedReport}-${new Date().toISOString().split("T")[0]}.html`
-    a.click()
-    URL.revokeObjectURL(url)
-    toast.success("Report downloaded - Open in browser and print to PDF")
+    // Header
+    doc.setFontSize(20)
+    doc.setTextColor(245, 158, 11)
+    doc.text("MyRide", 14, 20)
+
+    doc.setFontSize(14)
+    doc.setTextColor(0, 0, 0)
+    doc.text(selectedReportInfo?.name || "Report", 14, 30)
+
+    doc.setFontSize(10)
+    doc.setTextColor(100, 100, 100)
+    doc.text(`Generated ${reportDate} • ${formatDate(startDate)} to ${formatDate(endDate)}`, 14, 38)
+
+    // Draw header line
+    doc.setDrawColor(245, 158, 11)
+    doc.setLineWidth(0.5)
+    doc.line(14, 42, 196, 42)
+
+    if (rows.length > 0) {
+      autoTable(doc, {
+        head: [headers],
+        body: rows,
+        startY: 48,
+        styles: { fontSize: 8, cellPadding: 3 },
+        headStyles: { fillColor: [248, 249, 250], textColor: [100, 100, 100], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [252, 252, 252] },
+      })
+
+      const finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || 50
+      doc.setFontSize(9)
+      doc.setTextColor(100, 100, 100)
+      doc.text(`${rows.length} records`, 14, finalY + 10)
+    } else {
+      doc.setFontSize(12)
+      doc.setTextColor(100, 100, 100)
+      doc.text("No data available for the selected period", 14, 60)
+    }
+
+    // Footer
+    const pageHeight = doc.internal.pageSize.height
+    doc.setFontSize(8)
+    doc.setTextColor(150, 150, 150)
+    doc.text("MyRide Fleet Management", 14, pageHeight - 10)
+
+    // Save PDF
+    doc.save(`${selectedReport}-${new Date().toISOString().split("T")[0]}.pdf`)
+    toast.success(`PDF downloaded - ${rows.length} records`)
     setGenerating(false)
   }
 
@@ -608,18 +595,18 @@ export default function VehicleReportsPage() {
             {/* Date Range & Export */}
             <div className="flex items-center gap-4 mt-6 p-4 rounded-xl border bg-muted/30">
               <div className="flex items-center gap-2">
-                <Input
+                <input
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="w-40 bg-background"
+                  className="w-40 h-9 px-3 rounded-md border border-input bg-background text-sm cursor-pointer [color-scheme:dark]"
                 />
                 <span className="text-muted-foreground">→</span>
-                <Input
+                <input
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="w-40 bg-background"
+                  className="w-40 h-9 px-3 rounded-md border border-input bg-background text-sm cursor-pointer [color-scheme:dark]"
                 />
               </div>
               <div className="flex-1" />
@@ -639,7 +626,7 @@ export default function VehicleReportsPage() {
                 className="border-green-500/50 text-green-500 hover:bg-green-500/10"
               >
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Export Excel
+                Export CSV
               </Button>
             </div>
 

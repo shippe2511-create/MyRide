@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,7 +10,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -24,17 +23,18 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { DialogFooter } from "@/components/ui/dialog"
 import {
   ClipboardCheck, AlertTriangle, CheckCircle, XCircle, Car,
-  Loader2, RefreshCw, Download, MoreHorizontal, Pencil, Trash2, Search, Eye, Flag, X, FileText
+  Loader2, RefreshCw, Download, MoreHorizontal, Pencil, Trash2, Search, Eye, Flag, X,
+  Activity, BarChart3, FileDown, FileSpreadsheet, Clock, TrendingUp, Info,
 } from "lucide-react"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
-import { EmptyState } from "@/components/ui/empty-state"
 import { PermissionGate } from "@/components/permission-gate"
 import { Checkbox } from "@/components/ui/checkbox"
+import { cn } from "@/lib/utils"
+import jsPDF from "jspdf"
+import autoTable from "jspdf-autotable"
 
 interface IssueDetail {
   note: string
@@ -56,6 +56,21 @@ interface VehicleChecklist {
   resolution_notes: string | null
 }
 
+interface VehicleHealth {
+  vehicle_number: string
+  total_checks: number
+  total_issues: number
+  pending_issues: number
+  fixed_issues: number
+  deferred_issues: number
+  last_check: string | null
+  first_check: string | null
+  most_common_issue: string | null
+  issue_breakdown: Record<string, number>
+  health_score: number
+  days_in_service: number
+}
+
 const ITEM_LABELS: Record<string, string> = {
   fuel: "Fuel Level", tires: "Tires", lights: "Lights", body: "Body Condition",
   ac: "A/C", safety: "Safety Kit", documents: "Documents", seatbelts: "Seatbelts", cleanliness: "Cleanliness",
@@ -63,9 +78,29 @@ const ITEM_LABELS: Record<string, string> = {
 
 const PAGE_SIZE = 15
 
+const TABS = [
+  { id: "checks", label: "Checks", icon: ClipboardCheck },
+  { id: "fleet", label: "Fleet Health", icon: Activity },
+  { id: "reports", label: "Reports", icon: FileDown },
+]
+
+const REPORT_TYPES = [
+  { id: "fleet-health", name: "Fleet Health Summary", icon: Activity },
+  { id: "all-issues", name: "All Vehicle Issues", icon: AlertTriangle },
+  { id: "vehicle-checks", name: "Pre-trip Inspections", icon: ClipboardCheck },
+  { id: "issue-breakdown", name: "Issue Breakdown", icon: BarChart3 },
+  { id: "pending-issues", name: "Pending Issues", icon: Clock },
+  { id: "resolved-issues", name: "Resolved Issues", icon: CheckCircle },
+  { id: "vehicle-lifespan", name: "Vehicle Lifespan", icon: TrendingUp },
+  { id: "vehicle-history", name: "Vehicle Change History", icon: Activity },
+]
+
 export default function ChecklistsPage() {
   const supabase = createClient()
+  const [activeTab, setActiveTab] = useState("checks")
   const [checklists, setChecklists] = useState<VehicleChecklist[]>([])
+  const [allChecklists, setAllChecklists] = useState<VehicleChecklist[]>([])
+  const [vehicleHealthData, setVehicleHealthData] = useState<VehicleHealth[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState("all")
@@ -77,32 +112,42 @@ export default function ChecklistsPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().split("T")[0]
+  })
+  const [endDate, setEndDate] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split("T")[0]
+  })
 
   const [stats, setStats] = useState({ total: 0, withIssues: 0, passed: 0 })
 
-  // Initial load only
   useEffect(() => {
-    loadChecklists(true)
+    loadData(true)
 
-    // Real-time subscription for all changes
     const channel = supabase
       .channel('checklists_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_checklists' }, () => {
-        loadChecklists(false)
+        loadData(false)
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_types' }, () => {
+        loadData(false)
       })
       .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    return () => { supabase.removeChannel(channel) }
   }, [])
 
-  // Page/filter changes - no loading skeleton
   useEffect(() => {
-    if (!loading) {
-      loadChecklists(false)
-    }
+    if (!loading) loadChecklists(false)
   }, [filter, currentPage])
+
+  const loadData = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
+    await Promise.all([loadChecklists(showLoading), loadFleetHealth()])
+    if (showLoading) setLoading(false)
+  }
 
   const loadChecklists = async (showLoading = true) => {
     if (showLoading) setLoading(true)
@@ -121,28 +166,82 @@ export default function ChecklistsPage() {
       countQuery = countQuery.eq("has_issues", false)
     }
 
-    const [checklistsRes, filteredCountRes, totalRes, issuesRes, passedRes] = await Promise.all([
+    const [checklistsRes, filteredCountRes, totalRes, issuesRes, passedRes, allRes] = await Promise.all([
       query,
       countQuery,
       supabase.from("vehicle_checklists").select("*", { count: "exact", head: true }),
       supabase.from("vehicle_checklists").select("*", { count: "exact", head: true }).eq("has_issues", true),
       supabase.from("vehicle_checklists").select("*", { count: "exact", head: true }).eq("has_issues", false),
+      supabase.from("vehicle_checklists").select("*").order("checked_at", { ascending: false }),
     ])
 
     setChecklists(checklistsRes.data || [])
+    setAllChecklists(allRes.data || [])
     setTotalCount(filteredCountRes.count || 0)
     setStats({ total: totalRes.count || 0, withIssues: issuesRes.count || 0, passed: passedRes.count || 0 })
-    setLoading(false)
+    if (showLoading) setLoading(false)
+  }
+
+  const loadFleetHealth = async () => {
+    const [vehiclesRes, checklistsRes] = await Promise.all([
+      supabase.from("vehicle_types").select("plate_no, display_name, is_active, created_at").eq("is_active", true),
+      supabase.from("vehicle_checklists").select("*").order("checked_at", { ascending: false }),
+    ])
+
+    const vehicles = vehiclesRes.data || []
+    const checks = checklistsRes.data || []
+
+    const vehicleMap = new Map<string, VehicleHealth>()
+    for (const v of vehicles) {
+      if (!v.plate_no) continue
+      vehicleMap.set(v.plate_no, {
+        vehicle_number: v.plate_no, total_checks: 0, total_issues: 0, pending_issues: 0, fixed_issues: 0, deferred_issues: 0,
+        last_check: null, first_check: v.created_at, most_common_issue: null, issue_breakdown: {}, health_score: 100,
+        days_in_service: v.created_at ? Math.ceil((Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60 * 24)) : 0,
+      })
+    }
+
+    for (const c of checks) {
+      const vn = c.vehicle_number
+      if (!vn || !vehicleMap.has(vn)) continue
+      const h = vehicleMap.get(vn)!
+      h.total_checks++
+      if (!h.last_check || new Date(c.checked_at) > new Date(h.last_check)) h.last_check = c.checked_at
+      if (c.has_issues) {
+        h.total_issues++
+        if (c.resolution_status === "pending" || !c.resolution_status) h.pending_issues++
+        else if (c.resolution_status === "fixed") h.fixed_issues++
+        else if (c.resolution_status === "deferred") h.deferred_issues++
+        if (c.issues) {
+          for (const key of Object.keys(c.issues)) {
+            h.issue_breakdown[key] = (h.issue_breakdown[key] || 0) + 1
+          }
+        }
+      }
+    }
+
+    for (const h of vehicleMap.values()) {
+      let maxCount = 0, mostCommon: string | null = null
+      for (const [issue, count] of Object.entries(h.issue_breakdown)) {
+        if (count > maxCount) { maxCount = count; mostCommon = issue }
+      }
+      h.most_common_issue = mostCommon
+      const issueRate = h.total_checks > 0 ? (h.total_issues / h.total_checks) * 100 : 0
+      h.health_score = Math.max(0, Math.min(100, Math.round(100 - issueRate * 2 - h.pending_issues * 10)))
+    }
+
+    setVehicleHealthData(Array.from(vehicleMap.values()))
   }
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleString("en-US", {
-      timeZone: "Indian/Maldives",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true
+      timeZone: "Indian/Maldives", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true
+    })
+  }
+
+  const formatDateOnly = (date: string) => {
+    return new Date(date).toLocaleString("en-US", {
+      timeZone: "Indian/Maldives", month: "short", day: "numeric", year: "numeric"
     })
   }
 
@@ -151,34 +250,22 @@ export default function ChecklistsPage() {
     return Object.entries(checklist.all_items).filter(([, passed]) => !passed).map(([key]) => key)
   }
 
+  const getHealthLabel = (score: number) => score >= 80 ? "Excellent" : score >= 60 ? "Good" : score >= 40 ? "Fair" : "Poor"
+  const getHealthColor = (score: number) => score >= 80 ? "text-green-500" : score >= 60 ? "text-yellow-500" : score >= 40 ? "text-orange-500" : "text-red-500"
+
   const handleSave = async () => {
     if (!editingChecklist) return
     setSaving(true)
-
     const { error } = await supabase.from("vehicle_checklists").update({
-      driver_name: editingChecklist.driver_name,
-      vehicle_number: editingChecklist.vehicle_number,
-      has_issues: editingChecklist.has_issues,
-      issues: editingChecklist.issues,
-      all_items: editingChecklist.all_items,
-      remarks: editingChecklist.remarks,
+      driver_name: editingChecklist.driver_name, vehicle_number: editingChecklist.vehicle_number,
+      has_issues: editingChecklist.has_issues, issues: editingChecklist.issues,
+      all_items: editingChecklist.all_items, remarks: editingChecklist.remarks,
     }).eq("id", editingChecklist.id)
 
-    if (error) {
-      toast.error("Failed to update")
-    } else {
+    if (error) toast.error("Failed to update")
+    else {
       toast.success("Updated successfully")
-      // Update local state instead of reloading
-      const oldChecklist = checklists.find(c => c.id === editingChecklist.id)
       setChecklists(prev => prev.map(c => c.id === editingChecklist.id ? editingChecklist : c))
-      // Update stats if has_issues changed
-      if (oldChecklist && oldChecklist.has_issues !== editingChecklist.has_issues) {
-        setStats(prev => ({
-          ...prev,
-          withIssues: editingChecklist.has_issues ? prev.withIssues + 1 : Math.max(0, prev.withIssues - 1),
-          passed: editingChecklist.has_issues ? Math.max(0, prev.passed - 1) : prev.passed + 1,
-        }))
-      }
       setEditingChecklist(null)
     }
     setSaving(false)
@@ -186,43 +273,22 @@ export default function ChecklistsPage() {
 
   const confirmDelete = async () => {
     if (!deleteId) return
-    const checklist = checklists.find(c => c.id === deleteId)
     const { error } = await supabase.from("vehicle_checklists").delete().eq("id", deleteId)
-    if (error) {
-      toast.error("Failed to delete")
-    } else {
+    if (error) toast.error("Failed to delete")
+    else {
       toast.success("Deleted successfully")
-      // Update local state instead of reloading
       setChecklists(prev => prev.filter(c => c.id !== deleteId))
-      if (checklist) {
-        setStats(prev => ({
-          ...prev,
-          total: Math.max(0, prev.total - 1),
-          withIssues: checklist.has_issues ? Math.max(0, prev.withIssues - 1) : prev.withIssues,
-          passed: !checklist.has_issues ? Math.max(0, prev.passed - 1) : prev.passed,
-        }))
-      }
     }
     setDeleteId(null)
   }
 
   const toggleIssuesStatus = async (checklist: VehicleChecklist) => {
     const newStatus = !checklist.has_issues
-    const { error } = await supabase
-      .from("vehicle_checklists")
-      .update({ has_issues: newStatus })
-      .eq("id", checklist.id)
-
-    if (error) {
-      toast.error("Failed to update status")
-    } else {
+    const { error } = await supabase.from("vehicle_checklists").update({ has_issues: newStatus }).eq("id", checklist.id)
+    if (error) toast.error("Failed to update status")
+    else {
       toast.success(newStatus ? "Flagged as having issues" : "Cleared issues")
       setChecklists(prev => prev.map(c => c.id === checklist.id ? { ...c, has_issues: newStatus } : c))
-      setStats(prev => ({
-        ...prev,
-        withIssues: newStatus ? prev.withIssues + 1 : Math.max(0, prev.withIssues - 1),
-        passed: newStatus ? Math.max(0, prev.passed - 1) : prev.passed + 1,
-      }))
     }
   }
 
@@ -233,63 +299,260 @@ export default function ChecklistsPage() {
     setEditingChecklist({ ...editingChecklist, all_items: newItems, has_issues: hasIssues })
   }
 
-  // Get filtered checklists for selection purposes
   const filteredChecklists = checklists.filter(c => {
     if (!search) return true
     const s = search.toLowerCase()
-    return (
-      c.driver_name?.toLowerCase().includes(s) ||
-      c.vehicle_number?.toLowerCase().includes(s)
-    )
+    return c.driver_name?.toLowerCase().includes(s) || c.vehicle_number?.toLowerCase().includes(s)
   })
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return
     const idsToDelete = Array.from(selectedIds)
     setBulkDeleteOpen(false)
-
-    const { error } = await supabase
-      .from("vehicle_checklists")
-      .delete()
-      .in("id", idsToDelete)
-
-    if (error) {
-      toast.error("Failed to delete selected checklists")
-    } else {
+    const { error } = await supabase.from("vehicle_checklists").delete().in("id", idsToDelete)
+    if (error) toast.error("Failed to delete selected checklists")
+    else {
       toast.success(`${idsToDelete.length} checklist(s) deleted`)
       setSelectedIds(new Set())
-      loadChecklists()
+      loadChecklists(false)
     }
   }
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === filteredChecklists.length) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(filteredChecklists.map(c => c.id)))
-    }
+    if (selectedIds.size === filteredChecklists.length) setSelectedIds(new Set())
+    else setSelectedIds(new Set(filteredChecklists.map(c => c.id)))
   }
 
   const toggleSelect = (id: string) => {
     const newSelected = new Set(selectedIds)
-    if (newSelected.has(id)) {
-      newSelected.delete(id)
-    } else {
-      newSelected.add(id)
-    }
+    if (newSelected.has(id)) newSelected.delete(id)
+    else newSelected.add(id)
     setSelectedIds(newSelected)
+  }
+
+  const exportCSV = async (reportType: string) => {
+    setGenerating(true)
+    let rows: Record<string, string>[] = []
+    let headers: string[] = []
+    let filename = ""
+
+    const filtered = allChecklists.filter(c => {
+      const date = new Date(c.checked_at)
+      return date >= new Date(startDate) && date <= new Date(endDate + "T23:59:59")
+    })
+
+    switch (reportType) {
+      case "fleet-health":
+        headers = ["Vehicle", "Health Score", "Status", "Days Active", "Total Checks", "Total Issues", "Pending", "Fixed", "Common Issue"]
+        rows = vehicleHealthData.map(v => ({
+          "Vehicle": v.vehicle_number, "Health Score": `${v.health_score}%`, "Status": getHealthLabel(v.health_score),
+          "Days Active": String(v.days_in_service), "Total Checks": String(v.total_checks), "Total Issues": String(v.total_issues),
+          "Pending": String(v.pending_issues), "Fixed": String(v.fixed_issues),
+          "Common Issue": v.most_common_issue ? (ITEM_LABELS[v.most_common_issue] || v.most_common_issue) : "-",
+        }))
+        filename = `fleet_health_${new Date().toISOString().split("T")[0]}.csv`
+        break
+      case "all-issues":
+        headers = ["Date", "Vehicle", "Driver", "Issues", "Status", "Resolution"]
+        rows = filtered.filter(c => c.has_issues).map(c => ({
+          "Date": formatDateOnly(c.checked_at), "Vehicle": c.vehicle_number || "-", "Driver": c.driver_name || "-",
+          "Issues": c.issues ? Object.keys(c.issues).map(k => ITEM_LABELS[k] || k).join(", ") : "-",
+          "Status": c.resolution_status || "Pending", "Resolution": c.resolution_notes || "-",
+        }))
+        filename = `all_issues_${new Date().toISOString().split("T")[0]}.csv`
+        break
+      case "vehicle-checks":
+        headers = ["Date", "Vehicle", "Driver", "Status", "Issues"]
+        rows = filtered.map(c => ({
+          "Date": formatDateOnly(c.checked_at), "Vehicle": c.vehicle_number || "-", "Driver": c.driver_name || "-",
+          "Status": c.has_issues ? "Issue" : "OK",
+          "Issues": c.issues ? Object.keys(c.issues).map(k => ITEM_LABELS[k] || k).join(", ") : "-",
+        }))
+        filename = `vehicle_checks_${new Date().toISOString().split("T")[0]}.csv`
+        break
+      case "issue-breakdown":
+        headers = ["Issue Type", "Occurrences", "Vehicles Affected"]
+        const breakdown: Record<string, { count: number; vehicles: Set<string> }> = {}
+        filtered.forEach(c => {
+          if (c.issues) {
+            Object.keys(c.issues).forEach(key => {
+              if (!breakdown[key]) breakdown[key] = { count: 0, vehicles: new Set() }
+              breakdown[key].count++
+              breakdown[key].vehicles.add(c.vehicle_number)
+            })
+          }
+        })
+        rows = Object.entries(breakdown).map(([key, val]) => ({
+          "Issue Type": ITEM_LABELS[key] || key, "Occurrences": String(val.count), "Vehicles Affected": String(val.vehicles.size),
+        })).sort((a, b) => parseInt(b["Occurrences"]) - parseInt(a["Occurrences"]))
+        filename = `issue_breakdown_${new Date().toISOString().split("T")[0]}.csv`
+        break
+      case "pending-issues":
+        headers = ["Date", "Vehicle", "Driver", "Issues", "Status"]
+        rows = filtered.filter(c => c.has_issues && (!c.resolution_status || c.resolution_status === "pending")).map(c => ({
+          "Date": formatDateOnly(c.checked_at), "Vehicle": c.vehicle_number || "-", "Driver": c.driver_name || "-",
+          "Issues": c.issues ? Object.keys(c.issues).map(k => ITEM_LABELS[k] || k).join(", ") : "-", "Status": "Pending",
+        }))
+        filename = `pending_issues_${new Date().toISOString().split("T")[0]}.csv`
+        break
+      case "resolved-issues":
+        headers = ["Date", "Vehicle", "Driver", "Issues", "Resolution", "Resolved"]
+        rows = filtered.filter(c => c.has_issues && c.resolution_status === "fixed").map(c => ({
+          "Date": formatDateOnly(c.checked_at), "Vehicle": c.vehicle_number || "-", "Driver": c.driver_name || "-",
+          "Issues": c.issues ? Object.keys(c.issues).map(k => ITEM_LABELS[k] || k).join(", ") : "-",
+          "Resolution": c.resolution_notes || "-", "Resolved": c.resolved_at ? formatDateOnly(c.resolved_at) : "-",
+        }))
+        filename = `resolved_issues_${new Date().toISOString().split("T")[0]}.csv`
+        break
+      case "vehicle-lifespan":
+        headers = ["Vehicle", "Days Active", "Health Score", "Issue Rate", "Recommendation"]
+        rows = vehicleHealthData.map(v => ({
+          "Vehicle": v.vehicle_number, "Days Active": String(v.days_in_service), "Health Score": `${v.health_score}%`,
+          "Issue Rate": v.total_checks > 0 ? `${Math.round((v.total_issues / v.total_checks) * 100)}%` : "0%",
+          "Recommendation": v.health_score < 40 ? "Consider Replacement" : "Keep",
+        })).sort((a, b) => parseInt(a["Health Score"]) - parseInt(b["Health Score"]))
+        filename = `vehicle_lifespan_${new Date().toISOString().split("T")[0]}.csv`
+        break
+      case "vehicle-history":
+        headers = ["Date", "Vehicle", "Event", "Driver", "Details"]
+        const historyRows: { date: string; vehicle: string; event: string; driver: string; details: string; ts: number }[] = []
+        filtered.forEach(c => {
+          historyRows.push({
+            date: formatDateOnly(c.checked_at), vehicle: c.vehicle_number || "-",
+            event: c.has_issues ? "Pre-trip Check (Issues)" : "Pre-trip Check (Passed)",
+            driver: c.driver_name || "-",
+            details: c.has_issues ? `Issues: ${Object.keys(c.issues || {}).map(k => ITEM_LABELS[k] || k).join(", ")}` : "All items passed",
+            ts: new Date(c.checked_at).getTime(),
+          })
+          if (c.resolution_status === "fixed" && c.resolved_at) {
+            historyRows.push({
+              date: formatDateOnly(c.resolved_at), vehicle: c.vehicle_number || "-",
+              event: "Issue Resolved", driver: "-", details: c.resolution_notes || "Fixed",
+              ts: new Date(c.resolved_at).getTime(),
+            })
+          }
+        })
+        historyRows.sort((a, b) => b.ts - a.ts)
+        rows = historyRows.map(h => ({ "Date": h.date, "Vehicle": h.vehicle, "Event": h.event, "Driver": h.driver, "Details": h.details }))
+        filename = `vehicle_history_${new Date().toISOString().split("T")[0]}.csv`
+        break
+    }
+
+    if (rows.length === 0) { toast.error("No data to export"); setGenerating(false); return }
+
+    const csv = [headers.join(","), ...rows.map(r => headers.map(h => {
+      const val = r[h] || ""
+      return val.includes(",") || val.includes('"') ? `"${val.replace(/"/g, '""')}"` : val
+    }).join(","))].join("\n")
+
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a"); a.href = url; a.download = filename; a.click()
+    URL.revokeObjectURL(url)
+    toast.success(`${rows.length} records exported`)
+    setGenerating(false)
+  }
+
+  const exportPDF = async (reportType: string) => {
+    setGenerating(true)
+    const report = REPORT_TYPES.find(r => r.id === reportType)
+    let rows: Record<string, string>[] = []
+    let headers: string[] = []
+
+    // Reuse CSV logic
+    const filtered = allChecklists.filter(c => {
+      const date = new Date(c.checked_at)
+      return date >= new Date(startDate) && date <= new Date(endDate + "T23:59:59")
+    })
+
+    switch (reportType) {
+      case "fleet-health":
+        headers = ["Vehicle", "Health", "Status", "Checks", "Issues", "Pending", "Fixed"]
+        rows = vehicleHealthData.map(v => ({
+          "Vehicle": v.vehicle_number, "Health": `${v.health_score}%`, "Status": getHealthLabel(v.health_score),
+          "Checks": String(v.total_checks), "Issues": String(v.total_issues),
+          "Pending": String(v.pending_issues), "Fixed": String(v.fixed_issues),
+        }))
+        break
+      case "all-issues":
+      case "pending-issues":
+      case "resolved-issues":
+        headers = ["Date", "Vehicle", "Driver", "Issues", "Status"]
+        let data = filtered.filter(c => c.has_issues)
+        if (reportType === "pending-issues") data = data.filter(c => !c.resolution_status || c.resolution_status === "pending")
+        if (reportType === "resolved-issues") data = data.filter(c => c.resolution_status === "fixed")
+        rows = data.map(c => ({
+          "Date": formatDateOnly(c.checked_at), "Vehicle": c.vehicle_number || "-", "Driver": c.driver_name || "-",
+          "Issues": c.issues ? Object.keys(c.issues).map(k => ITEM_LABELS[k] || k).join(", ") : "-",
+          "Status": c.resolution_status || "Pending",
+        }))
+        break
+      case "vehicle-checks":
+        headers = ["Date", "Vehicle", "Driver", "Status", "Issues"]
+        rows = filtered.map(c => ({
+          "Date": formatDateOnly(c.checked_at), "Vehicle": c.vehicle_number || "-", "Driver": c.driver_name || "-",
+          "Status": c.has_issues ? "Issue" : "OK",
+          "Issues": c.issues ? Object.keys(c.issues).map(k => ITEM_LABELS[k] || k).join(", ") : "-",
+        }))
+        break
+      case "issue-breakdown":
+        headers = ["Issue Type", "Occurrences", "Vehicles"]
+        const breakdown: Record<string, { count: number; vehicles: Set<string> }> = {}
+        filtered.forEach(c => {
+          if (c.issues) Object.keys(c.issues).forEach(key => {
+            if (!breakdown[key]) breakdown[key] = { count: 0, vehicles: new Set() }
+            breakdown[key].count++; breakdown[key].vehicles.add(c.vehicle_number)
+          })
+        })
+        rows = Object.entries(breakdown).map(([key, val]) => ({
+          "Issue Type": ITEM_LABELS[key] || key, "Occurrences": String(val.count), "Vehicles": String(val.vehicles.size),
+        }))
+        break
+      case "vehicle-lifespan":
+        headers = ["Vehicle", "Days", "Health", "Issue Rate", "Recommendation"]
+        rows = vehicleHealthData.map(v => ({
+          "Vehicle": v.vehicle_number, "Days": String(v.days_in_service), "Health": `${v.health_score}%`,
+          "Issue Rate": v.total_checks > 0 ? `${Math.round((v.total_issues / v.total_checks) * 100)}%` : "0%",
+          "Recommendation": v.health_score < 40 ? "Replace" : "Keep",
+        }))
+        break
+      case "vehicle-history":
+        headers = ["Date", "Vehicle", "Event", "Driver", "Details"]
+        const hist: { date: string; vehicle: string; event: string; driver: string; details: string; ts: number }[] = []
+        filtered.forEach(c => {
+          hist.push({ date: formatDateOnly(c.checked_at), vehicle: c.vehicle_number || "-", event: c.has_issues ? "Issues Found" : "Passed", driver: c.driver_name || "-", details: c.has_issues ? Object.keys(c.issues || {}).map(k => ITEM_LABELS[k] || k).join(", ") : "OK", ts: new Date(c.checked_at).getTime() })
+        })
+        hist.sort((a, b) => b.ts - a.ts)
+        rows = hist.map(h => ({ "Date": h.date, "Vehicle": h.vehicle, "Event": h.event, "Driver": h.driver, "Details": h.details }))
+        break
+    }
+
+    if (rows.length === 0) { toast.error("No data to export"); setGenerating(false); return }
+
+    const doc = new jsPDF()
+    doc.setFontSize(20); doc.setTextColor(245, 158, 11); doc.text("MyRide", 14, 20)
+    doc.setFontSize(14); doc.setTextColor(0, 0, 0); doc.text(report?.name || "Report", 14, 30)
+    doc.setFontSize(10); doc.setTextColor(100, 100, 100)
+    doc.text(`Generated ${new Date().toLocaleString("en-US", { timeZone: "Indian/Maldives" })} • ${startDate} to ${endDate}`, 14, 38)
+    doc.setDrawColor(245, 158, 11); doc.setLineWidth(0.5); doc.line(14, 42, 196, 42)
+
+    autoTable(doc, {
+      head: [headers], body: rows.map(r => headers.map(h => r[h] || "-")), startY: 48,
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [248, 249, 250], textColor: [100, 100, 100], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [252, 252, 252] },
+    })
+
+    doc.save(`${reportType}_${new Date().toISOString().split("T")[0]}.pdf`)
+    toast.success(`PDF downloaded - ${rows.length} records`)
+    setGenerating(false)
   }
 
   if (loading) {
     return (
       <div className="space-y-6">
-        <div>
-          <div className="w-40 h-8 bg-muted rounded animate-pulse" />
-          <div className="w-56 h-4 bg-muted rounded animate-pulse mt-2" />
-        </div>
-        <div className="grid gap-4 grid-cols-3">
-          {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
-        </div>
+        <div><div className="w-40 h-8 bg-muted rounded animate-pulse" /><div className="w-56 h-4 bg-muted rounded animate-pulse mt-2" /></div>
+        <div className="grid gap-4 grid-cols-3">{[1, 2, 3].map(i => <SkeletonCard key={i} />)}</div>
         <SkeletonTable rows={5} />
       </div>
     )
@@ -300,291 +563,240 @@ export default function ChecklistsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <ClipboardCheck className="h-6 w-6" />
-            Pre-trip Checks
-          </h1>
-          <p className="text-sm text-muted-foreground">Driver vehicle inspections</p>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><ClipboardCheck className="h-6 w-6" />Pre-trip Checks</h1>
+          <p className="text-sm text-muted-foreground">Vehicle inspections, fleet health & reports</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/vehicle-reports">
-              <FileText className="h-4 w-4 mr-2" />
-              Issue Reports
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => loadChecklists()}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={() => loadData(false)}><RefreshCw className="h-4 w-4 mr-2" />Refresh</Button>
       </div>
 
+      {/* Stats Cards */}
       <div className="grid gap-3 grid-cols-3">
         <Card className="p-4 bg-gradient-to-br from-slate-500/10 to-slate-600/5 border-slate-500/20">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-slate-500/20 shrink-0">
-              <ClipboardCheck className="h-4 w-4 text-slate-400" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xl font-bold tracking-tight">{stats.total}</p>
-              <p className="text-xs text-muted-foreground truncate">Total</p>
-            </div>
+            <div className="p-2 rounded-lg bg-slate-500/20 shrink-0"><ClipboardCheck className="h-4 w-4 text-slate-400" /></div>
+            <div className="min-w-0"><p className="text-xl font-bold tracking-tight">{stats.total}</p><p className="text-xs text-muted-foreground truncate">Total</p></div>
           </div>
         </Card>
         <Card className={`p-4 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20 ${stats.withIssues > 0 ? 'ring-2 ring-red-500/50' : ''}`}>
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-red-500/20 shrink-0">
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xl font-bold tracking-tight text-red-500">{stats.withIssues}</p>
-              <p className="text-xs text-muted-foreground truncate">With Issues</p>
-            </div>
+            <div className="p-2 rounded-lg bg-red-500/20 shrink-0"><AlertTriangle className="h-4 w-4 text-red-500" /></div>
+            <div className="min-w-0"><p className="text-xl font-bold tracking-tight text-red-500">{stats.withIssues}</p><p className="text-xs text-muted-foreground truncate">With Issues</p></div>
           </div>
         </Card>
         <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-500/20 shrink-0">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xl font-bold tracking-tight text-green-500">{stats.passed}</p>
-              <p className="text-xs text-muted-foreground truncate">Passed</p>
-            </div>
-            <span className="text-xs font-medium text-green-500 ml-auto shrink-0">
-              {stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0}%
-            </span>
+            <div className="p-2 rounded-lg bg-green-500/20 shrink-0"><CheckCircle className="h-4 w-4 text-green-500" /></div>
+            <div className="min-w-0"><p className="text-xl font-bold tracking-tight text-green-500">{stats.passed}</p><p className="text-xs text-muted-foreground truncate">Passed</p></div>
+            <span className="text-xs font-medium text-green-500 ml-auto shrink-0">{stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0}%</span>
           </div>
         </Card>
       </div>
 
-      {/* Bulk Action Bar */}
-      {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-muted rounded-lg border">
-          <span className="text-sm font-medium">{selectedIds.size} selected</span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setSelectedIds(new Set())}
-          >
-            <X className="h-4 w-4 mr-1" />
-            Clear
-          </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => setBulkDeleteOpen(true)}
-          >
-            <Trash2 className="h-4 w-4 mr-1" />
-            Delete Selected
-          </Button>
-        </div>
+      {/* Tabs */}
+      <div className="flex gap-1 p-1 bg-muted/50 rounded-lg w-fit">
+        {TABS.map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors",
+            activeTab === tab.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+          )}>
+            <tab.icon className="h-4 w-4" />{tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* CHECKS TAB */}
+      {activeTab === "checks" && (
+        <>
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-3 p-3 bg-muted rounded-lg border">
+              <span className="text-sm font-medium">{selectedIds.size} selected</span>
+              <Button variant="outline" size="sm" onClick={() => setSelectedIds(new Set())}><X className="h-4 w-4 mr-1" />Clear</Button>
+              <Button variant="destructive" size="sm" onClick={() => setBulkDeleteOpen(true)}><Trash2 className="h-4 w-4 mr-1" />Delete Selected</Button>
+            </div>
+          )}
+
+          <Card className="p-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Search driver or vehicle..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+              </div>
+              <Select value={filter} onValueChange={(v) => { setFilter(v); setCurrentPage(1) }}>
+                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="issues">With Issues</SelectItem>
+                  <SelectItem value="passed">Passed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12"><Checkbox checked={filteredChecklists.length > 0 && selectedIds.size === filteredChecklists.length} onCheckedChange={toggleSelectAll} /></TableHead>
+                  <TableHead>Driver</TableHead>
+                  <TableHead>Vehicle</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Failed Items</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredChecklists.length === 0 ? (
+                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">{search ? "No matching checklists" : "No checklists found"}</TableCell></TableRow>
+                ) : (
+                  filteredChecklists.map(checklist => {
+                    const failedItems = getFailedItems(checklist)
+                    return (
+                      <TableRow key={checklist.id} className={`group hover:bg-muted/50 transition-colors ${checklist.has_issues ? "bg-red-50 dark:bg-red-950/20" : ""} ${selectedIds.has(checklist.id) ? 'bg-muted/50' : ''}`}>
+                        <TableCell><Checkbox checked={selectedIds.has(checklist.id)} onCheckedChange={() => toggleSelect(checklist.id)} /></TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8"><AvatarFallback>{checklist.driver_name?.[0] || "?"}</AvatarFallback></Avatar>
+                            <span className="font-medium text-sm">{checklist.driver_name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell><div className="flex items-center gap-1 text-sm"><Car className="h-4 w-4 text-muted-foreground" />{checklist.vehicle_number}</div></TableCell>
+                        <TableCell><Badge className={checklist.has_issues ? "bg-red-500" : "bg-green-500"}>{checklist.has_issues ? "Issues" : "Passed"}</Badge></TableCell>
+                        <TableCell>
+                          {failedItems.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {failedItems.slice(0, 2).map(item => (<Badge key={item} variant="outline" className="text-xs text-red-500 border-red-300">{ITEM_LABELS[item] || item}</Badge>))}
+                              {failedItems.length > 2 && <Badge variant="outline" className="text-xs">+{failedItems.length - 2}</Badge>}
+                            </div>
+                          ) : "-"}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{formatDate(checklist.checked_at)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingChecklist(checklist)}><Pencil className="h-4 w-4" /></Button>
+                            <DropdownMenu modal={false}>
+                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onSelect={() => setSelectedChecklist(checklist)}><Eye className="h-4 w-4 mr-2" />View Details</DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => setEditingChecklist(checklist)}><Pencil className="h-4 w-4 mr-2" />Edit</DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => toggleIssuesStatus(checklist)}><Flag className="h-4 w-4 mr-2" />{checklist.has_issues ? "Clear Issues" : "Flag Issues"}</DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-destructive" onSelect={() => setDeleteId(checklist.id)}><Trash2 className="h-4 w-4 mr-2" />Delete</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+
+            {totalCount > PAGE_SIZE && (
+              <div className="flex items-center justify-between pt-4 border-t mt-4">
+                <p className="text-sm text-muted-foreground">Showing {((currentPage - 1) * PAGE_SIZE) + 1}-{Math.min(currentPage * PAGE_SIZE, totalCount)} of {totalCount}</p>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Previous</Button>
+                  <span className="text-sm text-muted-foreground">Page {currentPage} of {Math.ceil(totalCount / PAGE_SIZE)}</span>
+                  <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(Math.ceil(totalCount / PAGE_SIZE), p + 1))} disabled={currentPage >= Math.ceil(totalCount / PAGE_SIZE)}>Next</Button>
+                </div>
+              </div>
+            )}
+          </Card>
+        </>
       )}
 
-      <Card className="p-4">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search driver or vehicle..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
+      {/* FLEET HEALTH TAB */}
+      {activeTab === "fleet" && (
+        <Card className="p-4">
+          <div className="rounded-lg border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Vehicle</TableHead>
+                  <TableHead>Health</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Checks</TableHead>
+                  <TableHead>Issues</TableHead>
+                  <TableHead>Pending</TableHead>
+                  <TableHead>Common Issue</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {vehicleHealthData.length === 0 ? (
+                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No vehicles found</TableCell></TableRow>
+                ) : (
+                  vehicleHealthData.map(v => (
+                    <TableRow key={v.vehicle_number} className="hover:bg-muted/30 cursor-pointer group" onClick={() => setSelectedVehicle(v.vehicle_number)}>
+                      <TableCell className="font-medium"><div className="flex items-center gap-2">{v.vehicle_number}<Eye className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" /></div></TableCell>
+                      <TableCell className={cn("font-bold", getHealthColor(v.health_score))}>{v.health_score}%</TableCell>
+                      <TableCell><Badge variant={v.health_score >= 80 ? "default" : v.health_score >= 60 ? "secondary" : "destructive"}>{getHealthLabel(v.health_score)}</Badge></TableCell>
+                      <TableCell>{v.total_checks}</TableCell>
+                      <TableCell className="text-orange-500">{v.total_issues}</TableCell>
+                      <TableCell className="text-yellow-500">{v.pending_issues}</TableCell>
+                      <TableCell className="text-muted-foreground">{v.most_common_issue ? (ITEM_LABELS[v.most_common_issue] || v.most_common_issue) : "-"}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </div>
-          <Select value={filter} onValueChange={(v) => { setFilter(v); setCurrentPage(1) }}>
-            <SelectTrigger className="w-36">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="issues">With Issues</SelectItem>
-              <SelectItem value="passed">Passed</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        </Card>
+      )}
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12">
-                <Checkbox
-                  checked={filteredChecklists.length > 0 && selectedIds.size === filteredChecklists.length}
-                  onCheckedChange={toggleSelectAll}
-                />
-              </TableHead>
-              <TableHead>Driver</TableHead>
-              <TableHead>Vehicle</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Failed Items</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredChecklists.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                  {search ? "No matching checklists" : "No checklists found"}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredChecklists.map(checklist => {
-                const failedItems = getFailedItems(checklist)
-                return (
-                  <TableRow key={checklist.id} className={`group hover:bg-muted/50 transition-colors ${checklist.has_issues ? "bg-red-50 dark:bg-red-950/20" : ""} ${selectedIds.has(checklist.id) ? 'bg-muted/50' : ''}`}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedIds.has(checklist.id)}
-                        onCheckedChange={() => toggleSelect(checklist.id)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback>{checklist.driver_name?.[0] || "?"}</AvatarFallback>
-                        </Avatar>
-                        <span className="font-medium text-sm">{checklist.driver_name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-sm">
-                        <Car className="h-4 w-4 text-muted-foreground" />
-                        {checklist.vehicle_number}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={checklist.has_issues ? "bg-red-500" : "bg-green-500"}>
-                        {checklist.has_issues ? "Issues" : "Passed"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {failedItems.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {failedItems.slice(0, 2).map(item => (
-                            <Badge key={item} variant="outline" className="text-xs text-red-500 border-red-300">
-                              {ITEM_LABELS[item] || item}
-                            </Badge>
-                          ))}
-                          {failedItems.length > 2 && (
-                            <Badge variant="outline" className="text-xs">+{failedItems.length - 2}</Badge>
-                          )}
-                        </div>
-                      ) : "-"}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{formatDate(checklist.checked_at)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => setEditingChecklist(checklist)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <DropdownMenu modal={false}>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onSelect={() => setSelectedChecklist(checklist)}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => setEditingChecklist(checklist)}>
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => toggleIssuesStatus(checklist)}>
-                              <Flag className="h-4 w-4 mr-2" />
-                              {checklist.has_issues ? "Clear Issues" : "Flag Issues"}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onSelect={() => setDeleteId(checklist.id)}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })
-            )}
-          </TableBody>
-        </Table>
-
-        {/* Pagination */}
-        {totalCount > PAGE_SIZE && (
-          <div className="flex items-center justify-between pt-4 border-t mt-4">
-            <p className="text-sm text-muted-foreground">
-              Showing {((currentPage - 1) * PAGE_SIZE) + 1}-{Math.min(currentPage * PAGE_SIZE, totalCount)} of {totalCount}
-            </p>
+      {/* REPORTS TAB */}
+      {activeTab === "reports" && (
+        <Card className="p-6">
+          <div className="flex items-center gap-4 mb-6 p-4 rounded-xl border bg-muted/30">
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-              >
-                Previous
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                Page {currentPage} of {Math.ceil(totalCount / PAGE_SIZE)}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(p => Math.min(Math.ceil(totalCount / PAGE_SIZE), p + 1))}
-                disabled={currentPage >= Math.ceil(totalCount / PAGE_SIZE)}
-              >
-                Next
-              </Button>
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-40 h-9 px-3 rounded-md border border-input bg-background text-sm [color-scheme:dark]" />
+              <span className="text-muted-foreground">→</span>
+              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-40 h-9 px-3 rounded-md border border-input bg-background text-sm [color-scheme:dark]" />
             </div>
           </div>
-        )}
-      </Card>
 
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {REPORT_TYPES.map(report => (
+              <div key={report.id} className="flex flex-col gap-3 p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10"><report.icon className="h-4 w-4 text-primary" /></div>
+                  <span className="font-medium text-sm">{report.name}</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" className="flex-1 border-green-500/50 text-green-500 hover:bg-green-500/10" onClick={() => exportCSV(report.id)} disabled={generating}>
+                    <FileSpreadsheet className="h-3.5 w-3.5 mr-1" />CSV
+                  </Button>
+                  <Button size="sm" variant="outline" className="flex-1 border-red-500/50 text-red-500 hover:bg-red-500/10" onClick={() => exportPDF(report.id)} disabled={generating}>
+                    <FileDown className="h-3.5 w-3.5 mr-1" />PDF
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* View Details Dialog */}
       <Dialog open={!!selectedChecklist} onOpenChange={() => setSelectedChecklist(null)}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Checklist Details</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Checklist Details</DialogTitle></DialogHeader>
           {selectedChecklist && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 p-3 bg-muted rounded-lg text-sm">
                 <div><span className="text-muted-foreground">Driver:</span> {selectedChecklist.driver_name}</div>
                 <div><span className="text-muted-foreground">Vehicle:</span> {selectedChecklist.vehicle_number}</div>
                 <div><span className="text-muted-foreground">Date:</span> {formatDate(selectedChecklist.checked_at)}</div>
-                <div>
-                  <Badge className={selectedChecklist.has_issues ? "bg-red-500" : "bg-green-500"}>
-                    {selectedChecklist.has_issues ? "Issues Found" : "Passed"}
-                  </Badge>
-                </div>
+                <div><Badge className={selectedChecklist.has_issues ? "bg-red-500" : "bg-green-500"}>{selectedChecklist.has_issues ? "Issues Found" : "Passed"}</Badge></div>
               </div>
-
               {selectedChecklist.has_issues && selectedChecklist.issues && (
                 <div className="p-3 border border-red-200 rounded-lg bg-red-50 dark:bg-red-950/20">
-                  <h3 className="font-medium text-red-600 mb-2 flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4" />
-                    Issues
-                  </h3>
+                  <h3 className="font-medium text-red-600 mb-2 flex items-center gap-2"><AlertTriangle className="h-4 w-4" />Issues</h3>
                   <div className="space-y-2">
                     {Object.entries(selectedChecklist.issues).map(([key, value]) => {
                       const isDetail = typeof value === "object" && value !== null
                       const note = isDetail ? (value as IssueDetail).note : value as string
                       const photos = isDetail ? (value as IssueDetail).photos : undefined
-
                       return (
                         <div key={key} className="p-2 bg-background rounded border text-sm">
                           <p className="font-medium text-red-600">{ITEM_LABELS[key] || key}</p>
@@ -594,9 +806,7 @@ export default function ChecklistsPage() {
                               {photos.map((photo, i) => (
                                 <a key={i} href={photo} target="_blank" rel="noopener noreferrer" className="relative group">
                                   <img src={photo} alt="" className="h-16 w-16 object-cover rounded border" />
-                                  <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded">
-                                    <Download className="h-4 w-4 text-white" />
-                                  </span>
+                                  <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded"><Download className="h-4 w-4 text-white" /></span>
                                 </a>
                               ))}
                             </div>
@@ -607,7 +817,6 @@ export default function ChecklistsPage() {
                   </div>
                 </div>
               )}
-
               {selectedChecklist.all_items && (
                 <div className="p-3 border rounded-lg">
                   <h3 className="font-medium mb-2">All Items</h3>
@@ -621,7 +830,6 @@ export default function ChecklistsPage() {
                   </div>
                 </div>
               )}
-
               {selectedChecklist.remarks && (
                 <div className="p-3 border rounded-lg bg-muted/30">
                   <h3 className="font-medium mb-2">Admin Remarks</h3>
@@ -636,141 +844,114 @@ export default function ChecklistsPage() {
       {/* Edit Dialog */}
       <Dialog open={!!editingChecklist} onOpenChange={() => setEditingChecklist(null)}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Checklist</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Edit Checklist</DialogTitle></DialogHeader>
           {editingChecklist && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-sm font-medium">Driver Name</label>
-                  <Input
-                    value={editingChecklist.driver_name}
-                    onChange={e => setEditingChecklist({ ...editingChecklist, driver_name: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Vehicle Number</label>
-                  <Input
-                    value={editingChecklist.vehicle_number}
-                    onChange={e => setEditingChecklist({ ...editingChecklist, vehicle_number: e.target.value })}
-                  />
-                </div>
+                <div><label className="text-sm font-medium">Driver Name</label><Input value={editingChecklist.driver_name} onChange={e => setEditingChecklist({ ...editingChecklist, driver_name: e.target.value })} /></div>
+                <div><label className="text-sm font-medium">Vehicle Number</label><Input value={editingChecklist.vehicle_number} onChange={e => setEditingChecklist({ ...editingChecklist, vehicle_number: e.target.value })} /></div>
               </div>
-
               <div>
                 <label className="text-sm font-medium mb-2 block">Checklist Items (click to toggle)</label>
                 <div className="grid grid-cols-2 gap-2">
                   {editingChecklist.all_items && Object.entries(editingChecklist.all_items).map(([key, passed]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => toggleItemStatus(key)}
-                      className={`flex items-center gap-2 p-2 rounded border text-sm text-left transition-colors ${
-                        passed
-                          ? "bg-green-50 border-green-200 dark:bg-green-950/20"
-                          : "bg-red-50 border-red-200 dark:bg-red-950/20"
-                      }`}
-                    >
+                    <button key={key} type="button" onClick={() => toggleItemStatus(key)} className={`flex items-center gap-2 p-2 rounded border text-sm text-left transition-colors ${passed ? "bg-green-50 border-green-200 dark:bg-green-950/20" : "bg-red-50 border-red-200 dark:bg-red-950/20"}`}>
                       {passed ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-red-500" />}
                       {ITEM_LABELS[key] || key}
                     </button>
                   ))}
                 </div>
               </div>
-
-              {/* Show issues with photos */}
-              {editingChecklist.issues && Object.keys(editingChecklist.issues).length > 0 && (
-                <div className="p-3 border border-red-200 rounded-lg bg-red-50 dark:bg-red-950/20">
-                  <h3 className="font-medium text-red-600 mb-2 flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4" />
-                    Reported Issues
-                  </h3>
-                  <div className="space-y-3">
-                    {Object.entries(editingChecklist.issues).map(([key, value]) => {
-                      const isDetail = typeof value === "object" && value !== null
-                      const note = isDetail ? (value as IssueDetail).note : value as string
-                      const photos = isDetail ? (value as IssueDetail).photos : undefined
-
-                      return (
-                        <div key={key} className="p-2 bg-background rounded border text-sm">
-                          <p className="font-medium text-red-600">{ITEM_LABELS[key] || key}</p>
-                          <p className="text-muted-foreground">{note}</p>
-                          {photos && photos.length > 0 && (
-                            <div className="flex gap-2 mt-2 flex-wrap">
-                              {photos.map((photo, i) => (
-                                <a key={i} href={photo} target="_blank" rel="noopener noreferrer" className="relative group">
-                                  <img src={photo} alt="" className="h-20 w-20 object-cover rounded border" />
-                                  <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded">
-                                    <Download className="h-4 w-4 text-white" />
-                                  </span>
-                                </a>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Admin Remarks</label>
+                <textarea className="w-full min-h-[80px] p-3 rounded-md border bg-background text-sm resize-none" placeholder="Add comments..." value={editingChecklist?.remarks || ""} onChange={(e) => setEditingChecklist(prev => prev ? { ...prev, remarks: e.target.value } : null)} />
+              </div>
             </div>
           )}
-
-          {/* Remarks Field */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Admin Remarks</label>
-            <textarea
-              className="w-full min-h-[80px] p-3 rounded-md border bg-background text-sm resize-none"
-              placeholder="Add comments or remarks about this checklist..."
-              value={editingChecklist?.remarks || ""}
-              onChange={(e) => setEditingChecklist(prev => prev ? { ...prev, remarks: e.target.value } : null)}
-            />
-          </div>
-
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingChecklist(null)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Save
-            </Button>
+            <Button onClick={handleSave} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Save</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vehicle History Dialog */}
+      <Dialog open={!!selectedVehicle} onOpenChange={() => setSelectedVehicle(null)}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Car className="h-5 w-5" />Vehicle History: {selectedVehicle}</DialogTitle></DialogHeader>
+          {selectedVehicle && (() => {
+            const vehicleHealth = vehicleHealthData.find(v => v.vehicle_number === selectedVehicle)
+            const vehicleChecklists = allChecklists.filter(c => c.vehicle_number === selectedVehicle)
+            return (
+              <div className="flex-1 overflow-y-auto space-y-4">
+                {vehicleHealth && (
+                  <div className="grid grid-cols-4 gap-3">
+                    <div className="p-3 rounded-lg bg-muted/50 text-center"><p className={cn("text-2xl font-bold", getHealthColor(vehicleHealth.health_score))}>{vehicleHealth.health_score}%</p><p className="text-xs text-muted-foreground">Health Score</p></div>
+                    <div className="p-3 rounded-lg bg-muted/50 text-center"><p className="text-2xl font-bold">{vehicleHealth.total_checks}</p><p className="text-xs text-muted-foreground">Total Checks</p></div>
+                    <div className="p-3 rounded-lg bg-muted/50 text-center"><p className="text-2xl font-bold text-orange-500">{vehicleHealth.total_issues}</p><p className="text-xs text-muted-foreground">Total Issues</p></div>
+                    <div className="p-3 rounded-lg bg-muted/50 text-center"><p className="text-2xl font-bold text-yellow-500">{vehicleHealth.pending_issues}</p><p className="text-xs text-muted-foreground">Pending</p></div>
+                  </div>
+                )}
+                {vehicleHealth && Object.keys(vehicleHealth.issue_breakdown).length > 0 && (
+                  <div className="p-4 rounded-lg border">
+                    <h3 className="font-medium mb-3 flex items-center gap-2"><BarChart3 className="h-4 w-4" />Issue Breakdown</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(vehicleHealth.issue_breakdown).sort(([, a], [, b]) => b - a).map(([issue, count]) => (
+                        <Badge key={issue} variant="outline" className="text-sm">{ITEM_LABELS[issue] || issue}: {count}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="rounded-lg border overflow-hidden">
+                  <div className="px-4 py-3 bg-muted/50 border-b"><h3 className="font-medium flex items-center gap-2"><ClipboardCheck className="h-4 w-4" />Pre-trip Check History ({vehicleChecklists.length})</h3></div>
+                  <div className="max-h-[300px] overflow-y-auto">
+                    <Table>
+                      <TableHeader className="sticky top-0 bg-muted/30">
+                        <TableRow>
+                          <TableHead className="text-xs">Date</TableHead>
+                          <TableHead className="text-xs">Driver</TableHead>
+                          <TableHead className="text-xs">Status</TableHead>
+                          <TableHead className="text-xs">Issues</TableHead>
+                          <TableHead className="text-xs">Resolution</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {vehicleChecklists.length === 0 ? (
+                          <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No pre-trip checks recorded</TableCell></TableRow>
+                        ) : (
+                          vehicleChecklists.map(check => (
+                            <TableRow key={check.id} className={check.has_issues ? "bg-red-500/5" : ""}>
+                              <TableCell className="text-sm">{formatDate(check.checked_at)}</TableCell>
+                              <TableCell className="text-sm">{check.driver_name}</TableCell>
+                              <TableCell><Badge className={cn("text-xs", check.has_issues ? "bg-red-500" : "bg-green-500")}>{check.has_issues ? "Issue" : "OK"}</Badge></TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{check.issues ? Object.keys(check.issues).map(k => ITEM_LABELS[k] || k).join(", ") : "-"}</TableCell>
+                              <TableCell>{check.has_issues && <Badge variant={check.resolution_status === "fixed" ? "default" : "secondary"} className="text-xs">{check.resolution_status || "Pending"}</Badge>}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
         </DialogContent>
       </Dialog>
 
       {/* Bulk Delete Confirmation */}
       <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete {selectedIds.size} Checklist(s)?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete {selectedIds.size} selected checklist(s). This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBulkDelete} className="bg-red-500 hover:bg-red-600">
-              Delete All
-            </AlertDialogAction>
-          </AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>Delete {selectedIds.size} Checklist(s)?</AlertDialogTitle><AlertDialogDescription>This will permanently delete {selectedIds.size} selected checklist(s). This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleBulkDelete} className="bg-red-500 hover:bg-red-600">Delete All</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open) setDeleteId(null) }}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Checklist?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this checklist record. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>Delete Checklist?</AlertDialogTitle><AlertDialogDescription>This will permanently delete this checklist record. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

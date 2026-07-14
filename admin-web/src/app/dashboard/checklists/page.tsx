@@ -746,36 +746,139 @@ export default function ChecklistsPage() {
       )}
 
       {/* REPORTS TAB */}
-      {activeTab === "reports" && (
-        <Card className="p-6">
-          <div className="flex items-center gap-4 mb-6 p-4 rounded-xl border bg-muted/30">
-            <div className="flex items-center gap-2">
-              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-40 h-9 px-3 rounded-md border border-input bg-background text-sm [color-scheme:dark]" />
-              <span className="text-muted-foreground">→</span>
-              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-40 h-9 px-3 rounded-md border border-input bg-background text-sm [color-scheme:dark]" />
-            </div>
-          </div>
+      {activeTab === "reports" && (() => {
+        const filtered = allChecklists.filter(c => {
+          const date = new Date(c.checked_at)
+          return date >= new Date(startDate) && date <= new Date(endDate + "T23:59:59")
+        })
+        const totalChecks = filtered.length
+        const issuesFound = filtered.filter(c => c.has_issues).length
+        const pendingCount = filtered.filter(c => c.has_issues && (!c.resolution_status || c.resolution_status === "pending")).length
+        const resolvedCount = filtered.filter(c => c.has_issues && c.resolution_status === "fixed").length
+        const resolutionRate = issuesFound > 0 ? Math.round((resolvedCount / issuesFound) * 100) : 100
+        const activeVehicles = vehicleHealthData.length
+        const avgHealth = vehicleHealthData.length > 0 ? Math.round(vehicleHealthData.reduce((a, v) => a + v.health_score, 0) / vehicleHealthData.length) : 0
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {REPORT_TYPES.map(report => (
-              <div key={report.id} className="flex flex-col gap-3 p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors">
+        const setDatePreset = (preset: string) => {
+          const today = new Date()
+          let start = new Date()
+          switch (preset) {
+            case "7days": start.setDate(today.getDate() - 7); break
+            case "month": start = new Date(today.getFullYear(), today.getMonth(), 1); break
+            case "lastMonth": start = new Date(today.getFullYear(), today.getMonth() - 1, 1); today.setDate(0); break
+            case "all": start = new Date(2020, 0, 1); break
+          }
+          setStartDate(start.toISOString().split("T")[0])
+          setEndDate(preset === "lastMonth" ? today.toISOString().split("T")[0] : new Date(Date.now() + 86400000).toISOString().split("T")[0])
+        }
+
+        const reportStats: Record<string, { count: number; label: string; color: string }> = {
+          "fleet-health": { count: avgHealth, label: `${avgHealth}% avg health`, color: avgHealth >= 80 ? "text-green-500" : avgHealth >= 60 ? "text-yellow-500" : "text-red-500" },
+          "all-issues": { count: issuesFound, label: `${issuesFound} issues`, color: issuesFound > 0 ? "text-orange-500" : "text-green-500" },
+          "vehicle-checks": { count: totalChecks, label: `${totalChecks} inspections`, color: "text-blue-500" },
+          "issue-breakdown": { count: Object.keys(filtered.reduce((acc, c) => { if (c.issues) Object.keys(c.issues).forEach(k => acc[k] = true); return acc }, {} as Record<string, boolean>)).length, label: "issue types", color: "text-purple-500" },
+          "pending-issues": { count: pendingCount, label: `${pendingCount} pending`, color: pendingCount > 0 ? "text-yellow-500" : "text-green-500" },
+          "resolved-issues": { count: resolvedCount, label: `${resolvedCount} resolved`, color: "text-green-500" },
+          "vehicle-lifespan": { count: vehicleHealthData.length, label: `${vehicleHealthData.length} vehicles`, color: "text-blue-500" },
+          "vehicle-history": { count: filtered.length, label: `${filtered.length} events`, color: "text-slate-400" },
+        }
+
+        const REPORT_CATEGORIES = [
+          { title: "Health & Performance", ids: ["fleet-health", "vehicle-lifespan"] },
+          { title: "Issues & Resolutions", ids: ["all-issues", "pending-issues", "resolved-issues", "issue-breakdown"] },
+          { title: "History & Records", ids: ["vehicle-checks", "vehicle-history"] },
+        ]
+
+        return (
+          <div className="space-y-6">
+            {/* Quick Stats Bar */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <Card className="p-4 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10"><report.icon className="h-4 w-4 text-primary" /></div>
-                  <span className="font-medium text-sm">{report.name}</span>
+                  <ClipboardCheck className="h-5 w-5 text-blue-500" />
+                  <div><p className="text-2xl font-bold text-blue-500">{totalChecks}</p><p className="text-xs text-muted-foreground">Total Checks</p></div>
                 </div>
+              </Card>
+              <Card className={cn("p-4 bg-gradient-to-br border-orange-500/20", issuesFound > 0 ? "from-orange-500/10 to-orange-600/5" : "from-green-500/10 to-green-600/5")}>
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className={cn("h-5 w-5", issuesFound > 0 ? "text-orange-500" : "text-green-500")} />
+                  <div><p className={cn("text-2xl font-bold", issuesFound > 0 ? "text-orange-500" : "text-green-500")}>{issuesFound}</p><p className="text-xs text-muted-foreground">Issues Found</p></div>
+                </div>
+              </Card>
+              <Card className={cn("p-4 bg-gradient-to-br border-green-500/20", resolutionRate >= 80 ? "from-green-500/10 to-green-600/5" : "from-yellow-500/10 to-yellow-600/5")}>
+                <div className="flex items-center gap-3">
+                  <CheckCircle className={cn("h-5 w-5", resolutionRate >= 80 ? "text-green-500" : "text-yellow-500")} />
+                  <div><p className={cn("text-2xl font-bold", resolutionRate >= 80 ? "text-green-500" : "text-yellow-500")}>{resolutionRate}%</p><p className="text-xs text-muted-foreground">Resolved</p></div>
+                </div>
+              </Card>
+              <Card className="p-4 bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
+                <div className="flex items-center gap-3">
+                  <Car className="h-5 w-5 text-purple-500" />
+                  <div><p className="text-2xl font-bold text-purple-500">{activeVehicles}</p><p className="text-xs text-muted-foreground">Active Vehicles</p></div>
+                </div>
+              </Card>
+              <Card className={cn("p-4 bg-gradient-to-br border-emerald-500/20", avgHealth >= 80 ? "from-emerald-500/10 to-emerald-600/5" : avgHealth >= 60 ? "from-yellow-500/10 to-yellow-600/5" : "from-red-500/10 to-red-600/5")}>
+                <div className="flex items-center gap-3">
+                  <Activity className={cn("h-5 w-5", avgHealth >= 80 ? "text-emerald-500" : avgHealth >= 60 ? "text-yellow-500" : "text-red-500")} />
+                  <div><p className={cn("text-2xl font-bold", avgHealth >= 80 ? "text-emerald-500" : avgHealth >= 60 ? "text-yellow-500" : "text-red-500")}>{avgHealth}%</p><p className="text-xs text-muted-foreground">Fleet Health</p></div>
+                </div>
+              </Card>
+            </div>
+
+            {/* Date Filter */}
+            <Card className="p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-sm font-medium text-muted-foreground">Period:</span>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" className="flex-1 border-green-500/50 text-green-500 hover:bg-green-500/10" onClick={() => exportCSV(report.id)} disabled={generating}>
-                    <FileSpreadsheet className="h-3.5 w-3.5 mr-1" />CSV
-                  </Button>
-                  <Button size="sm" variant="outline" className="flex-1 border-red-500/50 text-red-500 hover:bg-red-500/10" onClick={() => exportPDF(report.id)} disabled={generating}>
-                    <FileDown className="h-3.5 w-3.5 mr-1" />PDF
-                  </Button>
+                  {[{ id: "7days", label: "Last 7 Days" }, { id: "month", label: "This Month" }, { id: "lastMonth", label: "Last Month" }, { id: "all", label: "All Time" }].map(p => (
+                    <Button key={p.id} size="sm" variant="outline" onClick={() => setDatePreset(p.id)} className="text-xs">{p.label}</Button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 ml-auto">
+                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-36 h-8 px-2 rounded-md border border-input bg-background text-xs [color-scheme:dark]" />
+                  <span className="text-muted-foreground text-sm">to</span>
+                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-36 h-8 px-2 rounded-md border border-input bg-background text-xs [color-scheme:dark]" />
+                </div>
+              </div>
+            </Card>
+
+            {/* Report Categories */}
+            {REPORT_CATEGORIES.map(category => (
+              <div key={category.title} className="space-y-3">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{category.title}</h3>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {REPORT_TYPES.filter(r => category.ids.includes(r.id)).map(report => {
+                    const stat = reportStats[report.id]
+                    return (
+                      <Card key={report.id} className="p-5 hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/5 group">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2.5 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                              <report.icon className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                              <h4 className="font-semibold">{report.name}</h4>
+                              <p className={cn("text-sm font-medium", stat?.color || "text-muted-foreground")}>{stat?.label}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" className="flex-1 h-9 border-green-500/30 text-green-500 hover:bg-green-500/10 hover:border-green-500/50" onClick={() => exportCSV(report.id)} disabled={generating}>
+                            <FileSpreadsheet className="h-4 w-4 mr-2" />Export CSV
+                          </Button>
+                          <Button size="sm" variant="outline" className="flex-1 h-9 border-red-500/30 text-red-500 hover:bg-red-500/10 hover:border-red-500/50" onClick={() => exportPDF(report.id)} disabled={generating}>
+                            <FileDown className="h-4 w-4 mr-2" />Export PDF
+                          </Button>
+                        </div>
+                      </Card>
+                    )
+                  })}
                 </div>
               </div>
             ))}
           </div>
-        </Card>
-      )}
+        )
+      })()}
 
       {/* View Details Dialog */}
       <Dialog open={!!selectedChecklist} onOpenChange={() => setSelectedChecklist(null)}>

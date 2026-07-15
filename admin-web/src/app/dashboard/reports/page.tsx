@@ -308,9 +308,8 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Customer": "customer_name",
     "Driver": "driver_name",
     "Pickup": "pickup_name",
-    "Cancelled By": "cancelled_by",
-    "Reason": "reason",
-    "Date": "date",
+    "Reason": "cancel_reason",
+    "Cancelled At": "cancelled_at",
   },
   peak_hours: {
     "Hour": "hour",
@@ -1147,7 +1146,7 @@ export default function ReportsPage() {
         case "cancellations": {
           let query = supabase
             .from("rides")
-            .select(`id, pickup_name, status, cancelled_by, cancellation_reason, created_at, customer:profiles!rides_customer_id_fkey(full_name), driver:drivers!rides_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`)
+            .select(`id, pickup_name, status, cancelled_at, cancel_reason, created_at, customer:profiles!rides_customer_id_fkey(full_name), driver:drivers!rides_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`)
             .eq("status", "cancelled")
             .order("created_at", { ascending: false })
           if (dateFilter) {
@@ -1162,9 +1161,8 @@ export default function ReportsPage() {
               "Customer": String(customer?.full_name || "-"),
               "Driver": String(driverProfile?.full_name || "-"),
               "Pickup": String(r.pickup_name || "-"),
-              "Cancelled By": formatStatus(String(r.cancelled_by || "-")),
-              "Reason": String(r.cancellation_reason || "-"),
-              "Date": formatDate(String(r.created_at || "")),
+              "Reason": String(r.cancel_reason || "-"),
+              "Cancelled At": r.cancelled_at ? formatDateTime(String(r.cancelled_at)) : formatDate(String(r.created_at || "")),
             }
           })
           filename = `cancellations_${new Date().toISOString().split("T")[0]}.csv`
@@ -1990,7 +1988,7 @@ export default function ReportsPage() {
           break
         }
         case "cancellations": {
-          let query = supabase.from("rides").select(`pickup_name, cancelled_by, cancellation_reason, created_at, customer:profiles!rides_customer_id_fkey(full_name), driver:drivers!rides_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`).eq("status", "cancelled").order("created_at", { ascending: false })
+          let query = supabase.from("rides").select(`pickup_name, cancelled_at, cancel_reason, created_at, customer:profiles!rides_customer_id_fkey(full_name), driver:drivers!rides_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`).eq("status", "cancelled").order("created_at", { ascending: false })
           if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
           const { data: rides } = await query
           rows = (rides || []).map((r: Record<string, unknown>) => {
@@ -2001,9 +1999,8 @@ export default function ReportsPage() {
               "Customer": String(customer?.full_name || "-"),
               "Driver": String(driverProfile?.full_name || "-"),
               "Pickup": String(r.pickup_name || "-"),
-              "Cancelled By": formatStatus(String(r.cancelled_by || "-")),
-              "Reason": String(r.cancellation_reason || "-"),
-              "Date": formatDate(String(r.created_at || "")),
+              "Reason": String(r.cancel_reason || "-"),
+              "Cancelled": r.cancelled_at ? formatDateTime(String(r.cancelled_at)) : formatDate(String(r.created_at || "")),
             }
           })
           break

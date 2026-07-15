@@ -1101,7 +1101,7 @@ export default function ReportsPage() {
         case "scheduled_rides": {
           let query = supabase
             .from("rides")
-            .select(`id, pickup_address, dropoff_address, scheduled_time, status, created_at, customer:profiles!rides_customer_id_fkey(full_name)`)
+            .select(`id, pickup_name, dropoff_name, scheduled_time, status, created_at, customer:profiles!rides_customer_id_fkey(full_name)`)
             .not("scheduled_time", "is", null)
             .order("scheduled_time", { ascending: false })
           if (dateFilter) {
@@ -1112,8 +1112,8 @@ export default function ReportsPage() {
             const customer = r.customer as Record<string, unknown> | null
             return {
               "Customer": String(customer?.full_name || "-"),
-              "Pickup": String(r.pickup_address || "-"),
-              "Dropoff": String(r.dropoff_address || "-"),
+              "Pickup": String(r.pickup_name || "-"),
+              "Dropoff": String(r.dropoff_name || "-"),
               "Scheduled For": formatDateTime(String(r.scheduled_time || "")),
               "Status": formatStatus(String(r.status || "")),
               "Created": formatDate(String(r.created_at || "")),
@@ -1957,15 +1957,15 @@ export default function ReportsPage() {
           break
         }
         case "scheduled_rides": {
-          let query = supabase.from("rides").select(`pickup_address, dropoff_address, scheduled_time, status, created_at, customer:profiles!rides_customer_id_fkey(full_name)`).not("scheduled_time", "is", null).order("scheduled_time", { ascending: false })
+          let query = supabase.from("rides").select(`pickup_name, dropoff_name, scheduled_time, status, created_at, customer:profiles!rides_customer_id_fkey(full_name)`).not("scheduled_time", "is", null).order("scheduled_time", { ascending: false })
           if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
           const { data: rides } = await query
           rows = (rides || []).map((r: Record<string, unknown>) => {
             const customer = r.customer as Record<string, unknown> | null
             return {
               "Customer": String(customer?.full_name || "-"),
-              "Pickup": String(r.pickup_address || "-"),
-              "Dropoff": String(r.dropoff_address || "-"),
+              "Pickup": String(r.pickup_name || "-"),
+              "Dropoff": String(r.dropoff_name || "-"),
               "Scheduled For": formatDateTime(String(r.scheduled_time || "")),
               "Status": formatStatus(String(r.status || "")),
               "Created": formatDate(String(r.created_at || "")),

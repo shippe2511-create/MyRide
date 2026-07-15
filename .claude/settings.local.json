@@ -241,7 +241,10 @@
       "Bash(grep -n '\\\\$' /Users/athifabdulla/Downloads/MyRide/admin-web/src/app/dashboard/reports/page.tsx)",
       "Bash(lsof -ti:3000)",
       "Bash(kill 63439)",
-      "Bash(npx vercel *)"
+      "Bash(npx vercel *)",
+      "Bash(GOOGLE_API_KEY=\"AIzaSyBZ7HVy2dUvTCC5SZkz0MaFCBON2QorFbI\" SUPABASE_SERVICE_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3a25keXlmbW1yemF6ZHZyc25rIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0ODc1NTQ5OCwiZXhwIjoyMDY0MzMxNDk4fQ.JKX8ApLMnPVBDn4_-cqbIaVOAXBQFB0jGwXELkPsT9I\" node scripts/fix-pickup-addresses.js)",
+      "Bash(GOOGLE_API_KEY=\"AIzaSyBZ7HVy2dUvTCC5SZkz0MaFCBON2QorFbI\" SUPABASE_SERVICE_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3a25keXlmbW1yemF6ZHZyc25rIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDMxMzQ3MCwiZXhwIjoyMDk1ODg5NDcwfQ.ru0EYcLEDKsbjtGxGImUcAEkeNFPX00qN99oDOoNvFw\" node *)",
+      "Bash(gh api *)"
     ],
     "additionalDirectories": [
       "/tmp"

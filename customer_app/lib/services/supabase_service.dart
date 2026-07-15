@@ -964,10 +964,30 @@ class SupabaseService {
     }
   }
 
-  // Online drivers for tracking (filtered by customer's pool access)
+  // Get assigned driver IDs for private pool customers
+  static Future<Set<String>> getAssignedDriverIds() async {
+    final customerId = userId;
+    if (customerId == null) return {};
+
+    try {
+      final response = await client
+          .from('customer_driver_assignments')
+          .select('driver_id')
+          .eq('customer_id', customerId);
+
+      return response.map<String>((r) => r['driver_id'] as String).toSet();
+    } catch (e) {
+      debugPrint('Error getting assigned drivers: $e');
+      return {};
+    }
+  }
+
+  // Online drivers for tracking (filtered by customer's pool access and assignments)
   static Future<List<Map<String, dynamic>>> getOnlineDrivers() async {
     try {
       final pools = await getCustomerPools();
+      final hasPrivateAccess = pools.contains('private');
+      final assignedDriverIds = hasPrivateAccess ? await getAssignedDriverIds() : <String>{};
 
       // Get drivers who are in pools the customer has access to
       final response = await client
@@ -982,7 +1002,20 @@ class SupabaseService {
       return drivers.where((d) {
         final driverPools = d['pools'] as List?;
         if (driverPools == null || driverPools.isEmpty) return false;
-        return driverPools.any((p) => pools.contains(p['pool']));
+
+        final isPublic = driverPools.any((p) => p['pool'] == 'public');
+        final isPrivate = driverPools.any((p) => p['pool'] == 'private');
+
+        // Public drivers: everyone can see
+        if (isPublic) return true;
+
+        // Private drivers: only if customer has private access AND driver is assigned
+        if (isPrivate && hasPrivateAccess) {
+          final driverId = d['id'] as String?;
+          return driverId != null && assignedDriverIds.contains(driverId);
+        }
+
+        return false;
       }).toList();
     } catch (e) {
       debugPrint('Error getting online drivers: $e');
@@ -990,10 +1023,12 @@ class SupabaseService {
     }
   }
 
-  // Available drivers (online, not on break, filtered by pool access)
+  // Available drivers (online, not on break, filtered by pool access and assignments)
   static Future<List<Map<String, dynamic>>> getAvailableDrivers() async {
     try {
       final pools = await getCustomerPools();
+      final hasPrivateAccess = pools.contains('private');
+      final assignedDriverIds = hasPrivateAccess ? await getAssignedDriverIds() : <String>{};
 
       final response = await client
           .from('drivers')
@@ -1004,10 +1039,19 @@ class SupabaseService {
       final drivers = List<Map<String, dynamic>>.from(response);
 
       return drivers.where((d) {
-        // Filter by pool access
         final driverPools = d['pools'] as List?;
         if (driverPools == null || driverPools.isEmpty) return false;
-        final hasPoolAccess = driverPools.any((p) => pools.contains(p['pool']));
+
+        final isPublic = driverPools.any((p) => p['pool'] == 'public');
+        final isPrivate = driverPools.any((p) => p['pool'] == 'private');
+
+        // Public drivers: everyone can see
+        // Private drivers: only if customer has private access AND driver is assigned
+        bool hasPoolAccess = isPublic;
+        if (!hasPoolAccess && isPrivate && hasPrivateAccess) {
+          final driverId = d['id'] as String?;
+          hasPoolAccess = driverId != null && assignedDriverIds.contains(driverId);
+        }
         if (!hasPoolAccess) return false;
 
         // Filter out drivers with inactive vehicles

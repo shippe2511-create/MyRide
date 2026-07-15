@@ -92,7 +92,6 @@ const reportTypes = [
   { id: "driver_performance", name: "Driver Performance", description: "KPIs: completion rate, cancellations, activity", icon: TrendingUp },
   { id: "shifts", name: "Shift Schedule", description: "Driver shift assignments and times", icon: Clock },
   { id: "break_history", name: "Break History", description: "Driver break times and durations", icon: Coffee },
-  { id: "quota_usage", name: "Quota Usage", description: "Customer ride quota consumption", icon: Ticket },
   { id: "support_tickets", name: "Support Tickets", description: "Customer support requests and status", icon: MessageSquare },
   { id: "ratings", name: "Ratings Report", description: "All ratings and feedback", icon: Star },
   { id: "usage", name: "Daily Usage", description: "Rides per day summary", icon: BarChart3 },
@@ -1101,19 +1100,20 @@ export default function ReportsPage() {
 
         case "scheduled_rides": {
           let query = supabase
-            .from("scheduled_rides")
-            .select(`id, pickup_name, dropoff_name, scheduled_time, status, created_at, customer:profiles!scheduled_rides_customer_id_fkey(full_name)`)
-            .order("scheduled_time", { ascending: true })
+            .from("rides")
+            .select(`id, pickup_address, dropoff_address, scheduled_time, status, created_at, customer:profiles!rides_customer_id_fkey(full_name)`)
+            .not("scheduled_time", "is", null)
+            .order("scheduled_time", { ascending: false })
           if (dateFilter) {
-            query = query.gte("scheduled_time", dateFilter.start).lte("scheduled_time", dateFilter.end + "T23:59:59")
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
           }
           const { data: rides } = await query
           rows = (rides || []).map((r: Record<string, unknown>) => {
             const customer = r.customer as Record<string, unknown> | null
             return {
               "Customer": String(customer?.full_name || "-"),
-              "Pickup": String(r.pickup_name || "-"),
-              "Dropoff": String(r.dropoff_name || "-"),
+              "Pickup": String(r.pickup_address || "-"),
+              "Dropoff": String(r.dropoff_address || "-"),
               "Scheduled For": formatDateTime(String(r.scheduled_time || "")),
               "Status": formatStatus(String(r.status || "")),
               "Created": formatDate(String(r.created_at || "")),
@@ -1957,15 +1957,15 @@ export default function ReportsPage() {
           break
         }
         case "scheduled_rides": {
-          let query = supabase.from("scheduled_rides").select(`pickup_name, dropoff_name, scheduled_time, status, created_at, customer:profiles!scheduled_rides_customer_id_fkey(full_name)`).order("scheduled_time", { ascending: true })
-          if (dateFilter) query = query.gte("scheduled_time", dateFilter.start).lte("scheduled_time", dateFilter.end + "T23:59:59")
+          let query = supabase.from("rides").select(`pickup_address, dropoff_address, scheduled_time, status, created_at, customer:profiles!rides_customer_id_fkey(full_name)`).not("scheduled_time", "is", null).order("scheduled_time", { ascending: false })
+          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
           const { data: rides } = await query
           rows = (rides || []).map((r: Record<string, unknown>) => {
             const customer = r.customer as Record<string, unknown> | null
             return {
               "Customer": String(customer?.full_name || "-"),
-              "Pickup": String(r.pickup_name || "-"),
-              "Dropoff": String(r.dropoff_name || "-"),
+              "Pickup": String(r.pickup_address || "-"),
+              "Dropoff": String(r.dropoff_address || "-"),
               "Scheduled For": formatDateTime(String(r.scheduled_time || "")),
               "Status": formatStatus(String(r.status || "")),
               "Created": formatDate(String(r.created_at || "")),
@@ -2233,7 +2233,7 @@ export default function ReportsPage() {
 
   const categories = [
     { name: "People", reports: ["customers", "drivers", "driver_performance", "customer_loyalty", "favorite_drivers"] },
-    { name: "Operations", reports: ["rides", "scheduled_rides", "recurring_rides", "cancellations", "shifts", "break_history", "quota_usage"] },
+    { name: "Operations", reports: ["rides", "scheduled_rides", "recurring_rides", "cancellations", "shifts", "break_history"] },
     { name: "Feedback", reports: ["ratings", "support_tickets"] },
     { name: "Safety", reports: ["sos_alerts", "incidents"] },
     { name: "Vehicles", reports: ["vehicles", "vehicle_checks", "vehicle_logs"] },

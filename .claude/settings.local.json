@@ -232,7 +232,16 @@
       "Bash(cat .env.local)",
       "Bash(cat .env)",
       "Bash(grep -rn \"debugPrint.*\\\\$\" --include=\"*.dart\" /Users/athifabdulla/Downloads/MyRide/customer_app/lib/)",
-      "Bash(perl *)"
+      "Bash(perl *)",
+      "Bash(pkill -f \"flutter clean\")",
+      "Bash(pkill -f \"xcodebuild\")",
+      "Bash(pkill -9 -f xcodebuild)",
+      "Bash(pkill -9 xcodebuild)",
+      "Bash(xargs -I {} xcrun xcresulttool get --path {} --format json)",
+      "Bash(grep -n '\\\\$' /Users/athifabdulla/Downloads/MyRide/admin-web/src/app/dashboard/reports/page.tsx)",
+      "Bash(lsof -ti:3000)",
+      "Bash(kill 63439)",
+      "Bash(npx vercel *)"
     ],
     "additionalDirectories": [
       "/tmp"

@@ -156,7 +156,6 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Status": "status",
     "Rating": "rating",
     "Total Trips": "total_trips",
-    "Online": "online_status",
     "Joined": "joined_date",
   },
   driver_performance: {
@@ -593,10 +592,9 @@ export default function ReportsPage() {
               "Department": String(d.department || "-"),
               "Gender": String(d.gender || "-"),
               "Status": formatStatus(String(d.status || "")),
-              "Rating": driverInfo?.rating ? `${driverInfo.rating}/5` : "-",
+              "Rating": driverInfo?.rating ? `${Number(driverInfo.rating).toFixed(1)} out of 5` : "-",
               "Total Trips": String(driverInfo?.total_trips || "0"),
-              "Online": driverInfo?.is_online ? "Online" : "Offline",
-              "Joined": formatDate(String(d.created_at || "")),
+                            "Joined": formatDate(String(d.created_at || "")),
             }
           })
           filename = `drivers_report_${new Date().toISOString().split("T")[0]}.csv`
@@ -647,7 +645,7 @@ export default function ReportsPage() {
             return {
               "Driver": String(profile?.full_name || "Unknown"),
               "Phone": formatPhone(profile?.phone as string | null),
-              "Rating": d.rating ? `${d.rating}/5` : "-",
+              "Rating": d.rating ? `${Number(d.rating).toFixed(1)} out of 5` : "-",
               "Total Rides": String(totalRides),
               "Completed": String(completedRides),
               "Cancelled": String(cancelledRides),
@@ -804,7 +802,7 @@ export default function ReportsPage() {
             return {
               "From": String(fromUser?.full_name || "-"),
               "To": String(toUser?.full_name || "-"),
-              "Rating": `${r.rating}/5`,
+              "Rating": `${Number(r.rating).toFixed(1)} out of 5`,
               "Comment": String(r.comment || "-"),
               "Date": formatDate(String(r.created_at || "")),
             }
@@ -1320,7 +1318,7 @@ export default function ReportsPage() {
             .sort((a, b) => b.count - a.count)
             .map((d) => ({
               "Driver": d.name,
-              "Rating": d.rating ? `${d.rating}/5` : "-",
+              "Rating": d.rating ? `${Number(d.rating).toFixed(1)} out of 5` : "-",
               "Favorites": String(d.count),
               "Total Rides": String(d.trips),
             }))
@@ -1655,10 +1653,9 @@ export default function ReportsPage() {
               "Department": String(d.department || "-"),
               "Gender": String(d.gender || "-"),
               "Status": formatStatus(String(d.status || "")),
-              "Rating": driverInfo?.rating ? `${driverInfo.rating}/5` : "-",
+              "Rating": driverInfo?.rating ? `${Number(driverInfo.rating).toFixed(1)} out of 5` : "-",
               "Total Trips": String(driverInfo?.total_trips || "0"),
-              "Online": driverInfo?.is_online ? "Online" : "Offline",
-              "Joined": formatDate(String(d.created_at || "")),
+                            "Joined": formatDate(String(d.created_at || "")),
             }
           })
           break
@@ -1721,7 +1718,7 @@ export default function ReportsPage() {
             return {
               "From": String(fromUser?.full_name || "-"),
               "To": String(toUser?.full_name || "-"),
-              "Rating": `${r.rating}/5`,
+              "Rating": `${Number(r.rating).toFixed(1)} out of 5`,
               "Comment": String(r.comment || "-"),
               "Date": formatDate(String(r.created_at || "")),
             }
@@ -1786,7 +1783,7 @@ export default function ReportsPage() {
             return {
               "Driver": String(profile?.full_name || "Unknown"),
               "Phone": formatPhone(profile?.phone as string | null),
-              "Rating": d.rating ? `${d.rating}/5` : "-",
+              "Rating": d.rating ? `${Number(d.rating).toFixed(1)} out of 5` : "-",
               "Total Rides": String(totalRides),
               "Completed": String(completedRides),
               "Cancelled": String(driverRides.filter(r => r.status === 'cancelled').length),
@@ -2101,7 +2098,7 @@ export default function ReportsPage() {
             if (!driverCounts[did]) driverCounts[did] = { name: String(profile?.full_name || "-"), rating: Number(driver?.rating || 0), trips: Number(driver?.total_trips || 0), count: 0 }
             driverCounts[did].count++
           })
-          rows = Object.values(driverCounts).sort((a, b) => b.count - a.count).map((d) => ({ "Driver": d.name, "Rating": d.rating ? `${d.rating}/5` : "-", "Favorites": String(d.count), "Total Rides": String(d.trips) }))
+          rows = Object.values(driverCounts).sort((a, b) => b.count - a.count).map((d) => ({ "Driver": d.name, "Rating": d.rating ? `${Number(d.rating).toFixed(1)} out of 5` : "-", "Favorites": String(d.count), "Total Rides": String(d.trips) }))
           break
         }
         case "fleet_health":

@@ -1359,14 +1359,11 @@ class DriverState extends ChangeNotifier {
           })
           .eq('id', _driverId);
 
-      // Log to break history
-      await SupabaseService.client
-          .from('break_history')
-          .insert({
-            'driver_id': _driverId,
-            'break_type': type,
-            'started_at': _breakStartTime!.toUtc().toIso8601String(),
-          });
+      // Log to break history via RPC (bypasses RLS)
+      await SupabaseService.client.rpc('insert_break_history', params: {
+        'p_driver_id': _driverId,
+        'p_break_type': type,
+      });
     }
 
     // Schedule break reminder based on admin-configured minutes
@@ -1408,24 +1405,14 @@ class DriverState extends ChangeNotifier {
           })
           .eq('id', _driverId);
 
-      // Update break history with end time and duration
-      if (driverData != null && driverData['break_start_time'] != null) {
-        final startTime = DateTime.parse(driverData['break_start_time']);
-        final endTime = DateTime.now().toUtc();
-        final durationMinutes = endTime.difference(startTime).inMinutes;
-
-        await SupabaseService.client
-            .from('break_history')
-            .update({
-              'ended_at': endTime.toIso8601String(),
-              'duration_minutes': durationMinutes,
-            })
-            .eq('driver_id', _driverId)
-            .isFilter('ended_at', null)
-            .order('created_at', ascending: false)
-            .limit(1);
-      }
+      // Update break history with end time and duration via RPC (bypasses RLS)
+      await SupabaseService.client.rpc('end_break_history', params: {
+        'p_driver_id': _driverId,
+      });
     }
+
+    // Refresh pending rides after ending break
+    _loadPendingRides();
 
     notifyListeners();
   }

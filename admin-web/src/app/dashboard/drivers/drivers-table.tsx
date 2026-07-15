@@ -157,14 +157,29 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
     department: "",
     gender: "",
     vehicle_id: "",
-    status: "pending"
+    status: "pending",
+    pools: { public: true, private: false }
   })
+  const [driverPools, setDriverPools] = useState<Record<string, string[]>>({})
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
 
   useEffect(() => {
     loadVehicles()
+    loadAllDriverPools()
   }, [])
+
+  const loadAllDriverPools = async () => {
+    const { data } = await supabase.from("driver_pools").select("driver_id, pool")
+    if (data) {
+      const poolMap: Record<string, string[]> = {}
+      data.forEach(row => {
+        if (!poolMap[row.driver_id]) poolMap[row.driver_id] = []
+        poolMap[row.driver_id].push(row.pool)
+      })
+      setDriverPools(poolMap)
+    }
+  }
 
   const loadVehicles = async () => {
     const { data, error } = await supabase
@@ -305,8 +320,24 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
     setLoading(false)
   }
 
-  const openEditDialog = (driver: Driver) => {
+  const openEditDialog = async (driver: Driver) => {
     setSelectedDriver(driver)
+
+    // Load driver's current pools
+    let currentPools = { public: true, private: false }
+    if (driver.driver_record?.id) {
+      const { data: poolData } = await supabase
+        .from("driver_pools")
+        .select("pool")
+        .eq("driver_id", driver.driver_record.id)
+      if (poolData) {
+        currentPools = {
+          public: poolData.some(p => p.pool === "public"),
+          private: poolData.some(p => p.pool === "private")
+        }
+      }
+    }
+
     setFormData({
       full_name: driver.full_name || "",
       email: driver.email || "",
@@ -315,7 +346,8 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
       department: driver.department || "",
       gender: driver.gender || "",
       vehicle_id: driver.driver_record?.vehicle_id || "",
-      status: driver.status || "pending"
+      status: driver.status || "pending",
+      pools: currentPools
     })
     setDialogType("edit")
   }
@@ -330,9 +362,30 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
       department: "",
       gender: "",
       vehicle_id: "",
-      status: "pending"
+      status: "pending",
+      pools: { public: true, private: false }
     })
     setDialogType("add")
+  }
+
+  const saveDriverPools = async (driverId: string, pools: { public: boolean, private: boolean }) => {
+    // Delete existing pools
+    await supabase.from("driver_pools").delete().eq("driver_id", driverId)
+
+    // Insert new pools
+    const poolsToInsert: Array<{ driver_id: string; pool: string }> = []
+    if (pools.public) poolsToInsert.push({ driver_id: driverId, pool: "public" })
+    if (pools.private) poolsToInsert.push({ driver_id: driverId, pool: "private" })
+
+    if (poolsToInsert.length > 0) {
+      await supabase.from("driver_pools").insert(poolsToInsert)
+    }
+
+    // Update local state
+    setDriverPools(prev => ({
+      ...prev,
+      [driverId]: poolsToInsert.map(p => p.pool)
+    }))
   }
 
   const handleSave = async () => {
@@ -400,17 +453,21 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
               return
             }
           } else {
+            // Save pool assignments
+            await saveDriverPools(existingDriver.id, formData.pools)
             toast.success("Driver updated")
             logActivity({ action: 'update', entityType: 'driver', entityId: selectedDriver.id, details: { name: formData.full_name } })
           }
         } else {
           // Create new driver record
-          const { error: driverError } = await supabase
+          const { data: newDriverRecord, error: driverError } = await supabase
             .from("drivers")
             .insert({
               profile_id: selectedDriver.id,
               vehicle_id: vehicleId
             })
+            .select("id")
+            .single()
 
           if (driverError) {
             console.error("Driver insert error:", driverError)
@@ -422,6 +479,10 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
               return
             }
           } else {
+            // Save pool assignments for newly created driver record
+            if (newDriverRecord) {
+              await saveDriverPools(newDriverRecord.id, formData.pools)
+            }
             toast.success("Driver updated")
             logActivity({ action: 'update', entityType: 'driver', entityId: selectedDriver.id, details: { name: formData.full_name } })
           }
@@ -469,16 +530,21 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
         // Create driver record with vehicle if assigned
         if (newProfile) {
           const vehicleId = formData.vehicle_id && formData.vehicle_id !== "none" ? formData.vehicle_id : null
-          const { error: driverError } = await supabase
+          const { data: newDriverRecord, error: driverError } = await supabase
             .from("drivers")
             .insert({
               profile_id: newProfile.id,
               vehicle_id: vehicleId
             })
+            .select("id")
+            .single()
 
           if (driverError) {
             console.error("Driver record error:", driverError)
             toast.error("Failed to create driver record: " + driverError.message)
+          } else if (newDriverRecord) {
+            // Save pool assignments
+            await saveDriverPools(newDriverRecord.id, formData.pools)
           }
         }
         toast.success("Driver added")
@@ -697,9 +763,10 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
               <TableHead>Driver</TableHead>
               <TableHead>Live Status</TableHead>
               <TableHead>Vehicle</TableHead>
+              <TableHead>Pool</TableHead>
               <TableHead className="text-center">Trips</TableHead>
               <TableHead className="text-center">Rating</TableHead>
-                            <TableHead>Active</TableHead>
+              <TableHead>Active</TableHead>
               <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
@@ -768,6 +835,19 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                     ) : (
                       <span className="text-muted-foreground text-sm">-</span>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      {driver.driver_record?.id && driverPools[driver.driver_record.id]?.includes("public") && (
+                        <Badge variant="outline" className="text-xs">Public</Badge>
+                      )}
+                      {driver.driver_record?.id && driverPools[driver.driver_record.id]?.includes("private") && (
+                        <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">Private</Badge>
+                      )}
+                      {(!driver.driver_record?.id || !driverPools[driver.driver_record.id]?.length) && (
+                        <span className="text-muted-foreground text-sm">-</span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-center">
                     <span className="font-medium">{driver.driver_record?.total_trips || 0}</span>
@@ -1028,6 +1108,28 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Pool Access</label>
+              <div className="flex gap-4">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="pool-public"
+                    checked={formData.pools.public}
+                    onCheckedChange={(checked) => setFormData({ ...formData, pools: { ...formData.pools, public: !!checked } })}
+                  />
+                  <label htmlFor="pool-public" className="text-sm">Public</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="pool-private"
+                    checked={formData.pools.private}
+                    onCheckedChange={(checked) => setFormData({ ...formData, pools: { ...formData.pools, private: !!checked } })}
+                  />
+                  <label htmlFor="pool-private" className="text-sm text-purple-600 dark:text-purple-400">Private</label>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">Drivers in &quot;Private&quot; pool are only visible to approved customers.</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">

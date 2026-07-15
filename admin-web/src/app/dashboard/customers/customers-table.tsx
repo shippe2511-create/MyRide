@@ -134,6 +134,56 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
     gender: string
   }>>([])
   const [importError, setImportError] = useState<string | null>(null)
+  const [customerPools, setCustomerPools] = useState<Record<string, boolean>>({})
+
+  // Load customer private pool access
+  useEffect(() => {
+    loadCustomerPools()
+  }, [])
+
+  const loadCustomerPools = async () => {
+    const { data } = await supabase
+      .from("customer_pools")
+      .select("customer_id")
+      .eq("pool", "private")
+    if (data) {
+      const poolMap: Record<string, boolean> = {}
+      data.forEach(row => {
+        poolMap[row.customer_id] = true
+      })
+      setCustomerPools(poolMap)
+    }
+  }
+
+  const togglePrivateAccess = async (customerId: string, currentlyHasAccess: boolean) => {
+    if (currentlyHasAccess) {
+      // Revoke private access
+      const { error } = await supabase
+        .from("customer_pools")
+        .delete()
+        .eq("customer_id", customerId)
+        .eq("pool", "private")
+      if (error) {
+        toast.error("Failed to revoke private access")
+      } else {
+        setCustomerPools(prev => ({ ...prev, [customerId]: false }))
+        toast.success("Private pool access revoked")
+        logActivity({ action: 'update', entityType: 'customer', entityId: customerId, details: { private_access: false } })
+      }
+    } else {
+      // Grant private access
+      const { error } = await supabase
+        .from("customer_pools")
+        .insert({ customer_id: customerId, pool: "private" })
+      if (error) {
+        toast.error("Failed to grant private access")
+      } else {
+        setCustomerPools(prev => ({ ...prev, [customerId]: true }))
+        toast.success("Private pool access granted")
+        logActivity({ action: 'update', entityType: 'customer', entityId: customerId, details: { private_access: true } })
+      }
+    }
+  }
 
   // Sync with server data when props change
   useEffect(() => {
@@ -787,6 +837,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
               <TableHead>Contact</TableHead>
               <TableHead>Employee ID</TableHead>
               <TableHead>Department</TableHead>
+              <TableHead>Private Access</TableHead>
               <TableHead>Active</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead className="w-12"></TableHead>
@@ -795,7 +846,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
           <TableBody>
             {customers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   No customers found
                 </TableCell>
               </TableRow>
@@ -856,6 +907,12 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <Switch
+                      checked={customerPools[customer.id] || false}
+                      onCheckedChange={() => togglePrivateAccess(customer.id, customerPools[customer.id] || false)}
+                    />
                   </TableCell>
                   <TableCell>
                     {customer.status === "pending" ? (

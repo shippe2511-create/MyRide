@@ -222,7 +222,7 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Break Type": "break_type",
     "Started": "started_at",
     "Ended": "ended_at",
-    "Duration (mins)": "duration_minutes",
+    "Duration": "duration",
   },
   shifts: {
     "Driver": "driver_name",
@@ -308,6 +308,7 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Customer": "customer_name",
     "Driver": "driver_name",
     "Pickup": "pickup_name",
+    "Cancelled By": "cancelled_by",
     "Reason": "cancel_reason",
     "Cancelled At": "cancelled_at",
   },
@@ -683,12 +684,19 @@ export default function ReportsPage() {
           rows = (breaks || []).map((b: Record<string, unknown>) => {
             const driver = b.driver as Record<string, unknown> | null
             const profile = driver?.profile as Record<string, unknown> | null
+            const mins = b.duration_minutes as number | null
+            let durationStr = "-"
+            if (mins != null) {
+              const hours = Math.floor(mins / 60)
+              const remainingMins = mins % 60
+              durationStr = hours > 0 ? `${hours}h ${remainingMins}m` : `${remainingMins}m`
+            }
             return {
               "Driver": String(profile?.full_name || "-"),
               "Break Type": String(b.break_type || "-"),
               "Started": b.started_at ? formatDateTime(String(b.started_at)) : "-",
               "Ended": b.ended_at ? formatDateTime(String(b.ended_at)) : "In Progress",
-              "Duration (mins)": b.duration_minutes != null ? String(b.duration_minutes) : "-",
+              "Duration": durationStr,
             }
           })
           filename = `break_history_${new Date().toISOString().split("T")[0]}.csv`
@@ -1146,7 +1154,7 @@ export default function ReportsPage() {
         case "cancellations": {
           let query = supabase
             .from("rides")
-            .select(`id, pickup_name, status, cancelled_at, cancel_reason, created_at, customer:profiles!rides_customer_id_fkey(full_name), driver:drivers!rides_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`)
+            .select(`id, pickup_name, pickup_lat, pickup_lng, status, cancelled_at, cancel_reason, created_at, customer:profiles!rides_customer_id_fkey(full_name), driver:drivers!rides_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`)
             .eq("status", "cancelled")
             .order("created_at", { ascending: false })
           if (dateFilter) {
@@ -1157,12 +1165,19 @@ export default function ReportsPage() {
             const customer = r.customer as Record<string, unknown> | null
             const driver = r.driver as Record<string, unknown> | null
             const driverProfile = driver?.profile as Record<string, unknown> | null
+            const reason = String(r.cancel_reason || "Not specified")
+            const cancelledBy = reason.toLowerCase().includes("customer") ? "Customer" : reason.toLowerCase().includes("driver") ? "Driver" : driverProfile?.full_name ? "Driver" : "Customer"
+            const pickupName = String(r.pickup_name || "")
+            const pickup = (pickupName && pickupName !== "Malé, Maldives" && pickupName !== "Maldives" && pickupName !== "Hulhumalé, Maldives")
+              ? pickupName
+              : (r.pickup_lat && r.pickup_lng ? `${Number(r.pickup_lat).toFixed(4)}, ${Number(r.pickup_lng).toFixed(4)}` : "-")
             return {
               "Customer": String(customer?.full_name || "-"),
-              "Driver": String(driverProfile?.full_name || "-"),
-              "Pickup": String(r.pickup_name || "-"),
-              "Reason": String(r.cancel_reason || "-"),
-              "Cancelled At": r.cancelled_at ? formatDateTime(String(r.cancelled_at)) : formatDate(String(r.created_at || "")),
+              "Driver": String(driverProfile?.full_name || "Not assigned"),
+              "Pickup": pickup,
+              "Cancelled By": cancelledBy,
+              "Reason": reason,
+              "Cancelled At": r.cancelled_at ? formatDateTime(String(r.cancelled_at)) : formatDateTime(String(r.created_at || "")),
             }
           })
           filename = `cancellations_${new Date().toISOString().split("T")[0]}.csv`
@@ -1818,12 +1833,19 @@ export default function ReportsPage() {
           rows = (breaks || []).map((b: Record<string, unknown>) => {
             const driver = b.driver as Record<string, unknown> | null
             const profile = driver?.profile as Record<string, unknown> | null
+            const mins = b.duration_minutes as number | null
+            let durationStr = "-"
+            if (mins != null) {
+              const hours = Math.floor(mins / 60)
+              const remainingMins = mins % 60
+              durationStr = hours > 0 ? `${hours}h ${remainingMins}m` : `${remainingMins}m`
+            }
             return {
               "Driver": String(profile?.full_name || "-"),
               "Break Type": String(b.break_type || "-"),
               "Started": b.started_at ? formatDateTime(String(b.started_at)) : "-",
               "Ended": b.ended_at ? formatDateTime(String(b.ended_at)) : "In Progress",
-              "Duration (mins)": b.duration_minutes != null ? String(b.duration_minutes) : "-",
+              "Duration": durationStr,
             }
           })
           break
@@ -1995,12 +2017,14 @@ export default function ReportsPage() {
             const customer = r.customer as Record<string, unknown> | null
             const driver = r.driver as Record<string, unknown> | null
             const driverProfile = driver?.profile as Record<string, unknown> | null
+            const reason = String(r.cancel_reason || "Not specified")
+            const cancelledBy = reason.toLowerCase().includes("customer") ? "Customer" : reason.toLowerCase().includes("driver") ? "Driver" : driverProfile?.full_name ? "Driver" : "Customer"
             return {
               "Customer": String(customer?.full_name || "-"),
-              "Driver": String(driverProfile?.full_name || "-"),
-              "Pickup": String(r.pickup_name || "-"),
-              "Reason": String(r.cancel_reason || "-"),
-              "Cancelled": r.cancelled_at ? formatDateTime(String(r.cancelled_at)) : formatDate(String(r.created_at || "")),
+              "Driver": String(driverProfile?.full_name || "Not assigned"),
+              "Cancelled By": cancelledBy,
+              "Reason": reason,
+              "Cancelled At": r.cancelled_at ? formatDateTime(String(r.cancelled_at)) : formatDateTime(String(r.created_at || "")),
             }
           })
           break

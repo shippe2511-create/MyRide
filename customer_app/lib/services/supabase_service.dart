@@ -939,30 +939,80 @@ class SupabaseService {
         .subscribe();
   }
 
-  // Online drivers for tracking
-  static Future<List<Map<String, dynamic>>> getOnlineDrivers() async {
-    final response = await client
-        .from('drivers')
-        .select('*, profile:profiles(*), vehicle:vehicle_types(*)')
-        .eq('is_online', true)
-        .eq('is_on_break', false);
-    return List<Map<String, dynamic>>.from(response);
-  }
+  // Get customer's pool access (public is always included)
+  static Future<List<String>> getCustomerPools() async {
+    final customerId = userId;
+    if (customerId == null) return ['public'];
 
-  // Available drivers (online, not on break)
-  static Future<List<Map<String, dynamic>>> getAvailableDrivers() async {
     try {
       final response = await client
+          .from('customer_pools')
+          .select('pool')
+          .eq('customer_id', customerId);
+
+      final pools = <String>['public']; // Everyone has public access
+      for (final row in response) {
+        final pool = row['pool'] as String?;
+        if (pool != null && !pools.contains(pool)) {
+          pools.add(pool);
+        }
+      }
+      return pools;
+    } catch (e) {
+      debugPrint('Error getting customer pools: $e');
+      return ['public'];
+    }
+  }
+
+  // Online drivers for tracking (filtered by customer's pool access)
+  static Future<List<Map<String, dynamic>>> getOnlineDrivers() async {
+    try {
+      final pools = await getCustomerPools();
+
+      // Get drivers who are in pools the customer has access to
+      final response = await client
           .from('drivers')
-          .select('*, profile:profiles(*), vehicle:vehicle_types(*)')
+          .select('*, profile:profiles(*), vehicle:vehicle_types(*), pools:driver_pools(pool)')
           .eq('is_online', true)
           .eq('is_on_break', false);
 
-      // Filter out drivers with inactive vehicles
       final drivers = List<Map<String, dynamic>>.from(response);
+
+      // Filter to only show drivers in accessible pools
       return drivers.where((d) {
+        final driverPools = d['pools'] as List?;
+        if (driverPools == null || driverPools.isEmpty) return false;
+        return driverPools.any((p) => pools.contains(p['pool']));
+      }).toList();
+    } catch (e) {
+      debugPrint('Error getting online drivers: $e');
+      return [];
+    }
+  }
+
+  // Available drivers (online, not on break, filtered by pool access)
+  static Future<List<Map<String, dynamic>>> getAvailableDrivers() async {
+    try {
+      final pools = await getCustomerPools();
+
+      final response = await client
+          .from('drivers')
+          .select('*, profile:profiles(*), vehicle:vehicle_types(*), pools:driver_pools(pool)')
+          .eq('is_online', true)
+          .eq('is_on_break', false);
+
+      final drivers = List<Map<String, dynamic>>.from(response);
+
+      return drivers.where((d) {
+        // Filter by pool access
+        final driverPools = d['pools'] as List?;
+        if (driverPools == null || driverPools.isEmpty) return false;
+        final hasPoolAccess = driverPools.any((p) => pools.contains(p['pool']));
+        if (!hasPoolAccess) return false;
+
+        // Filter out drivers with inactive vehicles
         final vehicle = d['vehicle'] as Map<String, dynamic>?;
-        if (vehicle == null) return true; // No vehicle assigned, allow
+        if (vehicle == null) return true;
         return vehicle['is_active'] == true;
       }).toList();
     } catch (e) {
@@ -971,12 +1021,15 @@ class SupabaseService {
     }
   }
 
-  // Get online driver locations (for map display)
+  // Get online driver locations (for map display, filtered by pool access)
   static Future<List<Map<String, dynamic>>> getOnlineDriverLocations() async {
     try {
-      // Use RPC function for reliable join query
-      final response = await client.rpc('get_online_driver_locations');
-      debugPrint('getOnlineDriverLocations: Got ${response.length} drivers');
+      // Use RPC function with customer ID for pool filtering
+      final customerId = userId;
+      final response = await client.rpc('get_online_driver_locations', params: {
+        'p_customer_id': customerId,
+      });
+      debugPrint('getOnlineDriverLocations: Got ${response.length} drivers for customer $customerId');
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint('Error getting online driver locations: $e');

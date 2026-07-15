@@ -280,6 +280,27 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  Future<String> _reverseGeocode(double lat, double lng) async {
+    try {
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/geocode/json'
+        '?latlng=$lat,$lng'
+        '&key=${AppConfig.googleMapsApiKey}'
+      );
+
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'OK' && (data['results'] as List).isNotEmpty) {
+          return data['results'][0]['formatted_address'] ?? '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}';
+        }
+      }
+    } catch (e) {
+      debugPrint('Reverse geocode error: $e');
+    }
+    return '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}';
+  }
+
   final List<Map<String, dynamic>> _placeIconOptions = [
     {'icon': Icons.home_rounded, 'label': 'Home'},
     {'icon': Icons.work_rounded, 'label': 'Work'},
@@ -796,14 +817,16 @@ class _SearchScreenState extends State<SearchScreen> {
                                         }
                                       }
                                     } else {
-                                      // Non-place result - use current location
+                                      // Non-place result - use current location with reverse geocoding
                                       final freshLoc = await LocationService.getCurrentLocation();
+                                      if (!mounted) return;
+                                      final pickupAddress = await _reverseGeocode(freshLoc.latitude, freshLoc.longitude);
                                       if (!mounted) return;
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
                                           builder: (_) => RideConfirmScreen(
-                                            pickup: 'Current location',
+                                            pickup: pickupAddress,
                                             dropoff: '${result['title']} · ${result['subtitle']}',
                                             pickupLat: freshLoc.latitude,
                                             pickupLng: freshLoc.longitude,
@@ -1215,10 +1238,12 @@ class _SearchScreenState extends State<SearchScreen> {
                             Navigator.pop(ctx);
                             final freshLoc = await LocationService.getCurrentLocation();
                             if (!mounted) return;
+                            final pickupAddress = await _reverseGeocode(freshLoc.latitude, freshLoc.longitude);
+                            if (!mounted) return;
                             Navigator.push(
                               context,
                               MaterialPageRoute(builder: (_) => RideConfirmScreen(
-                                pickup: 'Current location',
+                                pickup: pickupAddress,
                                 dropoff: locationName,
                                 pickupLat: freshLoc.latitude,
                                 pickupLng: freshLoc.longitude,
@@ -1593,11 +1618,13 @@ class _SearchScreenState extends State<SearchScreen> {
         HapticFeedback.mediumImpact();
         final freshLoc = await LocationService.getCurrentLocation();
         if (!mounted) return;
+        final pickupAddress = await _reverseGeocode(freshLoc.latitude, freshLoc.longitude);
+        if (!mounted) return;
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => RideConfirmScreen(
-              pickup: 'Current location',
+              pickup: pickupAddress,
               dropoff: place['address'],
               pickupLat: freshLoc.latitude,
               pickupLng: freshLoc.longitude,
@@ -2018,11 +2045,13 @@ class _SearchScreenState extends State<SearchScreen> {
           HapticFeedback.lightImpact();
           final freshLoc = await LocationService.getCurrentLocation();
           if (!mounted) return;
+          final pickupAddress = await _reverseGeocode(freshLoc.latitude, freshLoc.longitude);
+          if (!mounted) return;
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => RideConfirmScreen(
-                pickup: 'Current location',
+                pickup: pickupAddress,
                 dropoff: address,
                 pickupLat: freshLoc.latitude,
                 pickupLng: freshLoc.longitude,

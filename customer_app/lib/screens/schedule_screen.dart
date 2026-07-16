@@ -275,6 +275,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
           color: AppColors.yellow,
           backgroundColor: context.surfaceColor,
           child: CustomScrollView(
+            key: const PageStorageKey('schedule_scroll'),
+            physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               // Header
               SliverToBoxAdapter(child: _buildHeader(isDark, reminders.length)),
@@ -285,7 +287,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
 
               // Transport Mode Tabs - only show when View All
               if (_showAllTypes)
-                SliverToBoxAdapter(child: _buildModeTabs(isDark)),
+                SliverToBoxAdapter(
+                  key: const ValueKey('mode_tabs'),
+                  child: _buildModeTabs(isDark),
+                ),
 
               // Selected Type Header - show when specific type selected
               if (!_showAllTypes)
@@ -660,9 +665,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
             // Use color from database if available
             final colorHex = type['color'] as String? ?? '#FFD60A';
             final typeColor = Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
+            final isSelected = _selectedType == type['name'];
             return Expanded(
+              key: ValueKey('tab_${type['name']}'),
               child: GestureDetector(
                 onTap: () {
+                  if (_selectedType == type['name']) return;
                   HapticFeedback.lightImpact();
                   setState(() {
                     _selectedType = type['name'];
@@ -689,13 +697,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                     _selectedRoute = newFilteredRoutes.isNotEmpty ? (newFilteredRoutes.first['id'] ?? '') : '';
                   });
                 },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOutCubic,
+                child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   padding: const EdgeInsets.fromLTRB(8, 14, 8, 12),
                   decoration: BoxDecoration(
-                    color: context.surfaceColor,
+                    color: isSelected
+                        ? typeColor.withValues(alpha: 0.15)
+                        : context.surfaceColor,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(
@@ -705,7 +713,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                         width: 52,
                         height: 52,
                         decoration: BoxDecoration(
-                          color: typeColor.withValues(alpha: 0.2),
+                          color: typeColor.withValues(alpha: isSelected ? 0.3 : 0.2),
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Icon(
@@ -720,7 +728,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
                         style: TextStyle(
                           color: typeColor,
                           fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

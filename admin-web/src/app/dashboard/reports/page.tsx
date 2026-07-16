@@ -1012,9 +1012,10 @@ export default function ReportsPage() {
 
           const vehicleDriverMap: Record<string, string> = {}
           for (const d of drivers || []) {
-            const profile = d.profile as { full_name: string } | null
+            const profileData = d.profile as { full_name: string } | { full_name: string }[] | null
+            const profile = Array.isArray(profileData) ? profileData[0] : profileData
             if (d.vehicle_id && profile?.full_name) {
-              vehicleDriverMap[d.vehicle_id] = profile.full_name
+              vehicleDriverMap[d.vehicle_id as string] = profile.full_name
             }
           }
 
@@ -1735,8 +1736,9 @@ export default function ReportsPage() {
           const { data: drivers } = await supabase.from("drivers").select("vehicle_id, profile:profiles!drivers_profile_id_fkey(full_name)").not("vehicle_id", "is", null)
           const vehicleDriverMap: Record<string, string> = {}
           for (const d of drivers || []) {
-            const profile = d.profile as { full_name: string } | null
-            if (d.vehicle_id && profile?.full_name) vehicleDriverMap[d.vehicle_id] = profile.full_name
+            const profileData = d.profile as { full_name: string } | { full_name: string }[] | null
+            const profile = Array.isArray(profileData) ? profileData[0] : profileData
+            if (d.vehicle_id && profile?.full_name) vehicleDriverMap[d.vehicle_id as string] = profile.full_name
           }
           rows = (vehicles || []).map((v: Record<string, unknown>) => ({
             "Plate No": String(v.plate_no || "-"),

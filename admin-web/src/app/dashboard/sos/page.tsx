@@ -383,6 +383,11 @@ export default function SOSPage() {
     const updates: Record<string, unknown> = { status: newStatus }
     if (newStatus === "resolved" || newStatus === "false_alarm") {
       updates.resolved_at = new Date().toISOString()
+      // Get current admin user to save as resolver
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        updates.resolved_by = user.id
+      }
     }
 
     const { error } = await supabase.from("sos_alerts").update(updates).eq("id", alertId)

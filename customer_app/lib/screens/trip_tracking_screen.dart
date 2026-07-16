@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
@@ -2064,11 +2065,36 @@ Live tracking link: https://my-ride-ashen.vercel.app/track/$rideId
   Future<void> _activateSOS() async {
     HapticFeedback.heavyImpact();
 
+    final lat = _driverLocation.latitude;
+    final lng = _driverLocation.longitude;
+
+    // Get address from coordinates
+    String? locationAddress;
+    try {
+      final geocoding = Geocoding();
+      final placemarks = await geocoding.placemarkFromCoordinates(lat, lng);
+      if (placemarks.isNotEmpty) {
+        final place = placemarks.first;
+        final parts = <String>[
+          if (place.street?.isNotEmpty == true) place.street!,
+          if (place.subLocality?.isNotEmpty == true) place.subLocality!,
+          if (place.locality?.isNotEmpty == true) place.locality!,
+        ];
+        locationAddress = parts.join(', ');
+        if (locationAddress.isEmpty) {
+          locationAddress = place.name ?? 'Unknown location';
+        }
+      }
+    } catch (e) {
+      debugPrint('Could not get address for SOS: $e');
+    }
+
     // Send SOS alert to admin
     await SupabaseService.triggerSOSAlert(
-      latitude: _driverLocation.latitude,
-      longitude: _driverLocation.longitude,
+      latitude: lat,
+      longitude: lng,
       rideId: widget.tripData['rideId'] as String?,
+      locationAddress: locationAddress,
     );
 
     // Show notification

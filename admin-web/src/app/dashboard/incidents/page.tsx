@@ -70,6 +70,7 @@ interface Incident {
   description: string | null
   status: string
   location_name: string | null
+  reporter_name: string | null
   created_at: string
   resolved_at: string | null
   resolution: string | null
@@ -93,6 +94,7 @@ export default function IncidentsPage() {
     title: "",
     description: "",
     location_name: "",
+    reporter_name: "",
   })
   const [resolution, setResolution] = useState("")
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -117,11 +119,7 @@ export default function IncidentsPage() {
     if (showLoading) setLoading(true)
     let query = supabase
       .from("incidents")
-      .select(`
-        *,
-        customer:profiles!incidents_customer_id_fkey(full_name),
-        driver:drivers!incidents_driver_id_fkey(profile:profiles(full_name))
-      `)
+      .select(`*`)
       .order("created_at", { ascending: false })
 
     if (statusFilter !== "all") {
@@ -157,13 +155,14 @@ export default function IncidentsPage() {
       title: formData.title,
       description: formData.description || null,
       location_name: formData.location_name || null,
+      reporter_name: formData.reporter_name || null,
       status: "open",
     }).select().single()
     if (error) {
       toast.error("Failed to create incident")
     } else {
       toast.success("Incident created")
-      setFormData({ type: "complaint", severity: "medium", title: "", description: "", location_name: "" })
+      setFormData({ type: "complaint", severity: "medium", title: "", description: "", location_name: "", reporter_name: "" })
       if (data) {
         setIncidents(prev => [data, ...prev])
       }
@@ -439,6 +438,7 @@ export default function IncidentsPage() {
               <TableHead>Type</TableHead>
               <TableHead>Severity</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Reporter</TableHead>
               <TableHead>Location</TableHead>
               <TableHead>Created</TableHead>
               <TableHead className="w-12"></TableHead>
@@ -447,7 +447,7 @@ export default function IncidentsPage() {
           <TableBody>
             {filteredIncidents.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="py-16">
+                <TableCell colSpan={9} className="py-16">
                   <EmptyState
                     icon="incidents"
                     title="No incidents found"
@@ -475,6 +475,7 @@ export default function IncidentsPage() {
                   <TableCell className="capitalize">{incident.type}</TableCell>
                   <TableCell>{severityBadge(incident.severity)}</TableCell>
                   <TableCell>{statusBadge(incident.status)}</TableCell>
+                  <TableCell>{incident.reporter_name || "-"}</TableCell>
                   <TableCell>{incident.location_name || "-"}</TableCell>
                   <TableCell>{formatDate(incident.created_at)}</TableCell>
                   <TableCell>
@@ -590,13 +591,23 @@ export default function IncidentsPage() {
                 </Select>
               </div>
             </div>
-            <div>
-              <label className="text-sm font-medium">Location</label>
-              <Input
-                value={formData.location_name}
-                onChange={(e) => setFormData({ ...formData, location_name: e.target.value })}
-                placeholder="Where did this occur?"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Reporter Name</label>
+                <Input
+                  value={formData.reporter_name}
+                  onChange={(e) => setFormData({ ...formData, reporter_name: e.target.value })}
+                  placeholder="Who reported this?"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Location</label>
+                <Input
+                  value={formData.location_name}
+                  onChange={(e) => setFormData({ ...formData, location_name: e.target.value })}
+                  placeholder="Where did this occur?"
+                />
+              </div>
             </div>
             <div>
               <label className="text-sm font-medium">Description</label>
@@ -635,6 +646,12 @@ export default function IncidentsPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Description</p>
                   <p>{selectedIncident.description}</p>
+                </div>
+              )}
+              {selectedIncident.reporter_name && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Reporter</p>
+                  <p>{selectedIncident.reporter_name}</p>
                 </div>
               )}
               {selectedIncident.location_name && (

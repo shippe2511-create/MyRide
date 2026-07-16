@@ -37,6 +37,8 @@ interface VehicleType {
   description: string | null
   icon: string
   plate_no: string | null
+  make_model: string | null
+  color: string | null
   capacity: number
   base_fare: number
   per_km_rate: number
@@ -103,6 +105,8 @@ export default function VehiclesPage() {
     description: "",
     icon: "car",
     plate_no: "",
+    make_model: "",
+    color: "",
     capacity: 4,
     is_active: true,
     features: ""
@@ -148,6 +152,8 @@ export default function VehiclesPage() {
       description: "",
       icon: "car",
       plate_no: "",
+      make_model: "",
+      color: "",
       capacity: 4,
       is_active: true,
       features: ""
@@ -163,6 +169,8 @@ export default function VehiclesPage() {
       description: vehicle.description || "",
       icon: vehicle.icon,
       plate_no: vehicle.plate_no || "",
+      make_model: vehicle.make_model || "",
+      color: vehicle.color || "",
       capacity: vehicle.capacity,
       is_active: vehicle.is_active,
       features: (vehicle.features || []).join(", ")
@@ -186,6 +194,8 @@ export default function VehiclesPage() {
       description: formData.description || null,
       icon: formData.icon,
       plate_no: formData.plate_no || null,
+      make_model: formData.make_model || null,
+      color: formData.color || null,
       capacity: formData.capacity,
       is_active: formData.is_active,
       features: formData.features.split(",").map(f => f.trim()).filter(Boolean),
@@ -543,6 +553,24 @@ export default function VehiclesPage() {
                   value={formData.plate_no}
                   onChange={(e) => setFormData({ ...formData, plate_no: e.target.value.toUpperCase() })}
                   placeholder="C7846"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Make/Model</label>
+                <Input
+                  value={formData.make_model}
+                  onChange={(e) => setFormData({ ...formData, make_model: e.target.value })}
+                  placeholder="Toyota Hiace"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Color</label>
+                <Input
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  placeholder="White"
                 />
               </div>
             </div>

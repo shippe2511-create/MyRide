@@ -35,6 +35,7 @@ dependencies:
   firebase_messaging: ^15.2.5
   flutter_image_compress: ^2.4.0
   cached_network_image: ^3.4.1
+  geocoding: ^5.0.0
 
 dev_dependencies:
   flutter_test:

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../theme/app_theme.dart';
@@ -177,9 +178,33 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
       }
     }
 
+    // Get address from coordinates
+    String? locationAddress;
+    if (lat != null && lng != null) {
+      try {
+        final geocoding = Geocoding();
+        final placemarks = await geocoding.placemarkFromCoordinates(lat, lng);
+        if (placemarks.isNotEmpty) {
+          final place = placemarks.first;
+          final parts = <String>[
+            if (place.street?.isNotEmpty == true) place.street!,
+            if (place.subLocality?.isNotEmpty == true) place.subLocality!,
+            if (place.locality?.isNotEmpty == true) place.locality!,
+          ];
+          locationAddress = parts.join(', ');
+          if (locationAddress.isEmpty) {
+            locationAddress = place.name ?? 'Unknown location';
+          }
+        }
+      } catch (e) {
+        debugPrint('Could not get address for SOS: $e');
+      }
+    }
+
     await SupabaseService.triggerSOSAlert(
       latitude: lat,
       longitude: lng,
+      locationAddress: locationAddress,
     );
   }
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { formatPhone } from "@/lib/format-phone"
 import { toast } from "sonner"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -460,7 +461,7 @@ export default function SupportChatPage() {
                   <div>
                     <p className="font-medium">{selectedChat.customer?.full_name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {selectedChat.customer?.phone || selectedChat.customer?.email || selectedChat.customer?.employee_id}
+                      {formatPhone(selectedChat.customer?.phone) || selectedChat.customer?.email || selectedChat.customer?.employee_id}
                     </p>
                   </div>
                 </div>

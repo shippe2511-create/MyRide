@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { formatPhone } from "@/lib/format-phone"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -536,7 +537,7 @@ export default function RidesPage() {
                       </Avatar>
                       <div>
                         <p className="font-medium text-sm">{ride.customer?.full_name || "Unknown"}</p>
-                        <p className="text-xs text-muted-foreground">{ride.customer?.phone || "-"}</p>
+                        <p className="text-xs text-muted-foreground">{formatPhone(ride.customer?.phone) || "-"}</p>
                       </div>
                     </div>
                   </TableCell>
@@ -640,7 +641,7 @@ export default function RidesPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Customer</p>
                   <p className="font-medium">{selectedRide.customer?.full_name}</p>
-                  <p className="text-sm">{selectedRide.customer?.phone}</p>
+                  <p className="text-sm">{formatPhone(selectedRide.customer?.phone)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Driver</p>

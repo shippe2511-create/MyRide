@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { formatPhone } from "@/lib/format-phone"
 import { toast } from "sonner"
 import {
   Table,
@@ -959,7 +960,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                       {customer.phone ? (
                         <p className="text-sm flex items-center gap-1.5 text-muted-foreground select-text">
                           <Phone className="h-3 w-3" />
-                          {customer.phone}
+                          {formatPhone(customer.phone)}
                         </p>
                       ) : (
                         <p className="text-sm text-muted-foreground">-</p>
@@ -994,7 +995,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-7 text-xs text-purple-600 border-purple-300 hover:bg-purple-50"
+                          className="h-7 text-xs border-purple-500 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300"
                           onClick={() => openAssignDriversDialog(customer)}
                         >
                           Assign Vehicles
@@ -1171,7 +1172,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Phone</span>
-                  <span>{selectedCustomer.phone || "-"}</span>
+                  <span>{formatPhone(selectedCustomer.phone) || "-"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Employee ID</span>
@@ -1378,7 +1379,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                         <TableRow key={i}>
                           <TableCell className="font-medium">{row.full_name}</TableCell>
                           <TableCell className="text-muted-foreground">{row.email || "-"}</TableCell>
-                          <TableCell className="text-muted-foreground">{row.phone || "-"}</TableCell>
+                          <TableCell className="text-muted-foreground">{formatPhone(row.phone) || "-"}</TableCell>
                           <TableCell className="text-muted-foreground">{row.employee_id || "-"}</TableCell>
                           <TableCell className="text-muted-foreground">{row.department || "-"}</TableCell>
                           <TableCell className="text-muted-foreground">{row.gender || "-"}</TableCell>

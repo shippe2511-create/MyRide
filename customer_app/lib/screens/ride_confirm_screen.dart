@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/app_config.dart';
 import '../theme/app_theme.dart';
+import '../services/supabase_service.dart';
 import 'driver_matching_screen.dart';
 
 const String _darkMapStyle = '''
@@ -51,12 +53,56 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
   BitmapDescriptor? _pickupIcon;
   BitmapDescriptor? _dropoffIcon;
   MapType _mapType = MapType.normal;
+  bool _hasPrivateAccess = false;
+  bool _usePrivatePool = false;
+  RealtimeChannel? _assignmentChannel;
 
   @override
   void initState() {
     super.initState();
     _createMarkerIcons();
     _fetchRoute();
+    _checkPrivateAccess();
+    _setupRealtimeSubscription();
+  }
+
+  @override
+  void dispose() {
+    _assignmentChannel?.unsubscribe();
+    super.dispose();
+  }
+
+  void _setupRealtimeSubscription() {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return;
+
+    _assignmentChannel = Supabase.instance.client
+        .channel('ride_confirm_pools_$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'customer_pools',
+          callback: (payload) {
+            debugPrint('RideConfirmScreen: Pool changed, payload=$payload');
+            // Check if this change affects the current user
+            final newRecord = payload.newRecord;
+            final oldRecord = payload.oldRecord;
+            final affectedCustomerId = newRecord['customer_id'] ?? oldRecord['customer_id'];
+            if (affectedCustomerId == userId) {
+              debugPrint('RideConfirmScreen: Refreshing for current user');
+              _checkPrivateAccess();
+            }
+          },
+        )
+        .subscribe();
+  }
+
+  Future<void> _checkPrivateAccess() async {
+    final hasAccess = await SupabaseService.hasPrivatePoolAccess();
+    debugPrint('RideConfirmScreen: hasPrivateAccess=$hasAccess');
+    if (mounted) {
+      setState(() => _hasPrivateAccess = hasAccess);
+    }
   }
 
   Future<void> _createMarkerIcons() async {
@@ -442,6 +488,64 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
 
                   const SizedBox(height: 20),
 
+                  // Private vehicle toggle (only shown if customer has private access)
+                  if (_hasPrivateAccess) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: _usePrivatePool
+                            ? Colors.purple.withValues(alpha: 0.2)
+                            : context.cardColor,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _usePrivatePool ? Colors.purple : context.borderColor,
+                          width: _usePrivatePool ? 2 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.directions_car,
+                            color: _usePrivatePool ? Colors.purple : context.mutedColor,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Use Private Vehicle',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: _usePrivatePool ? Colors.purple : context.textColor,
+                                  ),
+                                ),
+                                Text(
+                                  _usePrivatePool
+                                      ? 'Your assigned vehicle will be requested'
+                                      : 'Request from any available driver',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: context.mutedColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: _usePrivatePool,
+                            onChanged: (value) {
+                              HapticFeedback.selectionClick();
+                              setState(() => _usePrivatePool = value);
+                            },
+                            activeColor: Colors.purple,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
                   // Request button
                   SizedBox(
                     width: double.infinity,
@@ -461,6 +565,7 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
                               dropoffLat: widget.dropoffLat,
                               dropoffLng: widget.dropoffLng,
                               seatsBooked: 1,
+                              pool: _usePrivatePool ? 'private' : 'public',
                             ),
                           ),
                         );

@@ -390,6 +390,7 @@ class SupabaseService {
     DateTime? scheduledTime,
     String? customerId,
     int seatsBooked = 1,
+    String pool = 'public',
   }) async {
     // Priority: passed customerId > auth user > lookup by stored profile
     String? finalCustomerId = customerId ?? currentUser?.id;
@@ -417,8 +418,30 @@ class SupabaseService {
       'scheduled_time': scheduledTime?.toIso8601String(),
       'seats_booked': seatsBooked,
       'status': 'pending',
+      'pool': pool,
     }).select().single();
     return response;
+  }
+
+  // Check if customer has private pool access
+  static Future<bool> hasPrivatePoolAccess() async {
+    final customerId = userId;
+    debugPrint('hasPrivatePoolAccess: customerId=$customerId');
+    if (customerId == null) return false;
+
+    try {
+      final response = await client
+          .from('customer_pools')
+          .select('id')
+          .eq('customer_id', customerId)
+          .eq('pool', 'private')
+          .maybeSingle();
+      debugPrint('hasPrivatePoolAccess: response=$response');
+      return response != null;
+    } catch (e) {
+      debugPrint('hasPrivatePoolAccess error: $e');
+      return false;
+    }
   }
 
   static Future<List<Map<String, dynamic>>> getMyRides() async {

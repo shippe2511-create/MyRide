@@ -280,6 +280,14 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  String _cleanAddress(String address) {
+    return address
+        .replaceAll(RegExp(r',?\s*Malé\s*\d*,?\s*Maldives\s*$', caseSensitive: false), '')
+        .replaceAll(RegExp(r',?\s*Male\s*\d*,?\s*Maldives\s*$', caseSensitive: false), '')
+        .replaceAll(RegExp(r',?\s*Maldives\s*$', caseSensitive: false), '')
+        .trim();
+  }
+
   Future<String> _reverseGeocode(double lat, double lng) async {
     try {
       final url = Uri.parse(
@@ -292,7 +300,8 @@ class _SearchScreenState extends State<SearchScreen> {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['status'] == 'OK' && (data['results'] as List).isNotEmpty) {
-          return data['results'][0]['formatted_address'] ?? '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}';
+          final address = data['results'][0]['formatted_address'] ?? '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}';
+          return _cleanAddress(address);
         }
       }
     } catch (e) {

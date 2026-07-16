@@ -534,6 +534,34 @@ class SupabaseService {
     final cutoffTime = DateTime.now().toUtc().subtract(const Duration(minutes: 30)).toIso8601String();
     debugPrint('getPendingRides: now=$now, cutoff=$cutoffTime');
 
+    // Get driver's pool memberships and assigned customers
+    final currentDriverId = driverId;
+    Set<String> driverPools = {'public'}; // Default to public
+    Set<String> assignedCustomerIds = {};
+
+    if (currentDriverId != null) {
+      // Get driver's pool memberships
+      final poolsResponse = await client
+          .from('driver_pools')
+          .select('pool')
+          .eq('driver_id', currentDriverId);
+      driverPools = (poolsResponse as List).map((p) => p['pool'] as String).toSet();
+      if (driverPools.isEmpty) driverPools = {'public'};
+
+      // Get customers assigned to this driver (for private pool)
+      if (driverPools.contains('private')) {
+        final assignmentsResponse = await client
+            .from('customer_driver_assignments')
+            .select('customer_id')
+            .eq('driver_id', currentDriverId);
+        assignedCustomerIds = (assignmentsResponse as List)
+            .map((a) => a['customer_id'] as String)
+            .toSet();
+      }
+    }
+
+    debugPrint('Driver pools: $driverPools, assigned customers: ${assignedCustomerIds.length}');
+
     // Get immediate rides (no scheduled_time, created recently)
     final immediateRides = await client
         .from('rides')
@@ -562,7 +590,39 @@ class SupabaseService {
       ...List<Map<String, dynamic>>.from(scheduledRides),
     ];
 
-    return allRides;
+    // Filter rides based on driver's pool access
+    final filteredRides = allRides.where((ride) {
+      final ridePool = ride['pool'] as String? ?? 'public';
+      final customerId = ride['customer_id'] as String?;
+
+      if (ridePool == 'private') {
+        // Private rides: only show to drivers in private pool AND assigned to this customer
+        return driverPools.contains('private') &&
+               customerId != null &&
+               assignedCustomerIds.contains(customerId);
+      } else {
+        // Public rides: show to drivers in public pool
+        return driverPools.contains('public');
+      }
+    }).toList();
+
+    // Sort: private rides first (priority), then by created_at
+    filteredRides.sort((a, b) {
+      final aPool = a['pool'] as String? ?? 'public';
+      final bPool = b['pool'] as String? ?? 'public';
+
+      // Private rides come first
+      if (aPool == 'private' && bPool != 'private') return -1;
+      if (bPool == 'private' && aPool != 'private') return 1;
+
+      // Within same pool, sort by created_at
+      final aTime = DateTime.tryParse(a['created_at'] ?? '') ?? DateTime.now();
+      final bTime = DateTime.tryParse(b['created_at'] ?? '') ?? DateTime.now();
+      return aTime.compareTo(bTime);
+    });
+
+    debugPrint('Filtered to ${filteredRides.length} rides for this driver');
+    return filteredRides;
   }
 
   // Get the current status of a specific ride

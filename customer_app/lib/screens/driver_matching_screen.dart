@@ -39,6 +39,7 @@ class DriverMatchingScreen extends StatefulWidget {
   final double dropoffLat;
   final double dropoffLng;
   final int seatsBooked;
+  final String pool;
 
   const DriverMatchingScreen({
     super.key,
@@ -50,6 +51,7 @@ class DriverMatchingScreen extends StatefulWidget {
     required this.dropoffLat,
     required this.dropoffLng,
     this.seatsBooked = 1,
+    this.pool = 'public',
   });
 
   @override
@@ -340,6 +342,7 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
         dropoffName: widget.dropoff,
         dropoffLat: widget.dropoffLat,
         dropoffLng: widget.dropoffLng,
+        pool: widget.pool,
       );
 
       _rideId = rideData['id'];

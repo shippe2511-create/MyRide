@@ -366,25 +366,43 @@ class _DriverAppState extends State<DriverApp> with WidgetsBindingObserver {
           debugShowCheckedModeBanner: false,
           theme: state.isDarkMode ? AppTheme.darkTheme : AppTheme.lightTheme,
           home: const SplashScreen(),
-          routes: {
-            '/splash': (_) => const SplashScreen(),
-            '/onboarding': (_) => const OnboardingScreen(),
-            '/login': (_) => const LoginScreen(),
-            '/register': (_) => const RegistrationScreen(),
-            '/suspended': (_) => const SuspendedScreen(),
-            '/home': (_) => const HomeScreen(),
-            '/history': (_) => const HistoryScreen(),
-            '/profile': (_) => const ProfileScreen(),
-            '/notifications': (_) => const NotificationsSettingsScreen(),
-            '/notifications-list': (_) => const NotificationsScreen(),
-            '/ratings': (_) => const RatingsScreen(),
-            '/documents': (_) => const DocumentsScreen(),
-            '/sos': (_) => const SOSScreen(),
-            '/shift-schedule': (_) => const ShiftScheduleScreen(),
-            '/help': (_) => const HelpScreen(),
-            '/about': (_) => const AboutScreen(),
-            '/support-chat': (_) => const SupportChatScreen(),
-            '/push-to-talk': (_) => const PushToTalkScreen(),
+          onGenerateRoute: (settings) {
+            // Use fade transition for /home to prevent flash
+            if (settings.name == '/home') {
+              return PageRouteBuilder(
+                settings: settings,
+                pageBuilder: (_, __, ___) => const HomeScreen(),
+                transitionsBuilder: (_, animation, __, child) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
+                transitionDuration: const Duration(milliseconds: 200),
+              );
+            }
+            // Default routes
+            final routes = <String, WidgetBuilder>{
+              '/splash': (_) => const SplashScreen(),
+              '/onboarding': (_) => const OnboardingScreen(),
+              '/login': (_) => const LoginScreen(),
+              '/register': (_) => const RegistrationScreen(),
+              '/suspended': (_) => const SuspendedScreen(),
+              '/history': (_) => const HistoryScreen(),
+              '/profile': (_) => const ProfileScreen(),
+              '/notifications': (_) => const NotificationsSettingsScreen(),
+              '/notifications-list': (_) => const NotificationsScreen(),
+              '/ratings': (_) => const RatingsScreen(),
+              '/documents': (_) => const DocumentsScreen(),
+              '/sos': (_) => const SOSScreen(),
+              '/shift-schedule': (_) => const ShiftScheduleScreen(),
+              '/help': (_) => const HelpScreen(),
+              '/about': (_) => const AboutScreen(),
+              '/support-chat': (_) => const SupportChatScreen(),
+              '/push-to-talk': (_) => const PushToTalkScreen(),
+            };
+            final builder = routes[settings.name];
+            if (builder != null) {
+              return MaterialPageRoute(builder: builder, settings: settings);
+            }
+            return null;
           },
           builder: (context, child) {
             return OfflineBanner(

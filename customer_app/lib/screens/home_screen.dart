@@ -2191,9 +2191,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         child: ElevatedButton(
                           onPressed: (pickupAddress.isNotEmpty && dropoffAddress.isNotEmpty)
                               ? () async {
-                                  // Check driver availability FIRST (most important)
-                                  final hasShift = await SupabaseService.hasDriverShiftAt(selectedDate);
-                                  if (!hasShift) {
+                                  // Check if it's a weekend day (Friday=5, Saturday=6 in Maldives)
+                                  final isWeekend = selectedDate.weekday == DateTime.friday || selectedDate.weekday == DateTime.saturday;
+                                  if (isWeekend) {
                                     final dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][selectedDate.weekday - 1];
                                     AppSnackbar.warning(context, 'No drivers available on $dayName');
                                     return;
@@ -2425,6 +2425,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return null;
     }
 
+    String cleanAddress(String address) {
+      return address
+          .replaceAll(RegExp(r',?\s*Malé\s*\d*,?\s*Maldives\s*$', caseSensitive: false), '')
+          .replaceAll(RegExp(r',?\s*Male\s*\d*,?\s*Maldives\s*$', caseSensitive: false), '')
+          .replaceAll(RegExp(r',?\s*Maldives\s*$', caseSensitive: false), '')
+          .trim();
+    }
+
     Future<String> reverseGeocode(LatLng point) async {
       try {
         final url = Uri.parse(
@@ -2437,7 +2445,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
           if (data['status'] == 'OK' && (data['results'] as List).isNotEmpty) {
-            return data['results'][0]['formatted_address'] ?? 'Pinned Location';
+            final address = data['results'][0]['formatted_address'] ?? 'Pinned Location';
+            return cleanAddress(address);
           }
         }
       } catch (e) {

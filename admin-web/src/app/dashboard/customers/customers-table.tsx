@@ -162,7 +162,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
     }
   }
 
-  const togglePrivateAccess = async (customerId: string, currentlyHasAccess: boolean) => {
+  const togglePrivateAccess = async (customerId: string, customerName: string, currentlyHasAccess: boolean) => {
     if (currentlyHasAccess) {
       // Revoke private access
       const { error } = await supabase
@@ -175,7 +175,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
       } else {
         setCustomerPools(prev => ({ ...prev, [customerId]: false }))
         toast.success("Private pool access revoked")
-        logActivity({ action: 'update', entityType: 'customer', entityId: customerId, details: { private_access: false } })
+        logActivity({ action: 'update', entityType: 'customer', entityId: customerId, details: { name: customerName, private_access: false } })
       }
     } else {
       // Grant private access
@@ -187,7 +187,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
       } else {
         setCustomerPools(prev => ({ ...prev, [customerId]: true }))
         toast.success("Private pool access granted")
-        logActivity({ action: 'update', entityType: 'customer', entityId: customerId, details: { private_access: true } })
+        logActivity({ action: 'update', entityType: 'customer', entityId: customerId, details: { name: customerName, private_access: true } })
       }
     }
   }
@@ -989,7 +989,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                     <div className="flex items-center gap-2">
                       <Switch
                         checked={customerPools[customer.id] || false}
-                        onCheckedChange={() => togglePrivateAccess(customer.id, customerPools[customer.id] || false)}
+                        onCheckedChange={() => togglePrivateAccess(customer.id, customer.full_name, customerPools[customer.id] || false)}
                       />
                       {customerPools[customer.id] && (
                         <Button

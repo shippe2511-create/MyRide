@@ -276,12 +276,12 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Message": "message",
   },
   activity_logs: {
-    "Action": "action",
-    "Entity": "entity_type",
-    "User": "user_name",
-    "Details": "details",
     "Date": "date",
     "Time": "time",
+    "Admin": "admin_name",
+    "Type": "entity_type",
+    "Target": "target_name",
+    "Change": "change",
   },
   chat_messages: {
     "Ride": "ride_id",
@@ -1082,42 +1082,58 @@ export default function ReportsPage() {
 
           rows = (logs || []).map((l: Record<string, unknown>) => {
             const details = l.details as Record<string, unknown> | null
-            let detailsText = "-"
+            const action = String(l.action || "")
+            const entityType = String(l.entity_type || "")
+
+            // Extract target name from details
+            const targetName = details?.name || details?.full_name || "-"
+
+            // Build human-readable change description
+            let changeText = "-"
             if (details) {
-              if (details.name) {
-                detailsText = String(details.name)
-              } else if (details.full_name) {
-                detailsText = String(details.full_name)
-              } else if (details.count) {
-                detailsText = `${details.count} items`
-              } else if (details.private_access !== undefined) {
-                detailsText = details.private_access ? "Private access granted" : "Private access revoked"
+              if (details.private_access !== undefined) {
+                changeText = details.private_access ? "Granted private pool access" : "Revoked private pool access"
               } else if (details.status) {
-                detailsText = `Status: ${formatStatus(String(details.status))}`
+                changeText = `Changed status to ${formatStatus(String(details.status))}`
               } else if (details.is_active !== undefined) {
-                detailsText = details.is_active ? "Activated" : "Deactivated"
+                changeText = details.is_active ? "Activated account" : "Deactivated account"
               } else if (details.assigned_driver) {
-                detailsText = `Assigned to ${details.assigned_driver}`
+                changeText = `Assigned driver: ${details.assigned_driver}`
+              } else if (details.count) {
+                changeText = `${action === "create" ? "Created" : action === "delete" ? "Deleted" : "Updated"} ${details.count} items`
+              } else if (details.bulk_import) {
+                changeText = `Bulk imported ${details.count || "multiple"} records`
+              } else if (details.message) {
+                changeText = String(details.message)
+              } else if (action === "create") {
+                changeText = `Created new ${entityType}`
+              } else if (action === "update") {
+                changeText = `Updated ${entityType} details`
+              } else if (action === "delete") {
+                changeText = `Deleted ${entityType}`
               } else {
-                // Format remaining as readable key-value pairs
+                // Format any remaining details
                 const formatted = Object.entries(details)
-                  .filter(([, v]) => v !== null && v !== undefined && v !== "")
+                  .filter(([k, v]) => k !== "name" && k !== "full_name" && v !== null && v !== undefined && v !== "")
                   .map(([k, v]) => {
                     const key = k.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
                     const val = typeof v === "boolean" ? (v ? "Yes" : "No") : String(v)
                     return `${key}: ${val}`
                   })
                   .join(", ")
-                detailsText = formatted || "-"
+                changeText = formatted || `${formatStatus(action)} ${entityType}`
               }
+            } else {
+              changeText = `${formatStatus(action)} ${entityType}`
             }
+
             return {
-              "Action": formatStatus(String(l.action || "")),
-              "Entity": formatStatus(String(l.entity_type || "")),
-              "User": String(l.admin_name || "System"),
-              "Details": detailsText,
               "Date": formatDate(String(l.created_at || "")),
               "Time": formatTime(String(l.created_at || "")),
+              "Admin": String(l.admin_name || "System"),
+              "Type": formatStatus(entityType),
+              "Target": String(targetName),
+              "Change": changeText,
             }
           })
           filename = `activity_logs_${new Date().toISOString().split("T")[0]}.csv`
@@ -1851,41 +1867,52 @@ export default function ReportsPage() {
           const { data: logs } = await query
           rows = (logs || []).map((l: Record<string, unknown>) => {
             const details = l.details as Record<string, unknown> | null
-            let detailsText = "-"
+            const action = String(l.action || "")
+            const entityType = String(l.entity_type || "")
+            const targetName = details?.name || details?.full_name || "-"
+            let changeText = "-"
             if (details) {
-              if (details.name) {
-                detailsText = String(details.name)
-              } else if (details.full_name) {
-                detailsText = String(details.full_name)
-              } else if (details.count) {
-                detailsText = `${details.count} items`
-              } else if (details.private_access !== undefined) {
-                detailsText = details.private_access ? "Private access granted" : "Private access revoked"
+              if (details.private_access !== undefined) {
+                changeText = details.private_access ? "Granted private pool access" : "Revoked private pool access"
               } else if (details.status) {
-                detailsText = `Status: ${formatStatus(String(details.status))}`
+                changeText = `Changed status to ${formatStatus(String(details.status))}`
               } else if (details.is_active !== undefined) {
-                detailsText = details.is_active ? "Activated" : "Deactivated"
+                changeText = details.is_active ? "Activated account" : "Deactivated account"
               } else if (details.assigned_driver) {
-                detailsText = `Assigned to ${details.assigned_driver}`
+                changeText = `Assigned driver: ${details.assigned_driver}`
+              } else if (details.count) {
+                changeText = `${action === "create" ? "Created" : action === "delete" ? "Deleted" : "Updated"} ${details.count} items`
+              } else if (details.bulk_import) {
+                changeText = `Bulk imported ${details.count || "multiple"} records`
+              } else if (details.message) {
+                changeText = String(details.message)
+              } else if (action === "create") {
+                changeText = `Created new ${entityType}`
+              } else if (action === "update") {
+                changeText = `Updated ${entityType} details`
+              } else if (action === "delete") {
+                changeText = `Deleted ${entityType}`
               } else {
                 const formatted = Object.entries(details)
-                  .filter(([, v]) => v !== null && v !== undefined && v !== "")
+                  .filter(([k, v]) => k !== "name" && k !== "full_name" && v !== null && v !== undefined && v !== "")
                   .map(([k, v]) => {
                     const key = k.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
                     const val = typeof v === "boolean" ? (v ? "Yes" : "No") : String(v)
                     return `${key}: ${val}`
                   })
                   .join(", ")
-                detailsText = formatted || "-"
+                changeText = formatted || `${formatStatus(action)} ${entityType}`
               }
+            } else {
+              changeText = `${formatStatus(action)} ${entityType}`
             }
             return {
-              "Action": formatStatus(String(l.action || "")),
-              "Entity": formatStatus(String(l.entity_type || "")),
-              "User": String(l.admin_name || "System"),
-              "Details": detailsText,
               "Date": formatDate(String(l.created_at || "")),
               "Time": formatTime(String(l.created_at || "")),
+              "Admin": String(l.admin_name || "System"),
+              "Type": formatStatus(entityType),
+              "Target": String(targetName),
+              "Change": changeText,
             }
           })
           break

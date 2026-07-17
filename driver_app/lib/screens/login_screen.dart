@@ -39,8 +39,8 @@ class _LoginScreenState extends State<LoginScreen> {
     return cleaned.length == 7 && (cleaned.startsWith('7') || cleaned.startsWith('9'));
   }
 
-  // DEV MODE: Skip OTP for testing
-  static const bool _devSkipOtp = true;
+  // DEV MODE: Skip OTP for testing (set to false for production)
+  static const bool _devSkipOtp = false;
 
   Future<void> _sendOTP() async {
     final phone = _phoneController.text.trim();

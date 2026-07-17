@@ -359,12 +359,16 @@ class DriverState extends ChangeNotifier {
 
   Future<void> _loadAvatarFromDb() async {
     if (_driverId.isEmpty) return;
-    final url = await SupabaseService.getDriverAvatarUrl(_driverId);
-    if (url != null && url.isNotEmpty && url != _avatarUrl) {
-      _avatarUrl = url;
-      final prefs = await SharedPreferences.getInstance();
-      prefs.setString('avatarUrl', url);
-      notifyListeners();
+    try {
+      final url = await SupabaseService.getDriverAvatarUrl(_driverId);
+      if (url != null && url.isNotEmpty && url != _avatarUrl) {
+        _avatarUrl = url;
+        final prefs = await SharedPreferences.getInstance();
+        prefs.setString('avatarUrl', url);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error loading avatar from DB: $e');
     }
   }
 
@@ -1328,6 +1332,12 @@ class DriverState extends ChangeNotifier {
     _rideCancellationSubscription = null;
     _driverProfileSubscription?.unsubscribe();
     _driverProfileSubscription = null;
+    _vehicleStatusSubscription?.unsubscribe();
+    _vehicleStatusSubscription = null;
+    _ridesStatsSubscription?.unsubscribe();
+    _ridesStatsSubscription = null;
+    _profileStatusSubscription?.unsubscribe();
+    _profileStatusSubscription = null;
   }
 
   void endShift() {
@@ -1589,12 +1599,6 @@ class DriverState extends ChangeNotifier {
       debugPrint('Error cancelling ride in Supabase: $e');
     }
 
-    // Simulate a new incoming request after cancellation
-    if (_isOnline) {
-      Future.delayed(const Duration(seconds: 3), () {
-
-      });
-    }
   }
 
   Future<bool> arrivedAtPickup() async {

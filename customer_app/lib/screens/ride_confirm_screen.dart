@@ -73,8 +73,11 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
   }
 
   void _setupRealtimeSubscription() {
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    if (userId == null) return;
+    // Use profileId from SupabaseService (phone-based login) or fall back to auth user id
+    final userId = SupabaseService.profileId.isNotEmpty
+        ? SupabaseService.profileId
+        : Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null || userId.isEmpty) return;
 
     _assignmentChannel = Supabase.instance.client
         .channel('ride_confirm_pools_$userId')

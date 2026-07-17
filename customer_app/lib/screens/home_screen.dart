@@ -78,6 +78,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   RealtimeChannel? _notificationsSubscription;
   String? _subscribedRideId;
   int _unreadNotificationCount = 0;
+  Timer? _notificationPollingTimer;
 
 
   @override
@@ -205,7 +206,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         });
 
     // Also poll every 30 seconds as fallback
-    Timer.periodic(const Duration(seconds: 30), (timer) {
+    _notificationPollingTimer?.cancel();
+    _notificationPollingTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       if (mounted) {
         _loadUnreadCount();
       } else {
@@ -500,6 +502,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _pageController.dispose();
     _pulseController.dispose();
     _scheduledRideTimer?.cancel();
+    _notificationPollingTimer?.cancel();
     _sessionBroadcastChannel?.unsubscribe();
     _announcementsSubscription?.unsubscribe();
     _rideStatusSubscription?.unsubscribe();

@@ -1280,9 +1280,19 @@ class SupabaseService {
       throw Exception('No sender ID available');
     }
     try {
+      // Get driver profile_id for receiver_id
+      final ride = await client
+          .from('rides')
+          .select('driver_id, driver:drivers(profile_id)')
+          .eq('id', rideId)
+          .maybeSingle();
+
+      final driverProfileId = ride?['driver']?['profile_id'];
+
       final result = await client.from('chat_messages').insert({
         'ride_id': rideId,
         'sender_id': id,
+        'receiver_id': driverProfileId,
         'sender_type': 'customer',
         'message': message,
         'created_at': DateTime.now().toIso8601String(),
@@ -1302,15 +1312,8 @@ class SupabaseService {
       }
 
       // Queue push notification for driver
-      try {
-        final ride = await client
-            .from('rides')
-            .select('driver_id, driver:drivers(profile_id)')
-            .eq('id', rideId)
-            .maybeSingle();
-
-        final driverProfileId = ride?['driver']?['profile_id'];
-        if (driverProfileId != null) {
+      if (driverProfileId != null) {
+        try {
           await client.from('push_notification_queue').insert({
             'user_id': driverProfileId,
             'title': 'New message from Customer',
@@ -1319,9 +1322,9 @@ class SupabaseService {
             'ride_id': rideId,
             'status': 'pending',
           });
+        } catch (e) {
+          debugPrint('Error queueing chat notification: $e');
         }
-      } catch (e) {
-        debugPrint('Error queueing chat notification: $e');
       }
     } catch (e) {
       debugPrint('Error sending chat message: $e');

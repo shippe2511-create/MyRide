@@ -972,14 +972,14 @@ export default function ReportsPage() {
           let query = supabase
             .from("documents")
             .select(`
-              id, document_type, status, created_at, expiry_date, verified_by,
-              driver:drivers!documents_driver_id_fkey(
-                profile:profiles!drivers_profile_id_fkey(full_name)
+              id, document_type, status, uploaded_at, expiry_date,
+              driver:drivers(
+                profile:profiles(full_name)
               )
             `)
-            .order("created_at", { ascending: false })
+            .order("uploaded_at", { ascending: false })
           if (dateFilter) {
-            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+            query = query.gte("uploaded_at", dateFilter.start).lte("uploaded_at", dateFilter.end + "T23:59:59")
           }
           const { data: docs } = await query
 
@@ -990,7 +990,7 @@ export default function ReportsPage() {
               "Driver": String(profile?.full_name || "-"),
               "Document": formatStatus(String(d.document_type || "")),
               "Status": formatStatus(String(d.status || "")),
-              "Uploaded": formatDate(String(d.created_at || "")),
+              "Uploaded": formatDate(String(d.uploaded_at || "")),
               "Expires": d.expiry_date ? formatDate(String(d.expiry_date)) : "-",
             }
           })
@@ -1972,8 +1972,8 @@ export default function ReportsPage() {
           break
         }
         case "documents": {
-          let query = supabase.from("documents").select(`document_type, status, created_at, expiry_date, driver:drivers!documents_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`).order("created_at", { ascending: false })
-          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          let query = supabase.from("documents").select(`document_type, status, uploaded_at, expiry_date, driver:drivers(profile:profiles(full_name))`).order("uploaded_at", { ascending: false })
+          if (dateFilter) query = query.gte("uploaded_at", dateFilter.start).lte("uploaded_at", dateFilter.end + "T23:59:59")
           const { data: docs } = await query
           rows = (docs || []).map((d: Record<string, unknown>) => {
             const driver = d.driver as Record<string, unknown> | null
@@ -1982,7 +1982,7 @@ export default function ReportsPage() {
               "Driver": String(profile?.full_name || "-"),
               "Document": formatStatus(String(d.document_type || "")),
               "Status": formatStatus(String(d.status || "")),
-              "Uploaded": formatDate(String(d.created_at || "")),
+              "Uploaded": formatDate(String(d.uploaded_at || "")),
               "Expires": d.expiry_date ? formatDate(String(d.expiry_date)) : "-",
             }
           })

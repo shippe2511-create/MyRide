@@ -141,6 +141,7 @@ export default function ChecklistsPage() {
 
   useEffect(() => {
     if (!loading) loadChecklists(false)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, currentPage])
 
   const loadData = async (showLoading = true) => {

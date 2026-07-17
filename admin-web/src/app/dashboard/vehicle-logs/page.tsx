@@ -200,6 +200,7 @@ export default function VehicleLogsPage() {
     if (!loading) {
       loadLogs(false)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterType, currentPage])
 
   const openDialog = (log?: VehicleLog) => {

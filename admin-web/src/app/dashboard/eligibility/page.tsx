@@ -71,10 +71,13 @@ export default function EligibilityPage() {
   }, [])
 
   const loadCampaigns = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("ride_campaigns")
       .select("*")
       .order("created_at", { ascending: false })
+    if (error) {
+      toast.error("Failed to load campaigns")
+    }
     setCampaigns(data || [])
     setLoading(false)
   }

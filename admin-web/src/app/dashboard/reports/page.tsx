@@ -256,6 +256,7 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Status": "status",
     "Uploaded": "uploaded_at",
     "Expires": "expiry_date",
+    "Verified By": "verified_by",
   },
   vehicles: {
     "Plate No": "plate_no",

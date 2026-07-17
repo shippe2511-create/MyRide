@@ -1084,9 +1084,32 @@ export default function ReportsPage() {
             const details = l.details as Record<string, unknown> | null
             let detailsText = "-"
             if (details) {
-              if (details.name) detailsText = String(details.name)
-              else if (details.count) detailsText = `${details.count} items`
-              else detailsText = Object.entries(details).map(([k, v]) => `${k}: ${v}`).join(", ").slice(0, 50)
+              if (details.name) {
+                detailsText = String(details.name)
+              } else if (details.full_name) {
+                detailsText = String(details.full_name)
+              } else if (details.count) {
+                detailsText = `${details.count} items`
+              } else if (details.private_access !== undefined) {
+                detailsText = details.private_access ? "Private access granted" : "Private access revoked"
+              } else if (details.status) {
+                detailsText = `Status: ${formatStatus(String(details.status))}`
+              } else if (details.is_active !== undefined) {
+                detailsText = details.is_active ? "Activated" : "Deactivated"
+              } else if (details.assigned_driver) {
+                detailsText = `Assigned to ${details.assigned_driver}`
+              } else {
+                // Format remaining as readable key-value pairs
+                const formatted = Object.entries(details)
+                  .filter(([, v]) => v !== null && v !== undefined && v !== "")
+                  .map(([k, v]) => {
+                    const key = k.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
+                    const val = typeof v === "boolean" ? (v ? "Yes" : "No") : String(v)
+                    return `${key}: ${val}`
+                  })
+                  .join(", ")
+                detailsText = formatted || "-"
+              }
             }
             return {
               "Action": formatStatus(String(l.action || "")),
@@ -1828,12 +1851,33 @@ export default function ReportsPage() {
           const { data: logs } = await query
           rows = (logs || []).map((l: Record<string, unknown>) => {
             const details = l.details as Record<string, unknown> | null
-            // Format details as readable text
             let detailsText = "-"
             if (details) {
-              if (details.name) detailsText = String(details.name)
-              else if (details.count) detailsText = `${details.count} items`
-              else detailsText = Object.entries(details).map(([k, v]) => `${k}: ${v}`).join(", ").slice(0, 50)
+              if (details.name) {
+                detailsText = String(details.name)
+              } else if (details.full_name) {
+                detailsText = String(details.full_name)
+              } else if (details.count) {
+                detailsText = `${details.count} items`
+              } else if (details.private_access !== undefined) {
+                detailsText = details.private_access ? "Private access granted" : "Private access revoked"
+              } else if (details.status) {
+                detailsText = `Status: ${formatStatus(String(details.status))}`
+              } else if (details.is_active !== undefined) {
+                detailsText = details.is_active ? "Activated" : "Deactivated"
+              } else if (details.assigned_driver) {
+                detailsText = `Assigned to ${details.assigned_driver}`
+              } else {
+                const formatted = Object.entries(details)
+                  .filter(([, v]) => v !== null && v !== undefined && v !== "")
+                  .map(([k, v]) => {
+                    const key = k.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
+                    const val = typeof v === "boolean" ? (v ? "Yes" : "No") : String(v)
+                    return `${key}: ${val}`
+                  })
+                  .join(", ")
+                detailsText = formatted || "-"
+              }
             }
             return {
               "Action": formatStatus(String(l.action || "")),

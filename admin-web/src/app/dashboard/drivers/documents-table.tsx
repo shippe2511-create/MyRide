@@ -97,12 +97,14 @@ export function DocumentsTable() {
   const [dialogType, setDialogType] = useState<"view" | "delete" | null>(null)
   const [updating, setUpdating] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [bulkLoading, setBulkLoading] = useState(false)
   const [driverFilter, setDriverFilter] = useState("all")
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
   useEffect(() => {
     loadDocuments(true)
+    loadCurrentUser()
 
     const channel = supabase
       .channel('documents-realtime')
@@ -115,6 +117,20 @@ export function DocumentsTable() {
       supabase.removeChannel(channel)
     }
   }, [])
+
+  const loadCurrentUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("email", user.email)
+        .single()
+      if (profile) {
+        setCurrentUserId(profile.id)
+      }
+    }
+  }
 
   const loadDocuments = async (showLoading = true) => {
     if (showLoading) setLoading(true)
@@ -163,7 +179,7 @@ export function DocumentsTable() {
     setUpdating(true)
     const { error } = await supabase
       .from("documents")
-      .update({ status: "verified", verified_at: new Date().toISOString() })
+      .update({ status: "verified", verified_at: new Date().toISOString(), verified_by: currentUserId })
       .eq("id", doc.id)
 
     if (error) {
@@ -232,7 +248,7 @@ export function DocumentsTable() {
     const ids = Array.from(selectedIds)
     const { error } = await supabase
       .from("documents")
-      .update({ status: "verified", verified_at: new Date().toISOString() })
+      .update({ status: "verified", verified_at: new Date().toISOString(), verified_by: currentUserId })
       .in("id", ids)
 
     if (error) {

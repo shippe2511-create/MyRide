@@ -665,8 +665,8 @@ export default function ReportsPage() {
 
           // Sort by completion rate descending
           rows.sort((a, b) => {
-            const rateA = parseInt(a["Completion Rate"]) || 0
-            const rateB = parseInt(b["Completion Rate"]) || 0
+            const rateA = parseInt(a["Completion %"]) || 0
+            const rateB = parseInt(b["Completion %"]) || 0
             return rateB - rateA
           })
 

@@ -271,7 +271,7 @@ export default function TrackingPage() {
               phone: d.driver?.profile?.phone || undefined,
               avatarUrl: d.driver?.avatar_url || d.driver?.profile?.avatar_url || undefined,
               rating: d.driver?.rating || undefined,
-              vehicleNumber: d.driver?.vehicle?.vehicle_number || d.driver?.vehicle?.vehicle_model || undefined,
+              vehicleNumber: d.driver?.vehicle?.vehicle_number || d.driver?.vehicle?.plate_no || undefined,
               isOnline: d.is_online,
               isOnBreak: d.driver?.is_on_break,
               breakType: d.driver?.break_type,

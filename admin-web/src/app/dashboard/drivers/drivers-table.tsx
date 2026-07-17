@@ -774,7 +774,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
           <TableBody>
             {drivers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                   No drivers found
                 </TableCell>
               </TableRow>

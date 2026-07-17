@@ -76,11 +76,11 @@ export default function AnalyticsPage() {
   useEffect(() => {
     loadAnalytics()
 
-    // Realtime updates for analytics
+    // Realtime updates for analytics (silent refresh, no loading state)
     const channel = supabase.channel('analytics_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rides' }, () => loadAnalytics())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => loadAnalytics())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => loadAnalytics())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rides' }, () => loadAnalytics(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => loadAnalytics(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => loadAnalytics(false))
       .subscribe()
 
     return () => {
@@ -88,8 +88,8 @@ export default function AnalyticsPage() {
     }
   }, [period])
 
-  const loadAnalytics = async () => {
-    setLoading(true)
+  const loadAnalytics = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
 
     const daysAgo = parseInt(period)
     const startDate = new Date()

@@ -45,6 +45,34 @@ const actionColors: Record<string, string> = {
   view: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300',
 }
 
+function formatDetails(details: Record<string, unknown>): string {
+  if (details.name) return String(details.name)
+  if (details.full_name) return String(details.full_name)
+  if (details.private_access !== undefined) {
+    return details.private_access ? "Granted private pool access" : "Revoked private pool access"
+  }
+  if (details.status) {
+    const status = String(details.status).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    return `Status: ${status}`
+  }
+  if (details.is_active !== undefined) {
+    return details.is_active ? "Activated" : "Deactivated"
+  }
+  if (details.count) return `${details.count} items`
+  if (details.message) return String(details.message)
+
+  // Fallback: format as readable key-value pairs
+  return Object.entries(details)
+    .filter(([, v]) => v !== null && v !== undefined && v !== "")
+    .slice(0, 3)
+    .map(([k, v]) => {
+      const key = k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      const val = typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v)
+      return `${key}: ${val}`
+    })
+    .join(", ")
+}
+
 export default function ActivityPage() {
   const [activities, setActivities] = useState<ActivityLog[]>([])
   const [loading, setLoading] = useState(true)
@@ -212,7 +240,7 @@ export default function ActivityPage() {
                       </p>
                       {activity.details && Object.keys(activity.details).length > 0 && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          {JSON.stringify(activity.details).slice(0, 100)}
+                          {formatDetails(activity.details)}
                         </p>
                       )}
                     </div>

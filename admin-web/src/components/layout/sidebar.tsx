@@ -124,7 +124,6 @@ const navigationSections: NavSection[] = [
     items: [
       { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3, permission: "reports:view" },
       { name: "Reports", href: "/dashboard/reports", icon: FileText, permission: "reports:view" },
-      { name: "Report Builder", href: "/dashboard/report-builder", icon: FileText, permission: "reports:view" },
       { name: "Ratings", href: "/dashboard/ratings", icon: Star, permission: "ratings:view" },
       { name: "Activity Log", href: "/dashboard/activity", icon: Activity, permission: "reports:view" },
     ]

@@ -403,7 +403,7 @@ export default function ZonesPage() {
     const headers = ["Name", "Type", "Priority", "Status", "Created At"]
     const rows = zones.map(z => [
       z.name,
-      z.zone_type,
+      z.zone_type === "pickup" ? "Pickup Only" : z.zone_type === "dropoff" ? "Dropoff Only" : "Both",
       z.priority,
       z.is_active ? "Active" : "Inactive",
       new Date(z.created_at).toLocaleDateString('en-US', { timeZone: 'Indian/Maldives' })

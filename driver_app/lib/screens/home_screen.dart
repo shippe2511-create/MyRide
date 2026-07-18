@@ -92,6 +92,9 @@ class _HomeScreenState extends State<HomeScreen> {
       // Load today's checklist from DB (may have been completed earlier)
       await state.loadTodayChecklist();
 
+      // Refresh stats from database (Today, Total, Rating)
+      await state.loadDriverStats();
+
       _checkForActiveRide();
 
       // If driver was online from previous session, re-initialize subscriptions

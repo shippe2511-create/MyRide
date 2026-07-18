@@ -780,142 +780,66 @@ Live tracking link: https://my-ride-ashen.vercel.app/track/$rideId
             ),
           ),
 
-          // Header bar (MyRide Live style)
+          // Header bar
           SafeArea(
-            child: Column(
-              children: [
-                // Top bar with logo and LIVE badge
-                Container(
-                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: context.surfaceColor,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: _rideStatus == 'in_progress' ? AppColors.success : AppColors.yellow,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
                   ),
-                  child: Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () => _rideStatus == 'in_progress' ? Navigator.pop(context) : _showCancelConfirmation(),
-                        child: Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: context.isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(Icons.close, color: context.textColor, size: 20),
-                        ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => _rideStatus == 'in_progress' ? Navigator.pop(context) : _showCancelConfirmation(),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: (_rideStatus == 'in_progress' ? Colors.white : Colors.black).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      const SizedBox(width: 12),
-                      // Logo and title
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: AppColors.yellow,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.local_taxi, color: Colors.black, size: 18),
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'MyRide Live',
-                            style: TextStyle(
-                              color: context.textColor,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          Text(
-                            (widget.tripData['ride_id'] as String?)?.substring(0, 8) ?? '',
-                            style: TextStyle(
-                              color: context.mutedColor,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Spacer(),
-                      // LIVE badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: AppColors.success,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              'LIVE',
-                              style: TextStyle(
-                                color: AppColors.success,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Status banner
-                Container(
-                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: _rideStatus == 'in_progress' ? AppColors.success : AppColors.yellow,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _rideStatus == 'in_progress' ? Icons.navigation : Icons.directions_car,
+                      child: Icon(
+                        _rideStatus == 'in_progress' ? Icons.arrow_back : Icons.close,
                         color: _rideStatus == 'in_progress' ? Colors.white : Colors.black,
-                        size: 16,
+                        size: 18,
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _rideStatus == 'in_progress' ? 'On trip • $_etaMinutes min to destination' : 'Driver on the way • $_etaMinutes min',
-                        style: TextStyle(
-                          color: _rideStatus == 'in_progress' ? Colors.white : Colors.black,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Icon(
+                    _rideStatus == 'in_progress' ? Icons.navigation : Icons.directions_car,
+                    color: _rideStatus == 'in_progress' ? Colors.white : Colors.black,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _rideStatus == 'in_progress' ? 'On trip • $_etaMinutes min to destination' : 'Driver on the way • $_etaMinutes min',
+                      style: TextStyle(
+                        color: _rideStatus == 'in_progress' ? Colors.white : Colors.black,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           // SOS Button (floating)
           if (AppSettingsService.sosEnabled)
             Positioned(
               left: 16,
-              top: MediaQuery.of(context).padding.top + 130,
+              top: MediaQuery.of(context).padding.top + 70,
               child: GestureDetector(
                 onTap: () => _showSOSOptions(),
                 child: Container(

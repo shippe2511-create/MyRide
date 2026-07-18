@@ -298,6 +298,7 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
     final driverVehicle = driver?['vehicle'] as Map<String, dynamic>?;
     final driverName = driverProfile?['full_name'] ?? 'Unknown Driver';
     final vehiclePlate = driverVehicle?['plate_no'] as String?;
+    final vehicleId = driverVehicle?['vehicle_id'] as String?;
     final rating = ride['rating'] as int?;
     final bookedForOther = ride['booked_for_other'] == true;
     final riderName = ride['rider_name'] as String?;
@@ -433,9 +434,9 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                             driverName,
                             style: TextStyle(color: context.textColor, fontSize: 13, fontWeight: FontWeight.w500),
                           ),
-                          if (vehiclePlate != null)
+                          if (vehiclePlate != null || vehicleId != null)
                             Text(
-                              vehiclePlate,
+                              [vehicleId, vehiclePlate].where((e) => e != null).join(' • '),
                               style: TextStyle(color: context.mutedColor, fontSize: 11),
                             ),
                         ],

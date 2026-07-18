@@ -250,9 +250,8 @@ export default function RidesPage() {
   })
 
   const exportToCSV = () => {
-    const headers = ["ID", "Customer", "Pickup", "Dropoff", "Status", "Date", "Duration (min)", "Distance (km)"]
+    const headers = ["Customer", "Pickup", "Dropoff", "Status", "Date", "Duration (min)", "Distance (km)"]
     const rows = filteredRides.map(ride => [
-      ride.id,
       ride.customer?.full_name || "N/A",
       ride.pickup_name,
       ride.dropoff_name,

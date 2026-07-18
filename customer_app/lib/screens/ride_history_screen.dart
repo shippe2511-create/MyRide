@@ -298,7 +298,7 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
     final driverVehicle = driver?['vehicle'] as Map<String, dynamic>?;
     final driverName = driverProfile?['full_name'] ?? 'Unknown Driver';
     final vehiclePlate = driverVehicle?['plate_no'] as String?;
-    final vehicleId = driverVehicle?['vehicle_id'] as String?;
+    final vehicleId = driverVehicle?['name'] as String?;
     final rating = ride['rating'] as int?;
     final bookedForOther = ride['booked_for_other'] == true;
     final riderName = ride['rider_name'] as String?;

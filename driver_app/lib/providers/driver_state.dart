@@ -782,6 +782,9 @@ class DriverState extends ChangeNotifier {
                   status == 'in_progress' ? RideStatus.inProgress : RideStatus.accepted,
           requestTime: MaldivesTimezone.parse(activeRide['created_at']) ?? MaldivesTimezone.now(),
           seatsBooked: (activeRide['seats_booked'] as num?)?.toInt() ?? 1,
+          riderName: activeRide['rider_name'] as String?,
+          riderPhone: activeRide['rider_phone'] as String?,
+          bookedForOther: activeRide['booked_for_other'] == true,
         );
 
         debugPrint('Restored active ride: ${_currentRide?.id}');
@@ -1318,6 +1321,9 @@ class DriverState extends ChangeNotifier {
         estimatedDuration: (ride['duration_minutes'] as num?)?.toInt() ?? 15,
         status: status,
         seatsBooked: (ride['seats_booked'] as num?)?.toInt() ?? 1,
+        riderName: ride['rider_name'] as String?,
+        riderPhone: ride['rider_phone'] as String?,
+        bookedForOther: ride['booked_for_other'] == true,
       );
     } catch (e) {
       debugPrint('Error converting ride: $e');

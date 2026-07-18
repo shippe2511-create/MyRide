@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
@@ -40,6 +42,10 @@ class DriverMatchingScreen extends StatefulWidget {
   final double dropoffLng;
   final int seatsBooked;
   final String pool;
+  // Book for someone else
+  final String? riderName;
+  final String? riderPhone;
+  final bool bookedForOther;
 
   const DriverMatchingScreen({
     super.key,
@@ -52,6 +58,9 @@ class DriverMatchingScreen extends StatefulWidget {
     required this.dropoffLng,
     this.seatsBooked = 1,
     this.pool = 'public',
+    this.riderName,
+    this.riderPhone,
+    this.bookedForOther = false,
   });
 
   @override
@@ -343,6 +352,9 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
         dropoffLat: widget.dropoffLat,
         dropoffLng: widget.dropoffLng,
         pool: widget.pool,
+        riderName: widget.riderName,
+        riderPhone: widget.riderPhone,
+        bookedForOther: widget.bookedForOther,
       );
 
       _rideId = rideData['id'];
@@ -473,6 +485,13 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
 
     if (!mounted) return;
 
+    // If booked for someone else, show share sheet to send tracking link
+    if (widget.bookedForOther && widget.riderPhone != null && _rideId != null) {
+      await _showShareTrackingSheet(driverName);
+    }
+
+    if (!mounted) return;
+
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -496,6 +515,155 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
             'dropoff_lng': widget.dropoffLng,
             'status': 'accepted',
           },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showShareTrackingSheet(String driverName) async {
+    final appState = Provider.of<AppState>(context, listen: false);
+    final bookerName = appState.userName ?? 'Someone';
+    final trackingUrl = 'https://my-ride-omega.vercel.app/track/$_rideId';
+    final message = '$bookerName booked you a MyRide. Track your driver here: $trackingUrl';
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: ctx.surfaceColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: ctx.borderColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Icon(Icons.check_circle, color: Colors.green, size: 56),
+            const SizedBox(height: 16),
+            Text(
+              'Driver Found!',
+              style: TextStyle(
+                color: ctx.textColor,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Share the tracking link with ${widget.riderName}',
+              style: TextStyle(color: ctx.mutedColor, fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+
+            // WhatsApp button
+            _buildShareOption(
+              ctx,
+              Icons.chat,
+              'WhatsApp',
+              const Color(0xFF25D366),
+              () async {
+                Navigator.pop(ctx);
+                final phone = widget.riderPhone!.replaceAll('+', '');
+                final encodedMsg = Uri.encodeComponent(message);
+                final url = 'https://wa.me/$phone?text=$encodedMsg';
+                if (await canLaunchUrl(Uri.parse(url))) {
+                  await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // SMS button
+            _buildShareOption(
+              ctx,
+              Icons.sms,
+              'SMS',
+              Colors.blue,
+              () async {
+                Navigator.pop(ctx);
+                final smsUrl = 'sms:${widget.riderPhone}?body=${Uri.encodeComponent(message)}';
+                if (await canLaunchUrl(Uri.parse(smsUrl))) {
+                  await launchUrl(Uri.parse(smsUrl));
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // Copy link button
+            _buildShareOption(
+              ctx,
+              Icons.copy,
+              'Copy Link',
+              Colors.orange,
+              () {
+                Navigator.pop(ctx);
+                Clipboard.setData(ClipboardData(text: trackingUrl));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Tracking link copied!')),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // More options
+            _buildShareOption(
+              ctx,
+              Icons.share,
+              'More Options',
+              ctx.mutedColor,
+              () {
+                Navigator.pop(ctx);
+                SharePlus.instance.share(ShareParams(text: message, subject: 'MyRide Tracking Link'));
+              },
+            ),
+
+            const SizedBox(height: 20),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Skip', style: TextStyle(color: ctx.mutedColor)),
+            ),
+            SizedBox(height: MediaQuery.of(ctx).padding.bottom),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShareOption(BuildContext ctx, IconData icon, String label, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 24),
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: TextStyle(
+                color: ctx.textColor,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            Icon(Icons.chevron_right, color: ctx.mutedColor),
+          ],
         ),
       ),
     );

@@ -1747,6 +1747,13 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildCustomerCard(RideRequest ride, DriverState state) {
+    final displayName = ride.bookedForOther && ride.riderName != null
+        ? ride.riderName!
+        : ride.customerName;
+    final displayPhone = ride.bookedForOther && ride.riderPhone != null
+        ? ride.riderPhone!
+        : ride.customerPhone;
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1758,7 +1765,6 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
         children: [
           Row(
             children: [
-              // Customer photo
               Stack(
                 children: [
                   Container(
@@ -1771,7 +1777,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                       shape: BoxShape.circle,
                     ),
                     child: CachedAvatar(
-                      imageUrl: ride.customerPhoto,
+                      imageUrl: ride.bookedForOther ? null : ride.customerPhoto,
                       radius: 30,
                       backgroundColor: AppColors.yellow,
                       fallbackIcon: Icons.person,
@@ -1786,7 +1792,7 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      ride.customerName,
+                      displayName,
                       style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 4),
@@ -1794,11 +1800,20 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                       children: [
                         Icon(Icons.phone, color: context.mutedColor, size: 14),
                         const SizedBox(width: 4),
-                        Text(ride.customerPhone, style: TextStyle(color: context.mutedColor, fontSize: 13)),
+                        Text(displayPhone, style: TextStyle(color: context.mutedColor, fontSize: 13)),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    if (ride.tripsTogether > 0)
+                    if (ride.bookedForOther) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.person_outline, color: AppColors.yellow, size: 14),
+                          const SizedBox(width: 4),
+                          Text('Booked by ${ride.customerName}', style: TextStyle(color: AppColors.yellow, fontSize: 12)),
+                        ],
+                      ),
+                    ] else if (ride.tripsTogether > 0) ...[
+                      const SizedBox(height: 4),
                       Row(
                         children: [
                           Icon(Icons.history, color: context.mutedColor, size: 14),
@@ -1806,17 +1821,17 @@ class _RideScreenState extends State<RideScreen> with TickerProviderStateMixin {
                           Text('${ride.tripsTogether} trip${ride.tripsTogether > 1 ? 's' : ''} together', style: TextStyle(color: context.mutedColor, fontSize: 12)),
                         ],
                       ),
+                    ],
                   ],
                 ),
               ),
-              // Action buttons
               Column(
                 children: [
                   if (AppSettingsService.chatEnabled)
-                    _buildActionButton(Icons.chat, Colors.blue, () => _openChat(ride.customerName, customerPhone: ride.customerPhone, rideId: ride.id)),
+                    _buildActionButton(Icons.chat, Colors.blue, () => _openChat(displayName, customerPhone: displayPhone, rideId: ride.id)),
                   if (AppSettingsService.chatEnabled)
                     const SizedBox(height: 8),
-                  _buildActionButton(Icons.call, AppColors.success, () => _makeCall(ride.customerPhone)),
+                  _buildActionButton(Icons.call, AppColors.success, () => _makeCall(displayPhone)),
                 ],
               ),
             ],

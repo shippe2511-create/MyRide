@@ -57,6 +57,12 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
   bool _usePrivatePool = false;
   RealtimeChannel? _assignmentChannel;
 
+  // Book for someone else
+  bool _bookingForOther = false;
+  final _riderNameController = TextEditingController();
+  final _riderPhoneController = TextEditingController();
+  String? _riderPhoneError;
+
   @override
   void initState() {
     super.initState();
@@ -69,7 +75,29 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
   @override
   void dispose() {
     _assignmentChannel?.unsubscribe();
+    _riderNameController.dispose();
+    _riderPhoneController.dispose();
     super.dispose();
+  }
+
+  bool _validateRiderPhone(String phone) {
+    // Remove spaces and dashes
+    final cleaned = phone.replaceAll(RegExp(r'[\s\-]'), '');
+    // Must be 7 digits (Maldives local) or +960 followed by 7 digits
+    if (cleaned.startsWith('+960')) {
+      return cleaned.length == 11 && RegExp(r'^\+960\d{7}$').hasMatch(cleaned);
+    } else if (cleaned.startsWith('960')) {
+      return cleaned.length == 10 && RegExp(r'^960\d{7}$').hasMatch(cleaned);
+    } else {
+      return cleaned.length == 7 && RegExp(r'^\d{7}$').hasMatch(cleaned);
+    }
+  }
+
+  String _formatPhoneForStorage(String phone) {
+    final cleaned = phone.replaceAll(RegExp(r'[\s\-]'), '');
+    if (cleaned.startsWith('+960')) return cleaned;
+    if (cleaned.startsWith('960')) return '+$cleaned';
+    return '+960$cleaned';
   }
 
   void _setupRealtimeSubscription() {
@@ -550,12 +578,164 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
                     const SizedBox(height: 16),
                   ],
 
+                  // Who's this ride for? selector
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: context.isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Who's this ride for?",
+                          style: TextStyle(
+                            color: context.textColor,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  setState(() {
+                                    _bookingForOther = false;
+                                    _riderPhoneError = null;
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: !_bookingForOther ? AppColors.yellow : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: !_bookingForOther ? AppColors.yellow : context.borderColor,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      'Myself',
+                                      style: TextStyle(
+                                        color: !_bookingForOther ? Colors.black : context.textColor,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  setState(() => _bookingForOther = true);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: _bookingForOther ? AppColors.yellow : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: _bookingForOther ? AppColors.yellow : context.borderColor,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      'Someone else',
+                                      style: TextStyle(
+                                        color: _bookingForOther ? Colors.black : context.textColor,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        // Rider details fields (shown when booking for someone else)
+                        if (_bookingForOther) ...[
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: _riderNameController,
+                            style: TextStyle(color: context.textColor),
+                            decoration: InputDecoration(
+                              hintText: "Rider's name",
+                              hintStyle: TextStyle(color: context.mutedColor),
+                              prefixIcon: Icon(Icons.person_outline, color: context.mutedColor),
+                              filled: true,
+                              fillColor: context.cardColor,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _riderPhoneController,
+                            style: TextStyle(color: context.textColor),
+                            keyboardType: TextInputType.phone,
+                            onChanged: (value) {
+                              if (_riderPhoneError != null) {
+                                setState(() => _riderPhoneError = null);
+                              }
+                            },
+                            decoration: InputDecoration(
+                              hintText: "Rider's phone (e.g. 7XXXXXX)",
+                              hintStyle: TextStyle(color: context.mutedColor),
+                              prefixIcon: Icon(Icons.phone_outlined, color: context.mutedColor),
+                              prefixText: '+960 ',
+                              prefixStyle: TextStyle(color: context.textColor),
+                              filled: true,
+                              fillColor: context.cardColor,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              errorText: _riderPhoneError,
+                              errorStyle: const TextStyle(color: Colors.red),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
                   // Request button
                   SizedBox(
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
                       onPressed: () {
+                        // Validate rider phone if booking for someone else
+                        if (_bookingForOther) {
+                          final phone = _riderPhoneController.text.trim();
+                          if (_riderNameController.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Please enter rider name'), backgroundColor: Colors.red),
+                            );
+                            return;
+                          }
+                          if (phone.isEmpty) {
+                            setState(() => _riderPhoneError = 'Phone number is required');
+                            return;
+                          }
+                          if (!_validateRiderPhone(phone)) {
+                            setState(() => _riderPhoneError = 'Enter a valid 7-digit Maldives number');
+                            return;
+                          }
+                        }
+
                         HapticFeedback.mediumImpact();
                         Navigator.pushReplacement(
                           context,
@@ -570,6 +750,9 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
                               dropoffLng: widget.dropoffLng,
                               seatsBooked: 1,
                               pool: _usePrivatePool ? 'private' : 'public',
+                              riderName: _bookingForOther ? _riderNameController.text.trim() : null,
+                              riderPhone: _bookingForOther ? _formatPhoneForStorage(_riderPhoneController.text.trim()) : null,
+                              bookedForOther: _bookingForOther,
                             ),
                           ),
                         );

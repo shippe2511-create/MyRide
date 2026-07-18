@@ -319,7 +319,9 @@ class _RideRequestPopupState extends State<RideRequestPopup>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  widget.request.customerName,
+                  widget.request.bookedForOther && widget.request.riderName != null
+                      ? widget.request.riderName!
+                      : widget.request.customerName,
                   style: TextStyle(
                     color: context.textColor,
                     fontSize: 24,
@@ -327,6 +329,17 @@ class _RideRequestPopupState extends State<RideRequestPopup>
                     letterSpacing: -0.5,
                   ),
                 ),
+                if (widget.request.bookedForOther) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Booked by ${widget.request.customerName}',
+                    style: TextStyle(
+                      color: AppColors.yellow,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

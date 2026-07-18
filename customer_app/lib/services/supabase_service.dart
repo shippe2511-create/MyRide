@@ -391,6 +391,10 @@ class SupabaseService {
     String? customerId,
     int seatsBooked = 1,
     String pool = 'public',
+    // Book for someone else
+    String? riderName,
+    String? riderPhone,
+    bool bookedForOther = false,
   }) async {
     // Priority: passed customerId > auth user > lookup by stored profile
     String? finalCustomerId = customerId ?? currentUser?.id;
@@ -419,6 +423,10 @@ class SupabaseService {
       'seats_booked': seatsBooked,
       'status': 'pending',
       'pool': pool,
+      // Book for someone else fields
+      'rider_name': riderName,
+      'rider_phone': riderPhone,
+      'booked_for_other': bookedForOther,
     }).select().single();
     return response;
   }

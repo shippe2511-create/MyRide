@@ -21,6 +21,9 @@ class RideRequest {
   final double? fare;
   final RideStatus status;
   final int seatsBooked;
+  final String? riderName;
+  final String? riderPhone;
+  final bool bookedForOther;
 
   RideRequest({
     required this.id,
@@ -45,6 +48,9 @@ class RideRequest {
     this.fare,
     this.status = RideStatus.pending,
     this.seatsBooked = 1,
+    this.riderName,
+    this.riderPhone,
+    this.bookedForOther = false,
   });
 
   bool get isScheduled => scheduledTime != null;
@@ -73,6 +79,9 @@ class RideRequest {
       fare: fare,
       status: status ?? this.status,
       seatsBooked: seatsBooked ?? this.seatsBooked,
+      riderName: riderName,
+      riderPhone: riderPhone,
+      bookedForOther: bookedForOther,
     );
   }
 }

@@ -297,6 +297,8 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
     final driverProfile = driver?['profile'] as Map<String, dynamic>?;
     final driverName = driverProfile?['full_name'] ?? 'Unknown Driver';
     final rating = ride['rating'] as int?;
+    final bookedForOther = ride['booked_for_other'] == true;
+    final riderName = ride['rider_name'] as String?;
 
     Color statusColor;
     IconData statusIcon;
@@ -350,6 +352,27 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                 ),
               ],
             ),
+            if (bookedForOther && riderName != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.yellow.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.person_outline, size: 14, color: AppColors.yellow),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Ride for $riderName',
+                      style: TextStyle(color: AppColors.yellow, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             Row(
               children: [

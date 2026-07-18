@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -56,6 +57,7 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
   bool _hasPrivateAccess = false;
   bool _usePrivatePool = false;
   RealtimeChannel? _assignmentChannel;
+  Timer? _privateAccessPollingTimer;
 
   // Book for someone else
   bool _bookingForOther = false;
@@ -70,14 +72,22 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
     _fetchRoute();
     _checkPrivateAccess();
     _setupRealtimeSubscription();
+    _startPrivateAccessPolling();
   }
 
   @override
   void dispose() {
     _assignmentChannel?.unsubscribe();
+    _privateAccessPollingTimer?.cancel();
     _riderNameController.dispose();
     _riderPhoneController.dispose();
     super.dispose();
+  }
+
+  void _startPrivateAccessPolling() {
+    _privateAccessPollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) _checkPrivateAccess();
+    });
   }
 
   bool _validateRiderPhone(String phone) {

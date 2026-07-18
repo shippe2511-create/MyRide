@@ -295,7 +295,9 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
     final dropoffName = ride['dropoff_name'] ?? 'Unknown';
     final driver = ride['driver'] as Map<String, dynamic>?;
     final driverProfile = driver?['profile'] as Map<String, dynamic>?;
+    final driverVehicle = driver?['vehicle'] as Map<String, dynamic>?;
     final driverName = driverProfile?['full_name'] ?? 'Unknown Driver';
+    final vehiclePlate = driverVehicle?['plate_no'] as String?;
     final rating = ride['rating'] as int?;
     final bookedForOther = ride['booked_for_other'] == true;
     final riderName = ride['rider_name'] as String?;
@@ -424,9 +426,19 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        driverName,
-                        style: TextStyle(color: context.textColor, fontSize: 13, fontWeight: FontWeight.w500),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            driverName,
+                            style: TextStyle(color: context.textColor, fontSize: 13, fontWeight: FontWeight.w500),
+                          ),
+                          if (vehiclePlate != null)
+                            Text(
+                              vehiclePlate,
+                              style: TextStyle(color: context.mutedColor, fontSize: 11),
+                            ),
+                        ],
                       ),
                     ],
                   ),

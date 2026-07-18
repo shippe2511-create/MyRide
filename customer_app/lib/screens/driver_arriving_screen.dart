@@ -705,54 +705,162 @@ ${widget.rideId != null ? 'Track: https://my-ride-ashen.vercel.app/track/${widge
             ),
           ),
 
-          // Top bar
+          // Header bar (MyRide Live style)
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => _showCancelConfirmation(),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(color: context.surfaceColor, borderRadius: BorderRadius.circular(14)),
-                      child: Icon(Icons.close, color: context.textColor, size: 22),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  // SOS Button (only show if enabled)
-                  if (AppSettingsService.sosEnabled)
-                    GestureDetector(
-                      onTap: () => _showSOSOptions(),
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: AppColors.error.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.error.withValues(alpha: 0.5)),
-                        ),
-                        child: Icon(Icons.sos, color: AppColors.error, size: 22),
+            child: Column(
+              children: [
+                // Top bar with logo and LIVE badge
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: context.surfaceColor,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
                       ),
-                    ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(color: AppColors.yellow, borderRadius: BorderRadius.circular(20)),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(_driverArrived ? Icons.check_circle : Icons.access_time, color: Colors.black, size: 18),
-                        const SizedBox(width: 6),
-                        Text(_driverArrived ? 'Arrived' : '$_currentEta min', style: TextStyle(color: Colors.black, fontSize: 15, fontWeight: FontWeight.w700)),
-                      ],
-                    ),
+                    ],
                   ),
-                ],
-              ),
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => _showCancelConfirmation(),
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: context.isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(Icons.close, color: context.textColor, size: 20),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Logo and title
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: AppColors.yellow,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.local_taxi, color: Colors.black, size: 18),
+                      ),
+                      const SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'MyRide Live',
+                            style: TextStyle(
+                              color: context.textColor,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            widget.rideId?.substring(0, 8) ?? '',
+                            style: TextStyle(
+                              color: context.mutedColor,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      // LIVE badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: AppColors.success,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              'LIVE',
+                              style: TextStyle(
+                                color: AppColors.success,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Status banner
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: _driverArrived ? AppColors.yellow : AppColors.success,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _driverArrived ? Icons.check_circle : Icons.directions_car,
+                        color: _driverArrived ? Colors.black : Colors.white,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _driverArrived ? 'Driver has arrived!' : 'Driver on the way • $_currentEta min',
+                        style: TextStyle(
+                          color: _driverArrived ? Colors.black : Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
+          // SOS Button (floating)
+          if (AppSettingsService.sosEnabled)
+            Positioned(
+              left: 16,
+              top: MediaQuery.of(context).padding.top + 130,
+              child: GestureDetector(
+                onTap: () => _showSOSOptions(),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.error.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.sos, color: Colors.white, size: 22),
+                ),
+              ),
+            ),
 
           // Bottom sheet
           DraggableScrollableSheet(
@@ -769,35 +877,6 @@ ${widget.rideId != null ? 'Track: https://my-ride-ashen.vercel.app/track/${widge
                   padding: EdgeInsets.zero,
                   children: [
                     Center(child: Container(margin: const EdgeInsets.only(top: 12), width: 40, height: 4, decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2)))),
-
-                    // Status with animation
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-                      child: Row(
-                        children: [
-                          if (_driverArrived)
-                            const StatusAnimation(
-                              type: TripAnimationType.complete,
-                              size: 28,
-                              repeat: false,
-                            )
-                          else
-                            PulsingDot(
-                              color: AppColors.success,
-                              size: 10,
-                            ),
-                          const SizedBox(width: 10),
-                          Text(
-                            _driverArrived ? 'Driver has arrived!' : 'Driver is on the way',
-                            style: TextStyle(
-                              color: _driverArrived ? AppColors.yellow : AppColors.success,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
 
                     // Vehicle with driver overlay (Uber/Careem style)
                     Padding(

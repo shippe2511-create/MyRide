@@ -529,111 +529,114 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
     await showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: ctx.surfaceColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: ctx.borderColor,
-                borderRadius: BorderRadius.circular(2),
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          decoration: BoxDecoration(
+            color: ctx.surfaceColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: ctx.borderColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Icon(Icons.check_circle, color: Colors.green, size: 56),
-            const SizedBox(height: 16),
-            Text(
-              'Driver Found!',
-              style: TextStyle(
-                color: ctx.textColor,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
+              const SizedBox(height: 16),
+              Icon(Icons.check_circle, color: Colors.green, size: 48),
+              const SizedBox(height: 12),
+              Text(
+                'Driver Found!',
+                style: TextStyle(
+                  color: ctx.textColor,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Share the tracking link with ${widget.riderName}',
-              style: TextStyle(color: ctx.mutedColor, fontSize: 14),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 4),
+              Text(
+                'Share the tracking link with ${widget.riderName}',
+                style: TextStyle(color: ctx.mutedColor, fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
 
-            // WhatsApp button
-            _buildShareOption(
-              ctx,
-              Icons.chat,
-              'WhatsApp',
-              const Color(0xFF25D366),
-              () async {
-                Navigator.pop(ctx);
-                final phone = widget.riderPhone!.replaceAll('+', '');
-                final encodedMsg = Uri.encodeComponent(message);
-                final url = 'https://wa.me/$phone?text=$encodedMsg';
-                if (await canLaunchUrl(Uri.parse(url))) {
-                  await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-                }
-              },
-            ),
-            const SizedBox(height: 12),
+              // WhatsApp button
+              _buildShareOption(
+                ctx,
+                Icons.chat,
+                'WhatsApp',
+                const Color(0xFF25D366),
+                () async {
+                  Navigator.pop(ctx);
+                  final phone = widget.riderPhone!.replaceAll('+', '');
+                  final encodedMsg = Uri.encodeComponent(message);
+                  final url = 'https://wa.me/$phone?text=$encodedMsg';
+                  if (await canLaunchUrl(Uri.parse(url))) {
+                    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                  }
+                },
+              ),
+              const SizedBox(height: 10),
 
-            // SMS button
-            _buildShareOption(
-              ctx,
-              Icons.sms,
-              'SMS',
-              Colors.blue,
-              () async {
-                Navigator.pop(ctx);
-                final smsUrl = 'sms:${widget.riderPhone}?body=${Uri.encodeComponent(message)}';
-                if (await canLaunchUrl(Uri.parse(smsUrl))) {
-                  await launchUrl(Uri.parse(smsUrl));
-                }
-              },
-            ),
-            const SizedBox(height: 12),
+              // SMS button
+              _buildShareOption(
+                ctx,
+                Icons.sms,
+                'SMS',
+                Colors.blue,
+                () async {
+                  Navigator.pop(ctx);
+                  final smsUrl = 'sms:${widget.riderPhone}?body=${Uri.encodeComponent(message)}';
+                  if (await canLaunchUrl(Uri.parse(smsUrl))) {
+                    await launchUrl(Uri.parse(smsUrl));
+                  }
+                },
+              ),
+              const SizedBox(height: 10),
 
-            // Copy link button
-            _buildShareOption(
-              ctx,
-              Icons.copy,
-              'Copy Link',
-              Colors.orange,
-              () {
-                Navigator.pop(ctx);
-                Clipboard.setData(ClipboardData(text: trackingUrl));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Tracking link copied!')),
-                );
-              },
-            ),
-            const SizedBox(height: 12),
+              // Copy link button
+              _buildShareOption(
+                ctx,
+                Icons.copy,
+                'Copy Link',
+                Colors.orange,
+                () {
+                  Navigator.pop(ctx);
+                  Clipboard.setData(ClipboardData(text: trackingUrl));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Tracking link copied!')),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
 
-            // More options
-            _buildShareOption(
-              ctx,
-              Icons.share,
-              'More Options',
-              ctx.mutedColor,
-              () {
-                Navigator.pop(ctx);
-                SharePlus.instance.share(ShareParams(text: message, subject: 'MyRide Tracking Link'));
-              },
-            ),
+              // More options
+              _buildShareOption(
+                ctx,
+                Icons.share,
+                'More Options',
+                ctx.mutedColor,
+                () {
+                  Navigator.pop(ctx);
+                  SharePlus.instance.share(ShareParams(text: message, subject: 'MyRide Tracking Link'));
+                },
+              ),
 
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Skip', style: TextStyle(color: ctx.mutedColor)),
-            ),
-            SizedBox(height: MediaQuery.of(ctx).padding.bottom),
-          ],
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('Skip', style: TextStyle(color: ctx.mutedColor, fontSize: 14)),
+              ),
+            ],
+          ),
         ),
       ),
     );

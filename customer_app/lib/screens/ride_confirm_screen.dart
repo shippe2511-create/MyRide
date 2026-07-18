@@ -520,76 +520,37 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
 
                   const SizedBox(height: 20),
 
-                  // Private vehicle toggle (only shown if customer has private access)
-                  if (_hasPrivateAccess) ...[
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: _usePrivatePool
-                            ? Colors.purple.withValues(alpha: 0.2)
-                            : context.cardColor,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: _usePrivatePool ? Colors.purple : context.borderColor,
-                          width: _usePrivatePool ? 2 : 1,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.directions_car,
-                            color: _usePrivatePool ? Colors.purple : context.mutedColor,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Use Private Vehicle',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: _usePrivatePool ? Colors.purple : context.textColor,
-                                  ),
-                                ),
-                                Text(
-                                  _usePrivatePool
-                                      ? 'Your assigned vehicle will be requested'
-                                      : 'Request from any available driver',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: context.mutedColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Switch(
-                            value: _usePrivatePool,
-                            onChanged: (value) {
-                              HapticFeedback.selectionClick();
-                              setState(() => _usePrivatePool = value);
-                            },
-                            activeColor: Colors.purple,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Who's this ride for? selector
+                  // Ride options card - unified design
                   Container(
-                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: context.isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
-                      borderRadius: BorderRadius.circular(16),
+                      color: context.cardColor,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: context.borderColor.withValues(alpha: 0.5)),
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Toggle row
-                        GestureDetector(
+                        // Private vehicle option (only shown if customer has private access)
+                        if (_hasPrivateAccess) ...[
+                          _buildOptionTile(
+                            icon: Icons.directions_car_filled_outlined,
+                            title: 'Private Vehicle',
+                            subtitle: _usePrivatePool ? 'Your assigned vehicle' : 'Use your dedicated driver',
+                            isActive: _usePrivatePool,
+                            activeColor: Colors.purple,
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(() => _usePrivatePool = !_usePrivatePool);
+                            },
+                          ),
+                          Divider(height: 1, color: context.borderColor.withValues(alpha: 0.3), indent: 68),
+                        ],
+                        // Book for someone else option
+                        _buildOptionTile(
+                          icon: Icons.person_add_alt_1_outlined,
+                          title: 'Book for someone else',
+                          subtitle: _bookingForOther ? 'Driver contacts the rider' : 'Send ride to a friend or family',
+                          isActive: _bookingForOther,
+                          activeColor: AppColors.yellow,
                           onTap: () {
                             HapticFeedback.selectionClick();
                             setState(() {
@@ -597,92 +558,6 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
                               if (!_bookingForOther) _riderPhoneError = null;
                             });
                           },
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: context.cardColor,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: _bookingForOther ? AppColors.yellow : context.borderColor,
-                                width: _bookingForOther ? 1.5 : 1,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: _bookingForOther
-                                        ? AppColors.yellow.withValues(alpha: 0.15)
-                                        : context.bgColor,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Icon(
-                                    Icons.person_add_outlined,
-                                    color: _bookingForOther ? AppColors.yellow : context.mutedColor,
-                                    size: 22,
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Order for someone else',
-                                        style: TextStyle(
-                                          color: context.textColor,
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        _bookingForOther
-                                            ? 'Driver will contact the rider directly'
-                                            : 'Tap to book for a friend or family',
-                                        style: TextStyle(
-                                          color: context.mutedColor,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  width: 48,
-                                  height: 28,
-                                  padding: const EdgeInsets.all(2),
-                                  decoration: BoxDecoration(
-                                    color: _bookingForOther ? AppColors.yellow : context.borderColor,
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: AnimatedAlign(
-                                    duration: const Duration(milliseconds: 200),
-                                    curve: Curves.easeOut,
-                                    alignment: _bookingForOther ? Alignment.centerRight : Alignment.centerLeft,
-                                    child: Container(
-                                      width: 24,
-                                      height: 24,
-                                      decoration: BoxDecoration(
-                                        color: _bookingForOther ? Colors.black : context.cardColor,
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.15),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         ),
                         // Rider details fields with animation
                         AnimatedSize(
@@ -691,72 +566,77 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
                           child: _bookingForOther
                               ? Column(
                                   children: [
-                                    const SizedBox(height: 16),
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        color: context.cardColor,
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          TextField(
-                                            controller: _riderNameController,
-                                            style: TextStyle(color: context.textColor, fontSize: 15),
-                                            textCapitalization: TextCapitalization.words,
-                                            decoration: InputDecoration(
-                                              hintText: "Rider's name",
-                                              hintStyle: TextStyle(color: context.mutedColor),
-                                              prefixIcon: Padding(
-                                                padding: const EdgeInsets.only(left: 14, right: 10),
-                                                child: Icon(Icons.person_outline, color: AppColors.yellow, size: 20),
+                                    Divider(height: 1, color: context.borderColor.withValues(alpha: 0.3), indent: 20, endIndent: 20),
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: context.isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+                                          borderRadius: BorderRadius.circular(14),
+                                        ),
+                                        child: Column(
+                                          children: [
+                                            TextField(
+                                              controller: _riderNameController,
+                                              style: TextStyle(color: context.textColor, fontSize: 15),
+                                              textCapitalization: TextCapitalization.words,
+                                              decoration: InputDecoration(
+                                                hintText: "Rider's name",
+                                                hintStyle: TextStyle(color: context.mutedColor),
+                                                prefixIcon: Padding(
+                                                  padding: const EdgeInsets.only(left: 14, right: 10),
+                                                  child: Icon(Icons.person_outline, color: AppColors.yellow, size: 20),
+                                                ),
+                                                prefixIconConstraints: const BoxConstraints(minWidth: 44),
+                                                filled: true,
+                                                fillColor: Colors.transparent,
+                                                border: InputBorder.none,
+                                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                                               ),
-                                              prefixIconConstraints: const BoxConstraints(minWidth: 44),
-                                              filled: true,
-                                              fillColor: Colors.transparent,
-                                              border: InputBorder.none,
-                                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                                             ),
-                                          ),
-                                          Divider(height: 1, color: context.borderColor, indent: 50),
-                                          TextField(
-                                            controller: _riderPhoneController,
-                                            style: TextStyle(color: context.textColor, fontSize: 15),
-                                            keyboardType: TextInputType.phone,
-                                            onChanged: (value) {
-                                              if (_riderPhoneError != null) {
-                                                setState(() => _riderPhoneError = null);
-                                              }
-                                            },
-                                            decoration: InputDecoration(
-                                              hintText: "7XXXXXX",
-                                              hintStyle: TextStyle(color: context.mutedColor),
-                                              prefixIcon: Padding(
-                                                padding: const EdgeInsets.only(left: 14, right: 10),
-                                                child: Icon(Icons.phone_outlined, color: AppColors.yellow, size: 20),
+                                            Divider(height: 1, color: context.borderColor.withValues(alpha: 0.3), indent: 50),
+                                            TextField(
+                                              controller: _riderPhoneController,
+                                              style: TextStyle(color: context.textColor, fontSize: 15),
+                                              keyboardType: TextInputType.phone,
+                                              onChanged: (value) {
+                                                if (_riderPhoneError != null) {
+                                                  setState(() => _riderPhoneError = null);
+                                                }
+                                              },
+                                              decoration: InputDecoration(
+                                                hintText: "7XXXXXX",
+                                                hintStyle: TextStyle(color: context.mutedColor),
+                                                prefixIcon: Padding(
+                                                  padding: const EdgeInsets.only(left: 14, right: 10),
+                                                  child: Icon(Icons.phone_outlined, color: AppColors.yellow, size: 20),
+                                                ),
+                                                prefixIconConstraints: const BoxConstraints(minWidth: 44),
+                                                prefixText: '+960 ',
+                                                prefixStyle: TextStyle(color: context.textColor, fontSize: 15),
+                                                filled: true,
+                                                fillColor: Colors.transparent,
+                                                border: InputBorder.none,
+                                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                                               ),
-                                              prefixIconConstraints: const BoxConstraints(minWidth: 44),
-                                              prefixText: '+960 ',
-                                              prefixStyle: TextStyle(color: context.textColor, fontSize: 15),
-                                              filled: true,
-                                              fillColor: Colors.transparent,
-                                              border: InputBorder.none,
-                                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                                             ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                     ),
                                     if (_riderPhoneError != null) ...[
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        children: [
-                                          const Icon(Icons.error_outline, color: Colors.red, size: 16),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            _riderPhoneError!,
-                                            style: const TextStyle(color: Colors.red, fontSize: 12),
-                                          ),
-                                        ],
+                                      Padding(
+                                        padding: const EdgeInsets.only(left: 16, bottom: 8),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.error_outline, color: Colors.red, size: 14),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              _riderPhoneError!,
+                                              style: const TextStyle(color: Colors.red, fontSize: 12),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ],
                                   ],
@@ -831,6 +711,99 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildOptionTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool isActive,
+    required Color activeColor,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? activeColor.withValues(alpha: 0.15)
+                      : context.isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  color: isActive ? activeColor : context.mutedColor,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: isActive ? activeColor : context.textColor,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: context.mutedColor,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 48,
+                height: 28,
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: isActive ? activeColor : context.borderColor,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: AnimatedAlign(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  alignment: isActive ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: isActive ? Colors.black : context.cardColor,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

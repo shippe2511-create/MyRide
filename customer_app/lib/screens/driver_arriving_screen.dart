@@ -705,51 +705,97 @@ ${widget.rideId != null ? 'Track: https://my-ride-ashen.vercel.app/track/${widge
             ),
           ),
 
-          // Header bar
+          // Header bar with back button, status pill, and location button
           SafeArea(
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: _driverArrived ? AppColors.yellow : AppColors.success,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: Row(
                 children: [
+                  // Back/Cancel button
                   GestureDetector(
                     onTap: () => _showCancelConfirmation(),
                     child: Container(
-                      width: 32,
-                      height: 32,
+                      width: 44,
+                      height: 44,
                       decoration: BoxDecoration(
-                        color: (_driverArrived ? Colors.black : Colors.white).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        color: context.surfaceColor,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.15),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                      child: Icon(Icons.close, color: _driverArrived ? Colors.black : Colors.white, size: 18),
+                      child: Icon(Icons.arrow_back, color: context.textColor, size: 22),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Icon(
-                    _driverArrived ? Icons.check_circle : Icons.directions_car,
-                    color: _driverArrived ? Colors.black : Colors.white,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
+                  // Status pill (centered)
                   Expanded(
-                    child: Text(
-                      _driverArrived ? 'Driver has arrived!' : 'Driver on the way • $_currentEta min',
-                      style: TextStyle(
-                        color: _driverArrived ? Colors.black : Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.yellow,
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.15),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _driverArrived ? Icons.check_circle : Icons.location_on,
+                            color: Colors.black,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              _driverArrived ? 'DRIVER ARRIVED' : 'WAITING FOR DRIVER',
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.5,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Location/center button
+                  GestureDetector(
+                    onTap: () {
+                      _mapController?.animateCamera(
+                        CameraUpdate.newLatLngZoom(_driverLocation, 16),
+                      );
+                    },
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: context.surfaceColor,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.15),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Icon(Icons.my_location, color: context.textColor, size: 22),
                     ),
                   ),
                 ],

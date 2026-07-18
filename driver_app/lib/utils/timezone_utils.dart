@@ -25,4 +25,13 @@ class MaldivesTimezone {
   static DateTime now() {
     return DateTime.now().toUtc().add(offset);
   }
+
+  /// Get start of today in Maldives timezone, returned as UTC for database queries
+  /// Example: If it's 2AM in Maldives (July 19), this returns midnight July 19 Maldives = 19:00 UTC July 18
+  static DateTime todayStartUtc() {
+    final maldivesNow = now();
+    final maldivesMidnight = DateTime(maldivesNow.year, maldivesNow.month, maldivesNow.day);
+    // Convert Maldives midnight back to UTC by subtracting offset
+    return maldivesMidnight.subtract(offset);
+  }
 }

@@ -140,7 +140,7 @@ class DriverState extends ChangeNotifier {
 
   bool _isChecklistValidToday() {
     if (_checklistCompletedDate == null) return false;
-    final now = DateTime.now();
+    final now = MaldivesTimezone.now();
     return _checklistCompletedDate!.year == now.year &&
         _checklistCompletedDate!.month == now.month &&
         _checklistCompletedDate!.day == now.day;
@@ -150,7 +150,7 @@ class DriverState extends ChangeNotifier {
   bool get isWithinDutyHours {
     final todayShiftInfo = todayShift;
 
-    final now = DateTime.now();
+    final now = MaldivesTimezone.now();
     final startParts = todayShiftInfo['start']!.split(':');
     final endParts = todayShiftInfo['end']!.split(':');
 
@@ -168,7 +168,7 @@ class DriverState extends ChangeNotifier {
 
   // Get today's shift info from loaded shifts (defaults to 8am-4pm if not scheduled)
   Map<String, String> get todayShift {
-    final today = DateTime.now();
+    final today = MaldivesTimezone.now();
     final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
     for (final shift in _weekShifts) {
@@ -296,9 +296,10 @@ class DriverState extends ChangeNotifier {
           _shiftStartTime = DateTime.tryParse(shiftStartStr);
         }
 
-        // Restore today's distance (check if same day)
+        // Restore today's distance (check if same day in Maldives timezone)
         final savedDate = prefs.getString('todayDistanceDate');
-        final today = DateTime.now().toIso8601String().substring(0, 10);
+        final maldivesNow = MaldivesTimezone.now();
+        final today = '${maldivesNow.year}-${maldivesNow.month.toString().padLeft(2, '0')}-${maldivesNow.day.toString().padLeft(2, '0')}';
         if (savedDate == today) {
           _todayDistance = prefs.getDouble('todayDistance') ?? 0;
         }
@@ -468,10 +469,8 @@ class DriverState extends ChangeNotifier {
 
       _totalTrips = (completedRides as List).length;
 
-      // Get today's trips (convert local midnight to UTC for comparison)
-      final now = DateTime.now();
-      final todayStart = DateTime(now.year, now.month, now.day);
-      final todayStartUtc = todayStart.toUtc().toIso8601String();
+      // Get today's trips using Maldives timezone (UTC+5)
+      final todayStartUtc = MaldivesTimezone.todayStartUtc().toIso8601String();
 
       final todayRides = await Supabase.instance.client
           .from('rides')
@@ -552,23 +551,23 @@ class DriverState extends ChangeNotifier {
         return;
       }
 
-      final today = DateTime.now();
-      final startOfDay = DateTime(today.year, today.month, today.day);
-      final endOfDay = startOfDay.add(const Duration(days: 1));
+      // Use Maldives timezone for "today" check
+      final todayStartUtc = MaldivesTimezone.todayStartUtc();
+      final tomorrowStartUtc = todayStartUtc.add(const Duration(days: 1));
 
       final response = await SupabaseService.client
           .from('vehicle_checklists')
           .select()
           .eq('driver_id', _driverId)
-          .gte('checked_at', startOfDay.toIso8601String())
-          .lt('checked_at', endOfDay.toIso8601String())
+          .gte('checked_at', todayStartUtc.toIso8601String())
+          .lt('checked_at', tomorrowStartUtc.toIso8601String())
           .order('checked_at', ascending: false)
           .limit(1)
           .maybeSingle();
 
       if (response != null) {
         _checklistCompleted = true;
-        _checklistCompletedDate = DateTime.tryParse(response['checked_at'] ?? '') ?? today;
+        _checklistCompletedDate = DateTime.tryParse(response['checked_at'] ?? '') ?? MaldivesTimezone.now();
         _checklistHasIssues = response['has_issues'] ?? false;
         final issues = response['issues'];
         if (issues is Map) {
@@ -1688,9 +1687,10 @@ class DriverState extends ChangeNotifier {
       _totalTrips++;
       _todayDistance += distance;
 
-      // Save today's distance
+      // Save today's distance (using Maldives timezone)
       final prefs = await SharedPreferences.getInstance();
-      final today = DateTime.now().toIso8601String().substring(0, 10);
+      final maldivesNow = MaldivesTimezone.now();
+      final today = '${maldivesNow.year}-${maldivesNow.month.toString().padLeft(2, '0')}-${maldivesNow.day.toString().padLeft(2, '0')}';
       await prefs.setDouble('todayDistance', _todayDistance);
       await prefs.setString('todayDistanceDate', today);
 

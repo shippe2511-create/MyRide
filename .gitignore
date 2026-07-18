@@ -57,3 +57,4 @@
 **/credentials.json
 **/*.pem
 **/*.p12
+.vercel

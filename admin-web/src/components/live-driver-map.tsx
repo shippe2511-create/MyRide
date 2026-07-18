@@ -1067,17 +1067,6 @@ export function LiveDriverMap({
           <Car className="h-4 w-4" />
         </Button>
 
-        {/* Heatmap Toggle */}
-        <Button
-          variant={showHeatmap ? "default" : "secondary"}
-          size="icon"
-          className="shadow-lg h-8 w-8"
-          onClick={() => setShowHeatmap(!showHeatmap)}
-          title="Driver density heatmap"
-        >
-          <Flame className="h-4 w-4" />
-        </Button>
-
         {/* Geofence Toggle */}
         <Button
           variant={showGeofence ? "default" : "secondary"}

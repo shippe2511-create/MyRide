@@ -424,15 +424,6 @@ function ZoneMapInner({
 
         <div className="h-px bg-border my-1" />
 
-        <Button variant={showHeatmap ? "default" : "secondary"} size="icon" className="shadow-lg h-8 w-8" onClick={() => setShowHeatmap(!showHeatmap)} title="Heatmap">
-          <Flame className="h-4 w-4" />
-        </Button>
-        <Button variant={showGeofence ? "default" : "secondary"} size="icon" className="shadow-lg h-8 w-8" onClick={() => setShowGeofence(!showGeofence)} title="Service area">
-          <Target className="h-4 w-4" />
-        </Button>
-
-        <div className="h-px bg-border my-1" />
-
         <div className="flex flex-col gap-1 bg-background/90 backdrop-blur rounded-lg p-1 shadow-lg">
           <Button variant={mapType === "streets" ? "default" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setMapType("streets")} title="Streets">
             <MapIcon className="h-4 w-4" />

@@ -263,7 +263,9 @@
       "Bash(pkill -9 -f dartvm)",
       "Bash(cp /Users/athifabdulla/Downloads/MyRide/customer_app/build/app/outputs/flutter-apk/app-release.apk /Users/athifabdulla/Downloads/MyRide-Customer.apk)",
       "Bash(cp /Users/athifabdulla/Downloads/MyRide/driver_app/build/app/outputs/flutter-apk/app-release.apk /Users/athifabdulla/Downloads/MyRide-Driver.apk)",
-      "Bash(vercel *)"
+      "Bash(vercel *)",
+      "Bash(python3 -m http.server 8081)",
+      "Bash(lsof -ti:3000,3001,3002)"
     ],
     "additionalDirectories": [
       "/tmp"

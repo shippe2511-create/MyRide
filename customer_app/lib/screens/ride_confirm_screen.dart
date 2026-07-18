@@ -124,16 +124,14 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'customer_pools',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'customer_id',
+            value: userId,
+          ),
           callback: (payload) {
-            debugPrint('RideConfirmScreen: Pool changed, payload=$payload');
-            // Check if this change affects the current user
-            final newRecord = payload.newRecord;
-            final oldRecord = payload.oldRecord;
-            final affectedCustomerId = newRecord['customer_id'] ?? oldRecord['customer_id'];
-            if (affectedCustomerId == userId) {
-              debugPrint('RideConfirmScreen: Refreshing for current user');
-              _checkPrivateAccess();
-            }
+            debugPrint('RideConfirmScreen: Pool changed for user $userId, payload=$payload');
+            _checkPrivateAccess();
           },
         )
         .subscribe();

@@ -24,6 +24,17 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "MyRide Admin",
   },
+  openGraph: {
+    title: "MyRide Admin Panel",
+    description: "Admin panel for MyRide staff transport service",
+    images: [{ url: "/icon-512.png", width: 512, height: 512 }],
+  },
+  twitter: {
+    card: "summary",
+    title: "MyRide Admin Panel",
+    description: "Admin panel for MyRide staff transport service",
+    images: ["/icon-512.png"],
+  },
 };
 
 export const viewport: Viewport = {

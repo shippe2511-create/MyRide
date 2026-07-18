@@ -15,9 +15,17 @@ import {
 import { SkeletonCard } from "@/components/ui/skeleton-card"
 import { PermissionGate } from "@/components/permission-gate"
 
+// Must use dynamic import with ssr:false for Google Maps
 const LiveDriverMap = dynamic(
   () => import("@/components/live-driver-map").then(mod => mod.LiveDriverMap),
-  { ssr: false, loading: () => <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div> }
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-full w-full flex items-center justify-center bg-muted rounded-lg">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 )
 
 interface DriverLocation {
@@ -62,10 +70,14 @@ interface DriverLocation {
   } | null
 }
 
-const supabase = createClient()
-
 export default function TrackingPage() {
+  const supabase = createClient()
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const { data: driverLocations = [], isLoading: loading, refetch } = useQuery({
     queryKey: ["tracking-page"],
@@ -176,7 +188,7 @@ export default function TrackingPage() {
     setSelectedDriverId(driver.id)
   }
 
-  if (loading) {
+  if (!mounted || loading) {
     return (
       <div className="space-y-4">
         <div>

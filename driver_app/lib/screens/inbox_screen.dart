@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../providers/driver_state.dart';
 import '../utils/timezone_utils.dart';
 import '../widgets/shimmer_loading.dart';
 
@@ -41,6 +42,7 @@ class InboxMessage {
       case 'promo':
         return MessageCategory.promo;
       case 'trip':
+      case 'ride':
         return MessageCategory.trip;
       case 'safety':
         return MessageCategory.safety;
@@ -63,7 +65,6 @@ class _InboxScreenState extends State<InboxScreen> {
   List<InboxMessage> _messages = [];
   bool _isLoading = true;
   RealtimeChannel? _subscription;
-  String? _profileId;
   Timer? _pollTimer;
 
   @override
@@ -73,12 +74,8 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   Future<void> _initAndLoad() async {
-    final prefs = await SharedPreferences.getInstance();
-    _profileId = prefs.getString('profile_id');
-    debugPrint('Inbox: Using profileId=$_profileId');
     _loadMessages();
     _subscribeToNotifications();
-    // Poll every 5 seconds as fallback
     _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (mounted) _loadMessages();
     });
@@ -91,39 +88,40 @@ class _InboxScreenState extends State<InboxScreen> {
     super.dispose();
   }
 
+  String? get _profileId {
+    try {
+      return Provider.of<DriverState>(context, listen: false).profileId;
+    } catch (e) {
+      return null;
+    }
+  }
+
   void _subscribeToNotifications() {
     final userId = _profileId;
-    if (userId == null) {
+    if (userId == null || userId.isEmpty) {
       debugPrint('Inbox: No profileId for subscription');
       return;
     }
 
     _subscription = SupabaseService.client
-        .channel('inbox_notifications_$userId')
+        .channel('driver_inbox_$userId')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'notifications',
           callback: (payload) {
-            debugPrint('Inbox: Notification INSERT received: ${payload.newRecord}');
-            // Check if this notification is for us
             final newUserId = payload.newRecord['user_id'];
             if (newUserId == userId) {
-              debugPrint('Inbox: Notification is for us, reloading');
               _loadMessages();
             }
           },
         )
-        .subscribe((status, error) {
-          debugPrint('Inbox: Subscription status=$status, error=$error');
-        });
-    debugPrint('Inbox: Subscribed to notifications for $userId');
+        .subscribe();
   }
 
   Future<void> _loadMessages() async {
     final userId = _profileId;
-    if (userId == null) {
-      debugPrint('Inbox: No profileId, cannot load messages');
+    if (userId == null || userId.isEmpty) {
       if (mounted) setState(() => _isLoading = false);
       return;
     }
@@ -135,8 +133,6 @@ class _InboxScreenState extends State<InboxScreen> {
           .eq('user_id', userId)
           .order('created_at', ascending: false)
           .limit(50);
-
-      debugPrint('Inbox: Loaded ${response.length} messages for $userId');
 
       if (mounted) {
         setState(() {
@@ -156,18 +152,25 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   Future<void> _markAllRead() async {
+    final userId = _profileId;
+    if (userId == null || userId.isEmpty) return;
+
     HapticFeedback.lightImpact();
-    await SupabaseService.markAllMessagesRead();
-    setState(() {
-      _messages = _messages.map((m) => InboxMessage(
-        id: m.id,
-        title: m.title,
-        subtitle: m.subtitle,
-        time: m.time,
-        isRead: true,
-        category: m.category,
-      )).toList();
-    });
+    try {
+      await SupabaseService.markAllNotificationsAsRead(userId);
+      setState(() {
+        _messages = _messages.map((m) => InboxMessage(
+          id: m.id,
+          title: m.title,
+          subtitle: m.subtitle,
+          time: m.time,
+          isRead: true,
+          category: m.category,
+        )).toList();
+      });
+    } catch (e) {
+      debugPrint('Error marking all as read: $e');
+    }
   }
 
   @override
@@ -247,7 +250,7 @@ class _InboxScreenState extends State<InboxScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: context.surfaceColor,
+                  color: context.cardColor,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: context.borderColor),
                 ),
@@ -276,7 +279,7 @@ class _InboxScreenState extends State<InboxScreen> {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: context.surfaceColor,
+              color: context.cardColor,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Icon(Icons.inbox_rounded, color: context.mutedColor, size: 40),
@@ -332,7 +335,7 @@ class _InboxScreenState extends State<InboxScreen> {
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: context.surfaceColor,
+            color: context.cardColor,
             borderRadius: BorderRadius.circular(18),
           ),
           child: Row(
@@ -408,7 +411,7 @@ class _InboxScreenState extends State<InboxScreen> {
       case MessageCategory.safety:
         return {'icon': Icons.shield, 'color': AppColors.error};
       case MessageCategory.system:
-        return {'icon': Icons.info_outline, 'color': AppColors.mutedDark};
+        return {'icon': Icons.info_outline, 'color': context.mutedColor};
     }
   }
 
@@ -416,7 +419,6 @@ class _InboxScreenState extends State<InboxScreen> {
     final now = MaldivesTimezone.now();
     final diff = now.difference(time);
 
-    // Handle negative differences
     if (diff.isNegative) return 'Just now';
 
     if (diff.inMinutes < 1) {
@@ -433,7 +435,12 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   void _showMessageDetail(InboxMessage message) async {
-    await SupabaseService.markMessageRead(message.id);
+    try {
+      await SupabaseService.markNotificationAsRead(message.id);
+    } catch (e) {
+      debugPrint('Error marking as read: $e');
+    }
+
     setState(() {
       final index = _messages.indexWhere((m) => m.id == message.id);
       if (index != -1) {
@@ -456,8 +463,8 @@ class _InboxScreenState extends State<InboxScreen> {
       builder: (context) => Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: context.surfaceColor,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          color: context.cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -524,7 +531,7 @@ class _InboxScreenState extends State<InboxScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
-                child: Text('Got it', style: TextStyle(fontWeight: FontWeight.w600)),
+                child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.w600)),
               ),
             ),
             SizedBox(height: MediaQuery.of(context).padding.bottom + 8),

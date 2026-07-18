@@ -6,12 +6,11 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatDate(date: string | Date) {
-  return new Date(date).toLocaleDateString('en-US', {
-    timeZone: 'Indian/Maldives',
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
+  const d = new Date(date)
+  const day = d.toLocaleDateString('en-US', { timeZone: 'Indian/Maldives', day: 'numeric' })
+  const month = d.toLocaleDateString('en-US', { timeZone: 'Indian/Maldives', month: 'short' })
+  const year = d.toLocaleDateString('en-US', { timeZone: 'Indian/Maldives', year: 'numeric' })
+  return `${day}-${month}-${year}`
 }
 
 export function formatDateTime(date: string | Date) {

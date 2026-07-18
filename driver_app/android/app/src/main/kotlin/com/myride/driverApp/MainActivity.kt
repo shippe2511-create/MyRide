@@ -1,4 +1,4 @@
-package com.myride.driver_app
+package com.myride.driverApp
 
 import io.flutter.embedding.android.FlutterActivity
 

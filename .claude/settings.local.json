@@ -259,7 +259,11 @@
       "Bash(NEXT_TURBOPACK=false npx next dev -H 0.0.0.0)",
       "Bash(md5 /Users/athifabdulla/Downloads/MyRide/admin-web/src/app/dashboard/reports/page.tsx)",
       "Bash(pkill -9 -f \"next\")",
-      "Bash(PORT=3001 npm run start)"
+      "Bash(PORT=3001 npm run start)",
+      "Bash(pkill -9 -f dartvm)",
+      "Bash(cp /Users/athifabdulla/Downloads/MyRide/customer_app/build/app/outputs/flutter-apk/app-release.apk /Users/athifabdulla/Downloads/MyRide-Customer.apk)",
+      "Bash(cp /Users/athifabdulla/Downloads/MyRide/driver_app/build/app/outputs/flutter-apk/app-release.apk /Users/athifabdulla/Downloads/MyRide-Driver.apk)",
+      "Bash(vercel *)"
     ],
     "additionalDirectories": [
       "/tmp"

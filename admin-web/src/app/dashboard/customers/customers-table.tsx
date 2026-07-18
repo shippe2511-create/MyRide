@@ -637,25 +637,54 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
     setBulkLoading(false)
   }
 
-  const exportCSV = () => {
+  const exportCSV = async () => {
+    toast.info("Exporting all customers...")
+
+    // Fetch ALL customers from database, not just current page
+    const { data: allCustomers, error } = await supabase
+      .from("profiles")
+      .select("full_name, email, phone, employee_id, department, status, created_at")
+      .in("role", ["customer", "super-admin", "admin"])
+      .order("full_name", { ascending: true })
+
+    if (error) {
+      toast.error("Failed to export customers")
+      return
+    }
+
+    // Helper to escape CSV fields (wrap in quotes if contains comma, quote, or newline)
+    const escapeCSV = (val: string) => {
+      if (val.includes(",") || val.includes('"') || val.includes("\n")) {
+        return `"${val.replace(/"/g, '""')}"`
+      }
+      return val
+    }
+
+    // Remove 960 country code prefix from phone
+    const formatPhoneForExport = (phone: string | null) => {
+      if (!phone) return ""
+      return phone.replace(/^(\+?960)/, "")
+    }
+
     const headers = ["Name", "Email", "Phone", "Employee ID", "Department", "Status", "Created At"]
-    const rows = customers.map(c => [
-      c.full_name,
-      c.email || "",
-      c.phone || "",
-      c.employee_id || "",
-      c.department || "",
-      c.status,
-      formatDate(c.created_at)
+    const rows = (allCustomers || []).map(c => [
+      escapeCSV(c.full_name || ""),
+      escapeCSV(c.email || ""),
+      escapeCSV(formatPhoneForExport(c.phone)),
+      escapeCSV(c.employee_id || ""),
+      escapeCSV(c.department || ""),
+      escapeCSV(c.status || ""),
+      escapeCSV(formatDate(c.created_at))
     ])
 
     const csv = [headers, ...rows].map(row => row.join(",")).join("\n")
-    const blob = new Blob([csv], { type: "text/csv" })
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
     a.download = "customers.csv"
     a.click()
+    toast.success(`Exported ${allCustomers?.length || 0} customers`)
   }
 
   const downloadTemplate = () => {

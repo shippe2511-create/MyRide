@@ -1,10 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 import TrackingClient from './tracking-client';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+function getSupabaseClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) {
+    throw new Error('Missing Supabase environment variables');
+  }
+  return createClient(url, key);
+}
 
 interface PageProps {
   params: Promise<{ rideId: string }>;
@@ -12,6 +16,7 @@ interface PageProps {
 
 export default async function TrackingPage({ params }: PageProps) {
   const { rideId } = await params;
+  const supabase = getSupabaseClient();
 
   // Fetch ride data server-side
   const { data: rideData, error: rideError } = await supabase

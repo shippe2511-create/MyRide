@@ -18,6 +18,7 @@ import 'history_screen.dart';
 import 'profile_screen.dart';
 import 'ride_screen.dart';
 import 'chat_screen.dart';
+import 'inbox_screen.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -373,6 +374,7 @@ class _HomeScreenState extends State<HomeScreen> {
         index: _selectedTab,
         children: [
           _buildHomeContent(),
+          const InboxScreen(),
           const HistoryScreen(),
           const ProfileScreen(),
         ],
@@ -691,7 +693,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // Profile avatar
           GestureDetector(
             onTap: () {
-              setState(() => _selectedTab = 2); // Switch to Profile tab
+              setState(() => _selectedTab = 3); // Switch to Profile tab
             },
             child: Container(
               width: 50,
@@ -1026,7 +1028,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: AppColors.info,
                       onTap: () {
                         HapticFeedback.lightImpact();
-                        _onTabChanged(1);
+                        _onTabChanged(2); // History tab
                       },
                     ),
                     _buildActionButton(
@@ -2386,8 +2388,9 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _buildNavItem(context, Icons.home_rounded, Icons.home_outlined, 0),
-                _buildNavItem(context, Icons.history_rounded, Icons.history_outlined, 1),
-                _buildNavItem(context, Icons.person_rounded, Icons.person_outline_rounded, 2),
+                _buildNavItem(context, Icons.inbox_rounded, Icons.inbox_outlined, 1),
+                _buildNavItem(context, Icons.history_rounded, Icons.history_outlined, 2),
+                _buildNavItem(context, Icons.person_rounded, Icons.person_outline_rounded, 3),
               ],
             ),
           ),

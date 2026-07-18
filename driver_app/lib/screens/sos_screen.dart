@@ -174,7 +174,8 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
     String? locationAddress;
     if (lat != null && lng != null) {
       try {
-        final placemarks = await placemarkFromCoordinates(lat, lng);
+        final geocoding = Geocoding();
+        final placemarks = await geocoding.placemarkFromCoordinates(lat, lng);
         if (placemarks.isNotEmpty) {
           final place = placemarks.first;
           final parts = <String>[

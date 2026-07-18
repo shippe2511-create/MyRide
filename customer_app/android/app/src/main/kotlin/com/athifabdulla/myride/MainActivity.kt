@@ -1,4 +1,4 @@
-package com.myride.myride
+package com.athifabdulla.myride
 
 import io.flutter.embedding.android.FlutterActivity
 

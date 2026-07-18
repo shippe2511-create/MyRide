@@ -273,13 +273,16 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  bool firebaseInitialized = false;
   try {
-    // Initialize Firebase
+    // Initialize Firebase - wrapped carefully for devices without Google Play Services
     await Firebase.initializeApp();
-    // Set up background message handler
+    firebaseInitialized = true;
+    // Set up background message handler only if Firebase initialized
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   } catch (e) {
-    debugPrint('Firebase init error: $e');
+    debugPrint('Firebase init error (continuing without Firebase): $e');
+    // Continue without Firebase - app should still work
   }
 
   try {

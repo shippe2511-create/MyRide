@@ -40,7 +40,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   // DEV MODE: Skip OTP for testing (set to false for production)
-  static const bool _devSkipOtp = false;
+  static const bool _devSkipOtp = true;
 
   Future<void> _sendOTP() async {
     final phone = _phoneController.text.trim();

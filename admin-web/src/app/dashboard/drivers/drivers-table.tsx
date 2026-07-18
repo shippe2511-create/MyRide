@@ -636,25 +636,54 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
     setBulkLoading(false)
   }
 
-  const exportCSV = () => {
+  const exportCSV = async () => {
+    toast.info("Exporting all drivers...")
+
+    // Fetch ALL drivers from database, not just current page
+    const { data: allDrivers, error } = await supabase
+      .from("profiles")
+      .select("full_name, email, phone, employee_id, department, status, created_at")
+      .eq("role", "driver")
+      .order("full_name", { ascending: true })
+
+    if (error) {
+      toast.error("Failed to export drivers")
+      return
+    }
+
+    // Helper to escape CSV fields (wrap in quotes if contains comma, quote, or newline)
+    const escapeCSV = (val: string) => {
+      if (val.includes(",") || val.includes('"') || val.includes("\n")) {
+        return `"${val.replace(/"/g, '""')}"`
+      }
+      return val
+    }
+
+    // Remove 960 country code prefix from phone
+    const formatPhoneForExport = (phone: string | null) => {
+      if (!phone) return ""
+      return phone.replace(/^(\+?960)/, "")
+    }
+
     const headers = ["Name", "Email", "Phone", "Employee ID", "Department", "Status", "Created At"]
-    const rows = drivers.map(d => [
-      d.full_name,
-      d.email || "",
-      d.phone || "",
-      d.employee_id || "",
-      d.department || "",
-      d.status,
-      formatDate(d.created_at)
+    const rows = (allDrivers || []).map(d => [
+      escapeCSV(d.full_name || ""),
+      escapeCSV(d.email || ""),
+      escapeCSV(formatPhoneForExport(d.phone)),
+      escapeCSV(d.employee_id || ""),
+      escapeCSV(d.department || ""),
+      escapeCSV(d.status || ""),
+      escapeCSV(formatDate(d.created_at))
     ])
 
     const csv = [headers, ...rows].map(row => row.join(",")).join("\n")
-    const blob = new Blob([csv], { type: "text/csv" })
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
     a.download = "drivers.csv"
     a.click()
+    toast.success(`Exported ${allDrivers?.length || 0} drivers`)
   }
 
   const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)

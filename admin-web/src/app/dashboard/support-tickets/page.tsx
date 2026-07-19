@@ -379,7 +379,7 @@ export default function SupportTicketsPage() {
             </div>
           </div>
         </Card>
-        <Card className={`p-4 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20 ${stats.open > 0 ? 'ring-2 ring-red-500/50' : ''}`}>
+        <Card className="p-4 bg-gradient-to-br from-red-500/10 to-red-600/5 border border-red-500/20">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-red-500/20">
               <AlertCircle className="h-4 w-4 text-red-500" />

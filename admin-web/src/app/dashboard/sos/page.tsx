@@ -535,7 +535,7 @@ export default function SOSPage() {
 
   return (
     <PermissionGate permission="sos:view">
-    <div className="space-y-6 p-1">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -556,7 +556,7 @@ export default function SOSPage() {
       </div>
 
       <div className="grid gap-4 grid-cols-3">
-        <Card className={`p-4 bg-gradient-to-br from-red-500/10 to-red-600/5 ${stats.active > 0 ? 'border-2 border-red-500/50' : 'border-red-500/20'}`}>
+        <Card className="p-4 bg-gradient-to-br from-red-500/10 to-red-600/5 border border-red-500/20">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-red-500/20 shrink-0">
               <AlertTriangle className={`h-4 w-4 text-red-500 ${stats.active > 0 ? 'animate-pulse' : ''}`} />
@@ -567,7 +567,7 @@ export default function SOSPage() {
             </div>
           </div>
         </Card>
-        <Card className="p-4 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20">
+        <Card className="p-4 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border border-yellow-500/20">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-yellow-500/20 shrink-0">
               <Clock className="h-4 w-4 text-yellow-500" />
@@ -578,7 +578,7 @@ export default function SOSPage() {
             </div>
           </div>
         </Card>
-        <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+        <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border border-green-500/20">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-green-500/20 shrink-0">
               <CheckCircle className="h-4 w-4 text-green-500" />

@@ -304,8 +304,8 @@ export default function IncidentsPage() {
       </div>
 
       {/* Status Cards */}
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
-        <Card className={`p-4 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20 ${incidents.filter(i => i.status === "open").length > 0 ? 'ring-2 ring-red-500/50' : ''}`}>
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+        <Card className="p-4 bg-gradient-to-br from-red-500/10 to-red-600/5 border border-red-500/20">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-red-500/20 shrink-0">
               <AlertTriangle className="h-4 w-4 text-red-500" />

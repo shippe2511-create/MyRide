@@ -24,7 +24,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ComboboxInput } from "@/components/ui/combobox-input"
-import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Car, Bus, Truck, Bike, Ship, GripVertical, Download } from "lucide-react"
+import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Car, Bus, Truck, Bike, Ship, GripVertical, Download, Search } from "lucide-react"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -99,6 +99,7 @@ export default function VehiclesPage() {
   const [saving, setSaving] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [search, setSearch] = useState("")
   const [formData, setFormData] = useState({
     name: "",
     display_name: "",
@@ -292,6 +293,19 @@ export default function VehiclesPage() {
 
   const activeCount = vehicles.filter(v => v.is_active).length
 
+  // Filter vehicles by search
+  const filteredVehicles = vehicles.filter(v => {
+    if (!search.trim()) return true
+    const searchLower = search.toLowerCase()
+    return (
+      v.name?.toLowerCase().includes(searchLower) ||
+      v.display_name?.toLowerCase().includes(searchLower) ||
+      v.plate_no?.toLowerCase().includes(searchLower) ||
+      v.make_model?.toLowerCase().includes(searchLower) ||
+      v.color?.toLowerCase().includes(searchLower)
+    )
+  })
+
   const exportCSV = () => {
     const headers = ["Name", "Display Name", "Plate No", "Capacity", "Status", "Created At"]
     const rows = vehicles.map(v => [
@@ -416,10 +430,23 @@ export default function VehiclesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Vehicle Types</CardTitle>
-          <CardDescription>
-            Configure vehicle types and features for your transport service
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>All Vehicle Types</CardTitle>
+              <CardDescription>
+                Configure vehicle types and features for your transport service
+              </CardDescription>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search vehicles..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-64 pl-9"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -441,14 +468,14 @@ export default function VehiclesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {vehicles.length === 0 ? (
+              {filteredVehicles.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    No vehicle types configured. Add your first vehicle type to get started.
+                    {search ? "No vehicles match your search." : "No vehicle types configured. Add your first vehicle type to get started."}
                   </TableCell>
                 </TableRow>
               ) : (
-                vehicles.map((vehicle) => {
+                filteredVehicles.map((vehicle) => {
                   const IconComponent = getIconComponent(vehicle.icon)
                   return (
                     <TableRow key={vehicle.id} className="group hover:bg-muted/50 transition-colors">

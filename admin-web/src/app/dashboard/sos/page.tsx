@@ -555,7 +555,7 @@ export default function SOSPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 grid-cols-3">
+      <div className="grid gap-4 grid-cols-3">
         <Card className={`p-4 bg-gradient-to-br from-red-500/10 to-red-600/5 ${stats.active > 0 ? 'border-2 border-red-500/50' : 'border-red-500/20'}`}>
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-red-500/20 shrink-0">

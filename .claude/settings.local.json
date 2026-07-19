@@ -265,7 +265,8 @@
       "Bash(cp /Users/athifabdulla/Downloads/MyRide/driver_app/build/app/outputs/flutter-apk/app-release.apk /Users/athifabdulla/Downloads/MyRide-Driver.apk)",
       "Bash(vercel *)",
       "Bash(python3 -m http.server 8081)",
-      "Bash(lsof -ti:3000,3001,3002)"
+      "Bash(lsof -ti:3000,3001,3002)",
+      "Bash(python3 *)"
     ],
     "additionalDirectories": [
       "/tmp"

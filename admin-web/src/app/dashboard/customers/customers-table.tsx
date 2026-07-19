@@ -317,12 +317,20 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
   // Debounced live search
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (search !== searchParams.get("search")) {
-        handleSearch(search)
+      const currentSearch = searchParams.get("search") || ""
+      if (search !== currentSearch) {
+        const params = new URLSearchParams(searchParams.toString())
+        if (search) {
+          params.set("search", search)
+        } else {
+          params.delete("search")
+        }
+        params.delete("page")
+        router.push(`/dashboard/customers?${params.toString()}`)
       }
     }, 300)
     return () => clearTimeout(timer)
-  }, [search])
+  }, [search, searchParams, router])
 
   const handleStatusChange = (value: string) => {
     setStatusFilter(value)

@@ -338,7 +338,7 @@ export default function DocumentsPage() {
             </div>
           </div>
         </Card>
-        <Card className={`p-4 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20 ${stats.pending > 0 ? 'ring-2 ring-yellow-500/50' : ''}`}>
+        <Card className="p-4 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border border-yellow-500/20">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-yellow-500/20 shrink-0">
               <Clock className="h-4 w-4 text-yellow-500" />

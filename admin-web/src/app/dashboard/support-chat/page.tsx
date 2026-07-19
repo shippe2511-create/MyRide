@@ -352,7 +352,7 @@ export default function SupportChatPage() {
             </div>
           </div>
         </Card>
-        <Card className={`p-4 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20 ${stats.open > 0 ? 'ring-2 ring-blue-500/50' : ''}`}>
+        <Card className="p-4 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-blue-500/20">
               <Clock className="h-4 w-4 text-blue-500" />

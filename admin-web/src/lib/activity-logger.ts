@@ -21,7 +21,7 @@ export async function logActivity({ action, entityType, entityId, details }: Log
     .eq('id', user.id)
     .single()
 
-  if (!profile || !['admin', 'super-admin', 'operator', 'support'].includes(profile.role)) return
+  if (!profile || !['super_admin', 'manager', 'operator'].includes(profile.role)) return
 
   await supabase.from('activity_logs').insert({
     action,

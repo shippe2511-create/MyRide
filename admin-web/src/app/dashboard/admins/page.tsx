@@ -28,7 +28,7 @@ import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { usePermissions } from "@/hooks/usePermissions"
-import { ROLE_DESCRIPTIONS, ROLE_COLORS, PERMISSION_CATEGORIES, type Role, type Permission, getPermissionsForRole, ALL_PERMISSIONS } from "@/lib/permissions"
+import { ROLE_DESCRIPTIONS, ROLE_COLORS, ROLE_LABELS, PERMISSION_CATEGORIES, type Role, type Permission, getPermissionsForRole, ALL_PERMISSIONS, STAFF_ROLES } from "@/lib/permissions"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -47,13 +47,11 @@ interface AdminUser {
   custom_permissions?: Record<string, boolean>
 }
 
+// 3-tier RBAC system
 const ROLES: { value: Role; label: string; color: string }[] = [
-  { value: "super-admin", label: "Super Admin", color: ROLE_COLORS["super-admin"] },
-  { value: "admin", label: "Admin", color: ROLE_COLORS["admin"] },
-  { value: "manager", label: "Manager", color: ROLE_COLORS["manager"] },
-  { value: "operator", label: "Operator", color: ROLE_COLORS["operator"] },
-  { value: "support", label: "Support", color: ROLE_COLORS["support"] },
-  { value: "viewer", label: "Viewer", color: ROLE_COLORS["viewer"] },
+  { value: "super_admin", label: ROLE_LABELS["super_admin"], color: ROLE_COLORS["super_admin"] },
+  { value: "manager", label: ROLE_LABELS["manager"], color: ROLE_COLORS["manager"] },
+  { value: "operator", label: ROLE_LABELS["operator"], color: ROLE_COLORS["operator"] },
 ]
 
 export default function AdminsPage() {
@@ -85,7 +83,7 @@ export default function AdminsPage() {
   useEffect(() => {
     loadAdmins()
 
-    const adminRoles = ['super-admin', 'admin', 'manager', 'operator', 'support', 'viewer']
+    const adminRoles = ['super_admin', 'manager', 'operator']
 
     const channel = supabase
       .channel('admins_realtime')
@@ -130,7 +128,7 @@ export default function AdminsPage() {
     const { data } = await supabase
       .from("profiles")
       .select("*")
-      .in("role", ["super-admin", "admin", "manager", "operator", "support", "viewer"])
+      .in("role", ["super_admin", "manager", "operator"])
       .order("created_at", { ascending: false })
 
     setAdmins(data || [])
@@ -417,7 +415,7 @@ export default function AdminsPage() {
   }
 
   return (
-    <PermissionGate permission="admins:view">
+    <PermissionGate permission="staff:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -699,7 +697,7 @@ export default function AdminsPage() {
                 </SelectContent>
               </Select>
               {!isSuperAdmin && (
-                <p className="text-xs text-muted-foreground mt-1">Only super-admin can change roles</p>
+                <p className="text-xs text-muted-foreground mt-1">Only Super Admin can change roles</p>
               )}
             </div>
           </div>

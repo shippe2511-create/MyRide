@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify caller is authenticated super-admin
+    // Verify caller is authenticated super_admin
     const cookieStore = await cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,15 +25,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Check if user is super-admin
+    // Check if user is super_admin
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single()
 
-    if (!profile || profile.role !== "super-admin") {
-      return NextResponse.json({ error: "Forbidden - super-admin access required" }, { status: 403 })
+    if (!profile || profile.role !== "super_admin") {
+      return NextResponse.json({ error: "Forbidden - super_admin access required" }, { status: 403 })
     }
 
     const { userId, email, newPassword } = await request.json()

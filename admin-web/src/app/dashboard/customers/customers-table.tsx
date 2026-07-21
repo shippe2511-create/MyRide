@@ -282,7 +282,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
           setTotalCount(prev => Math.max(0, prev - 1))
         } else if (payload.eventType === 'INSERT' && payload.new) {
           const newCustomer = payload.new as Customer
-          if (['customer', 'super-admin', 'admin', 'operator', 'support', 'viewer'].includes(newCustomer.role)) {
+          if (newCustomer.role === 'customer') {
             setCustomers(prev => {
               // Check if already exists to prevent duplicates
               if (prev.some(c => c.id === newCustomer.id)) return prev
@@ -652,7 +652,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
     const { data: allCustomers, error } = await supabase
       .from("profiles")
       .select("full_name, email, phone, employee_id, department, status, created_at")
-      .in("role", ["customer", "super-admin", "admin"])
+      .eq("role", "customer")
       .order("full_name", { ascending: true })
 
     if (error) {
@@ -1308,22 +1308,6 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                     <SelectItem value="approved">Active</SelectItem>
                     <SelectItem value="pending">Pending</SelectItem>
                     <SelectItem value="suspended">Suspended</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">Role</label>
-                <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="customer">Customer</SelectItem>
-                    <SelectItem value="super-admin">Super Admin</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="operator">Operator</SelectItem>
-                    <SelectItem value="support">Support</SelectItem>
-                    <SelectItem value="viewer">Viewer</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

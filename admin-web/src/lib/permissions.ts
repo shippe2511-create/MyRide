@@ -30,15 +30,17 @@ export const ALL_PERMISSIONS = [
   "ratings:manage",
   "reports:view",
   "reports:export",
-  "admins:view",
-  "admins:manage",
+  "staff:view",
+  "staff:manage",
   "settings:view",
   "settings:manage",
+  "audit:view",
 ] as const
 
 export type Permission = typeof ALL_PERMISSIONS[number]
 
-export type Role = "super-admin" | "admin" | "manager" | "operator" | "support" | "viewer"
+// 3-tier RBAC: super_admin > manager > operator
+export type Role = "super_admin" | "manager" | "operator"
 
 // Permission categories for UI grouping
 export const PERMISSION_CATEGORIES: Record<string, { label: string; permissions: Permission[] }> = {
@@ -96,15 +98,17 @@ export const PERMISSION_CATEGORIES: Record<string, { label: string; permissions:
   },
   admin: {
     label: "Administration",
-    permissions: ["admins:view", "admins:manage", "settings:view", "settings:manage"],
+    permissions: ["staff:view", "staff:manage", "settings:view", "settings:manage", "audit:view"],
   },
 }
 
-// Role-based default permissions
+// Role-based default permissions - 3-tier system
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
-  "super-admin": [...ALL_PERMISSIONS],
+  // Super Admin: Full access including staff management and settings
+  "super_admin": [...ALL_PERMISSIONS],
 
-  "admin": [
+  // Manager: Operations (drivers, vehicles, pools, customers, reports). NO staff/settings
+  "manager": [
     "dashboard:view",
     "customers:view", "customers:manage",
     "drivers:view", "drivers:manage",
@@ -117,81 +121,50 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "pools:view", "pools:manage",
     "content:view", "content:manage",
     "zones:view", "zones:manage",
-    "chat:view", "chat:manage",
-    "sos:view", "sos:manage",
-    "ratings:view", "ratings:manage",
-    "reports:view", "reports:export",
-    "settings:view", "settings:manage",
-    // No admins:manage - can't manage other admins
-  ],
-
-  "manager": [
-    "dashboard:view",
-    "customers:view", "customers:manage",
-    "drivers:view", "drivers:manage",
-    "vehicles:view", "vehicles:manage",
-    "rides:view", "rides:manage",
-    "tracking:view",
-    "schedules:view", "schedules:manage",
-    "pretrip:view", "pretrip:manage",
-    "eligibility:view", "eligibility:manage",
-    "pools:view", "pools:manage",
-    "zones:view",
     "chat:view",
     "sos:view", "sos:manage",
     "ratings:view", "ratings:manage",
     "reports:view", "reports:export",
+    "audit:view",
   ],
 
+  // Operator: Dispatch/support (view rides, live tracking, handle active trips). NO management
   "operator": [
     "dashboard:view",
     "customers:view",
-    "drivers:view", "drivers:manage",
-    "vehicles:view", "vehicles:manage",
-    "rides:view", "rides:manage",
-    "tracking:view",
-    "schedules:view", "schedules:manage",
-    "pretrip:view", "pretrip:manage",
-    "zones:view",
-    "chat:view",
-    "sos:view",
-    "ratings:view",
-  ],
-
-  "support": [
-    "dashboard:view",
-    "customers:view",
     "drivers:view",
     "vehicles:view",
-    "rides:view",
-    "tracking:view",
-    "schedules:view",
-    "chat:view", "chat:manage",
-    "sos:view", "sos:manage",
-    "ratings:view", "ratings:manage",
-  ],
-
-  "viewer": [
-    "dashboard:view",
-    "customers:view",
-    "drivers:view",
-    "vehicles:view",
-    "rides:view",
+    "rides:view", "rides:manage", // Can cancel/reassign rides
     "tracking:view",
     "schedules:view",
     "pretrip:view",
-    "eligibility:view",
+    "pools:view",
     "content:view",
     "zones:view",
-    "chat:view",
-    "sos:view",
+    "chat:view", "chat:manage", // Can respond to support chat
+    "sos:view", "sos:manage", // Can handle SOS alerts
     "ratings:view",
-    "reports:view",
   ],
 }
 
+// Legacy role mapping for backwards compatibility during transition
+const LEGACY_ROLE_MAP: Record<string, Role> = {
+  "admin": "super_admin",
+  "super-admin": "super_admin",
+  "support": "operator",
+  "viewer": "operator",
+}
+
+function normalizeRole(role: string): Role {
+  if (role in LEGACY_ROLE_MAP) {
+    return LEGACY_ROLE_MAP[role]
+  }
+  return role as Role
+}
+
 export function getPermissionsForRole(role: string): Permission[] {
-  return ROLE_PERMISSIONS[role as Role] || []
+  const normalizedRole = normalizeRole(role)
+  return ROLE_PERMISSIONS[normalizedRole] || []
 }
 
 export function hasPermission(role: string, permission: Permission): boolean {
@@ -227,8 +200,9 @@ export function getPermissionLabel(permission: Permission): string {
     sos: "SOS & Incidents",
     ratings: "Ratings",
     reports: "Reports",
-    admins: "Admins",
+    staff: "Staff",
     settings: "Settings",
+    audit: "Audit Log",
   }
   const actionLabels: Record<string, string> = {
     view: "View",
@@ -239,19 +213,22 @@ export function getPermissionLabel(permission: Permission): string {
 }
 
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
-  "super-admin": "Full system access including admin management and all settings",
-  "admin": "Full operational access, cannot manage other admins",
-  "manager": "Manage operations, reports, and most features except admin settings",
-  "operator": "Day-to-day operations: rides, drivers, vehicles, schedules",
-  "support": "Customer support: chat, SOS, ratings, view-only for most data",
-  "viewer": "Read-only access to view all operational data",
+  "super_admin": "Full system access including staff management and all settings",
+  "manager": "Manage operations: drivers, vehicles, pools, customers, reports. Cannot manage staff or settings.",
+  "operator": "Dispatch & support: view rides, live tracking, handle active trips. Limited management access.",
 }
 
 export const ROLE_COLORS: Record<Role, string> = {
-  "super-admin": "bg-red-500",
-  "admin": "bg-orange-500",
+  "super_admin": "bg-red-500",
   "manager": "bg-blue-500",
   "operator": "bg-green-500",
-  "support": "bg-purple-500",
-  "viewer": "bg-gray-500",
 }
+
+export const ROLE_LABELS: Record<Role, string> = {
+  "super_admin": "Super Admin",
+  "manager": "Manager",
+  "operator": "Operator",
+}
+
+// All valid staff roles
+export const STAFF_ROLES: Role[] = ["super_admin", "manager", "operator"]

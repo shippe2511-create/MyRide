@@ -119,7 +119,7 @@ function useAvailableCustomers() {
       const { data, error } = await supabase
         .from("profiles")
         .select("id, full_name, phone, email")
-        .in("role", ["customer", "admin", "super-admin"])
+        .eq("role", "customer")
         .eq("status", "approved")
         .order("full_name")
 

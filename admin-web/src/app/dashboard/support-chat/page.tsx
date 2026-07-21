@@ -80,7 +80,7 @@ export default function SupportChatPage() {
 
   const [stats, setStats] = useState({ total: 0, open: 0, active: 0, resolved: 0 })
 
-  const canDelete = userRole === 'admin' || userRole === 'super-admin'
+  const canDelete = userRole === 'super_admin' || userRole === 'manager'
 
   useEffect(() => {
     loadAdminId()

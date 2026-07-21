@@ -1204,16 +1204,6 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                 />
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium">Department</label>
-                <Input
-                  value={formData.department}
-                  onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                  placeholder="IT Division"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
                 <label className="text-sm font-medium flex items-center gap-2">
                   <Car className="h-4 w-4" />
                   Assigned Vehicle
@@ -1232,8 +1222,10 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <label className="text-sm font-medium">Org. Department</label>
+                <label className="text-sm font-medium">Department</label>
                 <Select value={formData.department_id} onValueChange={(v) => setFormData({ ...formData, department_id: v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select department" />

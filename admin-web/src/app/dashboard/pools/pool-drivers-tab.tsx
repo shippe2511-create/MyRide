@@ -90,7 +90,7 @@ function useDriverPoolsData(poolFilter?: string) {
           created_at,
           driver:drivers!inner(
             id,
-            profile:profiles!inner(full_name, phone),
+            profile:profiles!drivers_profile_id_fkey(full_name, phone),
             vehicle:vehicles(vehicle_number, make, model)
           ),
           pool:pools!inner(name, access_type)
@@ -119,7 +119,7 @@ function useAvailableDrivers() {
         .select(`
           id,
           profile_id,
-          profile:profiles!inner(full_name, phone),
+          profile:profiles!drivers_profile_id_fkey(full_name, phone),
           vehicle:vehicles(vehicle_number)
         `)
         .order("profile(full_name)")

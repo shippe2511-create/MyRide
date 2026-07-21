@@ -2,6 +2,16 @@
 
 import { useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
+interface RecentRide {
+  id: string
+  status: string
+  pickup_address: string | null
+  dropoff_address: string | null
+  created_at: string
+  customer?: { full_name: string } | null
+  driver?: { profile?: { full_name: string } | null } | null
+}
 import { Badge } from "@/components/ui/badge"
 import {
   Car,
@@ -268,7 +278,7 @@ export function DashboardClient() {
             {stats.recentRides.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">No recent rides</p>
             ) : (
-              stats.recentRides.map((ride: any) => (
+              stats.recentRides.map((ride: RecentRide) => (
                 <div key={ride.id} className="flex items-center justify-between py-2 border-b last:border-0">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">

@@ -138,6 +138,7 @@ function ZoneMapInner({
       })
       drawControlRef.current = drawControl
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       map.on(L.Draw.Event.CREATED, (e: any) => {
         const layer = e.layer
         drawnItems.addLayer(layer)
@@ -148,7 +149,9 @@ function ZoneMapInner({
         setDrawingMode(false)
       })
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       map.on(L.Draw.Event.EDITED, (e: any) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         e.layers.eachLayer((layer: any) => {
           if (layer.zoneId) {
             const coords = layer.getLatLngs()[0].map((ll: L.LatLng) => [ll.lat, ll.lng])
@@ -209,6 +212,7 @@ function ZoneMapInner({
     if (!mapRef.current || !mapReady) return
     const updateTiles = async () => {
       const L = (await import("leaflet")).default
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       mapRef.current!.eachLayer((layer: any) => {
         if (layer._url && layer._url.includes("tile")) {
           mapRef.current!.removeLayer(layer)
@@ -335,8 +339,9 @@ function ZoneMapInner({
   const saveBoundaryEdit = () => {
     if (!editablePolygonRef.current || !selectedZone) return
 
-    const latLngs = editablePolygonRef.current.getLatLngs()[0]
-    const coords = latLngs.map((ll: any) => [ll.lat, ll.lng])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const latLngs = editablePolygonRef.current.getLatLngs()[0] as any[]
+    const coords = latLngs.map((ll: L.LatLng) => [ll.lat, ll.lng])
 
     onZoneUpdate(selectedZone.id, coords)
 

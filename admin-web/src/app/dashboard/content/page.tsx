@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core"
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable"
@@ -31,6 +31,35 @@ import { ComboboxInput } from "@/components/ui/combobox-input"
 import { Plus, Edit, Trash2, MoreHorizontal, Bell, Users, FileText, Megaphone, Calendar, Coffee, Quote, GripVertical, Heart, Ban } from "lucide-react"
 import { SkeletonTable } from "@/components/ui/skeleton-card"
 
+interface Announcement {
+  id: string
+  title: string
+  message: string | null
+  image_url: string | null
+  category: string | null
+  priority: string
+  is_active: boolean
+  created_at: string
+  sort_order: number
+}
+
+interface BreakTip {
+  id: string
+  title: string
+  description: string | null
+  icon: string | null
+  is_active: boolean
+  sort_order: number
+}
+
+interface QuoteItem {
+  id: string
+  quote: string
+  author: string | null
+  is_active: boolean
+  sort_order: number
+}
+
 const STAFF_CATEGORIES = [
   { value: "news", label: "News" },
   { value: "policy", label: "Policy" },
@@ -45,7 +74,13 @@ const STAFF_CATEGORIES = [
 ]
 
 // Sortable table row component for announcements
-function SortableAnnouncementRow({ ann, onEdit, onDelete, onToggleStatus, formatDate }: any) {
+function SortableAnnouncementRow({ ann, onEdit, onDelete, onToggleStatus, formatDate }: {
+  ann: Announcement
+  onEdit: (ann: Announcement) => void
+  onDelete: (id: string) => void
+  onToggleStatus: (ann: Announcement) => void
+  formatDate: (date: string) => string
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ann.id })
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
 
@@ -92,7 +127,14 @@ function SortableAnnouncementRow({ ann, onEdit, onDelete, onToggleStatus, format
 }
 
 // Sortable row for Staff Corner
-function SortableStaffRow({ item, onEdit, onDelete, onToggleStatus, getCategoryIcon, formatDate }: any) {
+function SortableStaffRow({ item, onEdit, onDelete, onToggleStatus, getCategoryIcon, formatDate }: {
+  item: StaffCornerItem
+  onEdit: (item: StaffCornerItem) => void
+  onDelete: (id: string) => void
+  onToggleStatus: (item: StaffCornerItem) => void
+  getCategoryIcon: (category: string) => React.ReactNode
+  formatDate: (date: string) => string
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
 
@@ -128,7 +170,12 @@ function SortableStaffRow({ item, onEdit, onDelete, onToggleStatus, getCategoryI
 }
 
 // Sortable row for Break Tips
-function SortableBreakTipRow({ tip, onEdit, onDelete, onToggleStatus }: any) {
+function SortableBreakTipRow({ tip, onEdit, onDelete, onToggleStatus }: {
+  tip: BreakTip
+  onEdit: (tip: BreakTip) => void
+  onDelete: (id: string) => void
+  onToggleStatus: (tip: BreakTip) => void
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tip.id })
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
   const icons: Record<string, string> = { eye: "👁️", water: "💧", stretch: "🧘", walk: "🚶", breathe: "🌬️", music: "🎵" }
@@ -140,7 +187,7 @@ function SortableBreakTipRow({ tip, onEdit, onDelete, onToggleStatus }: any) {
           <GripVertical className="h-4 w-4 text-muted-foreground" />
         </div>
       </TableCell>
-      <TableCell className="text-2xl">{icons[tip.icon] || "💡"}</TableCell>
+      <TableCell className="text-2xl">{tip.icon ? icons[tip.icon] : "💡"}</TableCell>
       <TableCell><p className="font-medium">{tip.title}</p><p className="text-sm text-muted-foreground">{tip.description}</p></TableCell>
       <TableCell><Switch checked={tip.is_active} onCheckedChange={() => onToggleStatus(tip)} /></TableCell>
       <TableCell>
@@ -172,7 +219,12 @@ function SortableBreakTipRow({ tip, onEdit, onDelete, onToggleStatus }: any) {
 }
 
 // Sortable row for Quotes
-function SortableQuoteRow({ quote, onEdit, onDelete, onToggleStatus }: any) {
+function SortableQuoteRow({ quote, onEdit, onDelete, onToggleStatus }: {
+  quote: QuoteItem
+  onEdit: (quote: QuoteItem) => void
+  onDelete: (id: string) => void
+  onToggleStatus: (quote: QuoteItem) => void
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: quote.id })
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
 
@@ -214,10 +266,20 @@ function SortableQuoteRow({ quote, onEdit, onDelete, onToggleStatus }: any) {
   )
 }
 
+interface Reaction {
+  id: string
+  content_type: string
+  content_id: string
+  reaction: string
+  created_at: string
+  contentTitle?: string
+  user?: { id: string; full_name: string; email: string; phone: string | null }[] | null
+}
+
 // Reactions Tab Component
 function ReactionsTab() {
   const supabase = createClient()
-  const [reactions, setReactions] = useState<any[]>([])
+  const [reactions, setReactions] = useState<Reaction[]>([])
   const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState<"all" | "announcement" | "staff_corner">("all")
   const [reactionFilter, setReactionFilter] = useState<"all" | "thumbs_up" | "heart" | "thumbs_down" | "laugh">("all")
@@ -381,7 +443,7 @@ function ReactionsTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {reactions.map((r: any) => (
+              {reactions.map((r: Reaction) => (
                 <TableRow key={r.id}>
                   <TableCell>
                     <div>
@@ -392,7 +454,7 @@ function ReactionsTab() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <p className="font-medium">{r.user?.full_name || "Unknown"}</p>
+                    <p className="font-medium">{r.user?.[0]?.full_name || "Unknown"}</p>
                   </TableCell>
                   <TableCell className="text-xl">{REACTION_EMOJIS[r.reaction]}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
@@ -442,18 +504,32 @@ interface StaffCornerItem {
   created_at: string
 }
 
+interface Notification {
+  id: string
+  title: string
+  body: string
+  target_type: string
+  sent_at: string | null
+  sent_count: number
+  success_count: number
+  created_at: string
+}
+
+type ContentItem = Announcement | StaffCornerItem | BreakTip | QuoteItem | Notification | null
+
 export default function ContentPage() {
   const supabase = createClient()
-  const [announcements, setAnnouncements] = useState<any[]>([])
-  const [notifications, setNotifications] = useState<any[]>([])
+  const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [notifications, setNotifications] = useState<Notification[]>([])
   const [staffCorner, setStaffCorner] = useState<StaffCornerItem[]>([])
-  const [breakTips, setBreakTips] = useState<any[]>([])
-  const [quotes, setQuotes] = useState<any[]>([])
+  const [breakTips, setBreakTips] = useState<BreakTip[]>([])
+  const [quotes, setQuotes] = useState<QuoteItem[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogType, setDialogType] = useState<string | null>(null)
-  const [selectedItem, setSelectedItem] = useState<any>(null)
+  const [selectedItem, setSelectedItem] = useState<ContentItem>(null)
   const [saving, setSaving] = useState(false)
-  const [formData, setFormData] = useState<any>({})
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [formData, setFormData] = useState<Record<string, any>>({})
   const [selectedNotifications, setSelectedNotifications] = useState<Set<string>>(new Set())
 
   const sensors = useSensors(
@@ -554,48 +630,52 @@ export default function ContentPage() {
     setLoading(false)
   }
 
-  const openDialog = (type: string, item?: any) => {
+  const openDialog = (type: string, item?: ContentItem) => {
     setSelectedItem(item || null)
     if (type === "announcement") {
+      const ann = item as Announcement | null
       setFormData({
-        title: item?.title || "",
-        subtitle: item?.message || "",
-        category: item?.category || "general",
-        priority: item?.priority || "normal",
-        is_pinned: item?.is_pinned || false,
-        is_active: item?.is_active ?? true,
-        image_url: item?.image_url || ""
+        title: ann?.title || "",
+        subtitle: ann?.message || "",
+        category: ann?.category || "general",
+        priority: ann?.priority || "normal",
+        is_pinned: false,
+        is_active: ann?.is_active ?? true,
+        image_url: ann?.image_url || ""
       })
     } else if (type === "push") {
       setFormData({
-        title: item?.title || "",
-        body: item?.body || "",
-        target_type: item?.target_type || "all"
+        title: "",
+        body: "",
+        target_type: "all"
       })
     } else if (type === "staff") {
+      const staff = item as StaffCornerItem | null
       setFormData({
-        title: item?.title || "",
-        subtitle: item?.subtitle || "",
-        content: item?.content || "",
-        category: item?.category || "news",
-        priority: item?.priority || "normal",
-        is_pinned: item?.is_pinned || false,
-        is_active: item?.is_active ?? true,
-        image_url: item?.image_url || ""
+        title: staff?.title || "",
+        subtitle: staff?.subtitle || "",
+        content: staff?.content || "",
+        category: staff?.category || "news",
+        priority: staff?.priority || "normal",
+        is_pinned: staff?.is_pinned || false,
+        is_active: staff?.is_active ?? true,
+        image_url: staff?.image_url || ""
       })
     } else if (type === "break_tip") {
+      const tip = item as BreakTip | null
       setFormData({
-        title: item?.title || "",
-        description: item?.description || "",
-        icon: item?.icon || "lightbulb",
-        sort_order: item?.sort_order || 0,
-        is_active: item?.is_active ?? true
+        title: tip?.title || "",
+        description: tip?.description || "",
+        icon: tip?.icon || "lightbulb",
+        sort_order: tip?.sort_order || 0,
+        is_active: tip?.is_active ?? true
       })
     } else if (type === "quote") {
+      const q = item as QuoteItem | null
       setFormData({
-        quote: item?.quote || "",
-        author: item?.author || "",
-        is_active: item?.is_active ?? true
+        quote: q?.quote || "",
+        author: q?.author || "",
+        is_active: q?.is_active ?? true
       })
     }
     setDialogType(type)
@@ -825,7 +905,7 @@ export default function ContentPage() {
     }
   }
 
-  const toggleBreakTipStatus = async (tip: any) => {
+  const toggleBreakTipStatus = async (tip: BreakTip) => {
     // Optimistic update first
     const newValue = !tip.is_active
     setBreakTips(prev => prev.map(t => t.id === tip.id ? { ...t, is_active: newValue } : t))
@@ -841,7 +921,7 @@ export default function ContentPage() {
     }
   }
 
-  const toggleQuoteStatus = async (quote: any) => {
+  const toggleQuoteStatus = async (quote: QuoteItem) => {
     // Optimistic update first
     const newValue = !quote.is_active
     setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, is_active: newValue } : q))
@@ -1032,7 +1112,7 @@ export default function ContentPage() {
                           <SortableStaffRow
                             key={item.id}
                             item={item}
-                            onEdit={(i: any) => openDialog("staff", i)}
+                            onEdit={(i) => openDialog("staff", i)}
                             onDelete={(id: string) => handleDelete("staff", id)}
                             onToggleStatus={toggleStaffStatus}
                             getCategoryIcon={getCategoryIcon}
@@ -1085,7 +1165,7 @@ export default function ContentPage() {
                           <SortableAnnouncementRow
                             key={ann.id}
                             ann={ann}
-                            onEdit={(a: any) => openDialog("announcement", a)}
+                            onEdit={(a) => openDialog("announcement", a)}
                             onDelete={(id: string) => handleDelete("announcement", id)}
                             onToggleStatus={toggleAnnouncementStatus}
                             formatDate={formatDate}
@@ -1179,7 +1259,7 @@ export default function ContentPage() {
                         <TableCell><Badge variant="secondary">{notif.target_type}</Badge></TableCell>
                         <TableCell>{notif.sent_count}</TableCell>
                         <TableCell className="text-green-500">{notif.success_count}</TableCell>
-                        <TableCell>{formatDate(notif.sent_at)}</TableCell>
+                        <TableCell>{notif.sent_at ? formatDate(notif.sent_at) : "-"}</TableCell>
                         <TableCell>
                           <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
@@ -1240,7 +1320,7 @@ export default function ContentPage() {
                           <SortableBreakTipRow
                             key={tip.id}
                             tip={tip}
-                            onEdit={(t: any) => openDialog("break_tip", t)}
+                            onEdit={(t) => openDialog("break_tip", t)}
                             onDelete={(id: string) => handleDelete("break_tip", id)}
                             onToggleStatus={toggleBreakTipStatus}
                           />
@@ -1289,7 +1369,7 @@ export default function ContentPage() {
                           <SortableQuoteRow
                             key={quote.id}
                             quote={quote}
-                            onEdit={(q: any) => openDialog("quote", q)}
+                            onEdit={(q) => openDialog("quote", q)}
                             onDelete={(id: string) => handleDelete("quote", id)}
                             onToggleStatus={toggleQuoteStatus}
                           />

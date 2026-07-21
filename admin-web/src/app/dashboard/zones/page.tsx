@@ -185,7 +185,13 @@ export default function ZonesPage() {
     }
     setSaving(true)
 
-    const payload: any = {
+    const payload: {
+      name: string
+      zone_type: string
+      priority: number
+      is_active: boolean
+      boundary_coords?: number[][]
+    } = {
       name: formData.name,
       zone_type: formData.zone_type,
       priority: parseInt(formData.priority) || 0,

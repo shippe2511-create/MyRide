@@ -134,6 +134,7 @@ export function LocationPicker({ latitude, longitude, address, onLocationChange 
     if (!mapRef.current || !mapReady) return
     const updateTiles = async () => {
       const L = (await import("leaflet")).default
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       mapRef.current!.eachLayer((layer: any) => {
         if (layer._url && (layer._url.includes("tile") || layer._url.includes("arcgis"))) {
           mapRef.current!.removeLayer(layer)
@@ -162,7 +163,7 @@ export function LocationPicker({ latitude, longitude, address, onLocationChange 
     setSearching(false)
   }
 
-  const selectSuggestion = (result: any) => {
+  const selectSuggestion = (result: { lat: string; lon: string; display_name: string }) => {
     const lat = parseFloat(result.lat)
     const lng = parseFloat(result.lon)
     onLocationChange(lat, lng, result.display_name)

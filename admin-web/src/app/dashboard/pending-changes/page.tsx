@@ -84,8 +84,8 @@ export default function PendingChangesPage() {
       if (error) throw error
       toast.success(`Approved ${change.field_name} change for ${change.profile?.full_name}`)
       queryClient.invalidateQueries({ queryKey: ["pending-changes"] })
-    } catch (e: any) {
-      toast.error("Failed to approve: " + e.message)
+    } catch (e) {
+      toast.error("Failed to approve: " + (e instanceof Error ? e.message : "Unknown error"))
     } finally {
       setProcessing(null)
     }
@@ -105,8 +105,8 @@ export default function PendingChangesPage() {
       setSelectedChange(null)
       setRejectReason("")
       queryClient.invalidateQueries({ queryKey: ["pending-changes"] })
-    } catch (e: any) {
-      toast.error("Failed to reject: " + e.message)
+    } catch (e) {
+      toast.error("Failed to reject: " + (e instanceof Error ? e.message : "Unknown error"))
     } finally {
       setProcessing(null)
     }

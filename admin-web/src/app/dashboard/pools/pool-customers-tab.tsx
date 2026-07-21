@@ -414,50 +414,70 @@ export function PoolCustomersTab({
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Restricted Pools</label>
-              {restrictedPools.length === 0 ? (
-                <div className="border rounded-lg p-4 text-center text-muted-foreground">
-                  <Lock className="h-6 w-6 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No restricted pools available</p>
-                </div>
-              ) : (
-                <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
-                  {restrictedPools.map((pool) => (
-                    <div
-                      key={pool.id}
-                      className="flex items-center gap-3 p-2 rounded hover:bg-muted/50 cursor-pointer"
-                      onClick={() => {
-                        const newSelected = new Set(selectedPools)
-                        if (newSelected.has(pool.id)) {
-                          newSelected.delete(pool.id)
-                        } else {
-                          newSelected.add(pool.id)
-                        }
-                        setSelectedPools(newSelected)
-                      }}
-                    >
-                      <Checkbox
-                        checked={selectedPools.has(pool.id)}
-                        onCheckedChange={(checked) => {
-                          const newSelected = new Set(selectedPools)
-                          if (checked) {
-                            newSelected.add(pool.id)
-                          } else {
-                            newSelected.delete(pool.id)
-                          }
-                          setSelectedPools(newSelected)
-                        }}
-                      />
-                      <div className="flex items-center gap-2 flex-1">
-                        <Lock className="h-4 w-4 text-yellow-500" />
-                        <span className="font-medium">{pool.name}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {(() => {
+                const customerExistingPools = selectedCustomer
+                  ? (customerPools || [])
+                      .filter((cp) => cp.customer_id === selectedCustomer)
+                      .map((cp) => cp.pool_id)
+                  : []
+                return restrictedPools.length === 0 ? (
+                  <div className="border rounded-lg p-4 text-center text-muted-foreground">
+                    <Lock className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No restricted pools available</p>
+                  </div>
+                ) : (
+                  <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
+                    {restrictedPools.map((pool) => {
+                      const alreadyHasAccess = customerExistingPools.includes(pool.id)
+                      return (
+                        <div
+                          key={pool.id}
+                          className={`flex items-center gap-3 p-2 rounded ${
+                            alreadyHasAccess
+                              ? "bg-green-500/10 cursor-default"
+                              : "hover:bg-muted/50 cursor-pointer"
+                          }`}
+                          onClick={() => {
+                            if (alreadyHasAccess) return
+                            const newSelected = new Set(selectedPools)
+                            if (newSelected.has(pool.id)) {
+                              newSelected.delete(pool.id)
+                            } else {
+                              newSelected.add(pool.id)
+                            }
+                            setSelectedPools(newSelected)
+                          }}
+                        >
+                          <Checkbox
+                            checked={alreadyHasAccess || selectedPools.has(pool.id)}
+                            disabled={alreadyHasAccess}
+                            onCheckedChange={(checked) => {
+                              if (alreadyHasAccess) return
+                              const newSelected = new Set(selectedPools)
+                              if (checked) {
+                                newSelected.add(pool.id)
+                              } else {
+                                newSelected.delete(pool.id)
+                              }
+                              setSelectedPools(newSelected)
+                            }}
+                          />
+                          <div className="flex items-center gap-2 flex-1">
+                            <Lock className={`h-4 w-4 ${alreadyHasAccess ? "text-green-500" : "text-yellow-500"}`} />
+                            <span className="font-medium">{pool.name}</span>
+                          </div>
+                          {alreadyHasAccess && (
+                            <span className="text-xs text-green-500 font-medium">Already granted</span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
               {selectedPools.size > 0 && (
                 <p className="text-xs text-muted-foreground">
-                  {selectedPools.size} pool{selectedPools.size > 1 ? "s" : ""} selected
+                  {selectedPools.size} new pool{selectedPools.size > 1 ? "s" : ""} selected
                 </p>
               )}
             </div>

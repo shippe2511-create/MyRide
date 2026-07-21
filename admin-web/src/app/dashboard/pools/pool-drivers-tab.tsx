@@ -63,10 +63,10 @@ interface DriverPool {
       full_name: string
       phone: string
     }
-    vehicles?: {
-      vehicle_number: string
-      vehicle_model: string
-    }[]
+    vehicle?: {
+      display_name: string
+      plate_no: string | null
+    } | null
   }
   pool: {
     name: string
@@ -100,7 +100,7 @@ function useDriverPoolsData(poolFilter?: string) {
           driver:drivers!inner(
             id,
             profile:profiles!drivers_profile_id_fkey(full_name, phone),
-            vehicles(vehicle_number, vehicle_model)
+            vehicle:vehicle_types(display_name, plate_no)
           ),
           pool:pools!inner(name, access_type)
         `)
@@ -261,7 +261,8 @@ export function PoolDriversTab({
     return (
       group.driver.profile.full_name.toLowerCase().includes(searchLower) ||
       group.driver.profile.phone.includes(search) ||
-      group.driver.vehicles?.[0]?.vehicle_number?.toLowerCase().includes(searchLower)
+      group.driver.vehicle?.display_name?.toLowerCase().includes(searchLower) ||
+      group.driver.vehicle?.plate_no?.toLowerCase().includes(searchLower)
     )
   })
 
@@ -331,10 +332,15 @@ export function PoolDriversTab({
                   <TableCell className="font-medium">{group.driver.profile.full_name}</TableCell>
                   <TableCell className="text-muted-foreground">{formatPhone(group.driver.profile.phone)}</TableCell>
                   <TableCell>
-                    {group.driver.vehicles && group.driver.vehicles.length > 0 ? (
+                    {group.driver.vehicle ? (
                       <div className="flex items-center gap-1">
                         <Car className="h-4 w-4 text-muted-foreground" />
-                        <span>{group.driver.vehicles[0].vehicle_number}</span>
+                        <div className="flex flex-col">
+                          <span>{group.driver.vehicle.display_name}</span>
+                          {group.driver.vehicle.plate_no && (
+                            <span className="text-xs text-muted-foreground">{group.driver.vehicle.plate_no}</span>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <span className="text-muted-foreground">—</span>

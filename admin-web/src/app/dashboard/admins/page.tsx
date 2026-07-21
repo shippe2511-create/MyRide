@@ -23,7 +23,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Plus, Shield, Loader2, RefreshCw, Pencil, Trash2, MoreHorizontal, KeyRound, Eye, EyeOff, Info, Settings2, Download, X } from "lucide-react"
+import { Plus, Shield, Loader2, RefreshCw, Pencil, Trash2, MoreHorizontal, KeyRound, Eye, EyeOff, Info, Settings2, Download, X, Building2 } from "lucide-react"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -45,6 +45,14 @@ interface AdminUser {
   avatar_url: string | null
   created_at: string
   custom_permissions?: Record<string, boolean>
+  department_id: string | null
+  department?: { id: string; name: string } | null
+}
+
+interface Department {
+  id: string
+  name: string
+  is_active: boolean
 }
 
 // 3-tier RBAC system
@@ -72,16 +80,19 @@ export default function AdminsPage() {
   const [savingPermissions, setSavingPermissions] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [departments, setDepartments] = useState<Department[]>([])
 
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
     phone: "",
     role: "operator",
+    department_id: "",
   })
 
   useEffect(() => {
     loadAdmins()
+    loadDepartments()
 
     const adminRoles = ['super_admin', 'manager', 'operator']
 
@@ -127,12 +138,21 @@ export default function AdminsPage() {
     setLoading(true)
     const { data } = await supabase
       .from("profiles")
-      .select("*")
+      .select("*, department:departments(id, name)")
       .in("role", ["super_admin", "manager", "operator"])
       .order("created_at", { ascending: false })
 
     setAdmins(data || [])
     setLoading(false)
+  }
+
+  const loadDepartments = async () => {
+    const { data } = await supabase
+      .from("departments")
+      .select("id, name, is_active")
+      .eq("is_active", true)
+      .order("name")
+    setDepartments(data || [])
   }
 
   const handleSave = async () => {
@@ -141,7 +161,16 @@ export default function AdminsPage() {
       return
     }
 
+    // Validate department for non-super_admin roles
+    if (formData.role !== "super_admin" && !formData.department_id) {
+      toast.error("Department is required for Manager and Operator roles")
+      return
+    }
+
     setSaving(true)
+
+    // super_admin always has NULL department_id
+    const departmentId = formData.role === "super_admin" ? null : (formData.department_id || null)
 
     if (editingAdmin) {
       const { error } = await supabase.from("profiles").update({
@@ -149,6 +178,7 @@ export default function AdminsPage() {
         email: formData.email,
         phone: formData.phone || null,
         role: formData.role,
+        department_id: departmentId,
       }).eq("id", editingAdmin.id)
 
       if (error) {
@@ -164,6 +194,7 @@ export default function AdminsPage() {
         email: formData.email,
         phone: formData.phone || null,
         role: formData.role,
+        department_id: departmentId,
         status: "approved",
       })
 
@@ -181,7 +212,7 @@ export default function AdminsPage() {
   const closeDialog = () => {
     setDialogOpen(false)
     setEditingAdmin(null)
-    setFormData({ full_name: "", email: "", phone: "", role: "operator" })
+    setFormData({ full_name: "", email: "", phone: "", role: "operator", department_id: "" })
   }
 
   const openEdit = (admin: AdminUser) => {
@@ -191,6 +222,7 @@ export default function AdminsPage() {
       email: admin.email,
       phone: admin.phone || "",
       role: admin.role,
+      department_id: admin.department_id || "",
     })
     setDialogOpen(true)
   }
@@ -378,12 +410,13 @@ export default function AdminsPage() {
   }
 
   const exportCSV = () => {
-    const headers = ["Name", "Email", "Phone", "Role", "Status", "Created At"]
+    const headers = ["Name", "Email", "Phone", "Role", "Department", "Status", "Created At"]
     const rows = admins.map(a => [
       a.full_name,
       a.email || "",
       a.phone || "",
       a.role,
+      a.role === "super_admin" ? "All Departments" : (a.department?.name || ""),
       a.status,
       formatDate(a.created_at)
     ])
@@ -500,6 +533,7 @@ export default function AdminsPage() {
               <TableHead>User</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
+              <TableHead>Department</TableHead>
               <TableHead>Active</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead></TableHead>
@@ -508,7 +542,7 @@ export default function AdminsPage() {
           <TableBody>
             {admins.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isSuperAdmin ? 7 : 6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={isSuperAdmin ? 8 : 7} className="text-center py-8 text-muted-foreground">
                   No admin users found
                 </TableCell>
               </TableRow>
@@ -540,6 +574,18 @@ export default function AdminsPage() {
                     <Badge className={getRoleColor(admin.role)}>
                       {ROLES.find(r => r.value === admin.role)?.label || admin.role}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {admin.role === "super_admin" ? (
+                      <span className="text-xs text-muted-foreground italic">All Departments</span>
+                    ) : admin.department ? (
+                      <div className="flex items-center gap-1.5">
+                        <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-sm">{admin.department.name}</span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Switch
@@ -700,6 +746,40 @@ export default function AdminsPage() {
                 <p className="text-xs text-muted-foreground mt-1">Only Super Admin can change roles</p>
               )}
             </div>
+            {formData.role !== "super_admin" && (
+              <div>
+                <label className="text-sm font-medium">Department *</label>
+                <Select
+                  value={formData.department_id}
+                  onValueChange={v => setFormData({ ...formData, department_id: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map(dept => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                          {dept.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Required for Manager and Operator roles
+                </p>
+              </div>
+            )}
+            {formData.role === "super_admin" && (
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  <Building2 className="h-4 w-4 inline mr-1" />
+                  Super Admins have access to all departments
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={closeDialog}>Cancel</Button>

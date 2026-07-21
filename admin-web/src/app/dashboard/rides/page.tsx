@@ -152,7 +152,7 @@ export default function RidesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 20
 
-  const { data, isLoading, isFetching, refetch } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ["rides-page", statusFilter, dateRange],
     queryFn: () => fetchRidesData(statusFilter, dateRange),
     staleTime: 30 * 1000,

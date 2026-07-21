@@ -26,9 +26,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Plus, Shield, Loader2, RefreshCw, Pencil, Trash2, MoreHorizontal, KeyRound, Eye, EyeOff, Info, Settings2, Download, X, Building2 } from "lucide-react"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
-import { EmptyState } from "@/components/ui/empty-state"
 import { usePermissions } from "@/hooks/usePermissions"
-import { ROLE_DESCRIPTIONS, ROLE_COLORS, ROLE_LABELS, PERMISSION_CATEGORIES, type Role, type Permission, getPermissionsForRole, ALL_PERMISSIONS, STAFF_ROLES } from "@/lib/permissions"
+import { ROLE_DESCRIPTIONS, ROLE_COLORS, ROLE_LABELS, PERMISSION_CATEGORIES, type Role, type Permission, getPermissionsForRole } from "@/lib/permissions"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -64,7 +63,7 @@ const ROLES: { value: Role; label: string; color: string }[] = [
 
 export default function AdminsPage() {
   const supabase = createClient()
-  const { isSuperAdmin, can } = usePermissions()
+  const { isSuperAdmin } = usePermissions()
   const [admins, setAdmins] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)

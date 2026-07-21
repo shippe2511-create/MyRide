@@ -68,7 +68,7 @@ export default function CustomersPage() {
   const status = searchParams.get("status") || undefined
   const page = parseInt(searchParams.get("page") || "1")
 
-  const { data, isLoading, isFetching } = useCustomersData(search, status, page)
+  const { data, isLoading } = useCustomersData(search, status, page)
 
   // Realtime subscription for profile updates
   useEffect(() => {

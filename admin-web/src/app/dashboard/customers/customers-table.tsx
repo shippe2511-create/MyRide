@@ -143,19 +143,11 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
     gender: string
   }>>([])
   const [importError, setImportError] = useState<string | null>(null)
-  const [customerPools, setCustomerPools] = useState<Record<string, boolean>>({})
-  const [assignDriversOpen, setAssignDriversOpen] = useState(false)
-  const [assigningCustomer, setAssigningCustomer] = useState<Customer | null>(null)
-  const [privateDrivers, setPrivateDrivers] = useState<Array<{ id: string; name: string; vehicle: string }>>([])
-  const [assignedDriverIds, setAssignedDriverIds] = useState<Set<string>>(new Set())
-  const [assignLoading, setAssignLoading] = useState(false)
   const [departments, setDepartments] = useState<Department[]>([])
   const [departmentFilter, setDepartmentFilter] = useState("all")
 
-  // Load customer private pool access and departments
+  // Load departments
   useEffect(() => {
-    loadCustomerPools()
-    loadPrivateDrivers()
     loadDepartments()
   }, [])
 
@@ -166,120 +158,6 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
       .eq("is_active", true)
       .order("name")
     setDepartments(data || [])
-  }
-
-  const loadCustomerPools = async () => {
-    const { data } = await supabase
-      .from("customer_pools")
-      .select("customer_id")
-      .eq("pool", "private")
-    if (data) {
-      const poolMap: Record<string, boolean> = {}
-      data.forEach(row => {
-        poolMap[row.customer_id] = true
-      })
-      setCustomerPools(poolMap)
-    }
-  }
-
-  const togglePrivateAccess = async (customerId: string, customerName: string, currentlyHasAccess: boolean) => {
-    if (currentlyHasAccess) {
-      // Revoke private access
-      const { error } = await supabase
-        .from("customer_pools")
-        .delete()
-        .eq("customer_id", customerId)
-        .eq("pool", "private")
-      if (error) {
-        toast.error("Failed to revoke private access")
-      } else {
-        setCustomerPools(prev => ({ ...prev, [customerId]: false }))
-        toast.success("Private pool access revoked")
-        logActivity({ action: 'update', entityType: 'customer', entityId: customerId, details: { name: customerName, private_access: false } })
-      }
-    } else {
-      // Grant private access
-      const { error } = await supabase
-        .from("customer_pools")
-        .insert({ customer_id: customerId, pool: "private" })
-      if (error) {
-        toast.error("Failed to grant private access")
-      } else {
-        setCustomerPools(prev => ({ ...prev, [customerId]: true }))
-        toast.success("Private pool access granted")
-        logActivity({ action: 'update', entityType: 'customer', entityId: customerId, details: { name: customerName, private_access: true } })
-      }
-    }
-  }
-
-  const loadPrivateDrivers = async () => {
-    const { data } = await supabase
-      .from("driver_pools")
-      .select("driver_id, driver:drivers(id, profile:profiles(full_name), vehicle:vehicle_types(display_name, plate_no))")
-      .eq("pool", "private")
-    if (data) {
-      const drivers = data.map((row: Record<string, unknown>) => {
-        const driver = row.driver as Record<string, unknown> | null
-        const profile = driver?.profile as Record<string, unknown> | null
-        const vehicle = driver?.vehicle as Record<string, unknown> | null
-        return {
-          id: row.driver_id as string,
-          name: String(profile?.full_name || "Unknown"),
-          vehicle: vehicle ? `${vehicle.display_name || ""}${vehicle.plate_no ? ` (${vehicle.plate_no})` : ""}` : "No vehicle"
-        }
-      })
-      setPrivateDrivers(drivers)
-    }
-  }
-
-  const openAssignDriversDialog = async (customer: Customer) => {
-    setAssigningCustomer(customer)
-    setAssignLoading(true)
-
-    // Load current assignments for this customer
-    const { data } = await supabase
-      .from("customer_driver_assignments")
-      .select("driver_id")
-      .eq("customer_id", customer.id)
-
-    if (data) {
-      setAssignedDriverIds(new Set(data.map(r => r.driver_id)))
-    } else {
-      setAssignedDriverIds(new Set())
-    }
-
-    setAssignLoading(false)
-    setAssignDriversOpen(true)
-  }
-
-  const toggleDriverAssignment = async (driverId: string) => {
-    if (!assigningCustomer) return
-
-    const isCurrentlyAssigned = assignedDriverIds.has(driverId)
-
-    if (isCurrentlyAssigned) {
-      const { error } = await supabase
-        .from("customer_driver_assignments")
-        .delete()
-        .eq("customer_id", assigningCustomer.id)
-        .eq("driver_id", driverId)
-
-      if (!error) {
-        setAssignedDriverIds(prev => {
-          const next = new Set(prev)
-          next.delete(driverId)
-          return next
-        })
-      }
-    } else {
-      const { error } = await supabase
-        .from("customer_driver_assignments")
-        .insert({ customer_id: assigningCustomer.id, driver_id: driverId })
-
-      if (!error) {
-        setAssignedDriverIds(prev => new Set([...prev, driverId]))
-      }
-    }
   }
 
   // Sync with server data when props change
@@ -1000,7 +878,6 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
               <TableHead>Contact</TableHead>
               <TableHead>Employee ID</TableHead>
               <TableHead>Department</TableHead>
-              <TableHead>Private Access</TableHead>
               <TableHead>Active</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead className="w-12"></TableHead>
@@ -1009,7 +886,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
           <TableBody>
             {filteredCustomers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   {customers.length === 0 ? "No customers found" : "No customers match the selected filters"}
                 </TableCell>
               </TableRow>
@@ -1070,24 +947,6 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                     ) : (
                       <span className="text-muted-foreground text-xs">Unassigned</span>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={customerPools[customer.id] || false}
-                        onCheckedChange={() => togglePrivateAccess(customer.id, customer.full_name, customerPools[customer.id] || false)}
-                      />
-                      {customerPools[customer.id] && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs border-purple-500 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300"
-                          onClick={() => openAssignDriversDialog(customer)}
-                        >
-                          Assign Vehicles
-                        </Button>
-                      )}
-                    </div>
                   </TableCell>
                   <TableCell>
                     {customer.status === "pending" ? (
@@ -1490,47 +1349,6 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                 </>
               )}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Assign Drivers Dialog */}
-      <Dialog open={assignDriversOpen} onOpenChange={setAssignDriversOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Assign Private Vehicles</DialogTitle>
-            <DialogDescription>
-              Select which private pool vehicles {assigningCustomer?.full_name} can see and book.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            {assignLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : privateDrivers.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No drivers in private pool. Add drivers to the private pool first.
-              </p>
-            ) : (
-              <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                {privateDrivers.map(driver => (
-                  <div key={driver.id} className="flex items-center justify-between p-3 rounded-lg border">
-                    <div>
-                      <p className="font-medium text-sm">{driver.name}</p>
-                      <p className="text-xs text-muted-foreground">{driver.vehicle}</p>
-                    </div>
-                    <Switch
-                      checked={assignedDriverIds.has(driver.id)}
-                      onCheckedChange={() => toggleDriverAssignment(driver.id)}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignDriversOpen(false)}>Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

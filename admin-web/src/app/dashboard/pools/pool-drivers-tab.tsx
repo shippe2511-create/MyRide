@@ -63,10 +63,10 @@ interface DriverPool {
       full_name: string
       phone: string
     }
-    vehicle?: {
+    vehicles?: {
       vehicle_number: string
       vehicle_model: string
-    } | null
+    }[]
   }
   pool: {
     name: string
@@ -100,7 +100,7 @@ function useDriverPoolsData(poolFilter?: string) {
           driver:drivers!inner(
             id,
             profile:profiles!drivers_profile_id_fkey(full_name, phone),
-            vehicle:vehicles(vehicle_number, vehicle_model)
+            vehicles(vehicle_number, vehicle_model)
           ),
           pool:pools!inner(name, access_type)
         `)
@@ -331,10 +331,10 @@ export function PoolDriversTab({
                   <TableCell className="font-medium">{group.driver.profile.full_name}</TableCell>
                   <TableCell className="text-muted-foreground">{formatPhone(group.driver.profile.phone)}</TableCell>
                   <TableCell>
-                    {group.driver.vehicle ? (
+                    {group.driver.vehicles && group.driver.vehicles.length > 0 ? (
                       <div className="flex items-center gap-1">
                         <Car className="h-4 w-4 text-muted-foreground" />
-                        <span>{group.driver.vehicle.vehicle_number}</span>
+                        <span>{group.driver.vehicles[0].vehicle_number}</span>
                       </div>
                     ) : (
                       <span className="text-muted-foreground">—</span>

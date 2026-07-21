@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
+import { ComboboxInput } from "@/components/ui/combobox-input"
 
 const supabase = createClient()
 
@@ -345,18 +346,16 @@ export function PoolCustomersTab({
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Customer</label>
-              <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a customer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(availableCustomers || []).map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.full_name} ({customer.phone})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ComboboxInput
+                value={selectedCustomer}
+                onChange={setSelectedCustomer}
+                options={(availableCustomers || []).map((customer) => ({
+                  value: customer.id,
+                  label: `${customer.full_name}${customer.phone ? ` (${customer.phone})` : ""}`,
+                }))}
+                placeholder="Search customer..."
+                allowCustom={false}
+              />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Restricted Pools</label>

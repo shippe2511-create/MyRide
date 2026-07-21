@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
+import { ComboboxInput } from "@/components/ui/combobox-input"
 
 const supabase = createClient()
 
@@ -332,19 +333,16 @@ export function PoolDriversTab({
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Driver</label>
-              <Select value={selectedDriver} onValueChange={setSelectedDriver}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a driver" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(availableDrivers || []).map((driver) => (
-                    <SelectItem key={driver.id} value={driver.id}>
-                      {driver.profile.full_name}
-                      {driver.vehicle && ` (${driver.vehicle.vehicle_number})`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ComboboxInput
+                value={selectedDriver}
+                onChange={setSelectedDriver}
+                options={(availableDrivers || []).map((driver) => ({
+                  value: driver.id,
+                  label: `${driver.profile.full_name}${driver.vehicle ? ` (${driver.vehicle.vehicle_number})` : ""}`,
+                }))}
+                placeholder="Search driver..."
+                allowCustom={false}
+              />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Pools</label>

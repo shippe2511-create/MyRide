@@ -82,7 +82,8 @@ interface Driver {
     phone: string
   }
   vehicle?: {
-    vehicle_number: string
+    display_name: string
+    plate_no: string | null
   } | null
 }
 
@@ -129,7 +130,7 @@ function useAvailableDrivers() {
           id,
           profile_id,
           profile:profiles!drivers_profile_id_fkey(full_name, phone),
-          vehicle:vehicles(vehicle_number)
+          vehicle:vehicle_types(display_name, plate_no)
         `)
         .order("profile(full_name)")
 
@@ -418,7 +419,7 @@ export function PoolDriversTab({
                 onChange={setSelectedDriver}
                 options={(availableDrivers || []).map((driver) => ({
                   value: driver.id,
-                  label: `${driver.profile.full_name}${driver.vehicle ? ` (${driver.vehicle.vehicle_number})` : ""}`,
+                  label: `${driver.profile.full_name}${driver.vehicle ? ` (${driver.vehicle.plate_no || driver.vehicle.display_name})` : ""}`,
                 }))}
                 placeholder="Search driver..."
                 allowCustom={false}

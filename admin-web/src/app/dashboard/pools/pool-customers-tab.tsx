@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Plus, Trash2, Search, Lock, MoreHorizontal, Pencil, UserPlus } from "lucide-react"
+import { Plus, Trash2, Search, Lock, MoreHorizontal, Pencil, UserPlus, X } from "lucide-react"
 import { DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -368,10 +368,22 @@ export function PoolCustomersTab({
                           <Badge
                             key={p.id}
                             variant="outline"
-                            className="border-yellow-500/50 text-yellow-500"
+                            className="group/badge pr-1 border-yellow-500/50 text-yellow-500"
                           >
                             <Lock className="h-3 w-3 mr-1" />
                             {p.pool.name}
+                            {canManage && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  removeMutation.mutate(p.id)
+                                }}
+                                disabled={removeMutation.isPending}
+                                className="ml-1 hover:bg-destructive/20 rounded-full p-0.5 opacity-60 hover:opacity-100 transition-opacity"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            )}
                           </Badge>
                         ))}
                       </div>

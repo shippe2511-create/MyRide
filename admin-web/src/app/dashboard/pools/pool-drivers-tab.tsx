@@ -29,7 +29,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Plus, Trash2, Car, Search, MoreHorizontal } from "lucide-react"
+import { Plus, Trash2, Car, Search, MoreHorizontal, Lock, Globe } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -148,16 +149,20 @@ export function PoolDriversTab({
   const [search, setSearch] = useState("")
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [selectedDriver, setSelectedDriver] = useState<string>("")
-  const [selectedPool, setSelectedPool] = useState<string>("")
+  const [selectedPools, setSelectedPools] = useState<Set<string>>(new Set())
 
   const { data: driverPools, isLoading } = useDriverPoolsData(poolFilter)
   const { data: availableDrivers } = useAvailableDrivers()
 
   const addMutation = useMutation({
-    mutationFn: async ({ driverId, poolId }: { driverId: string; poolId: string }) => {
-      const { error } = await supabase.from("driver_pools").insert({
+    mutationFn: async ({ driverId, poolIds }: { driverId: string; poolIds: string[] }) => {
+      const inserts = poolIds.map((poolId) => ({
         driver_id: driverId,
         pool_id: poolId,
+      }))
+      const { error } = await supabase.from("driver_pools").upsert(inserts, {
+        onConflict: "driver_id,pool_id",
+        ignoreDuplicates: true,
       })
       if (error) throw error
     },
@@ -166,15 +171,11 @@ export function PoolDriversTab({
       queryClient.invalidateQueries({ queryKey: ["pools"] })
       setIsAddOpen(false)
       setSelectedDriver("")
-      setSelectedPool("")
-      toast.success("Driver added to pool")
+      setSelectedPools(new Set())
+      toast.success("Driver assigned to pools")
     },
     onError: (error: Error) => {
-      if (error.message.includes("duplicate")) {
-        toast.error("Driver is already in this pool")
-      } else {
-        toast.error(error.message || "Failed to add driver to pool")
-      }
+      toast.error(error.message || "Failed to assign driver to pools")
     },
   })
 
@@ -325,8 +326,8 @@ export function PoolDriversTab({
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Assign Driver to Pool</DialogTitle>
-            <DialogDescription>Select a driver and pool to create an assignment</DialogDescription>
+            <DialogTitle>Assign Driver to Pools</DialogTitle>
+            <DialogDescription>Select a driver and one or more pools</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -346,21 +347,55 @@ export function PoolDriversTab({
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Pool</label>
-              <Select value={selectedPool} onValueChange={setSelectedPool}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a pool" />
-                </SelectTrigger>
-                <SelectContent>
-                  {pools
-                    .filter((p) => p.is_active)
-                    .map((pool) => (
-                      <SelectItem key={pool.id} value={pool.id}>
-                        {pool.name} ({pool.access_type})
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <label className="text-sm font-medium">Pools</label>
+              <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
+                {pools
+                  .filter((p) => p.is_active)
+                  .map((pool) => (
+                    <div
+                      key={pool.id}
+                      className="flex items-center gap-3 p-2 rounded hover:bg-muted/50 cursor-pointer"
+                      onClick={() => {
+                        const newSelected = new Set(selectedPools)
+                        if (newSelected.has(pool.id)) {
+                          newSelected.delete(pool.id)
+                        } else {
+                          newSelected.add(pool.id)
+                        }
+                        setSelectedPools(newSelected)
+                      }}
+                    >
+                      <Checkbox
+                        checked={selectedPools.has(pool.id)}
+                        onCheckedChange={(checked) => {
+                          const newSelected = new Set(selectedPools)
+                          if (checked) {
+                            newSelected.add(pool.id)
+                          } else {
+                            newSelected.delete(pool.id)
+                          }
+                          setSelectedPools(newSelected)
+                        }}
+                      />
+                      <div className="flex items-center gap-2 flex-1">
+                        {pool.access_type === "open" ? (
+                          <Globe className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <Lock className="h-4 w-4 text-yellow-500" />
+                        )}
+                        <span className="font-medium">{pool.name}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {pool.access_type}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+              {selectedPools.size > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {selectedPools.size} pool{selectedPools.size > 1 ? "s" : ""} selected
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -369,11 +404,11 @@ export function PoolDriversTab({
             </Button>
             <Button
               onClick={() =>
-                addMutation.mutate({ driverId: selectedDriver, poolId: selectedPool })
+                addMutation.mutate({ driverId: selectedDriver, poolIds: Array.from(selectedPools) })
               }
-              disabled={!selectedDriver || !selectedPool || addMutation.isPending}
+              disabled={!selectedDriver || selectedPools.size === 0 || addMutation.isPending}
             >
-              {addMutation.isPending ? "Adding..." : "Add to Pool"}
+              {addMutation.isPending ? "Assigning..." : `Assign to ${selectedPools.size} Pool${selectedPools.size > 1 ? "s" : ""}`}
             </Button>
           </DialogFooter>
         </DialogContent>

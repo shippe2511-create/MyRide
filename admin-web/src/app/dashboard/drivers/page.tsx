@@ -41,7 +41,7 @@ function useDriversData(search?: string, status?: string, page: number = 1) {
 
       const [driversRes, driverRecordsRes, totalRes, activeRes, pendingRes] = await Promise.all([
         query,
-        supabase.from("drivers").select("id, profile_id, vehicle_id, is_online, is_on_break, break_type, break_start_time, total_trips, rating, updated_at, vehicle:vehicle_types(id, display_name, plate_no)"),
+        supabase.from("drivers").select("id, profile_id, vehicle_id, department_id, is_online, is_on_break, break_type, break_start_time, total_trips, rating, updated_at, vehicle:vehicle_types(id, display_name, plate_no), department:departments(id, name)"),
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver"),
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver").eq("status", "approved"),
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver").eq("status", "pending"),
@@ -56,6 +56,8 @@ function useDriversData(search?: string, status?: string, page: number = 1) {
             id: driverRecord.id,
             vehicle_id: driverRecord.vehicle_id,
             vehicle: driverRecord.vehicle,
+            department_id: driverRecord.department_id,
+            department: driverRecord.department,
             is_online: driverRecord.is_online,
             is_on_break: driverRecord.is_on_break,
             break_type: driverRecord.break_type,

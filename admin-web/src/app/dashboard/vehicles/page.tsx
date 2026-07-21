@@ -24,7 +24,10 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ComboboxInput } from "@/components/ui/combobox-input"
-import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Car, Bus, Truck, Bike, Ship, GripVertical, Download, Search } from "lucide-react"
+import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Car, Bus, Truck, Bike, Ship, GripVertical, Download, Search, Building2 } from "lucide-react"
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -47,7 +50,14 @@ interface VehicleType {
   is_active: boolean
   sort_order: number
   features: string[]
+  department_id: string | null
+  department?: { id: string; name: string } | null
   created_at: string
+}
+
+interface Department {
+  id: string
+  name: string
 }
 
 const VEHICLE_CATEGORIES = [
@@ -100,6 +110,7 @@ export default function VehiclesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [search, setSearch] = useState("")
+  const [departments, setDepartments] = useState<Department[]>([])
   const [formData, setFormData] = useState({
     name: "",
     display_name: "",
@@ -110,7 +121,8 @@ export default function VehiclesPage() {
     color: "",
     capacity: 4,
     is_active: true,
-    features: ""
+    features: "",
+    department_id: ""
   })
 
   const { data: vehicles = [], isLoading: loading, refetch } = useQuery({
@@ -118,7 +130,7 @@ export default function VehiclesPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vehicle_types")
-        .select("*")
+        .select("*, department:departments(id, name)")
         .order("sort_order", { ascending: true })
 
       if (error && error.code === "42P01") {
@@ -128,6 +140,19 @@ export default function VehiclesPage() {
     },
     staleTime: 30 * 1000,
   })
+
+  // Load departments
+  useEffect(() => {
+    const loadDepartments = async () => {
+      const { data } = await supabase
+        .from("departments")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name")
+      setDepartments(data || [])
+    }
+    loadDepartments()
+  }, [])
 
   // Realtime subscription for vehicle updates
   useEffect(() => {
@@ -157,7 +182,8 @@ export default function VehiclesPage() {
       color: "",
       capacity: 4,
       is_active: true,
-      features: ""
+      features: "",
+      department_id: ""
     })
     setDialogOpen(true)
   }
@@ -174,7 +200,8 @@ export default function VehiclesPage() {
       color: vehicle.color || "",
       capacity: vehicle.capacity,
       is_active: vehicle.is_active,
-      features: (vehicle.features || []).join(", ")
+      features: (vehicle.features || []).join(", "),
+      department_id: vehicle.department_id || ""
     })
     setDialogOpen(true)
   }
@@ -189,6 +216,8 @@ export default function VehiclesPage() {
     // Auto-generate unique internal name from display_name + plate_no
     const autoName = `${formData.display_name}_${formData.plate_no || Date.now()}`.replace(/\s+/g, "_").toLowerCase()
 
+    const deptId = formData.department_id && formData.department_id !== "none" ? formData.department_id : null
+
     const payload = {
       name: selectedVehicle ? selectedVehicle.name : autoName,
       display_name: formData.display_name,
@@ -200,7 +229,8 @@ export default function VehiclesPage() {
       capacity: formData.capacity,
       is_active: formData.is_active,
       features: formData.features.split(",").map(f => f.trim()).filter(Boolean),
-      sort_order: selectedVehicle?.sort_order || vehicles.length + 1
+      sort_order: selectedVehicle?.sort_order || vehicles.length + 1,
+      department_id: deptId
     }
 
     let error
@@ -462,6 +492,7 @@ export default function VehiclesPage() {
                 <TableHead className="w-12"></TableHead>
                 <TableHead>Vehicle</TableHead>
                 <TableHead>Category</TableHead>
+                <TableHead>Department</TableHead>
                 <TableHead>Capacity</TableHead>
                 <TableHead>Active</TableHead>
                 <TableHead className="w-12"></TableHead>
@@ -470,7 +501,7 @@ export default function VehiclesPage() {
             <TableBody>
               {filteredVehicles.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     {search ? "No vehicles match your search." : "No vehicle types configured. Add your first vehicle type to get started."}
                   </TableCell>
                 </TableRow>
@@ -504,6 +535,13 @@ export default function VehiclesPage() {
                         <Badge variant="outline" className="capitalize">
                           {vehicle.icon || "car"}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {vehicle.department ? (
+                          <Badge variant="outline">{vehicle.department.name}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
                       </TableCell>
                       <TableCell>{vehicle.capacity} seats</TableCell>
                       <TableCell>
@@ -632,13 +670,31 @@ export default function VehiclesPage() {
                 />
               </div>
             </div>
-            <div className="grid gap-2">
-              <label className="text-sm font-medium">Features (comma separated)</label>
-              <Input
-                value={formData.features}
-                onChange={(e) => setFormData({ ...formData, features: e.target.value })}
-                placeholder="AC, WiFi, USB Charging"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Features (comma separated)</label>
+                <Input
+                  value={formData.features}
+                  onChange={(e) => setFormData({ ...formData, features: e.target.value })}
+                  placeholder="AC, WiFi, USB Charging"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Org. Department</label>
+                <Select value={formData.department_id} onValueChange={(v) => setFormData({ ...formData, department_id: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Department</SelectItem>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <Switch

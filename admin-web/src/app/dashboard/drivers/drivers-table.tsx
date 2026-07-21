@@ -65,6 +65,7 @@ import {
   CheckCircle,
   XCircle,
   Car,
+  Building2,
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 
@@ -74,6 +75,11 @@ interface Vehicle {
   display_name: string
   plate_no: string | null
   is_active: boolean
+}
+
+interface Department {
+  id: string
+  name: string
 }
 import { formatDate } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
@@ -94,6 +100,8 @@ interface Driver {
     id: string
     vehicle_id: string | null
     vehicle?: Vehicle | null
+    department_id?: string | null
+    department?: Department | null
     is_online?: boolean
     is_on_break?: boolean
     break_type?: string | null
@@ -158,16 +166,19 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
     department: "",
     gender: "",
     vehicle_id: "",
+    department_id: "",
     status: "pending",
     pools: { public: true, private: false }
   })
   const [driverPools, setDriverPools] = useState<Record<string, string[]>>({})
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
+  const [departments, setDepartments] = useState<Department[]>([])
 
   useEffect(() => {
     loadVehicles()
     loadAllDriverPools()
+    loadDepartments()
   }, [])
 
   const loadAllDriverPools = async () => {
@@ -192,6 +203,18 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
       console.error("Error loading vehicles:", error)
     }
     setVehicles(data || [])
+  }
+
+  const loadDepartments = async () => {
+    const { data, error } = await supabase
+      .from("departments")
+      .select("id, name")
+      .eq("is_active", true)
+      .order("name")
+    if (error) {
+      console.error("Error loading departments:", error)
+    }
+    setDepartments(data || [])
   }
 
   const totalPages = Math.ceil(totalCount / pageSize)
@@ -347,6 +370,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
       department: driver.department || "",
       gender: driver.gender || "",
       vehicle_id: driver.driver_record?.vehicle_id || "",
+      department_id: driver.driver_record?.department_id || "",
       status: driver.status || "pending",
       pools: currentPools
     })
@@ -363,6 +387,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
       department: "",
       gender: "",
       vehicle_id: "",
+      department_id: "",
       status: "pending",
       pools: { public: true, private: false }
     })
@@ -437,11 +462,14 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
           .eq("profile_id", selectedDriver.id)
           .maybeSingle()
 
+        // Convert "none" to null for department_id
+        const deptId = formData.department_id && formData.department_id !== "none" ? formData.department_id : null
+
         if (existingDriver) {
           // Update existing driver record
           const { error: driverError } = await supabase
             .from("drivers")
-            .update({ vehicle_id: vehicleId })
+            .update({ vehicle_id: vehicleId, department_id: deptId })
             .eq("profile_id", selectedDriver.id)
 
           if (driverError) {
@@ -465,7 +493,8 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
             .from("drivers")
             .insert({
               profile_id: selectedDriver.id,
-              vehicle_id: vehicleId
+              vehicle_id: vehicleId,
+              department_id: deptId
             })
             .select("id")
             .single()
@@ -488,8 +517,9 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
             logActivity({ action: 'update', entityType: 'driver', entityId: selectedDriver.id, details: { name: formData.full_name } })
           }
         }
-        // Get updated vehicle info for local state
+        // Get updated vehicle and department info for local state
         const selectedVehicle = vehicles.find(v => v.id === vehicleId)
+        const selectedDept = departments.find(d => d.id === deptId)
         setDrivers(prev => prev.map(d => d.id === selectedDriver.id ? {
           ...d,
           ...formData,
@@ -498,7 +528,9 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
           driver_record: {
             ...d.driver_record,
             vehicle_id: vehicleId,
-            vehicle: selectedVehicle ? { id: selectedVehicle.id, display_name: selectedVehicle.display_name, plate_no: selectedVehicle.plate_no } : null
+            vehicle: selectedVehicle ? { id: selectedVehicle.id, display_name: selectedVehicle.display_name, plate_no: selectedVehicle.plate_no } : null,
+            department_id: deptId,
+            department: selectedDept ? { id: selectedDept.id, name: selectedDept.name } : null
           }
         } as Driver : d))
         setDialogType(null)
@@ -528,14 +560,16 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
       if (error) {
         toast.error("Failed to add driver: " + error.message)
       } else {
-        // Create driver record with vehicle if assigned
+        // Create driver record with vehicle and department if assigned
         if (newProfile) {
           const vehicleId = formData.vehicle_id && formData.vehicle_id !== "none" ? formData.vehicle_id : null
+          const deptId = formData.department_id && formData.department_id !== "none" ? formData.department_id : null
           const { data: newDriverRecord, error: driverError } = await supabase
             .from("drivers")
             .insert({
               profile_id: newProfile.id,
-              vehicle_id: vehicleId
+              vehicle_id: vehicleId,
+              department_id: deptId
             })
             .select("id")
             .single()
@@ -793,6 +827,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
               <TableHead>Driver</TableHead>
               <TableHead>Live Status</TableHead>
               <TableHead>Vehicle</TableHead>
+              <TableHead>Department</TableHead>
               <TableHead>Pool</TableHead>
               <TableHead className="text-center">Trips</TableHead>
               <TableHead className="text-center">Rating</TableHead>
@@ -862,6 +897,13 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                           <span className="text-xs text-muted-foreground">({driver.driver_record.vehicle.plate_no})</span>
                         )}
                       </div>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {driver.driver_record?.department ? (
+                      <Badge variant="outline">{driver.driver_record.department.name}</Badge>
                     ) : (
                       <span className="text-muted-foreground text-sm">-</span>
                     )}
@@ -1120,24 +1162,42 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                 />
               </div>
             </div>
-            <div className="grid gap-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Car className="h-4 w-4" />
-                Assigned Vehicle
-              </label>
-              <Select value={formData.vehicle_id} onValueChange={(v) => setFormData({ ...formData, vehicle_id: v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select vehicle" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No Vehicle</SelectItem>
-                  {vehicles.map((vehicle) => (
-                    <SelectItem key={vehicle.id} value={vehicle.id}>
-                      {vehicle.display_name} {vehicle.plate_no && `(${vehicle.plate_no})`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Car className="h-4 w-4" />
+                  Assigned Vehicle
+                </label>
+                <Select value={formData.vehicle_id} onValueChange={(v) => setFormData({ ...formData, vehicle_id: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select vehicle" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Vehicle</SelectItem>
+                    {vehicles.map((vehicle) => (
+                      <SelectItem key={vehicle.id} value={vehicle.id}>
+                        {vehicle.display_name} {vehicle.plate_no && `(${vehicle.plate_no})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Org. Department</label>
+                <Select value={formData.department_id} onValueChange={(v) => setFormData({ ...formData, department_id: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Department</SelectItem>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="grid gap-2">
               <label className="text-sm font-medium">Pool Access</label>

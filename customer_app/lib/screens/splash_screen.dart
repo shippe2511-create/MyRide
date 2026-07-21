@@ -96,7 +96,7 @@ class _SplashScreenState extends State<SplashScreen>
         if (dbUser != null) {
           final status = dbUser['status'] as String?;
           final role = dbUser['role'] as String? ?? 'customer';
-          final isAdmin = role == 'admin' || role == 'super-admin';
+          final isAdmin = role == 'super_admin' || role == 'manager' || role == 'operator';
 
           if (status == 'pending' && !isAdmin) {
             Navigator.pushReplacementNamed(context, '/pending');

@@ -469,7 +469,7 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen> {
       if (profile != null && mounted) {
         final role = profile['role'] ?? 'customer';
         final status = profile['status'] ?? 'pending';
-        final isAdmin = role == 'admin' || role == 'super-admin';
+        final isAdmin = role == 'super_admin' || role == 'manager' || role == 'operator';
 
         if (status == 'approved' || isAdmin) {
           appState.setUserData(

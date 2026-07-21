@@ -142,8 +142,8 @@ class _LoginScreenState extends State<LoginScreen> {
           return;
         }
 
-        // Check status - admins/super-admins bypass pending check
-        final isAdmin = role == 'admin' || role == 'super-admin';
+        // Check status - admins bypass pending check
+        final isAdmin = role == 'super_admin' || role == 'manager' || role == 'operator';
         final status = existingUser['status'] ?? 'pending';
 
         if (!isAdmin && status == 'pending') {

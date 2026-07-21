@@ -261,7 +261,7 @@ export function PoolDriversTab({
     return (
       group.driver.profile.full_name.toLowerCase().includes(searchLower) ||
       group.driver.profile.phone.includes(search) ||
-      group.driver.vehicle?.vehicle_number?.toLowerCase().includes(searchLower)
+      group.driver.vehicles?.[0]?.vehicle_number?.toLowerCase().includes(searchLower)
     )
   })
 
@@ -522,8 +522,8 @@ export function PoolDriversTab({
               <label className="text-sm font-medium">Driver</label>
               <div className="p-3 border rounded-lg bg-muted/50">
                 <p className="font-medium">{editingAssignment?.driver.profile.full_name}</p>
-                {editingAssignment?.driver.vehicle && (
-                  <p className="text-sm text-muted-foreground">{editingAssignment.driver.vehicle.vehicle_number}</p>
+                {editingAssignment?.driver.vehicles?.[0] && (
+                  <p className="text-sm text-muted-foreground">{editingAssignment.driver.vehicles[0].vehicle_number}</p>
                 )}
               </div>
             </div>

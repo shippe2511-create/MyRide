@@ -65,7 +65,6 @@ import {
   CheckCircle,
   XCircle,
   Car,
-  Building2,
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 

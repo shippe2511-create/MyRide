@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { Car, Users, AlertTriangle, Clock, CheckCircle } from "lucide-react"
+import { Car, Users, AlertTriangle, Clock } from "lucide-react"
 
 interface QuickStats {
   todayRides: number

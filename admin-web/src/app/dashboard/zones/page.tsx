@@ -19,12 +19,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Map, Download, CheckSquare } from "lucide-react"
+import { Plus, Edit, Trash2, MoreHorizontal, Map, Download } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
-import { formatDate } from "@/lib/utils"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
-import { EmptyState } from "@/components/ui/empty-state"
 import { PermissionGate } from "@/components/permission-gate"
 import { ZoneMap } from "@/components/zone-map"
 import { LocationPicker } from "@/components/location-picker"

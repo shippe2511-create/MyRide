@@ -24,13 +24,12 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ComboboxInput } from "@/components/ui/combobox-input"
-import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Car, Bus, Truck, Bike, Ship, GripVertical, Download, Search, Building2 } from "lucide-react"
+import { Plus, Edit, Trash2, MoreHorizontal, Car, Bus, Truck, Bike, Ship, GripVertical, Download, Search } from "lucide-react"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
-import { EmptyState } from "@/components/ui/empty-state"
 import { PermissionGate } from "@/components/permission-gate"
 
 interface VehicleType {

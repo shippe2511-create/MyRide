@@ -51,7 +51,6 @@ import {
   MessageSquare,
   HelpCircle,
   AlertTriangle,
-  GripVertical,
 } from "lucide-react"
 
 interface HelpContent {

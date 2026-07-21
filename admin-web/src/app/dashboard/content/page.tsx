@@ -28,7 +28,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { ImagePicker } from "@/components/ui/image-picker"
 import { ComboboxInput } from "@/components/ui/combobox-input"
-import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Bell, Pin, Users, FileText, Megaphone, Calendar, Download, Coffee, Quote, GripVertical, Heart, Ban } from "lucide-react"
+import { Plus, Edit, Trash2, MoreHorizontal, Bell, Users, FileText, Megaphone, Calendar, Coffee, Quote, GripVertical, Heart, Ban } from "lucide-react"
 import { SkeletonTable } from "@/components/ui/skeleton-card"
 
 const STAFF_CATEGORIES = [

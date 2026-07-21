@@ -31,7 +31,6 @@ import {
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { PermissionGate } from "@/components/permission-gate"
-import { EmptyState } from "@/components/ui/empty-state"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {

@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import {
@@ -85,7 +84,6 @@ const DOCUMENT_TYPES = [
 ]
 
 export function DocumentsTable() {
-  const router = useRouter()
   const supabase = createClient()
 
   const [documents, setDocuments] = useState<Document[]>([])

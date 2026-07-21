@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   Layers, Car, Satellite, Map as MapIcon, Navigation, Maximize2, Minimize2,
-  LocateFixed, Search, X, Volume2, VolumeX, Flame, Target
+  LocateFixed, Search, X, Volume2, VolumeX, Target
 } from "lucide-react"
 
 const libraries: ("visualization" | "drawing")[] = ["visualization", "drawing"]

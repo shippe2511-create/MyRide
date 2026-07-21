@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import {
@@ -46,7 +45,6 @@ import {
   Eye,
   Plus,
   XCircle,
-  FileWarning,
   Trash2,
   X,
 } from "lucide-react"
@@ -79,7 +77,6 @@ interface Incident {
 }
 
 export default function IncidentsPage() {
-  const router = useRouter()
   const supabase = createClient()
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [loading, setLoading] = useState(true)

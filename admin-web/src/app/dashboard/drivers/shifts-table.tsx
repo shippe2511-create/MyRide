@@ -24,7 +24,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-  Plus, Loader2, Clock, Calendar, Trash2, Pencil, Users, Wand2, Check, MoreHorizontal
+  Plus, Loader2, Clock, Calendar, Trash2, Pencil, Users, Wand2, MoreHorizontal
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"

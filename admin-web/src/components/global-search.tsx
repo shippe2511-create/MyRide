@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/command"
 import {
   Users, Car, MapPin, Shield, Settings, BarChart3, Calendar,
-  MessageSquare, Star, FileText, Bell, Map, ClipboardCheck, Ticket
+  MessageSquare, Star, FileText, Map, ClipboardCheck, Ticket
 } from "lucide-react"
 
 interface SearchResult {

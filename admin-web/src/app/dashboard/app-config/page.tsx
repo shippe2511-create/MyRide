@@ -23,8 +23,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
-  Smartphone, FileText, Phone, HelpCircle, Shield, Settings2, Plus, Pencil,
-  Trash2, Mail, MessageSquare, AlertTriangle, Save, Loader2, Globe, Building2
+  Smartphone, FileText, Phone, HelpCircle, Settings2, Plus, Pencil,
+  Trash2, Mail, MessageSquare, AlertTriangle, Save, Loader2, Building2
 } from "lucide-react"
 import { toast } from "sonner"
 import { logActivity } from "@/lib/activity-logger"

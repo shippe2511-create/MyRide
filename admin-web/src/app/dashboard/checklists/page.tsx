@@ -20,13 +20,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import {
   ClipboardCheck, AlertTriangle, CheckCircle, XCircle, Car,
   Loader2, RefreshCw, Download, MoreHorizontal, Pencil, Trash2, Search, Eye, Flag, X,
-  Activity, BarChart3, FileDown, FileSpreadsheet, Clock, TrendingUp, Info,
+  Activity, BarChart3, FileDown, FileSpreadsheet, Clock, TrendingUp,
 } from "lucide-react"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"

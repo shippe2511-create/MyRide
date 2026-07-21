@@ -3,11 +3,10 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Car, UserPlus, AlertTriangle, CheckCircle, XCircle,
-  FileText, Star, Clock, Activity
+  Star, Activity
 } from "lucide-react"
 
 interface ActivityItem {

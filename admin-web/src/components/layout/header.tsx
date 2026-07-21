@@ -1,11 +1,9 @@
 "use client"
 
-import { Bell, Search, Users, Car, AlertCircle, LogOut } from "lucide-react"
+import { Bell, Users, Car, AlertCircle, LogOut } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,

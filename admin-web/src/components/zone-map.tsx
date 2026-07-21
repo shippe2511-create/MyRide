@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState } from "react"
 import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
-  Pencil, Map as MapIcon, Satellite, Layers, Car, Target,
-  Maximize2, Minimize2, LocateFixed, Search, X, Flame, Edit, Trash2
+  Pencil, Map as MapIcon, Satellite, Layers, Target,
+  Maximize2, Minimize2, LocateFixed, Search, X, Edit
 } from "lucide-react"
 
 interface Zone {

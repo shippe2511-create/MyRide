@@ -5,16 +5,15 @@ import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, Legend,
+  PieChart, Pie, Cell, Legend,
 } from "recharts"
 import {
-  Car, MapPin, Clock, Star, Loader2,
+  MapPin, Clock, Star,
   Calendar, Activity, Target, Award, Zap
 } from "lucide-react"
 import { SkeletonCard, SkeletonChart } from "@/components/ui/skeleton-card"
@@ -42,8 +41,6 @@ interface Driver {
   rating: number
   profile?: DriverProfile | DriverProfile[]
 }
-
-const COLORS = ["#facc15", "#22c55e", "#3b82f6", "#f97316", "#ec4899", "#8b5cf6", "#14b8a6"]
 
 export default function AnalyticsPage() {
   const supabase = createClient()

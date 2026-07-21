@@ -19,11 +19,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Plus, Edit, Trash2, MoreHorizontal, Loader2, Zap, Calendar, Clock, Download } from "lucide-react"
+import { Plus, Edit, Trash2, MoreHorizontal, Zap, Calendar, Clock, Download } from "lucide-react"
 import { formatDate } from "@/lib/utils"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
-import { EmptyState } from "@/components/ui/empty-state"
 import { PermissionGate } from "@/components/permission-gate"
 
 interface Campaign {

@@ -29,8 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Plus, Trash2, Search, Lock, MoreHorizontal, Pencil, UserPlus, X } from "lucide-react"
-import { DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
+import { Plus, Search, Lock, MoreHorizontal, UserPlus, X } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,

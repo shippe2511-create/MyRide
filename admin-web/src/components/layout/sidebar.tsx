@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
@@ -43,12 +43,10 @@ import {
   ShieldAlert,
   TrendingUp,
   Cog,
-  HelpCircle,
   Smartphone,
   Mic,
   ChevronLeft,
   ChevronRight,
-  Armchair,
   Clock,
   Layers,
   Building2,

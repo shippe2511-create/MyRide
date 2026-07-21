@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { TimePicker } from "@/components/ui/time-picker"
-import { Settings, Globe, Bell, Shield, Database, Save, Loader2, KeyRound, Phone, Plus, Trash2, GripVertical, Eye, EyeOff, Clock } from "lucide-react"
+import { Settings, Globe, Bell, Shield, Database, Save, Loader2, KeyRound, Plus, Trash2, Eye, EyeOff, Clock } from "lucide-react"
 import { toast } from "sonner"
 import { logActivity } from "@/lib/activity-logger"
 import { PermissionGate } from "@/components/permission-gate"

@@ -23,12 +23,11 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Fuel, Loader2, MoreVertical, Edit, Trash2, Plus, Wrench, Sparkles, Car, Filter, TrendingUp, TrendingDown, Calendar, DollarSign, Users, Download, X, CheckSquare } from "lucide-react"
+import { Fuel, Loader2, MoreVertical, Edit, Trash2, Wrench, Sparkles, Car, Filter, TrendingUp, TrendingDown, Calendar, DollarSign, Users, Download, X } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import { SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/skeleton-card"
-import { EmptyState } from "@/components/ui/empty-state"
 import { PermissionGate } from "@/components/permission-gate"
 
 interface VehicleLog {

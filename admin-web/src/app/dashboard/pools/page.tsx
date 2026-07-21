@@ -34,7 +34,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Layers, Plus, Pencil, Users, Car, Lock, Globe, Trash2, MoreHorizontal, Eye, Ban } from "lucide-react"
+import { Layers, Plus, Pencil, Users, Car, Lock, Globe, Trash2, MoreHorizontal, Ban } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,

@@ -3,7 +3,7 @@
 import { useState, useCallback, memo, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { formatPhone } from "@/lib/format-phone"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PermissionGate } from "@/components/permission-gate"
 import { Button } from "@/components/ui/button"
 import {

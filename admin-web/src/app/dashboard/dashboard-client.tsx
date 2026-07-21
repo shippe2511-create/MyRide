@@ -7,12 +7,10 @@ import {
   Car,
   Users,
   MapPin,
-  TrendingUp,
   Clock,
   CheckCircle,
   AlertCircle,
   ArrowUpRight,
-  FileText,
   ChevronRight,
   Activity
 } from "lucide-react"

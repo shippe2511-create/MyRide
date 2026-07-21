@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Radio, Car, Users, MapPin, Phone, RefreshCw, Loader2, Navigation,
-  Coffee, Clock, Route, User, X, Filter, ChevronRight
+  Coffee, Clock, Route, User, X, ChevronRight
 } from "lucide-react"
 import { SkeletonCard } from "@/components/ui/skeleton-card"
 import { PermissionGate } from "@/components/permission-gate"

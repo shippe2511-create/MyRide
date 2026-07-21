@@ -9,12 +9,12 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -24,13 +24,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
-  MapPin, Clock, CheckCircle, XCircle, Search, Loader2, RefreshCw, Car, MoreVertical, Edit, Trash2, TrendingUp, ChevronLeft, ChevronRight, Download, Eye, Calendar
+  MapPin, Clock, CheckCircle, XCircle, Search, Loader2, RefreshCw, MoreVertical, Edit, Trash2, TrendingUp, ChevronLeft, ChevronRight, Download, Eye, Calendar
 } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { FilterPills } from "@/components/ui/filter-pills"
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
-import { PermissionGate, ManageGate } from "@/components/permission-gate"
+import { PermissionGate } from "@/components/permission-gate"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu"

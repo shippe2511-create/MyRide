@@ -381,13 +381,14 @@ export function PoolCustomersTab({
                     </TableCell>
                     {canManage && (
                       <TableCell>
-                        <DropdownMenu>
+                        <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
                               <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Open menu</span>
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                          <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuItem onClick={() => openGrantMoreDialog(group.customer_id)}>
                               <UserPlus className="h-4 w-4 mr-2" />
                               Grant More Access

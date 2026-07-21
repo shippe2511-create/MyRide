@@ -29,7 +29,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Plus, Trash2, Search, Lock, MoreHorizontal } from "lucide-react"
+import { Plus, Trash2, Search, Lock, MoreHorizontal, Pencil, UserPlus } from "lucide-react"
+import { DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
@@ -150,8 +151,11 @@ export function PoolCustomersTab({
   const [poolFilter, setPoolFilter] = useState<string>("all")
   const [search, setSearch] = useState("")
   const [isAddOpen, setIsAddOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<string>("")
   const [selectedPools, setSelectedPools] = useState<Set<string>>(new Set())
+  const [editingAccess, setEditingAccess] = useState<CustomerPool | null>(null)
+  const [editPoolId, setEditPoolId] = useState<string>("")
 
   const { data: customerPools, isLoading } = useCustomerPoolsData(poolFilter)
   const { data: availableCustomers } = useAvailableCustomers()
@@ -200,6 +204,47 @@ export function PoolCustomersTab({
       toast.error(error.message || "Failed to revoke access")
     },
   })
+
+  const editMutation = useMutation({
+    mutationFn: async ({ id, newPoolId }: { id: string; newPoolId: string }) => {
+      const { error } = await supabase
+        .from("customer_pools")
+        .update({
+          pool_id: newPoolId,
+          granted_by: currentUser?.id,
+          granted_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customer-pools"] })
+      queryClient.invalidateQueries({ queryKey: ["pools"] })
+      setIsEditOpen(false)
+      setEditingAccess(null)
+      setEditPoolId("")
+      toast.success("Pool access updated")
+    },
+    onError: (error: Error) => {
+      if (error.message.includes("duplicate")) {
+        toast.error("Customer already has access to this pool")
+      } else {
+        toast.error(error.message || "Failed to update access")
+      }
+    },
+  })
+
+  const openEditDialog = (cp: CustomerPool) => {
+    setEditingAccess(cp)
+    setEditPoolId(cp.pool_id)
+    setIsEditOpen(true)
+  }
+
+  const openGrantMoreDialog = (customerId: string) => {
+    setSelectedCustomer(customerId)
+    setSelectedPools(new Set())
+    setIsAddOpen(true)
+  }
 
   const filteredCustomerPools = (customerPools || []).filter((cp) => {
     if (!search) return true
@@ -315,6 +360,15 @@ export function PoolCustomersTab({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEditDialog(cp)}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Change Pool
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openGrantMoreDialog(cp.customer_id)}>
+                              <UserPlus className="h-4 w-4 mr-2" />
+                              Grant More Access
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onClick={() => removeMutation.mutate(cp.id)}
                               disabled={removeMutation.isPending}
@@ -419,6 +473,65 @@ export function PoolCustomersTab({
               disabled={!selectedCustomer || selectedPools.size === 0 || addMutation.isPending}
             >
               {addMutation.isPending ? "Granting..." : `Grant Access to ${selectedPools.size} Pool${selectedPools.size > 1 ? "s" : ""}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Pool Access Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Pool Access</DialogTitle>
+            <DialogDescription>
+              Change which pool {editingAccess?.customer.full_name} has access to
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Customer</label>
+              <div className="p-3 border rounded-lg bg-muted/50">
+                <p className="font-medium">{editingAccess?.customer.full_name}</p>
+                <p className="text-sm text-muted-foreground">{editingAccess?.customer.email}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Current Pool</label>
+              <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/50">
+                <Lock className="h-4 w-4 text-yellow-500" />
+                <span>{editingAccess?.pool.name}</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">New Pool</label>
+              <Select value={editPoolId} onValueChange={setEditPoolId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a pool" />
+                </SelectTrigger>
+                <SelectContent>
+                  {restrictedPools.map((pool) => (
+                    <SelectItem key={pool.id} value={pool.id}>
+                      <div className="flex items-center gap-2">
+                        <Lock className="h-4 w-4 text-yellow-500" />
+                        {pool.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                editingAccess && editMutation.mutate({ id: editingAccess.id, newPoolId: editPoolId })
+              }
+              disabled={!editPoolId || editPoolId === editingAccess?.pool_id || editMutation.isPending}
+            >
+              {editMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

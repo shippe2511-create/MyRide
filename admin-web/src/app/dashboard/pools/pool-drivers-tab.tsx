@@ -336,9 +336,9 @@ export function PoolDriversTab({
                       <div className="flex items-center gap-1">
                         <Car className="h-4 w-4 text-muted-foreground" />
                         <div className="flex flex-col">
-                          <span>{group.driver.vehicle.display_name}</span>
-                          {group.driver.vehicle.plate_no && (
-                            <span className="text-xs text-muted-foreground">{group.driver.vehicle.plate_no}</span>
+                          <span>{group.driver.vehicle.plate_no || group.driver.vehicle.display_name}</span>
+                          {group.driver.vehicle.plate_no && group.driver.vehicle.display_name && (
+                            <span className="text-xs text-muted-foreground">{group.driver.vehicle.display_name}</span>
                           )}
                         </div>
                       </div>

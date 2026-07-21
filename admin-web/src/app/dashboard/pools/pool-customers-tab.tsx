@@ -246,13 +246,42 @@ export function PoolCustomersTab({
     setIsAddOpen(true)
   }
 
-  const filteredCustomerPools = (customerPools || []).filter((cp) => {
+  // Group customer pools by customer
+  const groupedByCustomer = (customerPools || []).reduce((acc, cp) => {
+    const customerId = cp.customer_id
+    if (!acc[customerId]) {
+      acc[customerId] = {
+        customer_id: customerId,
+        customer: cp.customer,
+        pools: [],
+        earliest_date: cp.granted_at || cp.created_at,
+        granter: cp.granter,
+      }
+    }
+    acc[customerId].pools.push({
+      id: cp.id,
+      pool_id: cp.pool_id,
+      pool: cp.pool,
+      granted_at: cp.granted_at,
+      created_at: cp.created_at,
+      granter: cp.granter
+    })
+    return acc
+  }, {} as Record<string, {
+    customer_id: string
+    customer: CustomerPool["customer"]
+    pools: { id: string; pool_id: string; pool: CustomerPool["pool"]; granted_at: string; created_at: string; granter: CustomerPool["granter"] }[]
+    earliest_date: string
+    granter: CustomerPool["granter"]
+  }>)
+
+  const filteredCustomers = Object.values(groupedByCustomer).filter((group) => {
     if (!search) return true
     const searchLower = search.toLowerCase()
     return (
-      cp.customer.full_name.toLowerCase().includes(searchLower) ||
-      cp.customer.phone.includes(search) ||
-      cp.customer.email.toLowerCase().includes(searchLower)
+      group.customer.full_name.toLowerCase().includes(searchLower) ||
+      group.customer.phone.includes(search) ||
+      group.customer.email.toLowerCase().includes(searchLower)
     )
   })
 
@@ -309,8 +338,7 @@ export function PoolCustomersTab({
                 <TableHead>Customer</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Pool</TableHead>
-                <TableHead>Granted By</TableHead>
+                <TableHead>Pools</TableHead>
                 <TableHead>Granted At</TableHead>
                 {canManage && <TableHead className="w-[80px]">Actions</TableHead>}
               </TableRow>
@@ -318,38 +346,38 @@ export function PoolCustomersTab({
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={canManage ? 7 : 6} className="text-center py-8">
+                  <TableCell colSpan={canManage ? 6 : 5} className="text-center py-8">
                     <p className="text-muted-foreground">Loading...</p>
                   </TableCell>
                 </TableRow>
-              ) : filteredCustomerPools.length === 0 ? (
+              ) : filteredCustomers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={canManage ? 7 : 6} className="text-center py-8">
+                  <TableCell colSpan={canManage ? 6 : 5} className="text-center py-8">
                     <p className="text-muted-foreground">No customer access grants found</p>
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredCustomerPools.map((cp) => (
-                  <TableRow key={cp.id}>
-                    <TableCell className="font-medium">{cp.customer.full_name}</TableCell>
-                    <TableCell className="text-muted-foreground">{formatPhone(cp.customer.phone)}</TableCell>
-                    <TableCell className="text-muted-foreground">{cp.customer.email}</TableCell>
+                filteredCustomers.map((group) => (
+                  <TableRow key={group.customer_id}>
+                    <TableCell className="font-medium">{group.customer.full_name}</TableCell>
+                    <TableCell className="text-muted-foreground">{formatPhone(group.customer.phone)}</TableCell>
+                    <TableCell className="text-muted-foreground">{group.customer.email}</TableCell>
                     <TableCell>
-                      <Badge
-                        variant="outline"
-                        className="border-yellow-500/50 text-yellow-500"
-                      >
-                        <Lock className="h-3 w-3 mr-1" />
-                        {cp.pool.name}
-                      </Badge>
+                      <div className="flex flex-wrap gap-1">
+                        {group.pools.map((p) => (
+                          <Badge
+                            key={p.id}
+                            variant="outline"
+                            className="border-yellow-500/50 text-yellow-500"
+                          >
+                            <Lock className="h-3 w-3 mr-1" />
+                            {p.pool.name}
+                          </Badge>
+                        ))}
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {cp.granter?.full_name || "—"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {cp.granted_at
-                        ? new Date(cp.granted_at).toLocaleDateString()
-                        : new Date(cp.created_at).toLocaleDateString()}
+                      {new Date(group.earliest_date).toLocaleDateString()}
                     </TableCell>
                     {canManage && (
                       <TableCell>
@@ -360,23 +388,26 @@ export function PoolCustomersTab({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openEditDialog(cp)}>
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Change Pool
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openGrantMoreDialog(cp.customer_id)}>
+                            <DropdownMenuItem onClick={() => openGrantMoreDialog(group.customer_id)}>
                               <UserPlus className="h-4 w-4 mr-2" />
                               Grant More Access
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => removeMutation.mutate(cp.id)}
-                              disabled={removeMutation.isPending}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Revoke Access
-                            </DropdownMenuItem>
+                            {group.pools.length > 0 && (
+                              <>
+                                <DropdownMenuSeparator />
+                                {group.pools.map((p) => (
+                                  <DropdownMenuItem
+                                    key={p.id}
+                                    onClick={() => removeMutation.mutate(p.id)}
+                                    disabled={removeMutation.isPending}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Revoke {p.pool.name}
+                                  </DropdownMenuItem>
+                                ))}
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

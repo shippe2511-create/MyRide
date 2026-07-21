@@ -30,6 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Plus, Trash2, Search, Lock, MoreHorizontal } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -148,7 +149,7 @@ export function PoolCustomersTab({
   const [search, setSearch] = useState("")
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<string>("")
-  const [selectedPool, setSelectedPool] = useState<string>("")
+  const [selectedPools, setSelectedPools] = useState<Set<string>>(new Set())
 
   const { data: customerPools, isLoading } = useCustomerPoolsData(poolFilter)
   const { data: availableCustomers } = useAvailableCustomers()
@@ -157,12 +158,16 @@ export function PoolCustomersTab({
   const restrictedPools = pools.filter((p) => p.access_type === "restricted" && p.is_active)
 
   const addMutation = useMutation({
-    mutationFn: async ({ customerId, poolId }: { customerId: string; poolId: string }) => {
-      const { error } = await supabase.from("customer_pools").insert({
+    mutationFn: async ({ customerId, poolIds }: { customerId: string; poolIds: string[] }) => {
+      const inserts = poolIds.map((poolId) => ({
         customer_id: customerId,
         pool_id: poolId,
         granted_by: currentUser?.id,
         granted_at: new Date().toISOString(),
+      }))
+      const { error } = await supabase.from("customer_pools").upsert(inserts, {
+        onConflict: "customer_id,pool_id",
+        ignoreDuplicates: true,
       })
       if (error) throw error
     },
@@ -171,15 +176,11 @@ export function PoolCustomersTab({
       queryClient.invalidateQueries({ queryKey: ["pools"] })
       setIsAddOpen(false)
       setSelectedCustomer("")
-      setSelectedPool("")
+      setSelectedPools(new Set())
       toast.success("Customer granted pool access")
     },
     onError: (error: Error) => {
-      if (error.message.includes("duplicate")) {
-        toast.error("Customer already has access to this pool")
-      } else {
-        toast.error(error.message || "Failed to grant access")
-      }
+      toast.error(error.message || "Failed to grant access")
     },
   })
 
@@ -338,7 +339,7 @@ export function PoolCustomersTab({
           <DialogHeader>
             <DialogTitle>Grant Pool Access</DialogTitle>
             <DialogDescription>
-              Grant a customer access to a restricted pool
+              Grant a customer access to one or more restricted pools
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -358,22 +359,53 @@ export function PoolCustomersTab({
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Restricted Pool</label>
-              <Select value={selectedPool} onValueChange={setSelectedPool}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a pool" />
-                </SelectTrigger>
-                <SelectContent>
+              <label className="text-sm font-medium">Restricted Pools</label>
+              {restrictedPools.length === 0 ? (
+                <div className="border rounded-lg p-4 text-center text-muted-foreground">
+                  <Lock className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No restricted pools available</p>
+                </div>
+              ) : (
+                <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
                   {restrictedPools.map((pool) => (
-                    <SelectItem key={pool.id} value={pool.id}>
-                      <div className="flex items-center gap-2">
+                    <div
+                      key={pool.id}
+                      className="flex items-center gap-3 p-2 rounded hover:bg-muted/50 cursor-pointer"
+                      onClick={() => {
+                        const newSelected = new Set(selectedPools)
+                        if (newSelected.has(pool.id)) {
+                          newSelected.delete(pool.id)
+                        } else {
+                          newSelected.add(pool.id)
+                        }
+                        setSelectedPools(newSelected)
+                      }}
+                    >
+                      <Checkbox
+                        checked={selectedPools.has(pool.id)}
+                        onCheckedChange={(checked) => {
+                          const newSelected = new Set(selectedPools)
+                          if (checked) {
+                            newSelected.add(pool.id)
+                          } else {
+                            newSelected.delete(pool.id)
+                          }
+                          setSelectedPools(newSelected)
+                        }}
+                      />
+                      <div className="flex items-center gap-2 flex-1">
                         <Lock className="h-4 w-4 text-yellow-500" />
-                        {pool.name}
+                        <span className="font-medium">{pool.name}</span>
                       </div>
-                    </SelectItem>
+                    </div>
                   ))}
-                </SelectContent>
-              </Select>
+                </div>
+              )}
+              {selectedPools.size > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {selectedPools.size} pool{selectedPools.size > 1 ? "s" : ""} selected
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -382,11 +414,11 @@ export function PoolCustomersTab({
             </Button>
             <Button
               onClick={() =>
-                addMutation.mutate({ customerId: selectedCustomer, poolId: selectedPool })
+                addMutation.mutate({ customerId: selectedCustomer, poolIds: Array.from(selectedPools) })
               }
-              disabled={!selectedCustomer || !selectedPool || addMutation.isPending}
+              disabled={!selectedCustomer || selectedPools.size === 0 || addMutation.isPending}
             >
-              {addMutation.isPending ? "Granting..." : "Grant Access"}
+              {addMutation.isPending ? "Granting..." : `Grant Access to ${selectedPools.size} Pool${selectedPools.size > 1 ? "s" : ""}`}
             </Button>
           </DialogFooter>
         </DialogContent>

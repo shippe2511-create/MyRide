@@ -40,6 +40,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { ComboboxInput } from "@/components/ui/combobox-input"
+import { formatPhone } from "@/lib/format-phone"
 
 const supabase = createClient()
 
@@ -286,7 +287,7 @@ export function PoolCustomersTab({
                 filteredCustomerPools.map((cp) => (
                   <TableRow key={cp.id}>
                     <TableCell className="font-medium">{cp.customer.full_name}</TableCell>
-                    <TableCell className="text-muted-foreground">{cp.customer.phone}</TableCell>
+                    <TableCell className="text-muted-foreground">{formatPhone(cp.customer.phone)}</TableCell>
                     <TableCell className="text-muted-foreground">{cp.customer.email}</TableCell>
                     <TableCell>
                       <Badge
@@ -351,7 +352,7 @@ export function PoolCustomersTab({
                 onChange={setSelectedCustomer}
                 options={(availableCustomers || []).map((customer) => ({
                   value: customer.id,
-                  label: `${customer.full_name}${customer.phone ? ` (${customer.phone})` : ""}`,
+                  label: `${customer.full_name}${customer.phone ? ` (${formatPhone(customer.phone)})` : ""}`,
                 }))}
                 placeholder="Search customer..."
                 allowCustom={false}

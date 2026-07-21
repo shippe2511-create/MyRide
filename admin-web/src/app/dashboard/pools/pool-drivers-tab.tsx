@@ -40,6 +40,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { ComboboxInput } from "@/components/ui/combobox-input"
+import { formatPhone } from "@/lib/format-phone"
 
 const supabase = createClient()
 
@@ -269,7 +270,7 @@ export function PoolDriversTab({
               filteredDriverPools.map((dp) => (
                 <TableRow key={dp.id}>
                   <TableCell className="font-medium">{dp.driver.profile.full_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{dp.driver.profile.phone}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatPhone(dp.driver.profile.phone)}</TableCell>
                   <TableCell>
                     {dp.driver.vehicle ? (
                       <div className="flex items-center gap-1">

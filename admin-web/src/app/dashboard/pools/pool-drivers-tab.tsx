@@ -237,13 +237,31 @@ export function PoolDriversTab({
     setIsAddOpen(true)
   }
 
-  const filteredDriverPools = (driverPools || []).filter((dp) => {
+  // Group driver pools by driver
+  const groupedByDriver = (driverPools || []).reduce((acc, dp) => {
+    const driverId = dp.driver_id
+    if (!acc[driverId]) {
+      acc[driverId] = {
+        driver_id: driverId,
+        driver: dp.driver,
+        pools: [],
+        earliest_date: dp.created_at,
+      }
+    }
+    acc[driverId].pools.push({ id: dp.id, pool_id: dp.pool_id, pool: dp.pool, created_at: dp.created_at })
+    if (new Date(dp.created_at) < new Date(acc[driverId].earliest_date)) {
+      acc[driverId].earliest_date = dp.created_at
+    }
+    return acc
+  }, {} as Record<string, { driver_id: string; driver: DriverPool["driver"]; pools: { id: string; pool_id: string; pool: DriverPool["pool"]; created_at: string }[]; earliest_date: string }>)
+
+  const filteredDrivers = Object.values(groupedByDriver).filter((group) => {
     if (!search) return true
     const searchLower = search.toLowerCase()
     return (
-      dp.driver.profile.full_name.toLowerCase().includes(searchLower) ||
-      dp.driver.profile.phone.includes(search) ||
-      dp.driver.vehicle?.vehicle_number?.toLowerCase().includes(searchLower)
+      group.driver.profile.full_name.toLowerCase().includes(searchLower) ||
+      group.driver.profile.phone.includes(search) ||
+      group.driver.vehicle?.vehicle_number?.toLowerCase().includes(searchLower)
     )
   })
 
@@ -289,7 +307,7 @@ export function PoolDriversTab({
               <TableHead>Driver</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>Vehicle</TableHead>
-              <TableHead>Pool</TableHead>
+              <TableHead>Pools</TableHead>
               <TableHead>Added</TableHead>
               {canManage && <TableHead className="w-[80px]">Actions</TableHead>}
             </TableRow>
@@ -301,41 +319,46 @@ export function PoolDriversTab({
                   <p className="text-muted-foreground">Loading...</p>
                 </TableCell>
               </TableRow>
-            ) : filteredDriverPools.length === 0 ? (
+            ) : filteredDrivers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={canManage ? 6 : 5} className="text-center py-8">
                   <p className="text-muted-foreground">No driver assignments found</p>
                 </TableCell>
               </TableRow>
             ) : (
-              filteredDriverPools.map((dp) => (
-                <TableRow key={dp.id}>
-                  <TableCell className="font-medium">{dp.driver.profile.full_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{formatPhone(dp.driver.profile.phone)}</TableCell>
+              filteredDrivers.map((group) => (
+                <TableRow key={group.driver_id}>
+                  <TableCell className="font-medium">{group.driver.profile.full_name}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatPhone(group.driver.profile.phone)}</TableCell>
                   <TableCell>
-                    {dp.driver.vehicle ? (
+                    {group.driver.vehicle ? (
                       <div className="flex items-center gap-1">
                         <Car className="h-4 w-4 text-muted-foreground" />
-                        <span>{dp.driver.vehicle.vehicle_number}</span>
+                        <span>{group.driver.vehicle.vehicle_number}</span>
                       </div>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={
-                        dp.pool.access_type === "open"
-                          ? "border-green-500/50 text-green-500"
-                          : "border-yellow-500/50 text-yellow-500"
-                      }
-                    >
-                      {dp.pool.name}
-                    </Badge>
+                    <div className="flex flex-wrap gap-1">
+                      {group.pools.map((p) => (
+                        <Badge
+                          key={p.id}
+                          variant="outline"
+                          className={
+                            p.pool.access_type === "open"
+                              ? "border-green-500/50 text-green-500"
+                              : "border-yellow-500/50 text-yellow-500"
+                          }
+                        >
+                          {p.pool.name}
+                        </Badge>
+                      ))}
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {new Date(dp.created_at).toLocaleDateString()}
+                    {new Date(group.earliest_date).toLocaleDateString()}
                   </TableCell>
                   {canManage && (
                     <TableCell>
@@ -346,23 +369,26 @@ export function PoolDriversTab({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditDialog(dp)}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Change Pool
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openAssignMoreDialog(dp.driver_id)}>
+                          <DropdownMenuItem onClick={() => openAssignMoreDialog(group.driver_id)}>
                             <UserPlus className="h-4 w-4 mr-2" />
                             Assign More Pools
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => removeMutation.mutate(dp.id)}
-                            disabled={removeMutation.isPending}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Remove from Pool
-                          </DropdownMenuItem>
+                          {group.pools.length > 0 && (
+                            <>
+                              <DropdownMenuSeparator />
+                              {group.pools.map((p) => (
+                                <DropdownMenuItem
+                                  key={p.id}
+                                  onClick={() => removeMutation.mutate(p.id)}
+                                  disabled={removeMutation.isPending}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Remove from {p.pool.name}
+                                </DropdownMenuItem>
+                              ))}
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

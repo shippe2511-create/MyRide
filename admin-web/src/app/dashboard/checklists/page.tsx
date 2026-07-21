@@ -671,21 +671,32 @@ export default function ChecklistsPage() {
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{formatDate(checklist.checked_at)}</TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingChecklist(checklist)}><Pencil className="h-4 w-4" /></Button>
-                            <DropdownMenu modal={false}>
-                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onSelect={() => setSelectedChecklist(checklist)}><Eye className="h-4 w-4 mr-2" />View Details</DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => setEditingChecklist(checklist)}><Pencil className="h-4 w-4 mr-2" />Edit</DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => toggleIssuesStatus(checklist)}><Flag className="h-4 w-4 mr-2" />{checklist.has_issues ? "Clear Issues" : "Flag Issues"}</DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-destructive" onSelect={() => setDeleteId(checklist.id)}><Trash2 className="h-4 w-4 mr-2" />Delete</DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
+                          <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onSelect={() => setSelectedChecklist(checklist)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => setEditingChecklist(checklist)}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => toggleIssuesStatus(checklist)}>
+                                <Flag className="h-4 w-4 mr-2" />
+                                {checklist.has_issues ? "Clear Issues" : "Flag Issues"}
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeleteId(checklist.id)}>
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     )

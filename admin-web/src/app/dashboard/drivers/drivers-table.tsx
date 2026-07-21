@@ -174,6 +174,8 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
   const [departments, setDepartments] = useState<Department[]>([])
+  const [departmentFilter, setDepartmentFilter] = useState("all")
+  const [poolFilter, setPoolFilter] = useState("all")
 
   useEffect(() => {
     loadVehicles()
@@ -594,11 +596,35 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
     setLoading(false)
   }
 
+  // Filter drivers by department and pool
+  const filteredDrivers = drivers.filter(driver => {
+    // Department filter
+    if (departmentFilter !== "all") {
+      if (departmentFilter === "none") {
+        if (driver.driver_record?.department_id) return false
+      } else {
+        if (driver.driver_record?.department_id !== departmentFilter) return false
+      }
+    }
+
+    // Pool filter
+    if (poolFilter !== "all") {
+      const pools = driver.driver_record?.id ? driverPools[driver.driver_record.id] || [] : []
+      if (poolFilter === "none") {
+        if (pools.length > 0) return false
+      } else {
+        if (!pools.includes(poolFilter)) return false
+      }
+    }
+
+    return true
+  })
+
   const toggleSelectAll = () => {
-    if (selectedIds.size === drivers.length) {
+    if (selectedIds.size === filteredDrivers.length) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(drivers.map(d => d.id)))
+      setSelectedIds(new Set(filteredDrivers.map(d => d.id)))
     }
   }
 
@@ -778,6 +804,31 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
               <SelectItem value="rejected">Rejected</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Depts</SelectItem>
+              <SelectItem value="none">No Department</SelectItem>
+              {departments.map((dept) => (
+                <SelectItem key={dept.id} value={dept.id}>
+                  {dept.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={poolFilter} onValueChange={setPoolFilter}>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="Pool" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Pools</SelectItem>
+              <SelectItem value="public">Public</SelectItem>
+              <SelectItem value="private">Private</SelectItem>
+              <SelectItem value="none">No Pool</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={exportCSV}>
@@ -820,7 +871,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
             <TableRow>
               <TableHead className="w-12">
                 <Checkbox
-                  checked={selectedIds.size === drivers.length && drivers.length > 0}
+                  checked={selectedIds.size === filteredDrivers.length && filteredDrivers.length > 0}
                   onCheckedChange={toggleSelectAll}
                 />
               </TableHead>
@@ -836,14 +887,14 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
             </TableRow>
           </TableHeader>
           <TableBody>
-            {drivers.length === 0 ? (
+            {filteredDrivers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                  No drivers found
+                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                  {drivers.length === 0 ? "No drivers found" : "No drivers match the selected filters"}
                 </TableCell>
               </TableRow>
             ) : (
-              drivers.map((driver) => (
+              filteredDrivers.map((driver) => (
                 <TableRow key={driver.id} className="group hover:bg-muted/50 transition-colors">
                   <TableCell>
                     <Checkbox

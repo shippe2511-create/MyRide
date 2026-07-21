@@ -50,6 +50,7 @@ import {
   ChevronRight,
   Armchair,
   Clock,
+  Layers,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -82,6 +83,7 @@ const navigationSections: NavSection[] = [
       { name: "Drivers", href: "/dashboard/drivers", icon: Car, permission: "drivers:view" },
       { name: "Pending Changes", href: "/dashboard/pending-changes", icon: Clock, permission: "customers:view" },
       { name: "Eligibility", href: "/dashboard/eligibility", icon: Ticket, permission: "eligibility:view" },
+      { name: "Service Pools", href: "/dashboard/pools", icon: Layers, permission: "pools:view" },
     ]
   },
   {

@@ -679,7 +679,7 @@ export default function VehiclesPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium">Org. Department</label>
+                <label className="text-sm font-medium">Department</label>
                 <Select value={formData.department_id} onValueChange={(v) => setFormData({ ...formData, department_id: v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select department" />

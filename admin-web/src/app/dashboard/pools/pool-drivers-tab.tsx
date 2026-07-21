@@ -29,7 +29,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Plus, Trash2, Car, Search, MoreHorizontal, Lock, Globe } from "lucide-react"
+import { Plus, Trash2, Car, Search, MoreHorizontal, Lock, Globe, Pencil, UserPlus } from "lucide-react"
+import { DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
@@ -150,8 +151,11 @@ export function PoolDriversTab({
   const [poolFilter, setPoolFilter] = useState<string>("all")
   const [search, setSearch] = useState("")
   const [isAddOpen, setIsAddOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
   const [selectedDriver, setSelectedDriver] = useState<string>("")
   const [selectedPools, setSelectedPools] = useState<Set<string>>(new Set())
+  const [editingAssignment, setEditingAssignment] = useState<DriverPool | null>(null)
+  const [editPoolId, setEditPoolId] = useState<string>("")
 
   const { data: driverPools, isLoading } = useDriverPoolsData(poolFilter)
   const { data: availableDrivers } = useAvailableDrivers()
@@ -195,6 +199,43 @@ export function PoolDriversTab({
       toast.error(error.message || "Failed to remove driver from pool")
     },
   })
+
+  const editMutation = useMutation({
+    mutationFn: async ({ id, newPoolId }: { id: string; newPoolId: string }) => {
+      const { error } = await supabase
+        .from("driver_pools")
+        .update({ pool_id: newPoolId })
+        .eq("id", id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["driver-pools"] })
+      queryClient.invalidateQueries({ queryKey: ["pools"] })
+      setIsEditOpen(false)
+      setEditingAssignment(null)
+      setEditPoolId("")
+      toast.success("Pool assignment updated")
+    },
+    onError: (error: Error) => {
+      if (error.message.includes("duplicate")) {
+        toast.error("Driver is already assigned to this pool")
+      } else {
+        toast.error(error.message || "Failed to update assignment")
+      }
+    },
+  })
+
+  const openEditDialog = (dp: DriverPool) => {
+    setEditingAssignment(dp)
+    setEditPoolId(dp.pool_id)
+    setIsEditOpen(true)
+  }
+
+  const openAssignMoreDialog = (driverId: string) => {
+    setSelectedDriver(driverId)
+    setSelectedPools(new Set())
+    setIsAddOpen(true)
+  }
 
   const filteredDriverPools = (driverPools || []).filter((dp) => {
     if (!search) return true
@@ -305,6 +346,15 @@ export function PoolDriversTab({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditDialog(dp)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Change Pool
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openAssignMoreDialog(dp.driver_id)}>
+                            <UserPlus className="h-4 w-4 mr-2" />
+                            Assign More Pools
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() => removeMutation.mutate(dp.id)}
                             disabled={removeMutation.isPending}
@@ -347,52 +397,74 @@ export function PoolDriversTab({
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Pools</label>
-              <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
-                {pools
-                  .filter((p) => p.is_active)
-                  .map((pool) => (
-                    <div
-                      key={pool.id}
-                      className="flex items-center gap-3 p-2 rounded hover:bg-muted/50 cursor-pointer"
-                      onClick={() => {
-                        const newSelected = new Set(selectedPools)
-                        if (newSelected.has(pool.id)) {
-                          newSelected.delete(pool.id)
-                        } else {
-                          newSelected.add(pool.id)
-                        }
-                        setSelectedPools(newSelected)
-                      }}
-                    >
-                      <Checkbox
-                        checked={selectedPools.has(pool.id)}
-                        onCheckedChange={(checked) => {
-                          const newSelected = new Set(selectedPools)
-                          if (checked) {
-                            newSelected.add(pool.id)
-                          } else {
-                            newSelected.delete(pool.id)
-                          }
-                          setSelectedPools(newSelected)
-                        }}
-                      />
-                      <div className="flex items-center gap-2 flex-1">
-                        {pool.access_type === "open" ? (
-                          <Globe className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <Lock className="h-4 w-4 text-yellow-500" />
-                        )}
-                        <span className="font-medium">{pool.name}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {pool.access_type}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-              </div>
+              {(() => {
+                const driverExistingPools = selectedDriver
+                  ? (driverPools || [])
+                      .filter((dp) => dp.driver_id === selectedDriver)
+                      .map((dp) => dp.pool_id)
+                  : []
+                return (
+                  <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
+                    {pools
+                      .filter((p) => p.is_active)
+                      .map((pool) => {
+                        const alreadyAssigned = driverExistingPools.includes(pool.id)
+                        return (
+                          <div
+                            key={pool.id}
+                            className={`flex items-center gap-3 p-2 rounded ${
+                              alreadyAssigned
+                                ? "bg-green-500/10 cursor-default"
+                                : "hover:bg-muted/50 cursor-pointer"
+                            }`}
+                            onClick={() => {
+                              if (alreadyAssigned) return
+                              const newSelected = new Set(selectedPools)
+                              if (newSelected.has(pool.id)) {
+                                newSelected.delete(pool.id)
+                              } else {
+                                newSelected.add(pool.id)
+                              }
+                              setSelectedPools(newSelected)
+                            }}
+                          >
+                            <Checkbox
+                              checked={alreadyAssigned || selectedPools.has(pool.id)}
+                              disabled={alreadyAssigned}
+                              onCheckedChange={(checked) => {
+                                if (alreadyAssigned) return
+                                const newSelected = new Set(selectedPools)
+                                if (checked) {
+                                  newSelected.add(pool.id)
+                                } else {
+                                  newSelected.delete(pool.id)
+                                }
+                                setSelectedPools(newSelected)
+                              }}
+                            />
+                            <div className="flex items-center gap-2 flex-1">
+                              {pool.access_type === "open" ? (
+                                <Globe className={`h-4 w-4 ${alreadyAssigned ? "text-green-500" : "text-green-500"}`} />
+                              ) : (
+                                <Lock className={`h-4 w-4 ${alreadyAssigned ? "text-green-500" : "text-yellow-500"}`} />
+                              )}
+                              <span className="font-medium">{pool.name}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {pool.access_type}
+                              </Badge>
+                            </div>
+                            {alreadyAssigned && (
+                              <span className="text-xs text-green-500 font-medium">Already assigned</span>
+                            )}
+                          </div>
+                        )
+                      })}
+                  </div>
+                )
+              })()}
               {selectedPools.size > 0 && (
                 <p className="text-xs text-muted-foreground">
-                  {selectedPools.size} pool{selectedPools.size > 1 ? "s" : ""} selected
+                  {selectedPools.size} new pool{selectedPools.size > 1 ? "s" : ""} selected
                 </p>
               )}
             </div>
@@ -408,6 +480,77 @@ export function PoolDriversTab({
               disabled={!selectedDriver || selectedPools.size === 0 || addMutation.isPending}
             >
               {addMutation.isPending ? "Assigning..." : `Assign to ${selectedPools.size} Pool${selectedPools.size > 1 ? "s" : ""}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Pool Assignment Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Pool Assignment</DialogTitle>
+            <DialogDescription>
+              Change which pool {editingAssignment?.driver.profile.full_name} is assigned to
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Driver</label>
+              <div className="p-3 border rounded-lg bg-muted/50">
+                <p className="font-medium">{editingAssignment?.driver.profile.full_name}</p>
+                {editingAssignment?.driver.vehicle && (
+                  <p className="text-sm text-muted-foreground">{editingAssignment.driver.vehicle.vehicle_number}</p>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Current Pool</label>
+              <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/50">
+                {editingAssignment?.pool.access_type === "open" ? (
+                  <Globe className="h-4 w-4 text-green-500" />
+                ) : (
+                  <Lock className="h-4 w-4 text-yellow-500" />
+                )}
+                <span>{editingAssignment?.pool.name}</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">New Pool</label>
+              <Select value={editPoolId} onValueChange={setEditPoolId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a pool" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pools
+                    .filter((p) => p.is_active)
+                    .map((pool) => (
+                      <SelectItem key={pool.id} value={pool.id}>
+                        <div className="flex items-center gap-2">
+                          {pool.access_type === "open" ? (
+                            <Globe className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <Lock className="h-4 w-4 text-yellow-500" />
+                          )}
+                          {pool.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                editingAssignment && editMutation.mutate({ id: editingAssignment.id, newPoolId: editPoolId })
+              }
+              disabled={!editPoolId || editPoolId === editingAssignment?.pool_id || editMutation.isPending}
+            >
+              {editMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

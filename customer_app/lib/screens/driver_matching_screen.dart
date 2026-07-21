@@ -41,7 +41,7 @@ class DriverMatchingScreen extends StatefulWidget {
   final double dropoffLat;
   final double dropoffLng;
   final int seatsBooked;
-  final String pool;
+  final String? poolId; // UUID of the selected pool
   // Book for someone else
   final String? riderName;
   final String? riderPhone;
@@ -57,7 +57,7 @@ class DriverMatchingScreen extends StatefulWidget {
     required this.dropoffLat,
     required this.dropoffLng,
     this.seatsBooked = 1,
-    this.pool = 'public',
+    this.poolId,
     this.riderName,
     this.riderPhone,
     this.bookedForOther = false,
@@ -351,7 +351,7 @@ class _DriverMatchingScreenState extends State<DriverMatchingScreen>
         dropoffName: widget.dropoff,
         dropoffLat: widget.dropoffLat,
         dropoffLng: widget.dropoffLng,
-        pool: widget.pool,
+        poolId: widget.poolId,
         riderName: widget.riderName,
         riderPhone: widget.riderPhone,
         bookedForOther: widget.bookedForOther,

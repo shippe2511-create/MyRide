@@ -390,7 +390,7 @@ class SupabaseService {
     DateTime? scheduledTime,
     String? customerId,
     int seatsBooked = 1,
-    String pool = 'public',
+    String? poolId, // UUID of the selected pool
     // Book for someone else
     String? riderName,
     String? riderPhone,
@@ -409,6 +409,12 @@ class SupabaseService {
         .eq('customer_id', finalCustomerId)
         .eq('status', 'pending');
 
+    // If no pool specified, get default (first open pool)
+    String? finalPoolId = poolId;
+    if (finalPoolId == null) {
+      finalPoolId = await getDefaultPoolId();
+    }
+
     final response = await client.from('rides').insert({
       'customer_id': finalCustomerId,
       'pickup_name': pickupName,
@@ -422,7 +428,7 @@ class SupabaseService {
       'scheduled_time': scheduledTime?.toIso8601String(),
       'seats_booked': seatsBooked,
       'status': 'pending',
-      'pool': pool,
+      'pool_id': finalPoolId,
       // Book for someone else fields
       'rider_name': riderName,
       'rider_phone': riderPhone,
@@ -431,24 +437,95 @@ class SupabaseService {
     return response;
   }
 
-  // Check if customer has private pool access
+  // Check if customer has private pool access (legacy - checks for any restricted pool)
   static Future<bool> hasPrivatePoolAccess() async {
     final customerId = userId;
     debugPrint('hasPrivatePoolAccess: customerId=$customerId');
     if (customerId == null) return false;
 
     try {
+      // Check if customer has access to any restricted pool
       final response = await client
           .from('customer_pools')
-          .select('id')
+          .select('id, pool:pools!inner(access_type)')
           .eq('customer_id', customerId)
-          .eq('pool', 'private')
-          .maybeSingle();
-      debugPrint('hasPrivatePoolAccess: response=$response');
-      return response != null;
+          .limit(1);
+
+      final hasRestricted = (response as List).any((r) =>
+        r['pool']?['access_type'] == 'restricted'
+      );
+      debugPrint('hasPrivatePoolAccess: hasRestricted=$hasRestricted');
+      return hasRestricted;
     } catch (e) {
       debugPrint('hasPrivatePoolAccess error: $e');
       return false;
+    }
+  }
+
+  // Get all pools the customer can access (open pools + granted restricted pools)
+  static Future<List<Map<String, dynamic>>> getAccessiblePools() async {
+    final customerId = userId;
+    debugPrint('getAccessiblePools: customerId=$customerId');
+
+    try {
+      // Get all active pools
+      final allPools = await client
+          .from('pools')
+          .select('id, name, description, access_type')
+          .eq('is_active', true)
+          .order('name');
+
+      if (customerId == null) {
+        // No user - only return open pools
+        return List<Map<String, dynamic>>.from(allPools)
+            .where((p) => p['access_type'] == 'open')
+            .toList();
+      }
+
+      // Get customer's granted restricted pool IDs
+      final grantedPools = await client
+          .from('customer_pools')
+          .select('pool_id')
+          .eq('customer_id', customerId);
+
+      final grantedPoolIds = (grantedPools as List)
+          .map((r) => r['pool_id'] as String)
+          .toSet();
+
+      // Filter: open pools OR granted restricted pools
+      final accessible = List<Map<String, dynamic>>.from(allPools).where((p) {
+        final accessType = p['access_type'] as String?;
+        final poolId = p['id'] as String?;
+        if (accessType == 'open') return true;
+        if (accessType == 'restricted' && poolId != null) {
+          return grantedPoolIds.contains(poolId);
+        }
+        return false;
+      }).toList();
+
+      debugPrint('getAccessiblePools: ${accessible.length} pools accessible');
+      return accessible;
+    } catch (e) {
+      debugPrint('getAccessiblePools error: $e');
+      return [];
+    }
+  }
+
+  // Get default pool ID (first open pool, typically "Public")
+  static Future<String?> getDefaultPoolId() async {
+    try {
+      final response = await client
+          .from('pools')
+          .select('id')
+          .eq('is_active', true)
+          .eq('access_type', 'open')
+          .order('name')
+          .limit(1)
+          .maybeSingle();
+      return response?['id'] as String?;
+    } catch (e) {
+      debugPrint('getDefaultPoolId error: $e');
+      return null;
     }
   }
 

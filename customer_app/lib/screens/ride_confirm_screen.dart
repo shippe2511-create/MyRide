@@ -54,10 +54,12 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
   BitmapDescriptor? _pickupIcon;
   BitmapDescriptor? _dropoffIcon;
   MapType _mapType = MapType.normal;
-  bool _hasPrivateAccess = false;
-  bool _usePrivatePool = false;
-  RealtimeChannel? _assignmentChannel;
-  Timer? _privateAccessPollingTimer;
+
+  // Pool selection
+  List<Map<String, dynamic>> _accessiblePools = [];
+  String? _selectedPoolId;
+  bool _loadingPools = true;
+  RealtimeChannel? _poolsChannel;
 
   // Book for someone else
   bool _bookingForOther = false;
@@ -70,24 +72,37 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
     super.initState();
     _createMarkerIcons();
     _fetchRoute();
-    _checkPrivateAccess();
+    _loadAccessiblePools();
     _setupRealtimeSubscription();
-    _startPrivateAccessPolling();
   }
 
   @override
   void dispose() {
-    _assignmentChannel?.unsubscribe();
-    _privateAccessPollingTimer?.cancel();
+    _poolsChannel?.unsubscribe();
     _riderNameController.dispose();
     _riderPhoneController.dispose();
     super.dispose();
   }
 
-  void _startPrivateAccessPolling() {
-    _privateAccessPollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (mounted) _checkPrivateAccess();
-    });
+  Future<void> _loadAccessiblePools() async {
+    try {
+      final pools = await SupabaseService.getAccessiblePools();
+      if (mounted) {
+        setState(() {
+          _accessiblePools = pools;
+          _loadingPools = false;
+          // Default to first pool (usually Public/open pool)
+          if (pools.isNotEmpty && _selectedPoolId == null) {
+            _selectedPoolId = pools.first['id'] as String?;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading pools: $e');
+      if (mounted) {
+        setState(() => _loadingPools = false);
+      }
+    }
   }
 
   bool _validateRiderPhone(String phone) {
@@ -118,7 +133,7 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
         : Supabase.instance.client.auth.currentUser?.id;
     if (userId == null || userId.isEmpty) return;
 
-    _assignmentChannel = Supabase.instance.client
+    _poolsChannel = Supabase.instance.client
         .channel('ride_confirm_pools_$userId')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
@@ -130,19 +145,11 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
             value: userId,
           ),
           callback: (payload) {
-            debugPrint('RideConfirmScreen: Pool changed for user $userId, payload=$payload');
-            _checkPrivateAccess();
+            debugPrint('RideConfirmScreen: Pool access changed for user $userId');
+            _loadAccessiblePools();
           },
         )
         .subscribe();
-  }
-
-  Future<void> _checkPrivateAccess() async {
-    final hasAccess = await SupabaseService.hasPrivatePoolAccess();
-    debugPrint('RideConfirmScreen: hasPrivateAccess=$hasAccess');
-    if (mounted) {
-      setState(() => _hasPrivateAccess = hasAccess);
-    }
   }
 
   Future<void> _createMarkerIcons() async {
@@ -528,6 +535,12 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
 
                   const SizedBox(height: 20),
 
+                  // Pool selector (only show if multiple pools available)
+                  if (!_loadingPools && _accessiblePools.length > 1) ...[
+                    _buildPoolSelector(context),
+                    const SizedBox(height: 16),
+                  ],
+
                   // Ride options card - unified design
                   Container(
                     decoration: BoxDecoration(
@@ -537,21 +550,6 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
                     ),
                     child: Column(
                       children: [
-                        // Private vehicle option (only shown if customer has private access)
-                        if (_hasPrivateAccess) ...[
-                          _buildOptionTile(
-                            icon: Icons.directions_car_filled_outlined,
-                            title: 'Private Vehicle',
-                            subtitle: _usePrivatePool ? 'Your assigned vehicle' : 'Use your dedicated driver',
-                            isActive: _usePrivatePool,
-                            activeColor: Colors.purple,
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              setState(() => _usePrivatePool = !_usePrivatePool);
-                            },
-                          ),
-                          Divider(height: 1, color: context.borderColor.withValues(alpha: 0.3), indent: 68),
-                        ],
                         // Book for someone else option
                         _buildOptionTile(
                           icon: Icons.person_add_alt_1_outlined,
@@ -694,7 +692,7 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
                               dropoffLat: widget.dropoffLat,
                               dropoffLng: widget.dropoffLng,
                               seatsBooked: 1,
-                              pool: _usePrivatePool ? 'private' : 'public',
+                              poolId: _selectedPoolId,
                               riderName: _bookingForOther ? _riderNameController.text.trim() : null,
                               riderPhone: _bookingForOther ? _formatPhoneForStorage(_riderPhoneController.text.trim()) : null,
                               bookedForOther: _bookingForOther,
@@ -720,6 +718,88 @@ class _RideConfirmScreenState extends State<RideConfirmScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPoolSelector(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 10),
+          child: Text(
+            'Service Pool',
+            style: TextStyle(
+              color: context.mutedColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: _accessiblePools.map((pool) {
+              final poolId = pool['id'] as String;
+              final poolName = pool['name'] as String? ?? 'Unknown';
+              final accessType = pool['access_type'] as String? ?? 'open';
+              final isSelected = _selectedPoolId == poolId;
+              final isRestricted = accessType == 'restricted';
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _selectedPoolId = poolId);
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? (isRestricted ? Colors.purple.withValues(alpha: 0.15) : AppColors.yellow.withValues(alpha: 0.15))
+                          : context.isDark
+                              ? Colors.white.withValues(alpha: 0.05)
+                              : Colors.black.withValues(alpha: 0.03),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isSelected
+                            ? (isRestricted ? Colors.purple : AppColors.yellow)
+                            : context.borderColor.withValues(alpha: 0.3),
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isRestricted ? Icons.lock_outline : Icons.public,
+                          size: 18,
+                          color: isSelected
+                              ? (isRestricted ? Colors.purple : AppColors.yellow)
+                              : context.mutedColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          poolName,
+                          style: TextStyle(
+                            color: isSelected
+                                ? (isRestricted ? Colors.purple : context.textColor)
+                                : context.textColor,
+                            fontSize: 14,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
     );
   }
 

@@ -36,33 +36,45 @@ class SupabaseService {
   // Check if phone exists in system
   static Future<Map<String, dynamic>?> checkPhoneExists(String phone) async {
     try {
-      // Try exact match first
+      // Normalize: strip spaces, +, and country code to get local 7-digit
+      String normalizedPhone = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+      if (normalizedPhone.startsWith('+960')) {
+        normalizedPhone = normalizedPhone.substring(4);
+      } else if (normalizedPhone.startsWith('960')) {
+        normalizedPhone = normalizedPhone.substring(3);
+      }
+
+      debugPrint('checkPhoneExists: input=$phone, normalized=$normalizedPhone');
+
+      // Try with normalized (local) phone first
       var response = await client
           .from('profiles')
           .select()
-          .eq('phone', phone)
+          .eq('phone', normalizedPhone)
           .maybeSingle();
 
-      if (response != null) return response;
-
-      // Try without country code (+960)
-      String phoneWithoutCode = phone;
-      if (phone.startsWith('+960')) {
-        phoneWithoutCode = phone.substring(4);
-      } else if (phone.startsWith('960')) {
-        phoneWithoutCode = phone.substring(3);
-      }
-
-      if (phoneWithoutCode != phone) {
+      // If not found, try with +960 prefix
+      if (response == null) {
         response = await client
             .from('profiles')
             .select()
-            .eq('phone', phoneWithoutCode)
+            .eq('phone', '+960$normalizedPhone')
             .maybeSingle();
       }
 
+      // If still not found, try original input
+      if (response == null && phone != normalizedPhone) {
+        response = await client
+            .from('profiles')
+            .select()
+            .eq('phone', phone)
+            .maybeSingle();
+      }
+
+      debugPrint('checkPhoneExists: found=${response != null}');
       return response;
     } catch (e) {
+      debugPrint('checkPhoneExists error: $e');
       return null;
     }
   }

@@ -84,11 +84,18 @@ interface Customer {
   phone: string | null
   employee_id: string | null
   department: string | null
+  department_id: string | null
+  org_department?: { id: string; name: string } | null
   gender: string | null
   status: string
   role: string
   avatar_url: string | null
   created_at: string
+}
+
+interface Department {
+  id: string
+  name: string
 }
 
 interface CustomersTableProps {
@@ -116,6 +123,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
     phone: "",
     employee_id: "",
     department: "",
+    department_id: "",
     gender: "",
     status: "approved",
     role: "customer",
@@ -141,12 +149,24 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
   const [privateDrivers, setPrivateDrivers] = useState<Array<{ id: string; name: string; vehicle: string }>>([])
   const [assignedDriverIds, setAssignedDriverIds] = useState<Set<string>>(new Set())
   const [assignLoading, setAssignLoading] = useState(false)
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [departmentFilter, setDepartmentFilter] = useState("all")
 
-  // Load customer private pool access
+  // Load customer private pool access and departments
   useEffect(() => {
     loadCustomerPools()
     loadPrivateDrivers()
+    loadDepartments()
   }, [])
+
+  const loadDepartments = async () => {
+    const { data } = await supabase
+      .from("departments")
+      .select("id, name")
+      .eq("is_active", true)
+      .order("name")
+    setDepartments(data || [])
+  }
 
   const loadCustomerPools = async () => {
     const { data } = await supabase
@@ -452,6 +472,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
       phone: customer.phone || "",
       employee_id: customer.employee_id || "",
       department: customer.department || "",
+      department_id: customer.department_id || "",
       gender: customer.gender || "",
       status: customer.status || "approved",
       role: customer.role || "customer",
@@ -468,6 +489,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
       phone: "",
       employee_id: "",
       department: "",
+      department_id: "",
       gender: "",
       status: "approved",
       role: "customer",
@@ -503,6 +525,8 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
         ? [{ phone: formData.emergency_contact.startsWith('+') ? formData.emergency_contact : `+960${formData.emergency_contact}`, name: 'Emergency' }]
         : []
 
+      const deptId = formData.department_id && formData.department_id !== "none" ? formData.department_id : null
+
       const { error } = await supabase
         .from("profiles")
         .update({
@@ -511,6 +535,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
           phone: phone,
           employee_id: formData.employee_id || null,
           department: formData.department || null,
+          department_id: deptId,
           gender: formData.gender || null,
           status: formData.status,
           role: formData.role,
@@ -538,6 +563,8 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
         ? [{ phone: formData.emergency_contact.startsWith('+') ? formData.emergency_contact : `+960${formData.emergency_contact}`, name: 'Emergency' }]
         : []
 
+      const deptId = formData.department_id && formData.department_id !== "none" ? formData.department_id : null
+
       const { data, error } = await supabase
         .from("profiles")
         .insert({
@@ -546,6 +573,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
           phone: phone,
           employee_id: formData.employee_id || null,
           department: formData.department || null,
+          department_id: deptId,
           gender: formData.gender || null,
           status: formData.status,
           role: "customer",
@@ -569,11 +597,18 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
     setLoading(false)
   }
 
+  // Filter customers by department
+  const filteredCustomers = customers.filter(customer => {
+    if (departmentFilter === "all") return true
+    if (departmentFilter === "none") return !customer.department_id
+    return customer.department_id === departmentFilter
+  })
+
   const toggleSelectAll = () => {
-    if (selectedIds.size === customers.length) {
+    if (selectedIds.size === filteredCustomers.length) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(customers.map(c => c.id)))
+      setSelectedIds(new Set(filteredCustomers.map(c => c.id)))
     }
   }
 
@@ -897,6 +932,20 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
               <SelectItem value="suspended">Suspended</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Depts</SelectItem>
+              <SelectItem value="none">Unassigned</SelectItem>
+              {departments.map((dept) => (
+                <SelectItem key={dept.id} value={dept.id}>
+                  {dept.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={exportCSV}>
@@ -943,14 +992,15 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
             <TableRow>
               <TableHead className="w-12">
                 <Checkbox
-                  checked={selectedIds.size === customers.length && customers.length > 0}
+                  checked={selectedIds.size === filteredCustomers.length && filteredCustomers.length > 0}
                   onCheckedChange={toggleSelectAll}
                 />
               </TableHead>
               <TableHead>Customer</TableHead>
               <TableHead>Contact</TableHead>
               <TableHead>Employee ID</TableHead>
-              <TableHead>Department</TableHead>
+              <TableHead>Employer Dept</TableHead>
+              <TableHead>Org Dept</TableHead>
               <TableHead>Private Access</TableHead>
               <TableHead>Active</TableHead>
               <TableHead>Joined</TableHead>
@@ -958,14 +1008,14 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
             </TableRow>
           </TableHeader>
           <TableBody>
-            {customers.length === 0 ? (
+            {filteredCustomers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                  No customers found
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                  {customers.length === 0 ? "No customers found" : "No customers match the selected filters"}
                 </TableCell>
               </TableRow>
             ) : (
-              customers.map((customer) => (
+              filteredCustomers.map((customer) => (
                 <TableRow key={customer.id} className="group hover:bg-muted/50 transition-colors">
                   <TableCell>
                     <Checkbox
@@ -1020,6 +1070,15 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                       </Badge>
                     ) : (
                       <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {customer.org_department ? (
+                      <Badge variant="secondary" className="font-normal">
+                        {customer.org_department.name}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">Unassigned</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -1266,7 +1325,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Employee ID <span className="text-red-500">*</span></label>
                 <Input
@@ -1277,12 +1336,28 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                 />
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium">Department</label>
+                <label className="text-sm font-medium">Employer Dept</label>
                 <Input
                   value={formData.department}
                   onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                   placeholder="Engineering"
                 />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Org Department</label>
+                <Select value={formData.department_id} onValueChange={(v) => setFormData({ ...formData, department_id: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select dept" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Unassigned</SelectItem>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">

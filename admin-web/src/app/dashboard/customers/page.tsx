@@ -22,7 +22,7 @@ function useCustomersData(search?: string, status?: string, page: number = 1) {
 
       let query = supabase
         .from("profiles")
-        .select("*", { count: "exact" })
+        .select("*, org_department:departments(id, name)", { count: "exact" })
         .eq("role", "customer")
         .order("full_name", { ascending: true })
 

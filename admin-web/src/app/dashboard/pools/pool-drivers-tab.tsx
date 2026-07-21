@@ -55,8 +55,7 @@ interface DriverPool {
     }
     vehicle?: {
       vehicle_number: string
-      make: string
-      model: string
+      vehicle_model: string
     } | null
   }
   pool: {
@@ -91,7 +90,7 @@ function useDriverPoolsData(poolFilter?: string) {
           driver:drivers!inner(
             id,
             profile:profiles!drivers_profile_id_fkey(full_name, phone),
-            vehicle:vehicles(vehicle_number, make, model)
+            vehicle:vehicles(vehicle_number, vehicle_model)
           ),
           pool:pools!inner(name, access_type)
         `)

@@ -46,7 +46,7 @@ interface AdminUser {
   created_at: string
   custom_permissions?: Record<string, boolean>
   department_id: string | null
-  department?: { id: string; name: string } | null
+  dept_relation?: { id: string; name: string } | null
 }
 
 interface Department {
@@ -138,7 +138,7 @@ export default function AdminsPage() {
     setLoading(true)
     const { data } = await supabase
       .from("profiles")
-      .select("*, department:departments(id, name)")
+      .select("*, dept_relation:departments(id, name)")
       .in("role", ["super_admin", "manager", "operator"])
       .order("created_at", { ascending: false })
 
@@ -416,7 +416,7 @@ export default function AdminsPage() {
       a.email || "",
       a.phone || "",
       a.role,
-      a.role === "super_admin" ? "All Departments" : (a.department?.name || ""),
+      a.role === "super_admin" ? "All Departments" : (a.dept_relation?.name || ""),
       a.status,
       formatDate(a.created_at)
     ])
@@ -578,10 +578,10 @@ export default function AdminsPage() {
                   <TableCell>
                     {admin.role === "super_admin" ? (
                       <span className="text-xs text-muted-foreground italic">All Departments</span>
-                    ) : admin.department ? (
+                    ) : admin.dept_relation ? (
                       <div className="flex items-center gap-1.5">
                         <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-sm">{admin.department.name}</span>
+                        <span className="text-sm">{admin.dept_relation.name}</span>
                       </div>
                     ) : (
                       <span className="text-muted-foreground">—</span>

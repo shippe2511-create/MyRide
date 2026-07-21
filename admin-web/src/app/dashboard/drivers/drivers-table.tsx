@@ -1241,28 +1241,6 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                 </Select>
               </div>
             </div>
-            <div className="grid gap-2">
-              <label className="text-sm font-medium">Pool Access</label>
-              <div className="flex gap-4">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="pool-public"
-                    checked={formData.pools.public}
-                    onCheckedChange={(checked) => setFormData({ ...formData, pools: { ...formData.pools, public: !!checked } })}
-                  />
-                  <label htmlFor="pool-public" className="text-sm">Public</label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="pool-private"
-                    checked={formData.pools.private}
-                    onCheckedChange={(checked) => setFormData({ ...formData, pools: { ...formData.pools, private: !!checked } })}
-                  />
-                  <label htmlFor="pool-private" className="text-sm text-purple-600 dark:text-purple-400">Private</label>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">Drivers in &quot;Private&quot; pool are only visible to approved customers.</p>
-            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Gender</label>

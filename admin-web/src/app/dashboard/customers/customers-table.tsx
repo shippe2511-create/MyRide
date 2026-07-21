@@ -999,8 +999,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
               <TableHead>Customer</TableHead>
               <TableHead>Contact</TableHead>
               <TableHead>Employee ID</TableHead>
-              <TableHead>Employer Dept</TableHead>
-              <TableHead>Org Dept</TableHead>
+              <TableHead>Department</TableHead>
               <TableHead>Private Access</TableHead>
               <TableHead>Active</TableHead>
               <TableHead>Joined</TableHead>
@@ -1010,7 +1009,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
           <TableBody>
             {filteredCustomers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   {customers.length === 0 ? "No customers found" : "No customers match the selected filters"}
                 </TableCell>
               </TableRow>
@@ -1064,17 +1063,8 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                     )}
                   </TableCell>
                   <TableCell>
-                    {customer.department ? (
-                      <Badge variant="outline" className="font-normal">
-                        {customer.department}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
                     {customer.org_department ? (
-                      <Badge variant="secondary" className="font-normal">
+                      <Badge variant="outline" className="font-normal">
                         {customer.org_department.name}
                       </Badge>
                     ) : (
@@ -1325,7 +1315,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                 />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Employee ID <span className="text-red-500">*</span></label>
                 <Input
@@ -1336,18 +1326,10 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                 />
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium">Employer Dept</label>
-                <Input
-                  value={formData.department}
-                  onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                  placeholder="Engineering"
-                />
-              </div>
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">Org Department</label>
+                <label className="text-sm font-medium">Department</label>
                 <Select value={formData.department_id} onValueChange={(v) => setFormData({ ...formData, department_id: v })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select dept" />
+                    <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Unassigned</SelectItem>

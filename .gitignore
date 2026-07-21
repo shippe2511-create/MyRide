@@ -58,3 +58,4 @@
 **/*.pem
 **/*.p12
 .vercel
+.claude/settings.local.json

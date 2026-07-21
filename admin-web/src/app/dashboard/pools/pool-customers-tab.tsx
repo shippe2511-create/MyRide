@@ -118,7 +118,7 @@ function useAvailableCustomers() {
       const { data, error } = await supabase
         .from("profiles")
         .select("id, full_name, phone, email")
-        .eq("role", "customer")
+        .neq("role", "driver")
         .eq("status", "approved")
         .order("full_name")
 

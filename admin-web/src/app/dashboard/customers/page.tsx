@@ -23,7 +23,7 @@ function useCustomersData(search?: string, status?: string, page: number = 1) {
       let query = supabase
         .from("profiles")
         .select("*, org_department:departments(id, name)", { count: "exact" })
-        .eq("role", "customer")
+        .neq("role", "driver")
         .order("full_name", { ascending: true })
 
       if (search) {
@@ -38,10 +38,10 @@ function useCustomersData(search?: string, status?: string, page: number = 1) {
 
       const [{ data: customers, count }, totalRes, approvedRes, pendingRes, suspendedRes] = await Promise.all([
         query,
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer"),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer").eq("status", "approved"),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer").eq("status", "pending"),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer").eq("status", "suspended"),
+        supabase.from("profiles").select("*", { count: "exact", head: true }).neq("role", "driver"),
+        supabase.from("profiles").select("*", { count: "exact", head: true }).neq("role", "driver").eq("status", "approved"),
+        supabase.from("profiles").select("*", { count: "exact", head: true }).neq("role", "driver").eq("status", "pending"),
+        supabase.from("profiles").select("*", { count: "exact", head: true }).neq("role", "driver").eq("status", "suspended"),
       ])
 
       return {

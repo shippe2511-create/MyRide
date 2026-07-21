@@ -436,7 +436,10 @@ class AppState extends ChangeNotifier {
       final profile = await SupabaseService.getProfile();
       if (profile != null) {
         final status = profile['status'] as String?;
-        if (status != null && status != 'approved') {
+        final role = profile['role'] as String? ?? 'customer';
+        final isAdmin = role == 'super_admin' || role == 'manager' || role == 'operator';
+        // Admins bypass status check
+        if (!isAdmin && status != null && status != 'approved') {
           _isSuspended = true;
           debugPrint('Account is suspended/not approved: $status');
         }

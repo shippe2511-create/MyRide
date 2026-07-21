@@ -386,22 +386,6 @@ export function PoolDriversTab({
                             <UserPlus className="h-4 w-4 mr-2" />
                             Assign More Pools
                           </DropdownMenuItem>
-                          {group.pools.length > 0 && (
-                            <>
-                              <DropdownMenuSeparator />
-                              {group.pools.map((p) => (
-                                <DropdownMenuItem
-                                  key={p.id}
-                                  onClick={() => removeMutation.mutate(p.id)}
-                                  disabled={removeMutation.isPending}
-                                  className="text-destructive focus:text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Remove from {p.pool.name}
-                                </DropdownMenuItem>
-                              ))}
-                            </>
-                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

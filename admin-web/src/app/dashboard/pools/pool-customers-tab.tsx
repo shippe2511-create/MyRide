@@ -405,22 +405,6 @@ export function PoolCustomersTab({
                               <UserPlus className="h-4 w-4 mr-2" />
                               Grant More Access
                             </DropdownMenuItem>
-                            {group.pools.length > 0 && (
-                              <>
-                                <DropdownMenuSeparator />
-                                {group.pools.map((p) => (
-                                  <DropdownMenuItem
-                                    key={p.id}
-                                    onClick={() => removeMutation.mutate(p.id)}
-                                    disabled={removeMutation.isPending}
-                                    className="text-destructive focus:text-destructive"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Revoke {p.pool.name}
-                                  </DropdownMenuItem>
-                                ))}
-                              </>
-                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

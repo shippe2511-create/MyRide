@@ -66,23 +66,19 @@ function LoginContent() {
 
       if (data.user) {
         // First try to find profile by auth user ID
-        let { data: profile, error: profileError } = await supabase
+        let { data: profile } = await supabase
           .from("profiles")
           .select("id, role, status")
           .eq("id", data.user.id)
           .single()
 
-        console.log("Profile lookup by ID:", { userId: data.user.id, profile, error: profileError })
-
         if (!profile) {
           // Try to find by email instead
-          const { data: profileByEmail, error: emailError } = await supabase
+          const { data: profileByEmail } = await supabase
             .from("profiles")
             .select("id, role, status")
             .eq("email", data.user.email)
             .single()
-
-          console.log("Profile lookup by email:", { email: data.user.email, profile: profileByEmail, error: emailError })
 
           if (profileByEmail) {
             // Profile exists with different ID - use it as-is
@@ -97,8 +93,6 @@ function LoginContent() {
           setLoading(false)
           return
         }
-
-        console.log("Final profile check:", { role: profile.role, status: profile.status, roleCheck: ["super_admin", "manager", "operator"].includes(profile.role) })
 
         if (!["super_admin", "manager", "operator"].includes(profile.role)) {
           toast.error("Access denied. Admin privileges required.")

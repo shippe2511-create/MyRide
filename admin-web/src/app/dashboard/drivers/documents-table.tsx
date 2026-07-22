@@ -107,15 +107,38 @@ export function DocumentsTable() {
     remind_date: "",
     remind_time: "08:00",
   })
+  const [documentReminders, setDocumentReminders] = useState<Record<string, { date: string; sent: boolean }>>({})
+
+  const loadReminders = async () => {
+    const { data } = await supabase
+      .from("reminders")
+      .select("target_id, remind_date, is_sent, message")
+      .eq("target_type", "specific_driver")
+      .like("message", "%expires%")
+
+    if (data) {
+      const reminderMap: Record<string, { date: string; sent: boolean }> = {}
+      data.forEach(r => {
+        if (r.target_id) {
+          reminderMap[r.target_id] = { date: r.remind_date, sent: r.is_sent }
+        }
+      })
+      setDocumentReminders(reminderMap)
+    }
+  }
 
   useEffect(() => {
     loadDocuments(true)
     loadCurrentUser()
+    loadReminders()
 
     const channel = supabase
       .channel('documents-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
         loadDocuments(false)
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reminders' }, () => {
+        loadReminders()
       })
       .subscribe()
 
@@ -467,6 +490,7 @@ export function DocumentsTable() {
               <TableHead>Document Type</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Expiry Date</TableHead>
+              <TableHead>Reminder</TableHead>
               <TableHead>Uploaded</TableHead>
               <TableHead className="w-24"></TableHead>
             </TableRow>
@@ -474,7 +498,7 @@ export function DocumentsTable() {
           <TableBody>
             {filteredDocuments.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   No documents found
                 </TableCell>
               </TableRow>
@@ -538,6 +562,21 @@ export function DocumentsTable() {
                         <Badge variant="warning" className="text-xs">Soon</Badge>
                       )}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    {doc.driver?.profile && documentReminders[doc.driver_id] ? (
+                      <div className="flex items-center gap-2">
+                        <Bell className="h-3 w-3 text-yellow-500" />
+                        <span className="text-sm text-yellow-500">
+                          {formatDate(documentReminders[doc.driver_id].date)}
+                        </span>
+                        {documentReminders[doc.driver_id].sent && (
+                          <Badge variant="outline" className="text-xs text-green-500 border-green-500">Sent</Badge>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">-</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <span className="text-sm" title={formatDate(doc.uploaded_at)}>
@@ -860,6 +899,7 @@ export function DocumentsTable() {
                 } else {
                   toast.success("Reminder scheduled")
                   setDialogType(null)
+                  loadReminders()
                 }
                 setUpdating(false)
               }}

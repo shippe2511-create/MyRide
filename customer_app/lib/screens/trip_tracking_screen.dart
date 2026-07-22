@@ -10,7 +10,9 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'dart:math' show sin, cos, sqrt, atan2, pi;
 import '../config/app_config.dart';
+import '../config/driver_arrival_config.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/supabase_service.dart';
@@ -71,6 +73,11 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> with TickerProv
   String? _routeDistance;
   bool _trafficEnabled = false;
   MapType _mapType = MapType.normal;
+
+  // Driver arrival notification flags (fire only ONCE per ride)
+  bool _arrivingNotified = false;
+  bool _arrivedNotified = false;
+  int? _currentEtaSeconds; // Parsed from route API response
   BitmapDescriptor? _carIcon;
   BitmapDescriptor? _pickupIcon;
   BitmapDescriptor? _dropoffIcon;
@@ -357,6 +364,8 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> with TickerProv
           );
           // Refresh route when driver moves
           _fetchRoute();
+          // Check if driver is arriving/arrived
+          _checkDriverArrivalNotifications();
         }
       }
     });
@@ -368,6 +377,85 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> with TickerProv
   bool _isValidMaldivesCoord(double lat, double lng) {
     // Maldives bounds: lat -0.7 to 7.1, lng 72.6 to 73.8
     return lat >= -0.7 && lat <= 7.1 && lng >= 72.6 && lng <= 73.8;
+  }
+
+  /// Calculate distance between two points using Haversine formula
+  double _calculateDistanceMeters(LatLng from, LatLng to) {
+    const double earthRadius = 6371000; // meters
+    final double lat1Rad = from.latitude * pi / 180;
+    final double lat2Rad = to.latitude * pi / 180;
+    final double deltaLat = (to.latitude - from.latitude) * pi / 180;
+    final double deltaLng = (to.longitude - from.longitude) * pi / 180;
+
+    final double a = sin(deltaLat / 2) * sin(deltaLat / 2) +
+        cos(lat1Rad) * cos(lat2Rad) * sin(deltaLng / 2) * sin(deltaLng / 2);
+    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+
+    return earthRadius * c;
+  }
+
+  /// Check and fire driver arrival notifications (each fires only ONCE per ride)
+  void _checkDriverArrivalNotifications() {
+    // Only check when driver is heading to pickup (not in_progress or completed)
+    if (_rideStatus == 'in_progress' || _rideStatus == 'completed' || _tripCompleted) {
+      return;
+    }
+
+    final distanceToPickup = _calculateDistanceMeters(_driverLocation, _pickupLocation);
+    debugPrint('Driver distance to pickup: ${distanceToPickup.toStringAsFixed(0)}m, ETA: $_currentEtaSeconds sec');
+
+    // Check "arrived" first (higher priority, smaller radius)
+    if (!_arrivedNotified && distanceToPickup <= DriverArrivalConfig.arrivedDistanceMeters) {
+      _arrivedNotified = true;
+      _fireArrivalNotification(
+        DriverArrivalConfig.arrivedTitle,
+        DriverArrivalConfig.arrivedBody,
+        isArrived: true,
+      );
+      return;
+    }
+
+    // Check "arriving" (ETA primary, distance fallback)
+    if (!_arrivingNotified) {
+      bool shouldNotify = false;
+
+      // Primary: ETA-based trigger
+      if (_currentEtaSeconds != null && _currentEtaSeconds! <= DriverArrivalConfig.arrivingEtaSeconds) {
+        shouldNotify = true;
+        debugPrint('Arriving notification triggered by ETA: $_currentEtaSeconds sec');
+      }
+      // Fallback: distance-based trigger (if no ETA available)
+      else if (_currentEtaSeconds == null && distanceToPickup <= DriverArrivalConfig.arrivingDistanceMeters) {
+        shouldNotify = true;
+        debugPrint('Arriving notification triggered by distance: ${distanceToPickup.toStringAsFixed(0)}m');
+      }
+
+      if (shouldNotify) {
+        _arrivingNotified = true;
+        _fireArrivalNotification(
+          DriverArrivalConfig.arrivingTitle,
+          DriverArrivalConfig.arrivingBody,
+          isArrived: false,
+        );
+      }
+    }
+  }
+
+  /// Fire the notification (push + in-app banner)
+  void _fireArrivalNotification(String title, String body, {required bool isArrived}) {
+    debugPrint('Firing arrival notification: $title');
+
+    // Push notification (works when backgrounded)
+    NotificationService.showNotification(
+      title: title,
+      body: body,
+      payload: 'driver_${isArrived ? 'arrived' : 'arriving'}',
+    );
+
+    // Haptic feedback when in-app
+    if (mounted) {
+      HapticFeedback.mediumImpact();
+    }
   }
 
   Future<void> _fetchRoute() async {
@@ -427,6 +515,10 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> with TickerProv
               final durationValue = leg['duration']['value'] as int?;
               if (durationValue != null) {
                 _etaMinutes = (durationValue / 60).ceil();
+                // Store ETA in seconds for arrival notifications (only when heading to pickup)
+                if (_rideStatus != 'in_progress') {
+                  _currentEtaSeconds = durationValue;
+                }
               }
             });
           }

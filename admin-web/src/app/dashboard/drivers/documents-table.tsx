@@ -113,15 +113,18 @@ export function DocumentsTable() {
   const loadReminders = async () => {
     const { data } = await supabase
       .from("reminders")
-      .select("target_id, remind_date, is_sent, message")
+      .select("title, remind_date, is_sent")
       .eq("target_type", "specific_driver")
-      .like("message", "%expires%")
+      .like("title", "doc:%")
 
     if (data) {
       const reminderMap: Record<string, { date: string; sent: boolean }> = {}
       data.forEach(r => {
-        if (r.target_id) {
-          reminderMap[r.target_id] = { date: r.remind_date, sent: r.is_sent }
+        // Title format: "doc:<document_id> - Document Expiry"
+        const match = r.title.match(/^doc:([a-f0-9-]+)/)
+        if (match) {
+          const docId = match[1]
+          reminderMap[docId] = { date: r.remind_date, sent: r.is_sent }
         }
       })
       setDocumentReminders(reminderMap)
@@ -579,8 +582,8 @@ export function DocumentsTable() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    {doc.driver?.profile_id && documentReminders[doc.driver.profile_id] ? (() => {
-                      const reminder = documentReminders[doc.driver.profile_id]
+                    {documentReminders[doc.id] ? (() => {
+                      const reminder = documentReminders[doc.id]
                       const reminderDate = new Date(reminder.date)
                       const today = new Date()
                       today.setHours(0, 0, 0, 0)
@@ -908,7 +911,7 @@ export function DocumentsTable() {
                 }
 
                 const { error } = await supabase.rpc("create_reminder", {
-                  p_title: reminderForm.title,
+                  p_title: `doc:${selectedDocument.id} - ${reminderForm.title}`,
                   p_message: reminderForm.message,
                   p_target_type: "specific_driver",
                   p_target_id: driverData.profile_id,

@@ -830,10 +830,16 @@ export function DocumentsTable() {
                   return
                 }
                 setUpdating(true)
-                const driverProfileId = selectedDocument.driver?.profile ?
-                  await supabase.from("drivers").select("profile_id").eq("id", selectedDocument.driver_id).single().then(r => r.data?.profile_id) : null
 
-                if (!driverProfileId) {
+                // Get driver profile ID
+                const { data: driverData, error: driverError } = await supabase
+                  .from("drivers")
+                  .select("profile_id")
+                  .eq("id", selectedDocument.driver_id)
+                  .single()
+
+                if (driverError || !driverData?.profile_id) {
+                  console.error("Driver lookup error:", driverError)
                   toast.error("Could not find driver profile")
                   setUpdating(false)
                   return
@@ -843,7 +849,7 @@ export function DocumentsTable() {
                   title: reminderForm.title,
                   message: reminderForm.message,
                   target_type: "specific_driver",
-                  target_id: driverProfileId,
+                  target_id: driverData.profile_id,
                   remind_date: reminderForm.remind_date,
                   remind_time: reminderForm.remind_time,
                   is_active: true,
@@ -851,7 +857,8 @@ export function DocumentsTable() {
                 })
 
                 if (error) {
-                  toast.error("Failed to create reminder")
+                  console.error("Reminder insert error:", error)
+                  toast.error("Failed to create reminder: " + error.message)
                 } else {
                   toast.success("Reminder scheduled")
                   setDialogType(null)

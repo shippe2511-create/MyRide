@@ -169,6 +169,7 @@ export function DocumentsTable() {
         *,
         driver:drivers!inner(
           id,
+          profile_id,
           profile:profiles(
             full_name,
             avatar_url,
@@ -564,13 +565,13 @@ export function DocumentsTable() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    {doc.driver?.profile && documentReminders[doc.driver_id] ? (
+                    {doc.driver?.profile_id && documentReminders[doc.driver.profile_id] ? (
                       <div className="flex items-center gap-2">
                         <Bell className="h-3 w-3 text-yellow-500" />
                         <span className="text-sm text-yellow-500">
-                          {formatDate(documentReminders[doc.driver_id].date)}
+                          {formatDate(documentReminders[doc.driver.profile_id].date)}
                         </span>
-                        {documentReminders[doc.driver_id].sent && (
+                        {documentReminders[doc.driver.profile_id].sent && (
                           <Badge variant="outline" className="text-xs text-green-500 border-green-500">Sent</Badge>
                         )}
                       </div>

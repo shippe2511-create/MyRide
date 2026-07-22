@@ -50,6 +50,8 @@ import {
   FileText,
   ExternalLink,
   Loader2,
+  Bell,
+  Calendar,
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { formatDate } from "@/lib/utils"
@@ -92,13 +94,19 @@ export function DocumentsTable() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [typeFilter, setTypeFilter] = useState("all")
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
-  const [dialogType, setDialogType] = useState<"view" | "delete" | null>(null)
+  const [dialogType, setDialogType] = useState<"view" | "delete" | "reminder" | null>(null)
   const [updating, setUpdating] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [bulkLoading, setBulkLoading] = useState(false)
   const [driverFilter, setDriverFilter] = useState("all")
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [reminderForm, setReminderForm] = useState({
+    title: "",
+    message: "",
+    remind_date: "",
+    remind_time: "08:00",
+  })
 
   useEffect(() => {
     loadDocuments(true)
@@ -572,6 +580,22 @@ export function DocumentsTable() {
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => {
+                            setSelectedDocument(doc)
+                            const driverName = doc.driver?.profile?.full_name || "Driver"
+                            const docType = getDocTypeLabel(doc.document_type)
+                            const expiryDate = doc.expiry_date ? new Date(doc.expiry_date).toLocaleDateString() : "N/A"
+                            setReminderForm({
+                              title: `Document Expiry Reminder`,
+                              message: `Your ${docType} expires on ${expiryDate}. Please renew it before expiry.`,
+                              remind_date: new Date().toISOString().split("T")[0],
+                              remind_time: "08:00",
+                            })
+                            setDialogType("reminder")
+                          }}>
+                            <Bell className="mr-2 h-4 w-4" />
+                            Set Reminder
+                          </DropdownMenuItem>
                           {doc.status !== "rejected" && (
                             <DropdownMenuItem onSelect={() => handleReject(doc)}>
                               <Ban className="mr-2 h-4 w-4" />
@@ -740,6 +764,101 @@ export function DocumentsTable() {
               disabled={bulkLoading}
             >
               {bulkLoading ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Set Reminder Dialog */}
+      <Dialog open={dialogType === "reminder"} onOpenChange={(open) => !open && setDialogType(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              Set Document Reminder
+            </DialogTitle>
+            <DialogDescription>
+              Send a reminder to {selectedDocument?.driver?.profile?.full_name} about their {selectedDocument && getDocTypeLabel(selectedDocument.document_type)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Title</label>
+              <Input
+                value={reminderForm.title}
+                onChange={(e) => setReminderForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="Reminder title"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Message</label>
+              <Input
+                value={reminderForm.message}
+                onChange={(e) => setReminderForm(f => ({ ...f, message: e.target.value }))}
+                placeholder="Reminder message"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Date</label>
+                <Input
+                  type="date"
+                  value={reminderForm.remind_date}
+                  onChange={(e) => setReminderForm(f => ({ ...f, remind_date: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Time</label>
+                <Input
+                  type="time"
+                  value={reminderForm.remind_time}
+                  onChange={(e) => setReminderForm(f => ({ ...f, remind_time: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogType(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!selectedDocument || !reminderForm.title || !reminderForm.remind_date) {
+                  toast.error("Please fill in all fields")
+                  return
+                }
+                setUpdating(true)
+                const driverProfileId = selectedDocument.driver?.profile ?
+                  await supabase.from("drivers").select("profile_id").eq("id", selectedDocument.driver_id).single().then(r => r.data?.profile_id) : null
+
+                if (!driverProfileId) {
+                  toast.error("Could not find driver profile")
+                  setUpdating(false)
+                  return
+                }
+
+                const { error } = await supabase.from("reminders").insert({
+                  title: reminderForm.title,
+                  message: reminderForm.message,
+                  target_type: "specific_driver",
+                  target_id: driverProfileId,
+                  remind_date: reminderForm.remind_date,
+                  remind_time: reminderForm.remind_time,
+                  is_active: true,
+                  is_sent: false,
+                })
+
+                if (error) {
+                  toast.error("Failed to create reminder")
+                } else {
+                  toast.success("Reminder scheduled")
+                  setDialogType(null)
+                }
+                setUpdating(false)
+              }}
+              disabled={updating}
+            >
+              {updating ? "Saving..." : "Schedule Reminder"}
             </Button>
           </DialogFooter>
         </DialogContent>

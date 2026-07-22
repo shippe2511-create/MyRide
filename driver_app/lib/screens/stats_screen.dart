@@ -16,13 +16,26 @@ class DriverStatsScreen extends StatefulWidget {
 class _DriverStatsScreenState extends State<DriverStatsScreen> {
   Map<String, dynamic> _stats = {};
   List<Map<String, dynamic>> _recentRides = [];
+  Map<String, dynamic> _goals = {'daily': 10, 'weekly': 50, 'monthly': 200};
   bool _isLoading = true;
   String _period = 'today';
 
   @override
   void initState() {
     super.initState();
+    _loadGoals();
     _loadStats();
+  }
+
+  Future<void> _loadGoals() async {
+    try {
+      final goals = await SupabaseService.getDriverGoals();
+      if (mounted) {
+        setState(() => _goals = goals);
+      }
+    } catch (e) {
+      debugPrint('Error loading goals: $e');
+    }
   }
 
   Future<void> _loadStats() async {
@@ -264,19 +277,19 @@ class _DriverStatsScreenState extends State<DriverStatsScreen> {
 
     switch (_period) {
       case 'today':
-        goal = 10;
+        goal = _goals['daily'] ?? 10;
         goalLabel = 'Daily Goal: $totalRides / $goal rides';
         break;
       case 'week':
-        goal = 50;
+        goal = _goals['weekly'] ?? 50;
         goalLabel = 'Weekly Goal: $totalRides / $goal rides';
         break;
       case 'month':
-        goal = 200;
+        goal = _goals['monthly'] ?? 200;
         goalLabel = 'Monthly Goal: $totalRides / $goal rides';
         break;
       default:
-        goal = 10;
+        goal = _goals['daily'] ?? 10;
         goalLabel = 'Daily Goal: $totalRides / $goal rides';
     }
 

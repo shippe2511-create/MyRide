@@ -42,6 +42,9 @@ interface AppSettings {
   break_reminder_minutes: number
   document_reminder_enabled: boolean
   document_reminder_days: number[]
+  driver_daily_goal: number
+  driver_weekly_goal: number
+  driver_monthly_goal: number
 }
 
 interface EmergencyContact {
@@ -88,6 +91,9 @@ const defaultSettings: AppSettings = {
   break_reminder_minutes: 30,
   document_reminder_enabled: true,
   document_reminder_days: [30, 14, 7],
+  driver_daily_goal: 10,
+  driver_weekly_goal: 50,
+  driver_monthly_goal: 200,
 }
 
 export default function SettingsPage() {
@@ -188,6 +194,9 @@ export default function SettingsPage() {
           break_reminder_minutes: settings.break_reminder_minutes,
           document_reminder_enabled: settings.document_reminder_enabled,
           document_reminder_days: settings.document_reminder_days,
+          driver_daily_goal: settings.driver_daily_goal,
+          driver_weekly_goal: settings.driver_weekly_goal,
+          driver_monthly_goal: settings.driver_monthly_goal,
           updated_at: new Date().toISOString()
         })
 
@@ -573,6 +582,50 @@ export default function SettingsPage() {
                     placeholder="30, 14, 7"
                   />
                   <p className="text-xs text-muted-foreground">Comma-separated days (e.g., 30, 14, 7 = reminders at 30, 14, and 7 days before expiry)</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Driver Goals</CardTitle>
+              <CardDescription>Set ride goals for drivers to track their progress</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-6 md:grid-cols-3">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Daily Goal (rides)</label>
+                  <Input
+                    type="number"
+                    value={settings.driver_daily_goal}
+                    onChange={(e) => updateSetting("driver_daily_goal", Number(e.target.value))}
+                    min={1}
+                    max={100}
+                  />
+                  <p className="text-xs text-muted-foreground">Target rides per day</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Weekly Goal (rides)</label>
+                  <Input
+                    type="number"
+                    value={settings.driver_weekly_goal}
+                    onChange={(e) => updateSetting("driver_weekly_goal", Number(e.target.value))}
+                    min={1}
+                    max={500}
+                  />
+                  <p className="text-xs text-muted-foreground">Target rides per week</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Monthly Goal (rides)</label>
+                  <Input
+                    type="number"
+                    value={settings.driver_monthly_goal}
+                    onChange={(e) => updateSetting("driver_monthly_goal", Number(e.target.value))}
+                    min={1}
+                    max={2000}
+                  />
+                  <p className="text-xs text-muted-foreground">Target rides per month</p>
                 </div>
               </div>
             </CardContent>

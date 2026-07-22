@@ -1437,6 +1437,24 @@ class SupabaseService {
     }
   }
 
+  // Driver Goals from app_settings
+  static Future<Map<String, dynamic>> getDriverGoals() async {
+    try {
+      final response = await client
+          .from('app_settings')
+          .select('driver_daily_goal, driver_weekly_goal, driver_monthly_goal')
+          .single();
+
+      return {
+        'daily': response['driver_daily_goal'] ?? 10,
+        'weekly': response['driver_weekly_goal'] ?? 50,
+        'monthly': response['driver_monthly_goal'] ?? 200,
+      };
+    } catch (e) {
+      return {'daily': 10, 'weekly': 50, 'monthly': 200};
+    }
+  }
+
   // Driver Stats
   static Future<Map<String, dynamic>> getDriverStats(String driverId, String period) async {
     try {

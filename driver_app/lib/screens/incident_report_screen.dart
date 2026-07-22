@@ -58,7 +58,8 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
       _latitude = position.latitude;
       _longitude = position.longitude;
 
-      final placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
+      final geocoding = Geocoding();
+      final placemarks = await geocoding.placemarkFromCoordinates(position.latitude, position.longitude);
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
         _locationName = [place.street, place.locality, place.country]

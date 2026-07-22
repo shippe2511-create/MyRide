@@ -942,7 +942,11 @@ export default function ChecklistsPage() {
           </div>
 
           {itemsLoading ? (
-            <SkeletonCard count={3} />
+            <div className="space-y-4">
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
           ) : categories.length === 0 ? (
             <Card className="p-8 text-center text-muted-foreground">
               <ClipboardCheck className="h-12 w-12 mx-auto mb-4 opacity-50" />

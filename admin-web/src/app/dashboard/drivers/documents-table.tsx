@@ -845,15 +845,13 @@ export function DocumentsTable() {
                   return
                 }
 
-                const { error } = await supabase.from("reminders").insert({
-                  title: reminderForm.title,
-                  message: reminderForm.message,
-                  target_type: "specific_driver",
-                  target_id: driverData.profile_id,
-                  remind_date: reminderForm.remind_date,
-                  remind_time: reminderForm.remind_time,
-                  is_active: true,
-                  is_sent: false,
+                const { error } = await supabase.rpc("create_reminder", {
+                  p_title: reminderForm.title,
+                  p_message: reminderForm.message,
+                  p_target_type: "specific_driver",
+                  p_target_id: driverData.profile_id,
+                  p_remind_date: reminderForm.remind_date,
+                  p_remind_time: reminderForm.remind_time,
                 })
 
                 if (error) {

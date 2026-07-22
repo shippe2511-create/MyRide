@@ -19,6 +19,7 @@ import 'screens/ratings_screen.dart';
 import 'screens/documents_screen.dart';
 import 'screens/sos_screen.dart';
 import 'screens/shift_schedule_screen.dart';
+import 'screens/my_bus_schedule_screen.dart';
 import 'screens/help_screen.dart';
 import 'screens/about_screen.dart';
 import 'screens/support_chat_screen.dart';
@@ -396,6 +397,7 @@ class _DriverAppState extends State<DriverApp> with WidgetsBindingObserver {
               '/documents': (_) => const DocumentsScreen(),
               '/sos': (_) => const SOSScreen(),
               '/shift-schedule': (_) => const ShiftScheduleScreen(),
+              '/bus-schedule': (_) => const MyBusScheduleScreen(),
               '/help': (_) => const HelpScreen(),
               '/about': (_) => const AboutScreen(),
               '/support-chat': (_) => const SupportChatScreen(),

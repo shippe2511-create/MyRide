@@ -26,6 +26,10 @@ class DriverState extends ChangeNotifier {
   Map<String, String> _checklistIssues = {};
   bool _isOnHomeScreen = false;
 
+  // Bus mode state
+  bool _isBusMode = false;
+  String? _activeBusTripId;
+
   String _driverName = '';
   String _driverId = '';
   String _profileId = '';
@@ -124,6 +128,8 @@ class DriverState extends ChangeNotifier {
   bool get checklistHasIssues => _checklistHasIssues;
   Map<String, String> get checklistIssues => _checklistIssues;
   bool get isOnHomeScreen => _isOnHomeScreen;
+  bool get isBusMode => _isBusMode;
+  String? get activeBusTripId => _activeBusTripId;
 
   void clearCurrentRide() {
     _currentRide = null;
@@ -1767,6 +1773,68 @@ class DriverState extends ChangeNotifier {
     if (_queuedRequests.isNotEmpty && _currentRide == null) {
       _currentRide = _queuedRequests.first.copyWith(status: RideStatus.accepted);
       _queuedRequests.removeAt(0);
+      notifyListeners();
+    }
+  }
+
+  // =====================================================
+  // BUS MODE METHODS
+  // =====================================================
+
+  /// Enter bus mode - suppress on-demand ride requests
+  void enterBusMode(String tripId) async {
+    _isBusMode = true;
+    _activeBusTripId = tripId;
+    _incomingRequests.clear();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isBusMode', true);
+    await prefs.setString('activeBusTripId', tripId);
+
+    debugPrint('Entered bus mode for trip: $tripId');
+    notifyListeners();
+  }
+
+  /// Exit bus mode - resume on-demand ride requests
+  void exitBusMode() async {
+    _isBusMode = false;
+    _activeBusTripId = null;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isBusMode', false);
+    await prefs.remove('activeBusTripId');
+
+    debugPrint('Exited bus mode');
+
+    // Resume polling for on-demand rides if online
+    if (_isOnline && !_isOnBreak) {
+      _loadPendingRides();
+    }
+
+    notifyListeners();
+  }
+
+  /// Check and restore bus mode on app startup
+  Future<void> checkBusMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isBusMode = prefs.getBool('isBusMode') ?? false;
+    final tripId = prefs.getString('activeBusTripId');
+
+    if (isBusMode && tripId != null) {
+      // Verify the trip is still active in database
+      final trip = await SupabaseService.getBusTrip(tripId);
+      if (trip != null && trip['status'] == 'in_progress') {
+        _isBusMode = true;
+        _activeBusTripId = tripId;
+        debugPrint('Restored bus mode for trip: $tripId');
+      } else {
+        // Trip is no longer active, clear bus mode
+        await prefs.setBool('isBusMode', false);
+        await prefs.remove('activeBusTripId');
+        _isBusMode = false;
+        _activeBusTripId = null;
+        debugPrint('Cleared stale bus mode - trip no longer active');
+      }
       notifyListeners();
     }
   }

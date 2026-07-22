@@ -2100,4 +2100,210 @@ class SupabaseService {
       return [];
     }
   }
+
+  // =====================================================
+  // BUS/SHUTTLE METHODS
+  // =====================================================
+
+  /// Get driver's bus schedule (roster assignments)
+  static Future<List<Map<String, dynamic>>> getMyBusSchedule(String driverId) async {
+    if (driverId.isEmpty) return [];
+    try {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final endDate = today.add(const Duration(days: 7));
+
+      final response = await client
+          .from('roster_assignments')
+          .select('''
+            *,
+            route:bus_routes(id, name, origin_label, destination_label),
+            vehicle:vehicles(id, name, plate_no, capacity),
+            schedule_template:schedule_templates(id, shift, departure_time)
+          ''')
+          .eq('driver_id', driverId)
+          .gte('service_date', today.toIso8601String().split('T')[0])
+          .lte('service_date', endDate.toIso8601String().split('T')[0])
+          .inFilter('status', ['scheduled', 'in_progress'])
+          .order('service_date')
+          .order('departure_time');
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error getting bus schedule: $e');
+      return [];
+    }
+  }
+
+  /// Get stops for a bus route
+  static Future<List<Map<String, dynamic>>> getBusRouteStops(String routeId) async {
+    try {
+      final response = await client
+          .from('bus_route_stops')
+          .select()
+          .eq('route_id', routeId)
+          .eq('is_active', true)
+          .order('stop_order');
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error getting bus route stops: $e');
+      return [];
+    }
+  }
+
+  /// Start a bus trip from roster assignment
+  static Future<Map<String, dynamic>?> startBusTrip(String assignmentId) async {
+    try {
+      // Get first stop of the route
+      final assignment = await client
+          .from('roster_assignments')
+          .select('route_id')
+          .eq('id', assignmentId)
+          .single();
+
+      final routeId = assignment['route_id'] as String;
+      final stops = await getBusRouteStops(routeId);
+      final firstStopId = stops.isNotEmpty ? stops.first['id'] : null;
+
+      // Create bus trip
+      final trip = await client.from('bus_trips').insert({
+        'roster_assignment_id': assignmentId,
+        'actual_start_time': DateTime.now().toIso8601String(),
+        'current_stop_id': firstStopId,
+        'status': 'in_progress',
+      }).select().single();
+
+      // Update roster assignment status
+      await client
+          .from('roster_assignments')
+          .update({'status': 'in_progress'})
+          .eq('id', assignmentId);
+
+      return trip;
+    } catch (e) {
+      debugPrint('Error starting bus trip: $e');
+      return null;
+    }
+  }
+
+  /// Get bus trip by ID
+  static Future<Map<String, dynamic>?> getBusTrip(String tripId) async {
+    try {
+      final response = await client
+          .from('bus_trips')
+          .select()
+          .eq('id', tripId)
+          .maybeSingle();
+
+      return response;
+    } catch (e) {
+      debugPrint('Error getting bus trip: $e');
+      return null;
+    }
+  }
+
+  /// Advance to next stop
+  static Future<bool> advanceToNextStop(String tripId, String nextStopId) async {
+    try {
+      await client
+          .from('bus_trips')
+          .update({'current_stop_id': nextStopId})
+          .eq('id', tripId);
+
+      return true;
+    } catch (e) {
+      debugPrint('Error advancing to next stop: $e');
+      return false;
+    }
+  }
+
+  /// Complete a bus trip
+  static Future<bool> completeBusTrip(String tripId, String assignmentId) async {
+    try {
+      // Update bus trip
+      await client
+          .from('bus_trips')
+          .update({
+            'actual_end_time': DateTime.now().toIso8601String(),
+            'status': 'completed',
+          })
+          .eq('id', tripId);
+
+      // Update roster assignment
+      await client
+          .from('roster_assignments')
+          .update({'status': 'completed'})
+          .eq('id', assignmentId);
+
+      return true;
+    } catch (e) {
+      debugPrint('Error completing bus trip: $e');
+      return false;
+    }
+  }
+
+  /// Get passenger counts for a trip
+  static Future<List<Map<String, dynamic>>> getPassengerCounts(String tripId) async {
+    try {
+      final response = await client
+          .from('stop_passenger_counts')
+          .select()
+          .eq('bus_trip_id', tripId)
+          .order('recorded_at');
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error getting passenger counts: $e');
+      return [];
+    }
+  }
+
+  /// Record passenger count at a stop
+  static Future<bool> recordPassengerCount({
+    required String tripId,
+    required String stopId,
+    required int boarded,
+    required int alighted,
+  }) async {
+    try {
+      await client.from('stop_passenger_counts').insert({
+        'bus_trip_id': tripId,
+        'route_stop_id': stopId,
+        'boarded_count': boarded,
+        'alighted_count': alighted,
+        'recorded_at': DateTime.now().toIso8601String(),
+      });
+
+      return true;
+    } catch (e) {
+      debugPrint('Error recording passenger count: $e');
+      return false;
+    }
+  }
+
+  /// Check if driver has active bus trip
+  static Future<Map<String, dynamic>?> getActiveBusTrip(String driverId) async {
+    if (driverId.isEmpty) return null;
+    try {
+      final response = await client
+          .from('bus_trips')
+          .select('''
+            *,
+            roster_assignment:roster_assignments!bus_trips_roster_assignment_id_fkey(
+              *,
+              route:bus_routes(id, name, origin_label, destination_label),
+              vehicle:vehicles(id, name, plate_no)
+            )
+          ''')
+          .eq('status', 'in_progress')
+          .eq('roster_assignment.driver_id', driverId)
+          .maybeSingle();
+
+      return response;
+    } catch (e) {
+      debugPrint('Error getting active bus trip: $e');
+      return null;
+    }
+  }
 }

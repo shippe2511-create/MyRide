@@ -109,6 +109,7 @@ const navigationSections: NavSection[] = [
       { name: "Bus Routes", href: "/dashboard/bus-routes", icon: Car, permission: "settings:view" },
       { name: "Bus Schedules", href: "/dashboard/bus-schedules", icon: Clock, permission: "settings:view" },
       { name: "Bus Roster", href: "/dashboard/bus-roster", icon: Users, permission: "settings:view" },
+      { name: "Bus Occupancy", href: "/dashboard/bus-occupancy", icon: Activity, permission: "settings:view" },
     ]
   },
   {

@@ -404,8 +404,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   SizedBox(height: 100), // Space for nav bar
                 ],
               ),
-              // Ride request popup during active ride
-              if (state.incomingRequests.isNotEmpty)
+              // Ride request popup during active ride (not in bus mode)
+              if (state.incomingRequests.isNotEmpty && !state.isBusMode)
                 Positioned.fill(
                   child: Container(
                     color: Colors.black.withValues(alpha: 0.7),
@@ -472,8 +472,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
-              // Show ride request popup when there's an incoming request
-              if (state.incomingRequests.isNotEmpty && !state.hasActiveRide && !_isPopupMinimized)
+              // Show ride request popup when there's an incoming request (not in bus mode)
+              if (state.incomingRequests.isNotEmpty && !state.hasActiveRide && !_isPopupMinimized && !state.isBusMode)
                 Positioned.fill(
                   child: Container(
                     color: Colors.black.withValues(alpha: 0.7),
@@ -538,8 +538,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-              // Show ride request popup when there's an incoming request
-              if (state.incomingRequests.isNotEmpty && !state.hasActiveRide && !_isPopupMinimized)
+              // Show ride request popup when there's an incoming request (not in bus mode)
+              if (state.incomingRequests.isNotEmpty && !state.hasActiveRide && !_isPopupMinimized && !state.isBusMode)
                 Builder(
                   builder: (context) {
                     final request = state.incomingRequests.first;
@@ -578,8 +578,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
 
-              // Minimized ride request badge - Modern pulsing design
-              if (state.incomingRequests.isNotEmpty && !state.hasActiveRide && _isPopupMinimized)
+              // Minimized ride request badge - Modern pulsing design (not in bus mode)
+              if (state.incomingRequests.isNotEmpty && !state.hasActiveRide && _isPopupMinimized && !state.isBusMode)
                 Positioned(
                   bottom: 100,
                   left: 20,

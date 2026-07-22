@@ -18,7 +18,7 @@ import {
 import { toast } from "sonner"
 import { Loader2, Clock, Calendar, Users, Car, ChevronLeft, ChevronRight, Wand2, Trash2 } from "lucide-react"
 import { PermissionGate } from "@/components/permission-gate"
-import { format, addDays, subDays, startOfDay, endOfDay } from "date-fns"
+import { format, addDays, subDays } from "date-fns"
 
 interface Driver {
   id: string
@@ -33,32 +33,33 @@ interface Vehicle {
   capacity: number
 }
 
-interface BusRoute {
+interface TransportRoute {
   id: string
-  name: string
-  origin_label: string
-  destination_label: string
+  route_name: string
+  route_code: string | null
+  transport_type: string
+  direction: string
 }
 
-interface ScheduleTemplate {
+interface RouteSchedule {
   id: string
   route_id: string
   departure_time: string
-  shift: string
-  days_of_week: number[]
-  route?: BusRoute
+  days_of_week: string[]
+  is_active: boolean
+  route?: TransportRoute
 }
 
 interface RosterAssignment {
   id: string
-  schedule_template_id: string | null
+  route_schedule_id: string | null
   driver_id: string | null
   vehicle_id: string | null
   route_id: string
   departure_time: string
   service_date: string
   status: string
-  route?: BusRoute
+  route?: TransportRoute
   driver?: Driver
   vehicle?: Vehicle
 }
@@ -76,11 +77,12 @@ export default function BusRosterPage() {
   const [roster, setRoster] = useState<RosterAssignment[]>([])
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
-  const [templates, setTemplates] = useState<ScheduleTemplate[]>([])
+  const [schedules, setSchedules] = useState<RouteSchedule[]>([])
   const [loading, setLoading] = useState(true)
   const [showGenerateDialog, setShowGenerateDialog] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState<string | null>(null)
+  const [transportType, setTransportType] = useState("internal_bus")
 
   const [generateForm, setGenerateForm] = useState({
     startDate: format(new Date(), "yyyy-MM-dd"),
@@ -89,22 +91,31 @@ export default function BusRosterPage() {
 
   useEffect(() => {
     loadMasterData()
-  }, [])
+  }, [transportType])
 
   useEffect(() => {
     loadRoster()
-  }, [selectedDate])
+  }, [selectedDate, transportType])
 
   const loadMasterData = async () => {
-    const [driversRes, vehiclesRes, templatesRes] = await Promise.all([
+    const [driversRes, vehiclesRes, schedulesRes] = await Promise.all([
       supabase.from("drivers").select("id, profile_id, profile:profiles(full_name)").eq("status", "approved"),
       supabase.from("vehicles").select("id, plate_no, name, capacity").eq("is_active", true),
-      supabase.from("schedule_templates").select("*, route:bus_routes(id, name, origin_label, destination_label)").eq("is_active", true),
+      supabase.from("route_schedules").select(`
+        *,
+        route:transport_routes(id, route_name, route_code, transport_type, direction)
+      `).eq("is_active", true),
     ])
 
     if (driversRes.data) setDrivers(driversRes.data as unknown as Driver[])
     if (vehiclesRes.data) setVehicles(vehiclesRes.data)
-    if (templatesRes.data) setTemplates(templatesRes.data as ScheduleTemplate[])
+    if (schedulesRes.data) {
+      // Filter schedules by transport type
+      const filtered = (schedulesRes.data as RouteSchedule[]).filter(
+        s => s.route?.transport_type === transportType
+      )
+      setSchedules(filtered)
+    }
   }
 
   const loadRoster = async () => {
@@ -115,14 +126,20 @@ export default function BusRosterPage() {
       .from("roster_assignments")
       .select(`
         *,
-        route:bus_routes(id, name, origin_label, destination_label),
+        route:transport_routes(id, route_name, route_code, transport_type, direction),
         driver:drivers(id, profile_id, profile:profiles(full_name)),
         vehicle:vehicles(id, plate_no, name, capacity)
       `)
       .eq("service_date", dateStr)
       .order("departure_time")
 
-    if (data) setRoster(data as RosterAssignment[])
+    if (data) {
+      // Filter by transport type
+      const filtered = (data as RosterAssignment[]).filter(
+        r => r.route?.transport_type === transportType
+      )
+      setRoster(filtered)
+    }
     setLoading(false)
   }
 
@@ -159,18 +176,25 @@ export default function BusRosterPage() {
     let created = 0
     let skipped = 0
 
+    // Map day names to day numbers (Mon=1, Sun=7)
+    const dayNameToNum: Record<string, number> = {
+      "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6, "Sun": 7
+    }
+
     for (let date = start; date <= end; date = addDays(date, 1)) {
       const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay()
       const dateStr = format(date, "yyyy-MM-dd")
 
-      for (const template of templates) {
-        if (!template.days_of_week.includes(dayOfWeek)) continue
+      for (const schedule of schedules) {
+        // Check if schedule runs on this day
+        const scheduleDays = schedule.days_of_week?.map(d => dayNameToNum[d] || 0) || []
+        if (!scheduleDays.includes(dayOfWeek)) continue
 
         // Check if assignment already exists
         const { data: existing } = await supabase
           .from("roster_assignments")
           .select("id")
-          .eq("schedule_template_id", template.id)
+          .eq("route_schedule_id", schedule.id)
           .eq("service_date", dateStr)
           .single()
 
@@ -180,9 +204,9 @@ export default function BusRosterPage() {
         }
 
         const { error } = await supabase.from("roster_assignments").insert({
-          schedule_template_id: template.id,
-          route_id: template.route_id,
-          departure_time: template.departure_time,
+          route_schedule_id: schedule.id,
+          route_id: schedule.route_id,
+          departure_time: schedule.departure_time,
           service_date: dateStr,
           status: "scheduled",
         })
@@ -224,6 +248,15 @@ export default function BusRosterPage() {
     )
   }
 
+  const getTransportLabel = (type: string) => {
+    switch (type) {
+      case "internal_bus": return "Internal Bus"
+      case "mtcc_bus": return "MTCC Bus"
+      case "ferry": return "Ferry"
+      default: return type
+    }
+  }
+
   return (
     <PermissionGate permission="settings:view">
       <div className="space-y-6">
@@ -231,7 +264,7 @@ export default function BusRosterPage() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Users className="h-6 w-6" />
-              Bus Roster
+              Transport Roster
             </h1>
             <p className="text-muted-foreground">Assign drivers and vehicles to scheduled departures</p>
           </div>
@@ -239,6 +272,20 @@ export default function BusRosterPage() {
             <Wand2 className="h-4 w-4 mr-2" />
             Generate Roster
           </Button>
+        </div>
+
+        {/* Transport Type Filter */}
+        <div className="flex gap-2">
+          {["internal_bus", "mtcc_bus", "ferry"].map(type => (
+            <Button
+              key={type}
+              variant={transportType === type ? "default" : "outline"}
+              size="sm"
+              onClick={() => setTransportType(type)}
+            >
+              {getTransportLabel(type)}
+            </Button>
+          ))}
         </div>
 
         {/* Date Navigation */}
@@ -285,7 +332,7 @@ export default function BusRosterPage() {
               </div>
             ) : roster.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No departures scheduled for this date. Use "Generate Roster" to create from templates.
+                No departures scheduled for this date. Use "Generate Roster" to create from schedules.
               </div>
             ) : (
               <Table>
@@ -310,9 +357,9 @@ export default function BusRosterPage() {
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{assignment.route?.name}</p>
+                          <p className="font-medium">{assignment.route?.route_name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {assignment.route?.origin_label} → {assignment.route?.destination_label}
+                            {assignment.route?.route_code} • {assignment.route?.direction}
                           </p>
                         </div>
                       </TableCell>
@@ -380,7 +427,7 @@ export default function BusRosterPage() {
             <DialogHeader>
               <DialogTitle>Generate Roster</DialogTitle>
               <DialogDescription>
-                Create roster entries from schedule templates for a date range.
+                Create roster entries from {getTransportLabel(transportType)} schedules for a date range.
                 Existing entries will not be duplicated.
               </DialogDescription>
             </DialogHeader>
@@ -404,15 +451,15 @@ export default function BusRosterPage() {
                 </div>
               </div>
               <div className="bg-muted p-3 rounded-lg text-sm">
-                <p className="font-medium">Active Templates: {templates.length}</p>
+                <p className="font-medium">Active Schedules: {schedules.length}</p>
                 <p className="text-muted-foreground">
-                  Roster entries will be created based on active schedule templates and their configured days.
+                  Roster entries will be created based on active {getTransportLabel(transportType)} schedules.
                 </p>
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowGenerateDialog(false)}>Cancel</Button>
-              <Button onClick={generateRoster} disabled={generating || templates.length === 0}>
+              <Button onClick={generateRoster} disabled={generating || schedules.length === 0}>
                 {generating ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />

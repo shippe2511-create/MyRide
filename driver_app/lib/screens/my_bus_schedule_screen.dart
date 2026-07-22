@@ -54,7 +54,7 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              assignment['route']?['name'] ?? 'Unknown Route',
+              assignment['route']?['route_name'] ?? 'Unknown Route',
               style: TextStyle(color: context.textColor, fontSize: 18, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
@@ -143,12 +143,21 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> {
     }
   }
 
-  Color _getShiftColor(String? shift) {
-    switch (shift) {
-      case 'morning': return Colors.orange;
-      case 'evening': return Colors.purple;
-      case 'night': return Colors.indigo;
+  Color _getTransportColor(String? transportType) {
+    switch (transportType) {
+      case 'internal_bus': return Colors.blue;
+      case 'mtcc_bus': return Colors.orange;
+      case 'ferry': return Colors.teal;
       default: return Colors.grey;
+    }
+  }
+
+  String _getTransportLabel(String? transportType) {
+    switch (transportType) {
+      case 'internal_bus': return 'INTERNAL BUS';
+      case 'mtcc_bus': return 'MTCC BUS';
+      case 'ferry': return 'FERRY';
+      default: return transportType?.toUpperCase() ?? 'TRANSPORT';
     }
   }
 
@@ -253,13 +262,13 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                         decoration: BoxDecoration(
-                                          color: _getShiftColor(assignment['schedule_template']?['shift']).withValues(alpha: 0.2),
+                                          color: _getTransportColor(route?['transport_type']).withValues(alpha: 0.2),
                                           borderRadius: BorderRadius.circular(8),
                                         ),
                                         child: Text(
-                                          (assignment['schedule_template']?['shift'] ?? 'shift').toString().toUpperCase(),
+                                          _getTransportLabel(route?['transport_type']),
                                           style: TextStyle(
-                                            color: _getShiftColor(assignment['schedule_template']?['shift']),
+                                            color: _getTransportColor(route?['transport_type']),
                                             fontSize: 11,
                                             fontWeight: FontWeight.w700,
                                           ),
@@ -285,7 +294,7 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> {
                                   ),
                                   const SizedBox(height: 12),
                                   Text(
-                                    route?['name'] ?? 'Unknown Route',
+                                    route?['route_name'] ?? 'Unknown Route',
                                     style: TextStyle(
                                       color: context.textColor,
                                       fontSize: 18,
@@ -294,7 +303,7 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${route?['origin_label'] ?? ''} → ${route?['destination_label'] ?? ''}',
+                                    '${route?['route_code'] ?? ''} • ${route?['direction'] ?? ''}',
                                     style: TextStyle(color: context.mutedColor, fontSize: 14),
                                   ),
                                   const SizedBox(height: 16),

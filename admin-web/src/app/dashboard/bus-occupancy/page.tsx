@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
-import { toast } from "sonner"
 import { Loader2, Bus, Users, MapPin, Clock, RefreshCw, TrendingUp, Activity } from "lucide-react"
 import { PermissionGate } from "@/components/permission-gate"
 import { format } from "date-fns"
@@ -22,9 +21,10 @@ interface BusTrip {
     service_date: string
     route: {
       id: string
-      name: string
-      origin_label: string
-      destination_label: string
+      route_name: string
+      route_code: string
+      direction: string
+      transport_type: string
     }
     driver: {
       id: string
@@ -39,7 +39,7 @@ interface BusTrip {
   }
   current_stop?: {
     id: string
-    name: string
+    stop_name: string
     stop_order: number
   }
   passenger_counts: {
@@ -72,9 +72,8 @@ export default function BusOccupancyPage() {
 
   useEffect(() => {
     loadData()
-    const interval = setInterval(loadData, 10000) // Refresh every 10 seconds
+    const interval = setInterval(loadData, 10000)
 
-    // Subscribe to realtime updates
     const channel = supabase
       .channel("bus_occupancy")
       .on(
@@ -99,7 +98,6 @@ export default function BusOccupancyPage() {
     try {
       const today = format(new Date(), "yyyy-MM-dd")
 
-      // Get active trips with full details
       const { data: trips } = await supabase
         .from("bus_trips")
         .select(`
@@ -111,44 +109,39 @@ export default function BusOccupancyPage() {
             id,
             departure_time,
             service_date,
-            route:bus_routes(id, name, origin_label, destination_label),
+            route:transport_routes(id, route_name, route_code, direction, transport_type),
             driver:drivers(id, profile:profiles(full_name)),
             vehicle:vehicles(id, name, plate_no, capacity)
           )
         `)
         .eq("status", "in_progress")
 
-      // Get passenger counts for active trips
       const tripsWithCounts: BusTrip[] = []
 
       if (trips) {
         for (const trip of trips) {
-          // Get passenger counts
           const { data: counts } = await supabase
             .from("stop_passenger_counts")
             .select("boarded_count, alighted_count")
             .eq("bus_trip_id", trip.id)
 
-          // Get current stop details
           let currentStop = null
           if (trip.current_stop_id) {
             const { data: stop } = await supabase
-              .from("bus_route_stops")
-              .select("id, name, stop_order")
+              .from("route_stops")
+              .select("id, stop_name, stop_order")
               .eq("id", trip.current_stop_id)
               .single()
             currentStop = stop
           }
 
-          // Get total stops for the route
           const routeId = (trip.roster_assignment as any)?.route?.id
           let totalStops = 0
           if (routeId) {
             const { count } = await supabase
-              .from("bus_route_stops")
+              .from("route_stops")
               .select("id", { count: "exact", head: true })
               .eq("route_id", routeId)
-              .eq("is_active", true)
             totalStops = count || 0
           }
 
@@ -164,7 +157,6 @@ export default function BusOccupancyPage() {
 
       setActiveTrips(tripsWithCounts)
 
-      // Calculate daily summary
       const { data: allTrips } = await supabase
         .from("bus_trips")
         .select(`
@@ -185,7 +177,6 @@ export default function BusOccupancyPage() {
       const todayTrips = allTrips || []
       const totalPassengers = allCounts?.reduce((sum, c) => sum + (c.boarded_count || 0), 0) || 0
 
-      // Calculate average occupancy
       let avgOccupancy = 0
       if (tripsWithCounts.length > 0) {
         const occupancies = tripsWithCounts.map(trip => {
@@ -246,7 +237,7 @@ export default function BusOccupancyPage() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Activity className="h-6 w-6" />
-              Live Bus Occupancy
+              Live Transport Occupancy
             </h1>
             <p className="text-muted-foreground">
               Real-time passenger counts and vehicle occupancy
@@ -344,10 +335,10 @@ export default function BusOccupancyPage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
               </span>
-              Active Bus Trips
+              Active Trips
             </CardTitle>
             <CardDescription>
-              {activeTrips.length} bus{activeTrips.length !== 1 ? "es" : ""} currently in service
+              {activeTrips.length} vehicle{activeTrips.length !== 1 ? "s" : ""} currently in service
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -358,7 +349,7 @@ export default function BusOccupancyPage() {
             ) : activeTrips.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Bus className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>No active bus trips at the moment</p>
+                <p>No active trips at the moment</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -376,12 +367,11 @@ export default function BusOccupancyPage() {
                     <Card key={trip.id} className="overflow-hidden">
                       <div className={`h-1 ${getOccupancyColor(percentage)}`} />
                       <CardContent className="pt-4">
-                        {/* Route info */}
                         <div className="flex items-start justify-between mb-3">
                           <div>
-                            <h3 className="font-semibold">{route?.name}</h3>
+                            <h3 className="font-semibold">{route?.route_name}</h3>
                             <p className="text-sm text-muted-foreground">
-                              {route?.origin_label} → {route?.destination_label}
+                              {route?.route_code} • {route?.direction}
                             </p>
                           </div>
                           <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30">
@@ -389,18 +379,16 @@ export default function BusOccupancyPage() {
                           </Badge>
                         </div>
 
-                        {/* Current stop */}
                         <div className="flex items-center gap-2 mb-3 p-2 rounded-lg bg-muted/50">
                           <MapPin className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm">
-                            {trip.current_stop?.name || "Starting..."}
+                            {trip.current_stop?.stop_name || "Starting..."}
                           </span>
                           <span className="text-xs text-muted-foreground ml-auto">
                             Stop {trip.current_stop?.stop_order || 1} of {trip.total_stops}
                           </span>
                         </div>
 
-                        {/* Route progress */}
                         <div className="mb-4">
                           <div className="flex justify-between text-xs text-muted-foreground mb-1">
                             <span>Route Progress</span>
@@ -409,7 +397,6 @@ export default function BusOccupancyPage() {
                           <Progress value={progress} className="h-1.5" />
                         </div>
 
-                        {/* Occupancy */}
                         <div className="mb-4">
                           <div className="flex justify-between items-center mb-2">
                             <span className="text-sm font-medium flex items-center gap-2">
@@ -434,7 +421,6 @@ export default function BusOccupancyPage() {
                           </p>
                         </div>
 
-                        {/* Driver & Vehicle */}
                         <div className="grid grid-cols-2 gap-2 text-sm">
                           <div className="p-2 rounded bg-muted/50">
                             <p className="text-muted-foreground text-xs">Driver</p>
@@ -450,7 +436,6 @@ export default function BusOccupancyPage() {
                           </div>
                         </div>
 
-                        {/* Time info */}
                         <div className="mt-3 pt-3 border-t flex justify-between text-xs text-muted-foreground">
                           <span>
                             Started: {trip.actual_start_time

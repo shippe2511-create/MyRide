@@ -2102,10 +2102,10 @@ class SupabaseService {
   }
 
   // =====================================================
-  // BUS/SHUTTLE METHODS
+  // BUS/SHUTTLE METHODS (uses existing transport_routes)
   // =====================================================
 
-  /// Get driver's bus schedule (roster assignments)
+  /// Get driver's transport schedule (roster assignments)
   static Future<List<Map<String, dynamic>>> getMyBusSchedule(String driverId) async {
     if (driverId.isEmpty) return [];
     try {
@@ -2117,9 +2117,9 @@ class SupabaseService {
           .from('roster_assignments')
           .select('''
             *,
-            route:bus_routes(id, name, origin_label, destination_label),
+            route:transport_routes(id, route_name, route_code, direction, transport_type),
             vehicle:vehicles(id, name, plate_no, capacity),
-            schedule_template:schedule_templates(id, shift, departure_time)
+            route_schedule:route_schedules(id, departure_time, days_of_week)
           ''')
           .eq('driver_id', driverId)
           .gte('service_date', today.toIso8601String().split('T')[0])
@@ -2135,19 +2135,18 @@ class SupabaseService {
     }
   }
 
-  /// Get stops for a bus route
+  /// Get stops for a transport route
   static Future<List<Map<String, dynamic>>> getBusRouteStops(String routeId) async {
     try {
       final response = await client
-          .from('bus_route_stops')
+          .from('route_stops')
           .select()
           .eq('route_id', routeId)
-          .eq('is_active', true)
           .order('stop_order');
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      debugPrint('Error getting bus route stops: $e');
+      debugPrint('Error getting route stops: $e');
       return [];
     }
   }
@@ -2292,7 +2291,7 @@ class SupabaseService {
             *,
             roster_assignment:roster_assignments!bus_trips_roster_assignment_id_fkey(
               *,
-              route:bus_routes(id, name, origin_label, destination_label),
+              route:transport_routes(id, route_name, route_code, direction),
               vehicle:vehicles(id, name, plate_no)
             )
           ''')

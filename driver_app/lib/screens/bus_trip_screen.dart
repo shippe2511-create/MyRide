@@ -133,7 +133,7 @@ class _BusTripScreenState extends State<BusTripScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'At ${_stops[_currentStopIndex]['name']}',
+                'At ${_stops[_currentStopIndex]['stop_name']}',
                 style: TextStyle(color: context.mutedColor, fontSize: 14),
               ),
               const SizedBox(height: 24),
@@ -339,7 +339,7 @@ class _BusTripScreenState extends State<BusTripScreen> {
                     ),
                   ),
                   Text(
-                    route?['name'] ?? 'Bus Trip',
+                    route?['route_name'] ?? 'Bus Trip',
                     style: const TextStyle(
                       color: AppColors.darkBg,
                       fontSize: 16,
@@ -391,7 +391,7 @@ class _BusTripScreenState extends State<BusTripScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '${route?['origin_label'] ?? ''} → ${route?['destination_label'] ?? ''}',
+                              '${route?['route_code'] ?? ''} • ${route?['direction'] ?? ''}',
                               style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w500),
                             ),
                             if (vehicle != null)
@@ -533,7 +533,7 @@ class _BusTripScreenState extends State<BusTripScreen> {
                                             ),
                                           ),
                                         Text(
-                                          stop['name'] ?? 'Stop ${index + 1}',
+                                          stop['stop_name'] ?? 'Stop ${index + 1}',
                                           style: TextStyle(
                                             color: isPast ? context.mutedColor : context.textColor,
                                             fontSize: 16,
@@ -651,7 +651,7 @@ class _BusTripScreenState extends State<BusTripScreen> {
                                           const Icon(Icons.arrow_forward),
                                           const SizedBox(width: 8),
                                           Text(
-                                            'Next: ${_stops.length > _currentStopIndex + 1 ? _stops[_currentStopIndex + 1]['name'] : ''}',
+                                            'Next: ${_stops.length > _currentStopIndex + 1 ? _stops[_currentStopIndex + 1]['stop_name'] : ''}',
                                             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                                             overflow: TextOverflow.ellipsis,
                                           ),

@@ -106,10 +106,8 @@ const navigationSections: NavSection[] = [
       { name: "Push to Talk", href: "/dashboard/push-to-talk", icon: Mic, permission: "settings:view" },
       { name: "Schedules", href: "/dashboard/scheduling", icon: Calendar, permission: "schedules:view" },
       { name: "Service Zones", href: "/dashboard/zones", icon: Map, permission: "zones:view" },
-      { name: "Bus Routes", href: "/dashboard/bus-routes", icon: Car, permission: "settings:view" },
-      { name: "Bus Schedules", href: "/dashboard/bus-schedules", icon: Clock, permission: "settings:view" },
-      { name: "Bus Roster", href: "/dashboard/bus-roster", icon: Users, permission: "settings:view" },
-      { name: "Bus Occupancy", href: "/dashboard/bus-occupancy", icon: Activity, permission: "settings:view" },
+      { name: "Transport Roster", href: "/dashboard/bus-roster", icon: Users, permission: "settings:view" },
+      { name: "Live Occupancy", href: "/dashboard/bus-occupancy", icon: Activity, permission: "settings:view" },
     ]
   },
   {

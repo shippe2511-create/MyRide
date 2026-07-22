@@ -13,6 +13,7 @@ import '../widgets/cached_avatar.dart';
 import 'stats_screen.dart';
 import 'vehicle_logs_screen.dart';
 import 'push_to_talk_screen.dart';
+import 'incident_report_screen.dart';
 import '../services/app_settings_service.dart';
 
 const String _defaultDriverTerms = '''MyRide Driver Terms & Conditions
@@ -345,6 +346,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const VehicleLogsScreen()),
+                      );
+                    },
+                  ),
+                  _buildSettingTile(
+                    context,
+                    icon: Icons.report_problem_outlined,
+                    title: 'Report Incident',
+                    trailing: Icon(Icons.chevron_right, color: context.mutedColor),
+                    iconColor: Colors.red,
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const IncidentReportScreen()),
                       );
                     },
                   ),

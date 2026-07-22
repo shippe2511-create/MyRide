@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // 3-tier RBAC - all staff roles allowed to access admin panel
-const ADMIN_ROLES = ['super_admin', 'manager', 'operator']
+const ADMIN_ROLES = ['super_admin', 'admin', 'manager', 'operator']
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -63,8 +63,10 @@ export async function updateSession(request: NextRequest) {
   // Check if user has admin role
   if (user && request.nextUrl.pathname.startsWith('/dashboard')) {
     const profile = await findProfile()
+    console.log('[Middleware] User:', user.id, user.email, 'Profile:', profile)
 
     if (!profile || !ADMIN_ROLES.includes(profile.role) || profile.status !== 'approved') {
+      console.log('[Middleware] Access denied - profile:', profile, 'ADMIN_ROLES:', ADMIN_ROLES)
       const url = request.nextUrl.clone()
       url.pathname = '/login'
       url.searchParams.set('error', 'unauthorized')

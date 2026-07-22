@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:math' as math;
 import '../theme/app_theme.dart';
 import '../providers/driver_state.dart';
@@ -112,6 +114,8 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
     ),
   ];
 
+  RealtimeChannel? _checklistChannel;
+
   @override
   void initState() {
     super.initState();
@@ -128,6 +132,25 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
     );
 
     _loadChecklistItems();
+    _subscribeToChecklistChanges();
+  }
+
+  void _subscribeToChecklistChanges() {
+    _checklistChannel = Supabase.instance.client
+        .channel('checklist_realtime')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'checklist_categories',
+          callback: (_) => _loadChecklistItems(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'checklist_items',
+          callback: (_) => _loadChecklistItems(),
+        )
+        .subscribe();
   }
 
   Future<void> _loadChecklistItems() async {
@@ -195,6 +218,7 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
 
   @override
   void dispose() {
+    _checklistChannel?.unsubscribe();
     _progressController.dispose();
     _pulseController.dispose();
     super.dispose();

@@ -1702,8 +1702,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     // Calculate minimum allowed time based on admin settings
     final minHoursAhead = AppSettingsService.scheduleMinHoursAhead;
     final maxDaysAhead = AppSettingsService.scheduleMaxDaysAhead;
-    final allowedStartTime = AppSettingsService.scheduleStartTime;
-    final allowedEndTime = AppSettingsService.scheduleEndTime;
 
     DateTime minDateTime = MaldivesTimezone.now().add(Duration(hours: minHoursAhead));
     DateTime selectedDate = _scheduledTime ?? minDateTime;
@@ -2194,28 +2192,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         child: ElevatedButton(
                           onPressed: (pickupAddress.isNotEmpty && dropoffAddress.isNotEmpty)
                               ? () async {
-                                  // Check if it's a weekend day (Friday=5, Saturday=6 in Maldives)
-                                  final isWeekend = selectedDate.weekday == DateTime.friday || selectedDate.weekday == DateTime.saturday;
-                                  if (isWeekend) {
-                                    final dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][selectedDate.weekday - 1];
-                                    AppSnackbar.warning(context, 'No drivers available on $dayName');
-                                    return;
-                                  }
-
-                                  // Validate allowed time window
-                                  final selectedHour = selectedTime.hour;
-                                  final selectedMinute = selectedTime.minute;
-                                  final selectedMinutes = selectedHour * 60 + selectedMinute;
-                                  final startMinutes = allowedStartTime.hour * 60 + allowedStartTime.minute;
-                                  final endMinutes = allowedEndTime.hour * 60 + allowedEndTime.minute;
-
-                                  if (selectedMinutes < startMinutes || selectedMinutes > endMinutes) {
-                                    final startStr = '${allowedStartTime.hour.toString().padLeft(2, '0')}:${allowedStartTime.minute.toString().padLeft(2, '0')}';
-                                    final endStr = '${allowedEndTime.hour.toString().padLeft(2, '0')}:${allowedEndTime.minute.toString().padLeft(2, '0')}';
-                                    AppSnackbar.warning(context, 'Schedule between $startStr - $endStr only');
-                                    return;
-                                  }
-
                                   // Validate minimum hours ahead
                                   final minTime = DateTime.now().add(Duration(hours: minHoursAhead));
                                   if (selectedDate.isBefore(minTime)) {
@@ -2227,6 +2203,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   final maxDate = DateTime.now().add(Duration(days: maxDaysAhead));
                                   if (selectedDate.isAfter(maxDate)) {
                                     AppSnackbar.warning(context, 'Cannot schedule more than $maxDaysAhead days ahead');
+                                    return;
+                                  }
+
+                                  // Check if drivers are available at the selected date/time based on pools and shifts
+                                  final hasDriver = await SupabaseService.hasDriverShiftAt(selectedDate);
+                                  if (!hasDriver) {
+                                    final dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][selectedDate.weekday - 1];
+                                    final timeStr = '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
+                                    AppSnackbar.warning(context, 'No drivers available on $dayName at $timeStr');
                                     return;
                                   }
 

@@ -134,19 +134,14 @@ class _LoginScreenState extends State<LoginScreen> {
       final existingUser = await SupabaseService.checkPhoneExists(fullPhone);
 
       if (existingUser != null) {
-        // Allow customer, admin, super-admin roles to use the app
-        // Drivers should use the driver app instead
+        // Allow all roles to use the customer app (drivers can also book rides)
         final role = existingUser['role'] ?? 'customer';
-        if (role == 'driver') {
-          _showError('Please use the Driver app to login');
-          return;
-        }
 
-        // Check status - admins bypass pending check
-        final isAdmin = role == 'super_admin' || role == 'manager' || role == 'operator';
+        // Check status - admins and drivers bypass pending check
+        final isAdminOrDriver = role == 'super_admin' || role == 'manager' || role == 'operator' || role == 'driver';
         final status = existingUser['status'] ?? 'pending';
 
-        if (!isAdmin && status == 'pending') {
+        if (!isAdminOrDriver && status == 'pending') {
           Navigator.pushReplacementNamed(context, '/pending');
           return;
         } else if (status == 'rejected') {
@@ -155,7 +150,7 @@ class _LoginScreenState extends State<LoginScreen> {
         } else if (status == 'suspended') {
           Navigator.pushReplacementNamed(context, '/suspended');
           return;
-        } else if (status != 'approved' && !isAdmin) {
+        } else if (status != 'approved' && !isAdminOrDriver) {
           // Block any non-approved status
           Navigator.pushReplacementNamed(context, '/suspended');
           return;

@@ -487,7 +487,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '${trip.rating}',
+                          trip.rating?.toStringAsFixed(1) ?? '0.0',
                           style: const TextStyle(
                             color: AppColors.warning,
                             fontSize: 14,

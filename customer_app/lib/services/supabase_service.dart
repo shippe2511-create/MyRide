@@ -2439,24 +2439,47 @@ class SupabaseService {
   // Check if any driver has a shift on a given date and time
   static Future<bool> hasDriverShiftAt(DateTime scheduledTime) async {
     try {
+      final customerId = _profileId;
+      if (customerId == null) return true;
+
       final dateStr = '${scheduledTime.year}-${scheduledTime.month.toString().padLeft(2, '0')}-${scheduledTime.day.toString().padLeft(2, '0')}';
       final timeStr = '${scheduledTime.hour.toString().padLeft(2, '0')}:${scheduledTime.minute.toString().padLeft(2, '0')}:00';
 
-      // Check for any scheduled shift on the given date where the time falls within shift hours
-      final response = await client
-          .from('shifts')
-          .select('id')
-          .eq('shift_date', dateStr)
-          .eq('status', 'scheduled')
-          .lte('start_time', timeStr)
-          .gte('end_time', timeStr)
-          .limit(1);
+      // Get available driver times for this customer based on their pool access
+      final availableTimes = await getAvailableDriverTimes(scheduledTime);
 
-      return (response as List).isNotEmpty;
+      // Check if the selected time falls within any available shift
+      for (final slot in availableTimes) {
+        final startTime = slot['start_time'] as String;
+        final endTime = slot['end_time'] as String;
+        if (timeStr.compareTo(startTime) >= 0 && timeStr.compareTo(endTime) <= 0) {
+          return true;
+        }
+      }
+      return false;
     } catch (e) {
       debugPrint('Error checking driver shifts: $e');
-      // If check fails, allow the ride (fail-open for user experience)
       return true;
+    }
+  }
+
+  // Get available driver times for a specific date based on customer's pool access
+  static Future<List<Map<String, dynamic>>> getAvailableDriverTimes(DateTime date) async {
+    try {
+      final customerId = _profileId;
+      if (customerId == null) return [];
+
+      final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+      final response = await client.rpc('get_available_driver_times', params: {
+        'p_customer_id': customerId,
+        'p_date': dateStr,
+      });
+
+      return List<Map<String, dynamic>>.from(response as List);
+    } catch (e) {
+      debugPrint('Error getting available driver times: $e');
+      return [];
     }
   }
 

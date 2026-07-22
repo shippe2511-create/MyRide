@@ -50,6 +50,7 @@ import {
   Clock,
   Layers,
   Building2,
+  Bell,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -137,6 +138,7 @@ const navigationSections: NavSection[] = [
       { name: "App Config", href: "/dashboard/app-config", icon: Smartphone, permission: "settings:view" },
       { name: "Content", href: "/dashboard/content", icon: FileText, permission: "content:view" },
       { name: "Chat", href: "/dashboard/chat", icon: MessageSquare, permission: "chat:view" },
+      { name: "Reminders", href: "/dashboard/reminders", icon: Bell, permission: "settings:view" },
       { name: "Users", href: "/dashboard/admins", icon: Shield, permission: "staff:view" },
       { name: "Departments", href: "/dashboard/departments", icon: Building2, permission: "departments:view" },
       { name: "Settings", href: "/dashboard/settings", icon: Settings, permission: "settings:view" },

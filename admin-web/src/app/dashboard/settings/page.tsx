@@ -40,6 +40,8 @@ interface AppSettings {
   notif_ride_completed: boolean
   notif_promotions: boolean
   break_reminder_minutes: number
+  document_reminder_enabled: boolean
+  document_reminder_days: number[]
 }
 
 interface EmergencyContact {
@@ -84,6 +86,8 @@ const defaultSettings: AppSettings = {
   notif_ride_completed: true,
   notif_promotions: true,
   break_reminder_minutes: 30,
+  document_reminder_enabled: true,
+  document_reminder_days: [30, 14, 7],
 }
 
 export default function SettingsPage() {
@@ -182,6 +186,8 @@ export default function SettingsPage() {
           notif_ride_completed: settings.notif_ride_completed,
           notif_promotions: settings.notif_promotions,
           break_reminder_minutes: settings.break_reminder_minutes,
+          document_reminder_enabled: settings.document_reminder_enabled,
+          document_reminder_days: settings.document_reminder_days,
           updated_at: new Date().toISOString()
         })
 
@@ -538,6 +544,35 @@ export default function SettingsPage() {
                     max={120}
                   />
                   <p className="text-xs text-muted-foreground">Notify drivers after this many minutes on break to go back online</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Document Expiry Reminders</label>
+                  <Select
+                    value={settings.document_reminder_enabled ? "enabled" : "disabled"}
+                    onValueChange={(v) => updateSetting("document_reminder_enabled", v === "enabled")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="enabled">Enabled</SelectItem>
+                      <SelectItem value="disabled">Disabled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Notify drivers and admins about expiring documents</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Reminder Days Before Expiry</label>
+                  <Input
+                    type="text"
+                    value={settings.document_reminder_days?.join(", ") || "30, 14, 7"}
+                    onChange={(e) => {
+                      const days = e.target.value.split(",").map(d => parseInt(d.trim())).filter(d => !isNaN(d) && d > 0)
+                      updateSetting("document_reminder_days", days.length > 0 ? days : [30, 14, 7])
+                    }}
+                    placeholder="30, 14, 7"
+                  />
+                  <p className="text-xs text-muted-foreground">Comma-separated days (e.g., 30, 14, 7 = reminders at 30, 14, and 7 days before expiry)</p>
                 </div>
               </div>
             </CardContent>

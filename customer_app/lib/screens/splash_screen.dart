@@ -96,9 +96,9 @@ class _SplashScreenState extends State<SplashScreen>
         if (dbUser != null) {
           final status = dbUser['status'] as String?;
           final role = dbUser['role'] as String? ?? 'customer';
-          final isAdmin = role == 'super_admin' || role == 'manager' || role == 'operator';
+          final isAdminOrDriver = role == 'super_admin' || role == 'manager' || role == 'operator' || role == 'driver';
 
-          if (status == 'pending' && !isAdmin) {
+          if (status == 'pending' && !isAdminOrDriver) {
             Navigator.pushReplacementNamed(context, '/pending');
             return;
           } else if (status == 'rejected') {
@@ -107,11 +107,11 @@ class _SplashScreenState extends State<SplashScreen>
           } else if (status == 'suspended') {
             Navigator.pushReplacementNamed(context, '/suspended');
             return;
-          } else if (status != 'approved' && !isAdmin) {
+          } else if (status != 'approved' && !isAdminOrDriver) {
             // Not approved, go to welcome
             Navigator.pushReplacementNamed(context, '/welcome');
             return;
-          } else if (status == 'approved' || isAdmin) {
+          } else if (status == 'approved' || isAdminOrDriver) {
             // Store profile ID and update local state
             if (dbUser['id'] != null) {
               appState.setProfileId(dbUser['id']);

@@ -356,7 +356,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          '${state.rating}',
+                          state.rating.toStringAsFixed(1),
                           style: TextStyle(
                             color: AppColors.yellow,
                             fontWeight: FontWeight.w600,

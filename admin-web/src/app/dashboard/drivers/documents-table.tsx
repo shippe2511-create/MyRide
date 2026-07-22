@@ -196,11 +196,35 @@ export function DocumentsTable() {
     ).values()
   ).sort((a, b) => a.name.localeCompare(b.name))
 
+  const isExpired = (date: string | null) => {
+    if (!date) return false
+    return new Date(date) < new Date()
+  }
+
+  const isExpiringSoon = (date: string | null) => {
+    if (!date) return false
+    const expiryDate = new Date(date)
+    const today = new Date()
+    const daysUntilExpiry = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    return daysUntilExpiry >= 0 && daysUntilExpiry <= 30
+  }
+
   const filteredDocuments = documents.filter(doc => {
     const matchesSearch = search === "" ||
       doc.driver?.profile?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
       doc.document_type.toLowerCase().includes(search.toLowerCase())
-    const matchesStatus = statusFilter === "all" || doc.status === statusFilter
+
+    let matchesStatus = true
+    if (statusFilter === "all") {
+      matchesStatus = true
+    } else if (statusFilter === "expired") {
+      matchesStatus = isExpired(doc.expiry_date)
+    } else if (statusFilter === "expiring_soon") {
+      matchesStatus = isExpiringSoon(doc.expiry_date) && !isExpired(doc.expiry_date)
+    } else {
+      matchesStatus = doc.status === statusFilter
+    }
+
     const matchesType = typeFilter === "all" || doc.document_type === typeFilter
     const matchesDriver = driverFilter === "all" || doc.driver_id === driverFilter
     return matchesSearch && matchesStatus && matchesType && matchesDriver
@@ -385,19 +409,6 @@ export function DocumentsTable() {
     return formatDate(dateStr)
   }
 
-  const isExpiringSoon = (expiryDate: string | null) => {
-    if (!expiryDate) return false
-    const expiry = new Date(expiryDate)
-    const now = new Date()
-    const diffDays = Math.floor((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-    return diffDays > 0 && diffDays <= 30
-  }
-
-  const isExpired = (expiryDate: string | null) => {
-    if (!expiryDate) return false
-    return new Date(expiryDate) < new Date()
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -420,7 +431,7 @@ export function DocumentsTable() {
             />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="w-36">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -428,6 +439,8 @@ export function DocumentsTable() {
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="verified">Approved</SelectItem>
               <SelectItem value="rejected">Rejected</SelectItem>
+              <SelectItem value="expired">Expired</SelectItem>
+              <SelectItem value="expiring_soon">Expiring Soon</SelectItem>
             </SelectContent>
           </Select>
           <Select value={typeFilter} onValueChange={setTypeFilter}>

@@ -584,8 +584,8 @@ export function DocumentsTable() {
                   <TableCell>
                     {documentReminders[doc.id] ? (
                       <div className="flex items-center gap-2">
-                        <Bell className="h-3 w-3 text-yellow-500" />
-                        <span className="text-sm text-yellow-500">
+                        <Bell className="h-3 w-3" />
+                        <span className="text-sm">
                           {formatDate(documentReminders[doc.id].date)}
                         </span>
                         {documentReminders[doc.id].sent && (

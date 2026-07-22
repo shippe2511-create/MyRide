@@ -4,7 +4,7 @@ import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-import { Clock } from "lucide-react"
+import { Clock, ChevronUp, ChevronDown } from "lucide-react"
 
 interface TimePickerProps {
   value: string // "HH:mm" format
@@ -55,8 +55,25 @@ export function TimePicker({ value, onChange, className }: TimePickerProps) {
     onChange(newValue)
   }
 
-  const hours = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-  const minutes = [0, 15, 30, 45]
+  const incrementHour = () => {
+    const newHour = hour12 === 12 ? 1 : hour12 + 1
+    handleHourChange(newHour)
+  }
+
+  const decrementHour = () => {
+    const newHour = hour12 === 1 ? 12 : hour12 - 1
+    handleHourChange(newHour)
+  }
+
+  const incrementMinute = () => {
+    const newMinute = (minute + 15) % 60
+    handleMinuteChange(newMinute)
+  }
+
+  const decrementMinute = () => {
+    const newMinute = minute === 0 ? 45 : minute - 15
+    handleMinuteChange(newMinute)
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -73,88 +90,101 @@ export function TimePicker({ value, onChange, className }: TimePickerProps) {
           {formatDisplay()}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <div className="flex p-3 gap-2">
-          {/* Hours */}
-          <div className="flex flex-col gap-1">
-            <div className="text-xs text-center text-muted-foreground mb-1 font-medium">Hour</div>
-            <div className="grid grid-cols-3 gap-1">
-              {hours.map((h) => (
-                <Button
-                  key={h}
-                  variant={hour12 === h ? "default" : "ghost"}
-                  size="sm"
-                  className="h-9 w-9"
-                  onClick={() => handleHourChange(h)}
-                >
-                  {h}
-                </Button>
-              ))}
+      <PopoverContent className="w-auto p-4" align="start">
+        <div className="flex items-center gap-3">
+          {/* Hour Spinner */}
+          <div className="flex flex-col items-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={incrementHour}
+            >
+              <ChevronUp className="h-4 w-4" />
+            </Button>
+            <div className="h-14 w-14 flex items-center justify-center rounded-lg bg-primary/10 border border-primary/20">
+              <span className="text-2xl font-semibold tabular-nums">
+                {hour12.toString().padStart(2, "0")}
+              </span>
             </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={decrementHour}
+            >
+              <ChevronDown className="h-4 w-4" />
+            </Button>
           </div>
 
-          {/* Divider */}
-          <div className="w-px bg-border" />
+          <span className="text-2xl font-semibold text-muted-foreground">:</span>
 
-          {/* Minutes */}
-          <div className="flex flex-col gap-1">
-            <div className="text-xs text-center text-muted-foreground mb-1 font-medium">Min</div>
-            <div className="flex flex-col gap-1">
-              {minutes.map((m) => (
-                <Button
-                  key={m}
-                  variant={minute === m ? "default" : "ghost"}
-                  size="sm"
-                  className="h-9 w-12"
-                  onClick={() => handleMinuteChange(m)}
-                >
-                  {m.toString().padStart(2, "0")}
-                </Button>
-              ))}
+          {/* Minute Spinner */}
+          <div className="flex flex-col items-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={incrementMinute}
+            >
+              <ChevronUp className="h-4 w-4" />
+            </Button>
+            <div className="h-14 w-14 flex items-center justify-center rounded-lg bg-primary/10 border border-primary/20">
+              <span className="text-2xl font-semibold tabular-nums">
+                {minute.toString().padStart(2, "0")}
+              </span>
             </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={decrementMinute}
+            >
+              <ChevronDown className="h-4 w-4" />
+            </Button>
           </div>
 
-          {/* Divider */}
-          <div className="w-px bg-border" />
-
-          {/* AM/PM */}
-          <div className="flex flex-col gap-1">
-            <div className="text-xs text-center text-muted-foreground mb-1 font-medium">&nbsp;</div>
-            <div className="flex flex-col gap-1">
-              <Button
-                variant={!isPM ? "default" : "ghost"}
-                size="sm"
-                className="h-9 w-12"
-                onClick={() => handlePeriodChange(false)}
-              >
-                AM
-              </Button>
-              <Button
-                variant={isPM ? "default" : "ghost"}
-                size="sm"
-                className="h-9 w-12"
-                onClick={() => handlePeriodChange(true)}
-              >
-                PM
-              </Button>
-            </div>
+          {/* AM/PM Toggle */}
+          <div className="flex flex-col gap-1 ml-2">
+            <Button
+              variant={!isPM ? "default" : "outline"}
+              size="sm"
+              className={cn(
+                "h-9 w-12 text-xs font-medium",
+                !isPM && "bg-primary text-primary-foreground"
+              )}
+              onClick={() => handlePeriodChange(false)}
+            >
+              AM
+            </Button>
+            <Button
+              variant={isPM ? "default" : "outline"}
+              size="sm"
+              className={cn(
+                "h-9 w-12 text-xs font-medium",
+                isPM && "bg-primary text-primary-foreground"
+              )}
+              onClick={() => handlePeriodChange(true)}
+            >
+              PM
+            </Button>
           </div>
         </div>
 
         {/* Quick presets */}
-        <div className="border-t p-2 flex gap-1 flex-wrap">
+        <div className="mt-4 pt-3 border-t flex gap-2 flex-wrap justify-center">
           {[
             { label: "6 AM", value: "06:00" },
-            { label: "8 AM", value: "08:00" },
+            { label: "9 AM", value: "09:00" },
             { label: "12 PM", value: "12:00" },
             { label: "6 PM", value: "18:00" },
             { label: "10 PM", value: "22:00" },
           ].map((preset) => (
             <Button
               key={preset.value}
-              variant="outline"
+              variant="ghost"
               size="sm"
-              className="text-xs h-7"
+              className="text-xs h-7 px-3 hover:bg-primary/10"
               onClick={() => {
                 onChange(preset.value)
                 setOpen(false)

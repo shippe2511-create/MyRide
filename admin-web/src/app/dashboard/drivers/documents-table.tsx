@@ -67,6 +67,7 @@ interface Document {
   verified_at: string | null
   driver?: {
     id: string
+    profile_id: string
     profile?: {
       full_name: string
       avatar_url: string | null

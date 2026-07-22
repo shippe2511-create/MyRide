@@ -1726,19 +1726,25 @@ class SupabaseService {
     int? odometer,
     String? notes,
     DateTime? logDate,
+    String? fuelType,
+    double? liters,
   }) async {
     final id = _driverId;
     if (id == null || id.isEmpty) return null;
 
     try {
-      final response = await client.from('vehicle_logs').insert({
+      final data = {
         'driver_id': id,
         'log_type': logType,
         'amount': amount,
         'odometer': odometer,
         'notes': notes,
         'log_date': (logDate ?? DateTime.now()).toIso8601String().split('T')[0],
-      }).select().single();
+      };
+      if (fuelType != null) data['fuel_type'] = fuelType;
+      if (liters != null) data['liters'] = liters;
+
+      final response = await client.from('vehicle_logs').insert(data).select().single();
       return response;
     } catch (e) {
       debugPrint('Error adding vehicle log: $e');

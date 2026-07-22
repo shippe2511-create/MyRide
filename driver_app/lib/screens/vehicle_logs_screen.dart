@@ -853,8 +853,10 @@ class _AddLogSheetState extends State<AddLogSheet> {
   final _amountController = TextEditingController();
   final _odometerController = TextEditingController();
   final _notesController = TextEditingController();
+  final _litersController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
   bool _isSaving = false;
+  String _fuelType = 'petrol';
 
   Color get _typeColor {
     switch (widget.logType) {
@@ -884,6 +886,39 @@ class _AddLogSheetState extends State<AddLogSheet> {
       case 'cleaning': return 'Cleaning';
       default: return 'Log';
     }
+  }
+
+  Widget _buildFuelTypeChip(String label, String value) {
+    final isSelected = _fuelType == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          setState(() => _fuelType = value);
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.orange : context.bgColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? Colors.orange : context.borderColor,
+            ),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : context.textColor,
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _pickDate() async {
@@ -927,6 +962,8 @@ class _AddLogSheetState extends State<AddLogSheet> {
       odometer: int.tryParse(_odometerController.text),
       notes: _notesController.text.isNotEmpty ? _notesController.text : null,
       logDate: _selectedDate,
+      fuelType: widget.logType == 'fuel' ? _fuelType : null,
+      liters: widget.logType == 'fuel' ? double.tryParse(_litersController.text) : null,
     );
 
     setState(() => _isSaving = false);
@@ -1028,6 +1065,41 @@ class _AddLogSheetState extends State<AddLogSheet> {
               ),
             ),
             const SizedBox(height: 20),
+
+            // Fuel-specific fields
+            if (widget.logType == 'fuel') ...[
+              // Fuel Type
+              Text('Fuel Type', style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _buildFuelTypeChip('Petrol', 'petrol'),
+                  const SizedBox(width: 10),
+                  _buildFuelTypeChip('Diesel', 'diesel'),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Liters
+              Text('Liters', style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _litersController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: TextStyle(color: context.textColor, fontSize: 16),
+                decoration: InputDecoration(
+                  hintText: 'Liters filled (optional)',
+                  hintStyle: TextStyle(color: context.mutedColor.withValues(alpha: 0.5)),
+                  suffixText: 'L',
+                  suffixStyle: TextStyle(color: context.mutedColor),
+                  filled: true,
+                  fillColor: context.bgColor,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  contentPadding: const EdgeInsets.all(20),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
 
             // Odometer field
             Text('Odometer', style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600)),

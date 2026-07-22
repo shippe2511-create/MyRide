@@ -298,7 +298,8 @@ export default function SettingsPage() {
       }
       toast.success("Document types saved")
       logActivity({ action: 'update', entityType: 'settings', entityId: 'document-types', details: { count: documentTypes.length } })
-    } catch {
+    } catch (e) {
+      console.error("Document types save error:", e)
       toast.error("Failed to save document types")
     }
     setSavingDocTypes(false)

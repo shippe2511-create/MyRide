@@ -167,6 +167,12 @@ export default function ChecklistsPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_types' }, () => {
         loadData(false)
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'checklist_categories' }, () => {
+        loadChecklistItems()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'checklist_items' }, () => {
+        loadChecklistItems()
+      })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }

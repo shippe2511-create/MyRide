@@ -803,6 +803,7 @@ export function DocumentsTable() {
                 <label className="text-sm font-medium">Date</label>
                 <Input
                   type="date"
+                  className="[color-scheme:dark]"
                   value={reminderForm.remind_date}
                   onChange={(e) => setReminderForm(f => ({ ...f, remind_date: e.target.value }))}
                 />
@@ -811,6 +812,7 @@ export function DocumentsTable() {
                 <label className="text-sm font-medium">Time</label>
                 <Input
                   type="time"
+                  className="[color-scheme:dark]"
                   value={reminderForm.remind_time}
                   onChange={(e) => setReminderForm(f => ({ ...f, remind_time: e.target.value }))}
                 />

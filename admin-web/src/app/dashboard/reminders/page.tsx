@@ -92,7 +92,7 @@ export default function RemindersPage() {
 
     setReminders(enrichedReminders)
     setDrivers((driversData || []).map(d => ({ id: (d.profiles as any).id, full_name: (d.profiles as any).full_name, role: "driver" })))
-    setCustomers(customersData || [])
+    setCustomers((customersData || []).map(c => ({ id: c.id, full_name: c.full_name, role: "customer" })))
     setLoading(false)
   }
 

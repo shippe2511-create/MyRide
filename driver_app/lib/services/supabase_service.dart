@@ -546,38 +546,50 @@ class SupabaseService {
     final cutoffTime = DateTime.now().toUtc().subtract(const Duration(minutes: 30)).toIso8601String();
     debugPrint('getPendingRides: now=$now, cutoff=$cutoffTime');
 
-    // Get driver's pool memberships and assigned customers
+    // Get driver's pool memberships (using pool_id UUIDs)
     final currentDriverId = driverId;
-    Set<String> driverPools = {'public'}; // Default to public
-    Set<String> assignedCustomerIds = {};
+    Set<String> driverPoolIds = {};
+    String? publicPoolId;
+
+    // Get the public pool ID for fallback
+    try {
+      final publicPool = await client
+          .from('pools')
+          .select('id')
+          .eq('access_type', 'open')
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle();
+      if (publicPool != null) {
+        publicPoolId = publicPool['id'] as String?;
+        driverPoolIds.add(publicPoolId!); // All drivers can see public pool rides
+      }
+    } catch (e) {
+      debugPrint('Error getting public pool: $e');
+    }
 
     if (currentDriverId != null) {
-      // Get driver's pool memberships
-      final poolsResponse = await client
-          .from('driver_pools')
-          .select('pool')
-          .eq('driver_id', currentDriverId);
-      driverPools = (poolsResponse as List).map((p) => p['pool'] as String).toSet();
-      if (driverPools.isEmpty) driverPools = {'public'};
-
-      // Get customers assigned to this driver (for private pool)
-      if (driverPools.contains('private')) {
-        final assignmentsResponse = await client
-            .from('customer_driver_assignments')
-            .select('customer_id')
+      // Get driver's restricted pool memberships
+      try {
+        final poolsResponse = await client
+            .from('driver_pools')
+            .select('pool_id')
             .eq('driver_id', currentDriverId);
-        assignedCustomerIds = (assignmentsResponse as List)
-            .map((a) => a['customer_id'] as String)
-            .toSet();
+        for (final p in (poolsResponse as List)) {
+          final poolId = p['pool_id'] as String?;
+          if (poolId != null) driverPoolIds.add(poolId);
+        }
+      } catch (e) {
+        debugPrint('Error getting driver pools: $e');
       }
     }
 
-    debugPrint('Driver pools: $driverPools, assigned customers: ${assignedCustomerIds.length}');
+    debugPrint('Driver pool IDs: $driverPoolIds');
 
     // Get immediate rides (no scheduled_time, created recently)
     final immediateRides = await client
         .from('rides')
-        .select('*, customer:profiles!customer_id(*)')
+        .select('*, customer:profiles!customer_id(*), pool:pools!pool_id(id, name, access_type)')
         .eq('status', 'pending')
         .isFilter('scheduled_time', null)
         .gte('created_at', cutoffTime)
@@ -587,11 +599,11 @@ class SupabaseService {
     final scheduledCutoff = DateTime.now().toUtc().subtract(const Duration(minutes: 10)).toIso8601String();
     final scheduledRides = await client
         .from('rides')
-        .select('*, customer:profiles!customer_id(*)')
+        .select('*, customer:profiles!customer_id(*), pool:pools!pool_id(id, name, access_type)')
         .eq('status', 'pending')
         .not('scheduled_time', 'is', null)
         .lte('scheduled_time', now)
-        .gte('scheduled_time', scheduledCutoff) // Only show if scheduled within last 10 min
+        .gte('scheduled_time', scheduledCutoff)
         .order('scheduled_time', ascending: true);
 
     debugPrint('Found ${immediateRides.length} immediate + ${scheduledRides.length} scheduled rides');
@@ -604,30 +616,24 @@ class SupabaseService {
 
     // Filter rides based on driver's pool access
     final filteredRides = allRides.where((ride) {
-      final ridePool = ride['pool'] as String? ?? 'public';
-      final customerId = ride['customer_id'] as String?;
+      final ridePoolId = ride['pool_id'] as String?;
+      final poolInfo = ride['pool'] as Map<String, dynamic>?;
+      final accessType = poolInfo?['access_type'] as String?;
 
-      if (ridePool == 'private') {
-        // Private rides: only show to drivers in private pool AND assigned to this customer
-        return driverPools.contains('private') &&
-               customerId != null &&
-               assignedCustomerIds.contains(customerId);
-      } else {
-        // Public rides: show to drivers in public pool
-        return driverPools.contains('public');
-      }
+      // Open pools: all drivers can see
+      if (accessType == 'open') return true;
+
+      // Restricted pools: only drivers in that pool can see
+      if (ridePoolId != null && driverPoolIds.contains(ridePoolId)) return true;
+
+      // No pool_id set: show to all (backwards compat)
+      if (ridePoolId == null) return true;
+
+      return false;
     }).toList();
 
-    // Sort: private rides first (priority), then by created_at
+    // Sort by created_at
     filteredRides.sort((a, b) {
-      final aPool = a['pool'] as String? ?? 'public';
-      final bPool = b['pool'] as String? ?? 'public';
-
-      // Private rides come first
-      if (aPool == 'private' && bPool != 'private') return -1;
-      if (bPool == 'private' && aPool != 'private') return 1;
-
-      // Within same pool, sort by created_at
       final aTime = DateTime.tryParse(a['created_at'] ?? '') ?? DateTime.now();
       final bTime = DateTime.tryParse(b['created_at'] ?? '') ?? DateTime.now();
       return aTime.compareTo(bTime);
@@ -2037,6 +2043,37 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Error uploading file to $bucket: $e');
       return null;
+    }
+  }
+
+  /// Get checklist categories and items from database
+  static Future<List<Map<String, dynamic>>> getChecklistItems() async {
+    try {
+      final categoriesRes = await client
+          .from('checklist_categories')
+          .select('*')
+          .eq('is_active', true)
+          .order('sort_order');
+
+      final itemsRes = await client
+          .from('checklist_items')
+          .select('*')
+          .eq('is_active', true)
+          .order('sort_order');
+
+      final categories = List<Map<String, dynamic>>.from(categoriesRes);
+      final items = List<Map<String, dynamic>>.from(itemsRes);
+
+      // Attach items to categories
+      for (final cat in categories) {
+        cat['items'] = items.where((item) => item['category_id'] == cat['id']).toList();
+      }
+
+      debugPrint('Loaded ${categories.length} checklist categories with ${items.length} items');
+      return categories;
+    } catch (e) {
+      debugPrint('Error loading checklist items: $e');
+      return [];
     }
   }
 }

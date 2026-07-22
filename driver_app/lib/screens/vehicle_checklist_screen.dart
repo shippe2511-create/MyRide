@@ -33,7 +33,11 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
   final Map<String, List<File>> _issuePhotos = {};
   final ImagePicker _picker = ImagePicker();
 
-  final List<_ChecklistCategory> _categories = [
+  List<_ChecklistCategory> _categories = [];
+  bool _loadingItems = true;
+
+  // Fallback hardcoded categories (used if database fetch fails)
+  final List<_ChecklistCategory> _fallbackCategories = [
     _ChecklistCategory(
       name: 'Exterior',
       icon: Icons.directions_car,
@@ -123,10 +127,69 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
+    _loadChecklistItems();
+  }
+
+  Future<void> _loadChecklistItems() async {
+    try {
+      final data = await SupabaseService.getChecklistItems();
+      if (data.isNotEmpty && mounted) {
+        setState(() {
+          _categories = data.map((cat) => _ChecklistCategory(
+            name: cat['name'] as String,
+            icon: _getIconFromString(cat['icon'] as String? ?? 'clipboard'),
+            items: (cat['items'] as List<dynamic>? ?? []).map((item) => _ChecklistItem(
+              key: item['key'] as String,
+              icon: _getIconFromString(item['icon'] as String? ?? 'check'),
+              title: item['title'] as String,
+              description: item['description'] as String? ?? '',
+            )).toList(),
+          )).toList();
+          _initializeChecklist();
+          _loadingItems = false;
+        });
+      } else {
+        _useFallbackCategories();
+      }
+    } catch (e) {
+      debugPrint('Error loading checklist items: $e');
+      _useFallbackCategories();
+    }
+  }
+
+  void _useFallbackCategories() {
+    if (mounted) {
+      setState(() {
+        _categories = _fallbackCategories;
+        _initializeChecklist();
+        _loadingItems = false;
+      });
+    }
+  }
+
+  void _initializeChecklist() {
+    _checklist.clear();
     for (var cat in _categories) {
       for (var item in cat.items) {
         _checklist[item.key] = CheckStatus.unchecked;
       }
+    }
+  }
+
+  IconData _getIconFromString(String iconName) {
+    switch (iconName) {
+      case 'car': return Icons.directions_car;
+      case 'armchair': return Icons.airline_seat_recline_normal;
+      case 'shield-check': return Icons.verified_user;
+      case 'circle-dot': return Icons.tire_repair;
+      case 'lightbulb': return Icons.highlight;
+      case 'sparkles': return Icons.cleaning_services;
+      case 'thermometer': return Icons.ac_unit;
+      case 'shield': return Icons.airline_seat_legroom_normal;
+      case 'fuel': return Icons.local_gas_station;
+      case 'file-text': return Icons.folder_copy;
+      case 'first-aid': return Icons.medical_services;
+      default: return Icons.check_circle;
     }
   }
 
@@ -142,9 +205,9 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
       _checklist.values.where((v) => v != CheckStatus.unchecked).length;
   int get _issueCount =>
       _checklist.values.where((v) => v == CheckStatus.issue).length;
-  bool get _allChecked => _checkedCount == _totalItems;
+  bool get _allChecked => _checkedCount == _totalItems && _totalItems > 0;
   bool get _hasIssues => _issueCount > 0;
-  double get _progress => _checkedCount / _totalItems;
+  double get _progress => _totalItems > 0 ? _checkedCount / _totalItems : 0;
 
   void _updateProgress() {
     _progressController.animateTo(_progress);
@@ -152,6 +215,22 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_loadingItems) {
+      return Scaffold(
+        backgroundColor: context.bgColor,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: AppColors.yellow),
+              const SizedBox(height: 16),
+              Text('Loading checklist...', style: TextStyle(color: context.mutedColor)),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: context.bgColor,
       extendBody: true,

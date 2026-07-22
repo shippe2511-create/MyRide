@@ -71,6 +71,26 @@ interface VehicleHealth {
   days_in_service: number
 }
 
+interface ChecklistCategory {
+  id: string
+  name: string
+  icon: string
+  sort_order: number
+  is_active: boolean
+  items?: ChecklistItem[]
+}
+
+interface ChecklistItem {
+  id: string
+  category_id: string
+  key: string
+  title: string
+  description: string | null
+  icon: string
+  sort_order: number
+  is_active: boolean
+}
+
 const ITEM_LABELS: Record<string, string> = {
   fuel: "Fuel Level", tires: "Tires", lights: "Lights", body: "Body Condition",
   ac: "A/C", safety: "Safety Kit", documents: "Documents", seatbelts: "Seatbelts", cleanliness: "Cleanliness",
@@ -80,6 +100,7 @@ const PAGE_SIZE = 15
 
 const TABS = [
   { id: "checks", label: "Checks", icon: ClipboardCheck },
+  { id: "items", label: "Manage Items", icon: Pencil },
   { id: "fleet", label: "Fleet Health", icon: Activity },
   { id: "reports", label: "Reports", icon: FileDown },
 ]
@@ -121,6 +142,18 @@ export default function ChecklistsPage() {
     const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split("T")[0]
   })
 
+  // Checklist items management state
+  const [categories, setCategories] = useState<ChecklistCategory[]>([])
+  const [itemsLoading, setItemsLoading] = useState(false)
+  const [editingCategory, setEditingCategory] = useState<ChecklistCategory | null>(null)
+  const [editingItem, setEditingItem] = useState<ChecklistItem | null>(null)
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false)
+  const [itemDialogOpen, setItemDialogOpen] = useState(false)
+  const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null)
+  const [deleteItemId, setDeleteItemId] = useState<string | null>(null)
+  const [categoryForm, setCategoryForm] = useState({ name: "", icon: "clipboard" })
+  const [itemForm, setItemForm] = useState({ category_id: "", key: "", title: "", description: "", icon: "check" })
+
   const [stats, setStats] = useState({ total: 0, withIssues: 0, passed: 0 })
 
   useEffect(() => {
@@ -146,8 +179,183 @@ export default function ChecklistsPage() {
 
   const loadData = async (showLoading = true) => {
     if (showLoading) setLoading(true)
-    await Promise.all([loadChecklists(showLoading), loadFleetHealth()])
+    await Promise.all([loadChecklists(showLoading), loadFleetHealth(), loadChecklistItems()])
     if (showLoading) setLoading(false)
+  }
+
+  const loadChecklistItems = async () => {
+    setItemsLoading(true)
+    try {
+      const [categoriesRes, itemsRes] = await Promise.all([
+        supabase.from("checklist_categories").select("*").order("sort_order"),
+        supabase.from("checklist_items").select("*").order("sort_order"),
+      ])
+
+      const cats = (categoriesRes.data || []) as ChecklistCategory[]
+      const items = (itemsRes.data || []) as ChecklistItem[]
+
+      // Attach items to their categories
+      const catsWithItems = cats.map(cat => ({
+        ...cat,
+        items: items.filter(item => item.category_id === cat.id)
+      }))
+
+      setCategories(catsWithItems)
+    } catch (e) {
+      console.error("Error loading checklist items:", e)
+      toast.error("Failed to load checklist items")
+    } finally {
+      setItemsLoading(false)
+    }
+  }
+
+  // Category CRUD
+  const openAddCategory = () => {
+    setEditingCategory(null)
+    setCategoryForm({ name: "", icon: "clipboard" })
+    setCategoryDialogOpen(true)
+  }
+
+  const openEditCategory = (cat: ChecklistCategory) => {
+    setEditingCategory(cat)
+    setCategoryForm({ name: cat.name, icon: cat.icon })
+    setCategoryDialogOpen(true)
+  }
+
+  const saveCategory = async () => {
+    if (!categoryForm.name.trim()) {
+      toast.error("Category name is required")
+      return
+    }
+    setSaving(true)
+    try {
+      if (editingCategory) {
+        await supabase.from("checklist_categories").update({
+          name: categoryForm.name,
+          icon: categoryForm.icon,
+          updated_at: new Date().toISOString()
+        }).eq("id", editingCategory.id)
+        toast.success("Category updated")
+      } else {
+        const maxOrder = Math.max(0, ...categories.map(c => c.sort_order))
+        await supabase.from("checklist_categories").insert({
+          name: categoryForm.name,
+          icon: categoryForm.icon,
+          sort_order: maxOrder + 1
+        })
+        toast.success("Category added")
+      }
+      setCategoryDialogOpen(false)
+      loadChecklistItems()
+    } catch (e) {
+      toast.error("Failed to save category")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const deleteCategory = async () => {
+    if (!deleteCategoryId) return
+    setSaving(true)
+    try {
+      await supabase.from("checklist_categories").delete().eq("id", deleteCategoryId)
+      toast.success("Category deleted")
+      setDeleteCategoryId(null)
+      loadChecklistItems()
+    } catch (e) {
+      toast.error("Failed to delete category")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const toggleCategoryActive = async (cat: ChecklistCategory) => {
+    try {
+      await supabase.from("checklist_categories").update({ is_active: !cat.is_active }).eq("id", cat.id)
+      loadChecklistItems()
+    } catch (e) {
+      toast.error("Failed to update category")
+    }
+  }
+
+  // Item CRUD
+  const openAddItem = (categoryId: string) => {
+    setEditingItem(null)
+    setItemForm({ category_id: categoryId, key: "", title: "", description: "", icon: "check" })
+    setItemDialogOpen(true)
+  }
+
+  const openEditItem = (item: ChecklistItem) => {
+    setEditingItem(item)
+    setItemForm({
+      category_id: item.category_id,
+      key: item.key,
+      title: item.title,
+      description: item.description || "",
+      icon: item.icon
+    })
+    setItemDialogOpen(true)
+  }
+
+  const saveItem = async () => {
+    if (!itemForm.title.trim() || !itemForm.key.trim()) {
+      toast.error("Title and Key are required")
+      return
+    }
+    setSaving(true)
+    try {
+      if (editingItem) {
+        await supabase.from("checklist_items").update({
+          title: itemForm.title,
+          description: itemForm.description || null,
+          icon: itemForm.icon,
+          updated_at: new Date().toISOString()
+        }).eq("id", editingItem.id)
+        toast.success("Item updated")
+      } else {
+        const catItems = categories.find(c => c.id === itemForm.category_id)?.items || []
+        const maxOrder = Math.max(0, ...catItems.map(i => i.sort_order))
+        await supabase.from("checklist_items").insert({
+          category_id: itemForm.category_id,
+          key: itemForm.key.toLowerCase().replace(/\s+/g, '_'),
+          title: itemForm.title,
+          description: itemForm.description || null,
+          icon: itemForm.icon,
+          sort_order: maxOrder + 1
+        })
+        toast.success("Item added")
+      }
+      setItemDialogOpen(false)
+      loadChecklistItems()
+    } catch (e) {
+      toast.error("Failed to save item")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const deleteItem = async () => {
+    if (!deleteItemId) return
+    setSaving(true)
+    try {
+      await supabase.from("checklist_items").delete().eq("id", deleteItemId)
+      toast.success("Item deleted")
+      setDeleteItemId(null)
+      loadChecklistItems()
+    } catch (e) {
+      toast.error("Failed to delete item")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const toggleItemActive = async (item: ChecklistItem) => {
+    try {
+      await supabase.from("checklist_items").update({ is_active: !item.is_active }).eq("id", item.id)
+      loadChecklistItems()
+    } catch (e) {
+      toast.error("Failed to update item")
+    }
   }
 
   const loadChecklists = async (showLoading = true) => {
@@ -719,6 +927,113 @@ export default function ChecklistsPage() {
         </>
       )}
 
+      {/* MANAGE ITEMS TAB */}
+      {activeTab === "items" && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">Checklist Categories & Items</h3>
+              <p className="text-sm text-muted-foreground">Manage pre-trip inspection items shown to drivers</p>
+            </div>
+            <Button onClick={openAddCategory}>
+              <ClipboardCheck className="h-4 w-4 mr-2" />
+              Add Category
+            </Button>
+          </div>
+
+          {itemsLoading ? (
+            <SkeletonCard count={3} />
+          ) : categories.length === 0 ? (
+            <Card className="p-8 text-center text-muted-foreground">
+              <ClipboardCheck className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No checklist categories yet</p>
+              <Button variant="outline" className="mt-4" onClick={openAddCategory}>Add First Category</Button>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {categories.map((cat) => (
+                <Card key={cat.id} className={cn("p-4", !cat.is_active && "opacity-60")}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <ClipboardCheck className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold flex items-center gap-2">
+                          {cat.name}
+                          {!cat.is_active && <Badge variant="secondary">Inactive</Badge>}
+                        </h4>
+                        <p className="text-sm text-muted-foreground">{cat.items?.length || 0} items</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => openAddItem(cat.id)}>
+                        Add Item
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditCategory(cat)}>
+                            <Pencil className="h-4 w-4 mr-2" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => toggleCategoryActive(cat)}>
+                            {cat.is_active ? <XCircle className="h-4 w-4 mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                            {cat.is_active ? "Deactivate" : "Activate"}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-red-600" onClick={() => setDeleteCategoryId(cat.id)}>
+                            <Trash2 className="h-4 w-4 mr-2" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+
+                  {cat.items && cat.items.length > 0 ? (
+                    <div className="space-y-2 ml-4 border-l-2 border-muted pl-4">
+                      {cat.items.map((item) => (
+                        <div key={item.id} className={cn(
+                          "flex items-center justify-between p-3 rounded-lg bg-muted/50",
+                          !item.is_active && "opacity-60"
+                        )}>
+                          <div className="flex items-center gap-3">
+                            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                            <div>
+                              <p className="font-medium flex items-center gap-2">
+                                {item.title}
+                                {!item.is_active && <Badge variant="outline" className="text-xs">Inactive</Badge>}
+                              </p>
+                              {item.description && (
+                                <p className="text-sm text-muted-foreground">{item.description}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => openEditItem(item)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => toggleItemActive(item)}>
+                              {item.is_active ? <XCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                            </Button>
+                            <Button variant="ghost" size="icon" className="text-red-600" onClick={() => setDeleteItemId(item.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground ml-4 italic">No items in this category</p>
+                  )}
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* FLEET HEALTH TAB */}
       {activeTab === "fleet" && (
         <Card className="p-4">
@@ -1067,6 +1382,135 @@ export default function ChecklistsPage() {
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Delete Checklist?</AlertDialogTitle><AlertDialogDescription>This will permanently delete this checklist record. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Category Dialog */}
+      <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingCategory ? "Edit Category" : "Add Category"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Category Name *</label>
+              <Input
+                value={categoryForm.name}
+                onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                placeholder="e.g., Exterior, Interior, Safety"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Icon</label>
+              <Select value={categoryForm.icon} onValueChange={(v) => setCategoryForm({ ...categoryForm, icon: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="car">Car</SelectItem>
+                  <SelectItem value="armchair">Interior</SelectItem>
+                  <SelectItem value="shield-check">Safety</SelectItem>
+                  <SelectItem value="clipboard">Clipboard</SelectItem>
+                  <SelectItem value="wrench">Maintenance</SelectItem>
+                  <SelectItem value="settings">Settings</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>Cancel</Button>
+            <Button onClick={saveCategory} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {editingCategory ? "Save Changes" : "Add Category"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Item Dialog */}
+      <Dialog open={itemDialogOpen} onOpenChange={setItemDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingItem ? "Edit Checklist Item" : "Add Checklist Item"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Title *</label>
+              <Input
+                value={itemForm.title}
+                onChange={(e) => setItemForm({ ...itemForm, title: e.target.value })}
+                placeholder="e.g., Tires & Wheels"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Key * <span className="text-muted-foreground">(unique identifier)</span></label>
+              <Input
+                value={itemForm.key}
+                onChange={(e) => setItemForm({ ...itemForm, key: e.target.value })}
+                placeholder="e.g., tires"
+                disabled={!!editingItem}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Description</label>
+              <Input
+                value={itemForm.description}
+                onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })}
+                placeholder="e.g., Properly inflated, good tread depth"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Icon</label>
+              <Select value={itemForm.icon} onValueChange={(v) => setItemForm({ ...itemForm, icon: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="check">Check</SelectItem>
+                  <SelectItem value="circle-dot">Tire</SelectItem>
+                  <SelectItem value="lightbulb">Light</SelectItem>
+                  <SelectItem value="car">Car</SelectItem>
+                  <SelectItem value="sparkles">Clean</SelectItem>
+                  <SelectItem value="thermometer">Climate</SelectItem>
+                  <SelectItem value="shield">Seatbelt</SelectItem>
+                  <SelectItem value="fuel">Fuel</SelectItem>
+                  <SelectItem value="file-text">Document</SelectItem>
+                  <SelectItem value="first-aid">First Aid</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setItemDialogOpen(false)}>Cancel</Button>
+            <Button onClick={saveItem} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {editingItem ? "Save Changes" : "Add Item"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Category Confirmation */}
+      <AlertDialog open={!!deleteCategoryId} onOpenChange={(open) => { if (!open) setDeleteCategoryId(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Category?</AlertDialogTitle>
+            <AlertDialogDescription>This will delete the category and all its items. This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={deleteCategory} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Item Confirmation */}
+      <AlertDialog open={!!deleteItemId} onOpenChange={(open) => { if (!open) setDeleteItemId(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Item?</AlertDialogTitle>
+            <AlertDialogDescription>This will delete the checklist item. This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={deleteItem} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

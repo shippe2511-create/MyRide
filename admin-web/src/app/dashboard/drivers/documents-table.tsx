@@ -876,55 +876,89 @@ export function DocumentsTable() {
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogType(null)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={async () => {
-                if (!selectedDocument || !reminderForm.title || !reminderForm.remind_date) {
-                  toast.error("Please fill in all fields")
-                  return
-                }
-                setUpdating(true)
+          <DialogFooter className="flex justify-between">
+            <div>
+              {selectedDocument && documentReminders[selectedDocument.id] && (
+                <Button
+                  variant="destructive"
+                  onClick={async () => {
+                    if (!selectedDocument) return
+                    setUpdating(true)
+                    const { error } = await supabase
+                      .from("reminders")
+                      .delete()
+                      .like("title", `doc:${selectedDocument.id}%`)
+                    if (error) {
+                      toast.error("Failed to remove reminder")
+                    } else {
+                      toast.success("Reminder removed")
+                      setDialogType(null)
+                      loadReminders()
+                    }
+                    setUpdating(false)
+                  }}
+                  disabled={updating}
+                >
+                  Remove Reminder
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setDialogType(null)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!selectedDocument || !reminderForm.title || !reminderForm.remind_date) {
+                    toast.error("Please fill in all fields")
+                    return
+                  }
+                  setUpdating(true)
 
-                // Get driver profile ID
-                const { data: driverData, error: driverError } = await supabase
-                  .from("drivers")
-                  .select("profile_id")
-                  .eq("id", selectedDocument.driver_id)
-                  .single()
+                  // Delete existing reminder first
+                  await supabase
+                    .from("reminders")
+                    .delete()
+                    .like("title", `doc:${selectedDocument.id}%`)
 
-                if (driverError || !driverData?.profile_id) {
-                  console.error("Driver lookup error:", driverError)
-                  toast.error("Could not find driver profile")
+                  // Get driver profile ID
+                  const { data: driverData, error: driverError } = await supabase
+                    .from("drivers")
+                    .select("profile_id")
+                    .eq("id", selectedDocument.driver_id)
+                    .single()
+
+                  if (driverError || !driverData?.profile_id) {
+                    console.error("Driver lookup error:", driverError)
+                    toast.error("Could not find driver profile")
+                    setUpdating(false)
+                    return
+                  }
+
+                  const { error } = await supabase.rpc("create_reminder", {
+                    p_title: `doc:${selectedDocument.id} - ${reminderForm.title}`,
+                    p_message: reminderForm.message,
+                    p_target_type: "specific_driver",
+                    p_target_id: driverData.profile_id,
+                    p_remind_date: reminderForm.remind_date,
+                    p_remind_time: reminderForm.remind_time,
+                  })
+
+                  if (error) {
+                    console.error("Reminder insert error:", error)
+                    toast.error("Failed to create reminder: " + error.message)
+                  } else {
+                    toast.success("Reminder scheduled")
+                    setDialogType(null)
+                    loadReminders()
+                  }
                   setUpdating(false)
-                  return
-                }
-
-                const { error } = await supabase.rpc("create_reminder", {
-                  p_title: `doc:${selectedDocument.id} - ${reminderForm.title}`,
-                  p_message: reminderForm.message,
-                  p_target_type: "specific_driver",
-                  p_target_id: driverData.profile_id,
-                  p_remind_date: reminderForm.remind_date,
-                  p_remind_time: reminderForm.remind_time,
-                })
-
-                if (error) {
-                  console.error("Reminder insert error:", error)
-                  toast.error("Failed to create reminder: " + error.message)
-                } else {
-                  toast.success("Reminder scheduled")
-                  setDialogType(null)
-                  loadReminders()
-                }
-                setUpdating(false)
-              }}
-              disabled={updating}
-            >
-              {updating ? "Saving..." : "Schedule Reminder"}
-            </Button>
+                }}
+                disabled={updating}
+              >
+                {updating ? "Saving..." : "Schedule Reminder"}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

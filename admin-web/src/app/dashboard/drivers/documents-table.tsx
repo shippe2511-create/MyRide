@@ -582,25 +582,17 @@ export function DocumentsTable() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    {documentReminders[doc.id] ? (() => {
-                      const reminder = documentReminders[doc.id]
-                      const reminderDate = new Date(reminder.date)
-                      const today = new Date()
-                      today.setHours(0, 0, 0, 0)
-                      const isPast = reminderDate < today
-                      const colorClass = reminder.sent ? "text-green-500" : isPast ? "text-red-500" : "text-yellow-500"
-                      return (
-                        <div className="flex items-center gap-2">
-                          <Bell className={`h-3 w-3 ${colorClass}`} />
-                          <span className={`text-sm ${colorClass}`}>
-                            {formatDate(reminder.date)}
-                          </span>
-                          {reminder.sent && (
-                            <Badge variant="outline" className="text-xs text-green-500 border-green-500">Sent</Badge>
-                          )}
-                        </div>
-                      )
-                    })() : (
+                    {documentReminders[doc.id] ? (
+                      <div className="flex items-center gap-2">
+                        <Bell className="h-3 w-3 text-yellow-500" />
+                        <span className="text-sm text-yellow-500">
+                          {formatDate(documentReminders[doc.id].date)}
+                        </span>
+                        {documentReminders[doc.id].sent && (
+                          <Badge variant="outline" className="text-xs text-green-500 border-green-500">Sent</Badge>
+                        )}
+                      </div>
+                    ) : (
                       <span className="text-muted-foreground text-sm">-</span>
                     )}
                   </TableCell>

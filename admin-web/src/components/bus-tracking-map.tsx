@@ -1,13 +1,13 @@
 "use client"
 
 import { useEffect, useState, useCallback, useRef } from "react"
-import { GoogleMap, OverlayView, TrafficLayer } from "@react-google-maps/api"
+import { GoogleMap, OverlayView, TrafficLayer, HeatmapLayer, Circle } from "@react-google-maps/api"
 import { useGoogleMaps } from "@/components/providers/google-maps-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   Layers, Bus, Satellite, Map as MapIcon, Maximize2, Minimize2,
-  LocateFixed, Search, X, Volume2, VolumeX, Target, Users
+  LocateFixed, Search, X, Volume2, VolumeX, Target, Navigation, Car
 } from "lucide-react"
 
 interface BusLocation {
@@ -66,6 +66,9 @@ const defaultCenter = {
   lat: 4.1755,
   lng: 73.5093,
 }
+
+const serviceAreaCenter = { lat: 4.1755, lng: 73.5093 }
+const serviceAreaRadius = 15000
 
 function BusMarker({
   bus,
@@ -141,13 +144,36 @@ export function BusTrackingMap({ buses, selectedBusId, onBusClick }: BusTracking
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showTraffic, setShowTraffic] = useState(false)
-  const [mapType, setMapType] = useState<"roadmap" | "satellite">("roadmap")
+  const [showGeofence, setShowGeofence] = useState(false)
+  const [showHeatmap, setShowHeatmap] = useState(false)
+  const [mapType, setMapType] = useState<"roadmap" | "satellite" | "terrain">("roadmap")
   const [searchQuery, setSearchQuery] = useState("")
   const [showSearch, setShowSearch] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(true)
+  const [isDark, setIsDark] = useState(true)
   const containerRef = useRef<HTMLDivElement>(null)
+  const initialFitDoneRef = useRef(false)
 
   const { isLoaded, loadError } = useGoogleMaps()
+
+  // Theme detection
+  useEffect(() => {
+    const checkTheme = () => {
+      const dark = document.documentElement.classList.contains("dark")
+      setIsDark(dark)
+    }
+
+    checkTheme()
+    const observer = new MutationObserver(checkTheme)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] })
+
+    return () => observer.disconnect()
+  }, [])
+
+  // Heatmap data from bus locations
+  const heatmapData = buses.map(bus =>
+    isLoaded && window.google ? new google.maps.LatLng(bus.latitude, bus.longitude) : null
+  ).filter(Boolean) as google.maps.LatLng[]
 
   const onLoad = useCallback((map: google.maps.Map) => {
     setMap(map)
@@ -157,23 +183,29 @@ export function BusTrackingMap({ buses, selectedBusId, onBusClick }: BusTracking
     setMap(null)
   }, [])
 
-  // Fit bounds to show all buses
+  // Fit bounds only on initial load
   useEffect(() => {
-    if (map && buses.length > 0) {
-      const bounds = new google.maps.LatLngBounds()
-      buses.forEach((bus) => {
-        bounds.extend({ lat: bus.latitude, lng: bus.longitude })
-      })
-      map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 })
+    if (!map || buses.length === 0 || selectedBusId) return
+    if (initialFitDoneRef.current) return
 
-      const listener = google.maps.event.addListenerOnce(map, "idle", () => {
-        const zoom = map.getZoom()
-        if (zoom && zoom > 16) {
-          map.setZoom(16)
-        }
-      })
-    }
-  }, [map, buses.length])
+    const validBuses = buses.filter(b => b.latitude && b.longitude)
+    if (validBuses.length === 0) return
+
+    const bounds = new google.maps.LatLngBounds()
+    validBuses.forEach((bus) => {
+      bounds.extend({ lat: bus.latitude, lng: bus.longitude })
+    })
+    map.fitBounds(bounds, { top: 80, right: 80, bottom: 80, left: 80 })
+
+    setTimeout(() => {
+      const zoom = map.getZoom()
+      if (zoom && zoom > 14) {
+        map.setZoom(14)
+      }
+    }, 100)
+
+    initialFitDoneRef.current = true
+  }, [map, buses, selectedBusId])
 
   // Center on selected bus
   useEffect(() => {
@@ -181,47 +213,70 @@ export function BusTrackingMap({ buses, selectedBusId, onBusClick }: BusTracking
       const selectedBus = buses.find((b) => b.id === selectedBusId)
       if (selectedBus) {
         map.panTo({ lat: selectedBus.latitude, lng: selectedBus.longitude })
-        map.setZoom(15)
+        const currentZoom = map.getZoom()
+        if (currentZoom && currentZoom < 15) {
+          map.setZoom(15)
+        }
       }
     }
   }, [map, selectedBusId, buses])
 
+  // Fullscreen handling
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange)
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange)
+  }, [])
+
   const toggleFullscreen = () => {
     if (!containerRef.current) return
 
-    if (!isFullscreen) {
-      containerRef.current.requestFullscreen?.()
+    if (!document.fullscreenElement) {
+      containerRef.current.requestFullscreen()
     } else {
-      document.exitFullscreen?.()
-    }
-    setIsFullscreen(!isFullscreen)
-  }
-
-  const centerOnBuses = () => {
-    if (map && buses.length > 0) {
-      const bounds = new google.maps.LatLngBounds()
-      buses.forEach((bus) => {
-        bounds.extend({ lat: bus.latitude, lng: bus.longitude })
-      })
-      map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 })
+      document.exitFullscreen()
     }
   }
 
-  const searchBus = () => {
-    if (!searchQuery.trim()) return
+  const recenterMap = () => {
+    if (!map || buses.length === 0) return
 
-    const query = searchQuery.toLowerCase()
-    const found = buses.find(
-      (b) =>
-        b.vehicle?.vehicle_number?.toLowerCase().includes(query) ||
-        (b.driver?.profile as any)?.full_name?.toLowerCase().includes(query) ||
-        b.route?.route_name?.toLowerCase().includes(query)
-    )
+    const bounds = new google.maps.LatLngBounds()
+    buses.forEach((bus) => {
+      bounds.extend({ lat: bus.latitude, lng: bus.longitude })
+    })
+    map.fitBounds(bounds, { top: 80, right: 80, bottom: 80, left: 80 })
 
-    if (found && map) {
-      map.panTo({ lat: found.latitude, lng: found.longitude })
-      map.setZoom(16)
-      onBusClick?.(found)
+    setTimeout(() => {
+      const zoom = map.getZoom()
+      if (zoom && zoom > 14) {
+        map.setZoom(14)
+      }
+    }, 100)
+  }
+
+  const searchMatchIds = new Set(
+    searchQuery.trim()
+      ? buses
+          .filter(b =>
+            b.vehicle?.vehicle_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (b.driver?.profile as any)?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            b.route?.route_name?.toLowerCase().includes(searchQuery.toLowerCase())
+          )
+          .map(b => b.id)
+      : []
+  )
+
+  const zoomToBus = (busId: string) => {
+    if (!map) return
+    const bus = buses.find(b => b.id === busId)
+    if (bus) {
+      map.panTo({ lat: bus.latitude, lng: bus.longitude })
+      map.setZoom(17)
+      onBusClick?.(bus)
     }
   }
 
@@ -251,7 +306,7 @@ export function BusTrackingMap({ buses, selectedBusId, onBusClick }: BusTracking
         onUnmount={onUnmount}
         mapTypeId={mapType}
         options={{
-          styles: mapType === "roadmap" ? darkMapStyle : undefined,
+          styles: isDark && mapType === "roadmap" ? darkMapStyle : undefined,
           disableDefaultUI: true,
           zoomControl: false,
           mapTypeControl: false,
@@ -260,6 +315,30 @@ export function BusTrackingMap({ buses, selectedBusId, onBusClick }: BusTracking
         }}
       >
         {showTraffic && <TrafficLayer />}
+
+        {showHeatmap && heatmapData.length > 0 && (
+          <HeatmapLayer
+            data={heatmapData}
+            options={{
+              radius: 30,
+              opacity: 0.6,
+            }}
+          />
+        )}
+
+        {showGeofence && (
+          <Circle
+            center={serviceAreaCenter}
+            radius={serviceAreaRadius}
+            options={{
+              fillColor: isDark ? "#3b82f6" : "#60a5fa",
+              fillOpacity: 0.1,
+              strokeColor: isDark ? "#3b82f6" : "#2563eb",
+              strokeOpacity: 0.8,
+              strokeWeight: 2,
+            }}
+          />
+        )}
 
         {buses.map((bus) => (
           <OverlayView
@@ -276,164 +355,180 @@ export function BusTrackingMap({ buses, selectedBusId, onBusClick }: BusTracking
         ))}
       </GoogleMap>
 
-      {/* Map Controls - Right Side */}
-      <div className="absolute top-4 right-4 flex flex-col gap-2">
-        {/* Search */}
-        <Button
-          size="icon"
-          variant="secondary"
-          className="w-10 h-10 bg-background/90 backdrop-blur shadow-lg"
-          onClick={() => setShowSearch(!showSearch)}
-        >
-          <Search className="h-5 w-5" />
-        </Button>
-
-        {/* Fullscreen */}
-        <Button
-          size="icon"
-          variant="secondary"
-          className="w-10 h-10 bg-background/90 backdrop-blur shadow-lg"
-          onClick={toggleFullscreen}
-        >
-          {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
-        </Button>
-
-        {/* Center on buses */}
-        <Button
-          size="icon"
-          variant="secondary"
-          className="w-10 h-10 bg-background/90 backdrop-blur shadow-lg"
-          onClick={centerOnBuses}
-        >
-          <Target className="h-5 w-5" />
-        </Button>
-
-        {/* Sound toggle */}
-        <Button
-          size="icon"
-          variant="secondary"
-          className="w-10 h-10 bg-background/90 backdrop-blur shadow-lg"
-          onClick={() => setSoundEnabled(!soundEnabled)}
-        >
-          {soundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
-        </Button>
-
-        <div className="h-px bg-border my-1" />
-
-        {/* Traffic */}
-        <Button
-          size="icon"
-          variant={showTraffic ? "default" : "secondary"}
-          className={`w-10 h-10 backdrop-blur shadow-lg ${showTraffic ? "" : "bg-background/90"}`}
-          onClick={() => setShowTraffic(!showTraffic)}
-        >
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 2v20M2 12h20" />
-            <circle cx="12" cy="12" r="3" />
-          </svg>
-        </Button>
-
-        {/* Heatmap placeholder */}
-        <Button
-          size="icon"
-          variant="secondary"
-          className="w-10 h-10 bg-background/90 backdrop-blur shadow-lg"
-        >
-          <LocateFixed className="h-5 w-5" />
-        </Button>
-
-        {/* Navigation */}
-        <Button
-          size="icon"
-          variant="secondary"
-          className="w-10 h-10 bg-background/90 backdrop-blur shadow-lg"
-          onClick={centerOnBuses}
-        >
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z" />
-          </svg>
-        </Button>
-
-        <div className="h-px bg-border my-1" />
-
-        {/* Map type toggle */}
-        <Button
-          size="icon"
-          variant={mapType === "satellite" ? "default" : "secondary"}
-          className={`w-10 h-10 backdrop-blur shadow-lg ${mapType === "satellite" ? "" : "bg-background/90"}`}
-          onClick={() => setMapType(mapType === "roadmap" ? "satellite" : "roadmap")}
-        >
-          <MapIcon className="h-5 w-5" />
-        </Button>
-
-        {/* Layers */}
-        <Button
-          size="icon"
-          variant="secondary"
-          className="w-10 h-10 bg-background/90 backdrop-blur shadow-lg"
-        >
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 2L2 7l10 5 10-5-10-5z" />
-            <path d="M2 17l10 5 10-5" />
-            <path d="M2 12l10 5 10-5" />
-          </svg>
-        </Button>
-
-        {/* Additional layers */}
-        <Button
-          size="icon"
-          variant="secondary"
-          className="w-10 h-10 bg-background/90 backdrop-blur shadow-lg"
-        >
-          <Layers className="h-5 w-5" />
-        </Button>
-      </div>
-
-      {/* Search Box */}
+      {/* Search Bar */}
       {showSearch && (
-        <div className="absolute top-4 left-4 right-20 flex gap-2">
-          <div className="relative flex-1 max-w-md">
+        <div className="absolute top-3 left-3 right-[180px] flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
+              placeholder="Search bus, driver, or route..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && searchBus()}
-              placeholder="Search bus, driver, or route..."
-              className="bg-background/90 backdrop-blur shadow-lg pr-8"
+              className="pl-9 pr-9 bg-background/95 backdrop-blur shadow-lg"
+              autoFocus
             />
             {searchQuery && (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+              <button
                 onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2"
               >
-                <X className="h-4 w-4" />
-              </Button>
+                <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+              </button>
             )}
           </div>
-          <Button onClick={searchBus} className="shadow-lg">
-            Search
-          </Button>
+          {searchMatchIds.size > 0 && (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="shadow-lg"
+              onClick={() => {
+                const firstMatch = buses.find(b => searchMatchIds.has(b.id))
+                if (firstMatch) zoomToBus(firstMatch.id)
+              }}
+            >
+              <Target className="h-4 w-4 mr-1" />
+              Go ({searchMatchIds.size})
+            </Button>
+          )}
         </div>
       )}
 
+      {/* Map Controls */}
+      <div className="absolute top-3 right-3 flex flex-col gap-2">
+        {/* Search Toggle */}
+        <Button
+          variant={showSearch ? "default" : "secondary"}
+          size="icon"
+          className="shadow-lg h-8 w-8"
+          onClick={() => setShowSearch(!showSearch)}
+          title="Search buses"
+        >
+          <Search className="h-4 w-4" />
+        </Button>
+
+        {/* Fullscreen Toggle */}
+        <Button
+          variant="secondary"
+          size="icon"
+          className="shadow-lg h-8 w-8"
+          onClick={toggleFullscreen}
+          title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+        >
+          {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </Button>
+
+        {/* Recenter */}
+        <Button
+          variant="secondary"
+          size="icon"
+          className="shadow-lg h-8 w-8"
+          onClick={recenterMap}
+          title="Show all buses"
+        >
+          <LocateFixed className="h-4 w-4" />
+        </Button>
+
+        {/* Sound Toggle */}
+        <Button
+          variant={soundEnabled ? "default" : "secondary"}
+          size="icon"
+          className="shadow-lg h-8 w-8"
+          onClick={() => setSoundEnabled(!soundEnabled)}
+          title={soundEnabled ? "Mute alerts" : "Enable sound alerts"}
+        >
+          {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+        </Button>
+
+        {/* Divider */}
+        <div className="h-px bg-border my-1" />
+
+        {/* Traffic Toggle */}
+        <Button
+          variant={showTraffic ? "default" : "secondary"}
+          size="icon"
+          className="shadow-lg h-8 w-8"
+          onClick={() => setShowTraffic(!showTraffic)}
+          title="Traffic layer"
+        >
+          <Car className="h-4 w-4" />
+        </Button>
+
+        {/* Geofence Toggle */}
+        <Button
+          variant={showGeofence ? "default" : "secondary"}
+          size="icon"
+          className="shadow-lg h-8 w-8"
+          onClick={() => setShowGeofence(!showGeofence)}
+          title="Service area"
+        >
+          <Target className="h-4 w-4" />
+        </Button>
+
+        {/* Heatmap Toggle */}
+        <Button
+          variant={showHeatmap ? "default" : "secondary"}
+          size="icon"
+          className="shadow-lg h-8 w-8"
+          onClick={() => setShowHeatmap(!showHeatmap)}
+          title="Bus heatmap"
+        >
+          <Navigation className="h-4 w-4" />
+        </Button>
+
+        {/* Divider */}
+        <div className="h-px bg-border my-1" />
+
+        {/* Map Type Buttons */}
+        <div className="flex flex-col gap-1 bg-background/90 backdrop-blur rounded-lg p-1 shadow-lg">
+          <Button
+            variant={mapType === "roadmap" ? "default" : "ghost"}
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setMapType("roadmap")}
+            title="Map"
+          >
+            <MapIcon className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={mapType === "satellite" ? "default" : "ghost"}
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setMapType("satellite")}
+            title="Satellite"
+          >
+            <Satellite className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={mapType === "terrain" ? "default" : "ghost"}
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setMapType("terrain")}
+            title="Terrain"
+          >
+            <Layers className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
       {/* Legend */}
-      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-900/90 backdrop-blur rounded-full px-4 py-2 flex items-center gap-4 text-sm text-white shadow-lg">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-green-500"></div>
-          <span>Available</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-          <span>Half Full</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-          <span>Almost Full</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-red-500"></div>
-          <span>Full</span>
+      <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-[10] bg-background/90 backdrop-blur rounded-lg px-4 py-2 shadow-lg text-xs">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+            <span>Available</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+            <span>Half Full</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+            <span>Almost Full</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+            <span>Full</span>
+          </div>
         </div>
       </div>
     </div>

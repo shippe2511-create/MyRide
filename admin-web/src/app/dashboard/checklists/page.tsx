@@ -633,11 +633,17 @@ export default function ChecklistsPage() {
       if (runningHoursForm.service_interval_hours) {
         updateData.service_interval_hours = parseFloat(runningHoursForm.service_interval_hours)
       }
-      await supabase.from("vehicle_types").update(updateData).eq("plate_no", editingRunningHours.vehicle_number)
+      const { error } = await supabase.from("vehicle_types").update(updateData).eq("plate_no", editingRunningHours.vehicle_number)
+      if (error) {
+        console.error("Save running hours error:", error)
+        toast.error("Failed to update: " + error.message)
+        return
+      }
       toast.success("Running hours updated")
       setEditingRunningHours(null)
       loadFleetHealth()
     } catch (e) {
+      console.error("Save running hours exception:", e)
       toast.error("Failed to update running hours")
     } finally {
       setSaving(false)
@@ -939,15 +945,18 @@ export default function ChecklistsPage() {
         filename = `vehicle_history_${new Date().toISOString().split("T")[0]}.csv`
         break
       case "running-hours":
-        headers = ["Date", "Vehicle", "Driver", "Running Hours", "Service Due", "Status"]
-        rows = filtered.filter(c => c.running_hours != null).map(c => {
-          const vh = vehicleHealthData.find(v => v.vehicle_number === c.vehicle_number)
-          const nextService = vh?.next_service_hours || 0
-          const isOverdue = c.running_hours && nextService > 0 && c.running_hours >= nextService
+        headers = ["Vehicle", "Vehicle ID", "Current Hours", "Service Interval", "Next Service", "Hours Until Service", "Status"]
+        rows = vehicleHealthData.map(v => {
+          const hoursToService = v.next_service_hours ? v.next_service_hours - v.current_running_hours : v.service_interval_hours - (v.current_running_hours % v.service_interval_hours)
+          const isOverdue = hoursToService <= 0
+          const isSoon = hoursToService > 0 && hoursToService <= 50
           return {
-            "Date": formatDateOnly(c.checked_at), "Vehicle": c.vehicle_number || "-", "Driver": c.driver_name || "-",
-            "Running Hours": String(c.running_hours), "Service Due": nextService > 0 ? String(nextService) : "-",
-            "Status": isOverdue ? "Service Overdue" : nextService > 0 && c.running_hours && (nextService - c.running_hours) <= 50 ? "Service Soon" : "OK",
+            "Vehicle": v.vehicle_number, "Vehicle ID": v.display_name || "-",
+            "Current Hours": v.current_running_hours.toFixed(1),
+            "Service Interval": v.service_interval_hours > 0 ? String(v.service_interval_hours) : "-",
+            "Next Service": v.next_service_hours ? String(v.next_service_hours) : "-",
+            "Hours Until Service": Math.round(hoursToService).toString(),
+            "Status": isOverdue ? "Overdue" : isSoon ? "Service Soon" : "OK",
           }
         })
         filename = `running_hours_${new Date().toISOString().split("T")[0]}.csv`
@@ -1042,15 +1051,18 @@ export default function ChecklistsPage() {
         rows = hist.map(h => ({ "Date": h.date, "Vehicle": h.vehicle, "Event": h.event, "Driver": h.driver, "Details": h.details }))
         break
       case "running-hours":
-        headers = ["Date", "Vehicle", "Driver", "Hours", "Service Due", "Status"]
-        rows = filtered.filter(c => c.running_hours != null).map(c => {
-          const vh = vehicleHealthData.find(v => v.vehicle_number === c.vehicle_number)
-          const nextService = vh?.next_service_hours || 0
-          const isOverdue = c.running_hours && nextService > 0 && c.running_hours >= nextService
+        headers = ["Vehicle", "ID", "Hours", "Interval", "Next", "Until", "Status"]
+        rows = vehicleHealthData.map(v => {
+          const hoursToService = v.next_service_hours ? v.next_service_hours - v.current_running_hours : v.service_interval_hours - (v.current_running_hours % v.service_interval_hours)
+          const isOverdue = hoursToService <= 0
+          const isSoon = hoursToService > 0 && hoursToService <= 50
           return {
-            "Date": formatDateOnly(c.checked_at), "Vehicle": c.vehicle_number || "-", "Driver": c.driver_name || "-",
-            "Hours": String(c.running_hours), "Service Due": nextService > 0 ? String(nextService) : "-",
-            "Status": isOverdue ? "Overdue" : nextService > 0 && c.running_hours && (nextService - c.running_hours) <= 50 ? "Soon" : "OK",
+            "Vehicle": v.vehicle_number, "ID": v.display_name || "-",
+            "Hours": v.current_running_hours.toFixed(1),
+            "Interval": v.service_interval_hours > 0 ? String(v.service_interval_hours) : "-",
+            "Next": v.next_service_hours ? String(v.next_service_hours) : "-",
+            "Until": String(Math.round(hoursToService)),
+            "Status": isOverdue ? "Overdue" : isSoon ? "Soon" : "OK",
           }
         })
         break
@@ -1407,10 +1419,10 @@ export default function ChecklistsPage() {
           setEndDate(preset === "lastMonth" ? today.toISOString().split("T")[0] : new Date(Date.now() + 86400000).toISOString().split("T")[0])
         }
 
-        const runningHoursRecords = filtered.filter(c => c.running_hours != null).length
+        const vehiclesWithHours = vehicleHealthData.filter(v => v.current_running_hours > 0).length
         const reportStats: Record<string, { count: number; label: string; color: string }> = {
           "fleet-health": { count: avgHealth, label: `${avgHealth}% avg health`, color: avgHealth >= 80 ? "text-green-500" : avgHealth >= 60 ? "text-yellow-500" : "text-red-500" },
-          "running-hours": { count: runningHoursRecords, label: `${runningHoursRecords} records`, color: "text-cyan-500" },
+          "running-hours": { count: vehicleHealthData.length, label: `${vehiclesWithHours} tracked`, color: "text-cyan-500" },
           "all-issues": { count: issuesFound, label: `${issuesFound} issues`, color: issuesFound > 0 ? "text-orange-500" : "text-green-500" },
           "vehicle-checks": { count: totalChecks, label: `${totalChecks} inspections`, color: "text-blue-500" },
           "issue-breakdown": { count: Object.keys(filtered.reduce((acc, c) => { if (c.issues) Object.keys(c.issues).forEach(k => acc[k] = true); return acc }, {} as Record<string, boolean>)).length, label: "issue types", color: "text-purple-500" },

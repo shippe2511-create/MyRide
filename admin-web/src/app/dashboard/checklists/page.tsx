@@ -27,6 +27,8 @@ import {
   ClipboardCheck, AlertTriangle, CheckCircle, XCircle, Car,
   Loader2, RefreshCw, Download, MoreHorizontal, Pencil, Trash2, Search, Eye, Flag, X,
   Activity, BarChart3, FileDown, FileSpreadsheet, Clock, TrendingUp,
+  Armchair, ShieldCheck, Wrench, Settings, Gauge, Zap, Disc, Sun, Wind, Droplet, FileText,
+  type LucideIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
@@ -115,6 +117,25 @@ const REPORT_TYPES = [
   { id: "vehicle-lifespan", name: "Vehicle Lifespan", icon: TrendingUp },
   { id: "vehicle-history", name: "Vehicle Change History", icon: Activity },
 ]
+
+const ICON_MAP: Record<string, LucideIcon> = {
+  car: Car,
+  armchair: Armchair,
+  "shield-check": ShieldCheck,
+  clipboard: ClipboardCheck,
+  wrench: Wrench,
+  settings: Settings,
+  gauge: Gauge,
+  zap: Zap,
+  disc: Disc,
+  sun: Sun,
+  wind: Wind,
+  droplet: Droplet,
+  "file-text": FileText,
+  "alert-triangle": AlertTriangle,
+  check: CheckCircle,
+  eye: Eye,
+}
 
 export default function ChecklistsPage() {
   const supabase = createClient()
@@ -965,9 +986,14 @@ export default function ChecklistsPage() {
                 <Card key={cat.id} className={cn("p-4", !cat.is_active && "opacity-60")}>
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <ClipboardCheck className="h-5 w-5 text-primary" />
-                      </div>
+                      {(() => {
+                        const IconComponent = ICON_MAP[cat.icon] || ClipboardCheck
+                        return (
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <IconComponent className="h-5 w-5 text-primary" />
+                          </div>
+                        )
+                      })()}
                       <div>
                         <h4 className="font-semibold flex items-center gap-2">
                           {cat.name}

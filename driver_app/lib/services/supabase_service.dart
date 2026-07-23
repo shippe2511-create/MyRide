@@ -2147,13 +2147,13 @@ class SupabaseService {
           .from('checklist_categories')
           .select('*')
           .eq('is_active', true)
-          .order('sort_order');
+          .order('sort_order', ascending: true);
 
       final itemsRes = await client
           .from('checklist_items')
           .select('*')
           .eq('is_active', true)
-          .order('sort_order');
+          .order('sort_order', ascending: true);
 
       final categories = List<Map<String, dynamic>>.from(categoriesRes);
       final items = List<Map<String, dynamic>>.from(itemsRes);
@@ -2164,6 +2164,9 @@ class SupabaseService {
       }
 
       debugPrint('Loaded ${categories.length} checklist categories with ${items.length} items');
+      for (final cat in categories) {
+        debugPrint('Category: ${cat['name']} (sort_order: ${cat['sort_order']})');
+      }
       return categories;
     } catch (e) {
       debugPrint('Error loading checklist items: $e');

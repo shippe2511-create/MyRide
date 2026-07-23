@@ -73,13 +73,16 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
   }
 
   Future<void> _submitReport() async {
-    if (_titleController.text.trim().isEmpty) {
+    final title = _titleController.text.trim();
+    final description = _descriptionController.text.trim();
+
+    if (title.isEmpty) {
       HapticFeedback.heavyImpact();
       AppSnackbar.error(context, 'Please enter a title');
       return;
     }
 
-    if (_descriptionController.text.trim().isEmpty) {
+    if (description.isEmpty) {
       HapticFeedback.heavyImpact();
       AppSnackbar.error(context, 'Please describe the incident');
       return;
@@ -92,13 +95,21 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
       final driverProfile = await SupabaseService.getProfile();
       final driverData = await SupabaseService.getDriverProfile();
 
+      if (driverData == null || driverData['id'] == null) {
+        if (mounted) {
+          AppSnackbar.error(context, 'Driver profile not found. Please log in again.');
+        }
+        setState(() => _isSubmitting = false);
+        return;
+      }
+
       final result = await SupabaseService.client.from('incidents').insert({
-        'driver_id': driverData?['id'],
+        'driver_id': driverData['id'],
         'ride_id': widget.rideId,
         'type': _selectedType,
         'severity': _selectedSeverity,
-        'title': _titleController.text.trim(),
-        'description': _descriptionController.text.trim(),
+        'title': title,
+        'description': description,
         'location_name': _locationName,
         'latitude': _latitude,
         'longitude': _longitude,
@@ -114,7 +125,13 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
     } catch (e) {
       debugPrint('Error submitting incident: $e');
       if (mounted) {
-        AppSnackbar.error(context, 'Failed to submit report');
+        String errorMsg = 'Failed to submit report';
+        if (e.toString().contains('title')) {
+          errorMsg = 'Please enter a title';
+        } else if (e.toString().contains('driver_id')) {
+          errorMsg = 'Driver profile not found';
+        }
+        AppSnackbar.error(context, errorMsg);
       }
     }
 

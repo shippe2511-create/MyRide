@@ -168,10 +168,10 @@ export default function ChecklistsPage() {
         loadData(false)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'checklist_categories' }, () => {
-        loadChecklistItems()
+        loadChecklistItems(false)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'checklist_items' }, () => {
-        loadChecklistItems()
+        loadChecklistItems(false)
       })
       .subscribe()
 
@@ -189,8 +189,8 @@ export default function ChecklistsPage() {
     if (showLoading) setLoading(false)
   }
 
-  const loadChecklistItems = async () => {
-    setItemsLoading(true)
+  const loadChecklistItems = async (showLoading = true) => {
+    if (showLoading) setItemsLoading(true)
     try {
       const [categoriesRes, itemsRes] = await Promise.all([
         supabase.from("checklist_categories").select("*").order("sort_order"),
@@ -211,7 +211,7 @@ export default function ChecklistsPage() {
       console.error("Error loading checklist items:", e)
       toast.error("Failed to load checklist items")
     } finally {
-      setItemsLoading(false)
+      if (showLoading) setItemsLoading(false)
     }
   }
 
@@ -1414,13 +1414,21 @@ export default function ChecklistsPage() {
               <label className="text-sm font-medium">Icon</label>
               <Select value={categoryForm.icon} onValueChange={(v) => setCategoryForm({ ...categoryForm, icon: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="car">Car</SelectItem>
+                <SelectContent position="popper" className="z-[200]">
+                  <SelectItem value="car">Car / Exterior</SelectItem>
                   <SelectItem value="armchair">Interior</SelectItem>
                   <SelectItem value="shield-check">Safety</SelectItem>
                   <SelectItem value="clipboard">Clipboard</SelectItem>
                   <SelectItem value="wrench">Maintenance</SelectItem>
                   <SelectItem value="settings">Settings</SelectItem>
+                  <SelectItem value="gauge">Engine / Fluids</SelectItem>
+                  <SelectItem value="zap">Electrical</SelectItem>
+                  <SelectItem value="disc">Tires / Wheels</SelectItem>
+                  <SelectItem value="sun">Lights</SelectItem>
+                  <SelectItem value="wind">HVAC / Climate</SelectItem>
+                  <SelectItem value="droplet">Fluids</SelectItem>
+                  <SelectItem value="file-text">Documents</SelectItem>
+                  <SelectItem value="alert-triangle">Warning</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1471,17 +1479,27 @@ export default function ChecklistsPage() {
               <label className="text-sm font-medium">Icon</label>
               <Select value={itemForm.icon} onValueChange={(v) => setItemForm({ ...itemForm, icon: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" className="z-[200]">
                   <SelectItem value="check">Check</SelectItem>
-                  <SelectItem value="circle-dot">Tire</SelectItem>
-                  <SelectItem value="lightbulb">Light</SelectItem>
-                  <SelectItem value="car">Car</SelectItem>
-                  <SelectItem value="sparkles">Clean</SelectItem>
-                  <SelectItem value="thermometer">Climate</SelectItem>
-                  <SelectItem value="shield">Seatbelt</SelectItem>
-                  <SelectItem value="fuel">Fuel</SelectItem>
-                  <SelectItem value="file-text">Document</SelectItem>
-                  <SelectItem value="first-aid">First Aid</SelectItem>
+                  <SelectItem value="circle-dot">Tire / Wheel</SelectItem>
+                  <SelectItem value="lightbulb">Headlights</SelectItem>
+                  <SelectItem value="car">Body / Exterior</SelectItem>
+                  <SelectItem value="sparkles">Cleanliness</SelectItem>
+                  <SelectItem value="thermometer">A/C / Climate</SelectItem>
+                  <SelectItem value="shield">Seatbelt / Safety</SelectItem>
+                  <SelectItem value="fuel">Fuel Level</SelectItem>
+                  <SelectItem value="file-text">Documents</SelectItem>
+                  <SelectItem value="heart">First Aid Kit</SelectItem>
+                  <SelectItem value="gauge">Engine / Fluids</SelectItem>
+                  <SelectItem value="zap">Battery / Electrical</SelectItem>
+                  <SelectItem value="disc">Brakes</SelectItem>
+                  <SelectItem value="eye">Mirrors / Visibility</SelectItem>
+                  <SelectItem value="volume-2">Horn / Signals</SelectItem>
+                  <SelectItem value="lock">Doors / Locks</SelectItem>
+                  <SelectItem value="droplet">Oil / Fluids</SelectItem>
+                  <SelectItem value="wind">Wipers / Windshield</SelectItem>
+                  <SelectItem value="alert-triangle">Warning Lights</SelectItem>
+                  <SelectItem value="package">Emergency Kit</SelectItem>
                 </SelectContent>
               </Select>
             </div>

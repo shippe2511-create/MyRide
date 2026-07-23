@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/supabase_service.dart';
@@ -30,11 +32,79 @@ class _BusTripScreenState extends State<BusTripScreen> {
   bool _isCompleting = false;
   int _currentStopIndex = 0;
   int _onBoardCount = 0;
+  Timer? _locationTimer;
+  bool _busFullAlertSent = false; // Track if alert was sent for current stop
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _startLocationTracking();
+  }
+
+  @override
+  void dispose() {
+    _locationTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startLocationTracking() {
+    // Update location every 10 seconds
+    _locationTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      _updateLocation();
+    });
+    // Also update immediately
+    _updateLocation();
+  }
+
+  Future<void> _updateLocation() async {
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      final driverState = context.read<DriverState>();
+      final route = widget.assignment['route'] as Map<String, dynamic>?;
+      final vehicle = widget.assignment['vehicle'] as Map<String, dynamic>?;
+      final vehicleCapacity = vehicle?['capacity'] as int? ?? 0;
+
+      final currentStopName = _stops.isNotEmpty && _currentStopIndex < _stops.length
+          ? _stops[_currentStopIndex]['stop_name'] as String?
+          : null;
+
+      await SupabaseService.updateBusLocation(
+        tripId: widget.tripId,
+        driverId: driverState.driverId,
+        vehicleId: widget.assignment['vehicle_id'] as String?,
+        routeId: widget.assignment['route_id'] as String,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        currentStopName: currentStopName,
+        currentStopIndex: _currentStopIndex,
+        passengersOnBoard: _onBoardCount,
+        vehicleCapacity: vehicleCapacity,
+      );
+
+      // Check if bus is full and send alert
+      if (vehicleCapacity > 0 && _onBoardCount >= vehicleCapacity && !_busFullAlertSent) {
+        _busFullAlertSent = true;
+        await SupabaseService.createBusFullAlert(
+          tripId: widget.tripId,
+          routeId: widget.assignment['route_id'] as String,
+          routeName: route?['route_name'] ?? 'Unknown Route',
+          stopName: currentStopName ?? 'Unknown Stop',
+          stopIndex: _currentStopIndex,
+          vehicleNumber: vehicle?['vehicle_number'],
+          passengersOnBoard: _onBoardCount,
+          vehicleCapacity: vehicleCapacity,
+          latitude: position.latitude,
+          longitude: position.longitude,
+        );
+        debugPrint('Bus full alert sent!');
+      }
+    } catch (e) {
+      debugPrint('Error updating location: $e');
+    }
   }
 
   Future<void> _loadData() async {
@@ -162,7 +232,10 @@ class _BusTripScreenState extends State<BusTripScreen> {
         };
         _onBoardCount += (counts['boarded'] ?? 0) - (counts['alighted'] ?? 0);
         _isAdvancing = false;
+        _busFullAlertSent = false; // Reset for next stop
       });
+      // Update location immediately after advancing
+      _updateLocation();
     } else {
       setState(() => _isAdvancing = false);
       if (mounted) AppSnackbar.error(context, 'Failed to advance stop');
@@ -396,77 +469,115 @@ class _BusTripScreenState extends State<BusTripScreen> {
     int max = 99,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: Colors.white, size: 24),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: context.textColor,
-                fontSize: 17,
-                fontWeight: FontWeight.w600,
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: Colors.white, size: 22),
               ),
-            ),
-          ),
-          // Minus button
-          GestureDetector(
-            onTap: value > 0 ? () {
-              HapticFeedback.lightImpact();
-              onChanged(value - 1);
-            } : null,
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: value > 0 ? color : context.borderColor,
-                borderRadius: BorderRadius.circular(12),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: context.textColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-              child: const Icon(Icons.remove, color: Colors.white, size: 22),
-            ),
-          ),
-          Container(
-            width: 56,
-            alignment: Alignment.center,
-            child: Text(
-              '$value',
-              style: TextStyle(
-                color: context.textColor,
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
+              // Minus button
+              GestureDetector(
+                onTap: value > 0 ? () {
+                  HapticFeedback.lightImpact();
+                  onChanged(value - 1);
+                } : null,
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: value > 0 ? color : context.borderColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.remove, color: Colors.white, size: 24),
+                ),
               ),
-            ),
-          ),
-          // Plus button
-          GestureDetector(
-            onTap: value < max ? () {
-              HapticFeedback.lightImpact();
-              onChanged(value + 1);
-            } : null,
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: value < max ? color : context.borderColor,
-                borderRadius: BorderRadius.circular(12),
+              Container(
+                width: 60,
+                alignment: Alignment.center,
+                child: Text(
+                  '$value',
+                  style: TextStyle(
+                    color: context.textColor,
+                    fontSize: 32,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
-              child: const Icon(Icons.add, color: Colors.white, size: 22),
-            ),
+              // Plus button
+              GestureDetector(
+                onTap: value < max ? () {
+                  HapticFeedback.lightImpact();
+                  onChanged(value + 1);
+                } : null,
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: value < max ? color : context.borderColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.add, color: Colors.white, size: 24),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Quick add buttons
+          Row(
+            children: [
+              for (final preset in [1, 5, 10])
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(right: preset == 10 ? 0 : 8),
+                    child: GestureDetector(
+                      onTap: (value + preset) <= max ? () {
+                        HapticFeedback.mediumImpact();
+                        onChanged(value + preset);
+                      } : null,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: (value + preset) <= max ? color.withValues(alpha: 0.2) : context.borderColor.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '+$preset',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: (value + preset) <= max ? color : context.mutedColor,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),

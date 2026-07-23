@@ -2390,4 +2390,90 @@ class SupabaseService {
       return null;
     }
   }
+
+  /// Update bus location for realtime tracking
+  static Future<bool> updateBusLocation({
+    required String tripId,
+    required String driverId,
+    String? vehicleId,
+    required String routeId,
+    required double latitude,
+    required double longitude,
+    String? currentStopName,
+    int currentStopIndex = 0,
+    int passengersOnBoard = 0,
+    int vehicleCapacity = 0,
+  }) async {
+    try {
+      final isFull = vehicleCapacity > 0 && passengersOnBoard >= vehicleCapacity;
+
+      // Upsert location (update if exists, insert if not)
+      await client.from('bus_location_tracking').upsert({
+        'trip_id': tripId,
+        'driver_id': driverId,
+        'vehicle_id': vehicleId,
+        'route_id': routeId,
+        'latitude': latitude,
+        'longitude': longitude,
+        'current_stop_name': currentStopName,
+        'current_stop_index': currentStopIndex,
+        'passengers_on_board': passengersOnBoard,
+        'vehicle_capacity': vehicleCapacity,
+        'is_full': isFull,
+        'status': 'in_progress',
+        'last_updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'trip_id');
+
+      return true;
+    } catch (e) {
+      debugPrint('Error updating bus location: $e');
+      return false;
+    }
+  }
+
+  /// Create alert when bus is full at a stop
+  static Future<bool> createBusFullAlert({
+    required String tripId,
+    required String routeId,
+    required String routeName,
+    required String stopName,
+    required int stopIndex,
+    String? vehicleNumber,
+    required int passengersOnBoard,
+    required int vehicleCapacity,
+    double? latitude,
+    double? longitude,
+  }) async {
+    try {
+      await client.from('bus_full_alerts').insert({
+        'trip_id': tripId,
+        'route_id': routeId,
+        'route_name': routeName,
+        'stop_name': stopName,
+        'stop_index': stopIndex,
+        'vehicle_number': vehicleNumber,
+        'passengers_on_board': passengersOnBoard,
+        'vehicle_capacity': vehicleCapacity,
+        'latitude': latitude,
+        'longitude': longitude,
+      });
+
+      return true;
+    } catch (e) {
+      debugPrint('Error creating bus full alert: $e');
+      return false;
+    }
+  }
+
+  /// Mark bus trip location as completed
+  static Future<void> completeBusLocationTracking(String tripId) async {
+    try {
+      await client
+          .from('bus_location_tracking')
+          .update({'status': 'completed'})
+          .eq('trip_id', tripId);
+    } catch (e) {
+      debugPrint('Error completing bus location tracking: $e');
+    }
+  }
 }

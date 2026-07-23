@@ -397,28 +397,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Navigator.pushNamed(context, '/documents');
                     },
                   ),
-                  _buildSettingTile(
-                    context,
-                    icon: Icons.schedule_outlined,
-                    title: 'Shift Schedule',
-                    trailing: Icon(Icons.chevron_right, color: context.mutedColor),
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      Navigator.pushNamed(context, '/shift-schedule');
-                    },
-                  ),
-                  _buildSettingTile(
-                    context,
-                    icon: Icons.directions_bus,
-                    title: 'My Bus Schedule',
-                    trailing: Icon(Icons.chevron_right, color: context.mutedColor),
-                    iconColor: Colors.blue,
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      Navigator.pushNamed(context, '/bus-schedule');
-                    },
-                  ),
-                ]),
+                  ]),
                 const SizedBox(height: 16),
 
                 // Emergency section (only show if SOS enabled)

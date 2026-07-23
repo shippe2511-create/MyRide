@@ -239,17 +239,35 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
 
   IconData _getIconFromString(String iconName) {
     switch (iconName) {
+      // Category icons (matching admin ICON_MAP)
+      case 'gauge': return Icons.speed;
+      case 'disc': return Icons.album;
+      case 'zap': return Icons.bolt;
+      case 'wrench': return Icons.build;
+      case 'clipboard': return Icons.assignment;
+      case 'file-text': return Icons.description;
+      case 'clipboard-check': return Icons.fact_check;
+      case 'settings': return Icons.settings;
+      case 'eye': return Icons.visibility;
+      case 'truck': return Icons.local_shipping;
+      case 'droplet': return Icons.water_drop;
+      case 'thermometer': return Icons.thermostat;
+      case 'battery': return Icons.battery_full;
+      case 'radio': return Icons.radio;
+      case 'alert-triangle': return Icons.warning;
+      case 'shield': return Icons.shield;
+      case 'tool': return Icons.handyman;
+      case 'cog': return Icons.settings;
+      // Legacy item icons
       case 'car': return Icons.directions_car;
       case 'armchair': return Icons.airline_seat_recline_normal;
       case 'shield-check': return Icons.verified_user;
       case 'circle-dot': return Icons.tire_repair;
       case 'lightbulb': return Icons.highlight;
       case 'sparkles': return Icons.cleaning_services;
-      case 'thermometer': return Icons.ac_unit;
-      case 'shield': return Icons.airline_seat_legroom_normal;
       case 'fuel': return Icons.local_gas_station;
-      case 'file-text': return Icons.folder_copy;
       case 'first-aid': return Icons.medical_services;
+      case 'check': return Icons.check_circle;
       default: return Icons.check_circle;
     }
   }
@@ -286,8 +304,14 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
   }
 
   int get _totalItems => _checklist.length;
-  int get _checkedCount =>
-      _checklist.values.where((v) => v != CheckStatus.unchecked).length;
+  int get _checkedCount {
+    int count = _checklist.entries.where((e) => e.key != 'running_hours' && e.value != CheckStatus.unchecked).length;
+    // Count running hours as checked if it has a valid value
+    if (_checklist.containsKey('running_hours') && _runningHoursController.text.trim().isNotEmpty && _runningHoursError == null) {
+      count++;
+    }
+    return count;
+  }
   int get _issueCount =>
       _checklist.values.where((v) => v == CheckStatus.issue).length;
   bool get _allChecked => _checkedCount == _totalItems && _totalItems > 0;
@@ -332,11 +356,6 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
               // Quick actions
               SliverToBoxAdapter(
                 child: _buildQuickActions(context),
-              ),
-
-              // Running Hours Input
-              SliverToBoxAdapter(
-                child: _buildRunningHoursInput(context),
               ),
 
               // Categories
@@ -639,45 +658,26 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
     );
   }
 
-  Widget _buildRunningHoursInput(BuildContext context) {
-    if (_loadingRunningHours) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: context.cardColor,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: context.borderColor),
-          ),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.yellow,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text('Loading running hours...', style: TextStyle(color: context.mutedColor)),
-            ],
-          ),
-        ),
-      );
-    }
+  Widget _buildRunningHoursItem(BuildContext context, _ChecklistItem item) {
+    final hasValue = _runningHoursController.text.trim().isNotEmpty;
+    final isValid = hasValue && _runningHoursError == null;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: context.cardColor,
+          color: isValid
+              ? AppColors.success.withValues(alpha: 0.08)
+              : context.cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: _runningHoursError != null ? AppColors.error : AppColors.yellow.withValues(alpha: 0.5),
-            width: _runningHoursError != null ? 2 : 1,
+            color: _runningHoursError != null
+                ? AppColors.error
+                : isValid
+                    ? AppColors.success.withValues(alpha: 0.3)
+                    : AppColors.yellow.withValues(alpha: 0.3),
+            width: 1,
           ),
         ),
         child: Column(
@@ -689,10 +689,16 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: AppColors.yellow.withValues(alpha: 0.15),
+                    color: isValid
+                        ? AppColors.success.withValues(alpha: 0.15)
+                        : AppColors.yellow.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(Icons.speed, color: AppColors.yellow, size: 22),
+                  child: Icon(
+                    isValid ? Icons.check : Icons.speed,
+                    color: isValid ? AppColors.success : AppColors.yellow,
+                    size: 22,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -700,7 +706,7 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Running Hours *',
+                        item.title,
                         style: TextStyle(
                           color: context.textColor,
                           fontSize: 15,
@@ -718,6 +724,8 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                     ],
                   ),
                 ),
+                if (isValid)
+                  Icon(Icons.check_circle, color: AppColors.success, size: 24),
               ],
             ),
             const SizedBox(height: 12),
@@ -747,6 +755,7 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                 suffixStyle: TextStyle(color: context.mutedColor, fontSize: 14),
               ),
               onChanged: (_) {
+                setState(() {});
                 if (_runningHoursError != null) {
                   _validateRunningHours();
                 }
@@ -839,6 +848,11 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
   }
 
   Widget _buildChecklistItem(BuildContext context, _ChecklistItem item) {
+    // Special handling for running hours item
+    if (item.key == 'running_hours') {
+      return _buildRunningHoursItem(context, item);
+    }
+
     final status = _checklist[item.key]!;
     final isOk = status == CheckStatus.ok;
     final hasIssue = status == CheckStatus.issue;

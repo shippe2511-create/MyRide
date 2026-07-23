@@ -223,6 +223,7 @@ export default function IncidentsPage() {
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString("en-US", {
+      timeZone: "Indian/Maldives",
       month: "short",
       day: "numeric",
       year: "numeric",

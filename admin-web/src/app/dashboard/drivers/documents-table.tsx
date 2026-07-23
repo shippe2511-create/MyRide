@@ -641,7 +641,7 @@ export function DocumentsTable() {
                             setSelectedDocument(doc)
                             const driverName = doc.driver?.profile?.full_name || "Driver"
                             const docType = getDocTypeLabel(doc.document_type)
-                            const expiryDate = doc.expiry_date ? new Date(doc.expiry_date).toLocaleDateString() : "N/A"
+                            const expiryDate = doc.expiry_date ? new Date(doc.expiry_date).toLocaleDateString("en-US", { timeZone: "Indian/Maldives", month: "short", day: "numeric", year: "numeric" }) : "N/A"
                             setReminderForm({
                               title: `Document Expiry Reminder`,
                               message: `Your ${docType} expires on ${expiryDate}. Please renew it before expiry.`,

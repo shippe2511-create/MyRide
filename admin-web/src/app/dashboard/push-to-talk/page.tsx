@@ -488,6 +488,7 @@ export default function PushToTalkPage() {
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleString("en-US", {
+      timeZone: "Indian/Maldives",
       month: "short",
       day: "numeric",
       hour: "numeric",

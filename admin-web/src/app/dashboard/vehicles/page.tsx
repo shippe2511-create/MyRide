@@ -343,7 +343,7 @@ export default function VehiclesPage() {
       v.plate_no || "",
       v.capacity,
       v.is_active ? "Active" : "Inactive",
-      new Date(v.created_at).toLocaleDateString()
+      new Date(v.created_at).toLocaleDateString("en-US", { timeZone: "Indian/Maldives", month: "short", day: "numeric", year: "numeric" })
     ])
 
     const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n")

@@ -376,7 +376,7 @@ export function PoolDriversTab({
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {new Date(group.earliest_date).toLocaleDateString()}
+                    {new Date(group.earliest_date).toLocaleDateString("en-US", { timeZone: "Indian/Maldives", month: "short", day: "numeric", year: "numeric" })}
                   </TableCell>
                   {canManage && (
                     <TableCell>

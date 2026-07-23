@@ -187,7 +187,7 @@ export default function AnalyticsPage() {
     const daily = Object.entries(dailyMap)
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([date, data]) => ({
-        date: new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        date: new Date(date).toLocaleDateString("en-US", { timeZone: "Indian/Maldives", month: "short", day: "numeric" }),
         ...data,
       }))
     setDailyData(daily)

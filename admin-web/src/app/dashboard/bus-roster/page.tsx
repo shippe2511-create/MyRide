@@ -13,6 +13,10 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { ComboboxInput } from "@/components/ui/combobox-input"
@@ -66,7 +70,7 @@ interface RosterAssignment {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  unassigned: "bg-gray-500",
+  pending: "bg-orange-500",
   scheduled: "bg-blue-500",
   in_progress: "bg-yellow-500",
   completed: "bg-green-500",
@@ -88,6 +92,9 @@ export default function BusRosterPage() {
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
   const [sortField, setSortField] = useState<"time" | "route" | "driver" | "vehicle" | "status">("time")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [deleting, setDeleting] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   const [generateForm, setGenerateForm] = useState({
     startDate: format(new Date(), "yyyy-MM-dd"),
@@ -99,6 +106,7 @@ export default function BusRosterPage() {
   }, [transportType])
 
   useEffect(() => {
+    setSelectedIds(new Set()) // Clear selection when date/type changes
     loadRoster()
   }, [selectedDate, transportType])
 
@@ -198,16 +206,15 @@ export default function BusRosterPage() {
   const updateAssignment = async (id: string, field: "driver_id" | "vehicle_id", value: string | null) => {
     setSaving(id)
 
-    // Find current assignment to check if both driver and vehicle will be assigned
+    // Find current assignment to determine new status
     const current = roster.find(r => r.id === id)
     const newDriverId = field === "driver_id" ? value : current?.driver_id
     const newVehicleId = field === "vehicle_id" ? value : current?.vehicle_id
 
-    // Determine new status: "scheduled" only if both driver AND vehicle are assigned
-    // Keep existing status if already in_progress or completed
+    // Only update status if currently pending or scheduled (not in_progress/completed)
     let newStatus = current?.status
-    if (current?.status === "scheduled" || current?.status === "unassigned") {
-      newStatus = (newDriverId && newVehicleId) ? "scheduled" : "unassigned"
+    if (current?.status === "scheduled" || current?.status === "pending") {
+      newStatus = (newDriverId && newVehicleId) ? "scheduled" : "pending"
     }
 
     const { error } = await supabase
@@ -272,7 +279,7 @@ export default function BusRosterPage() {
             route_id: schedule.route_id,
             departure_time: schedule.departure_time,
             service_date: dateStr,
-            status: "unassigned",
+            status: "pending",
           })
         }
       }
@@ -319,6 +326,47 @@ export default function BusRosterPage() {
     }
   }
 
+  const confirmDeleteSelected = () => {
+    if (selectedIds.size === 0) return
+    setShowDeleteDialog(true)
+  }
+
+  const deleteSelectedAssignments = async () => {
+    setShowDeleteDialog(false)
+    setDeleting(true)
+    const { error } = await supabase
+      .from("roster_assignments")
+      .delete()
+      .in("id", Array.from(selectedIds))
+
+    if (error) {
+      toast.error("Failed to delete selected assignments")
+    } else {
+      toast.success(`Deleted ${selectedIds.size} assignments`)
+      setSelectedIds(new Set())
+      loadRoster()
+    }
+    setDeleting(false)
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === sortedRoster.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(sortedRoster.map(r => r.id)))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedIds(newSelected)
+  }
+
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(":")
     const h = parseInt(hours)
@@ -327,10 +375,20 @@ export default function BusRosterPage() {
     return `${h12}:${minutes} ${ampm}`
   }
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (assignment: RosterAssignment) => {
+    // Show "Pending" if driver or vehicle is missing (unless completed/in_progress/cancelled)
+    let displayStatus = assignment.status
+    if (assignment.status === "scheduled" || assignment.status === "pending") {
+      if (!assignment.driver_id || !assignment.vehicle_id) {
+        displayStatus = "pending"
+      } else {
+        displayStatus = "scheduled"
+      }
+    }
+
     return (
-      <Badge variant="outline" className={`${STATUS_COLORS[status] || "bg-gray-500"} text-white border-0 capitalize`}>
-        {status.replace("_", " ")}
+      <Badge variant="outline" className={`${STATUS_COLORS[displayStatus] || "bg-gray-500"} text-white border-0 capitalize`}>
+        {displayStatus.replace("_", " ")}
       </Badge>
     )
   }
@@ -409,10 +467,26 @@ export default function BusRosterPage() {
             </h1>
             <p className="text-muted-foreground">Assign drivers and vehicles to scheduled departures</p>
           </div>
-          <Button onClick={() => setShowGenerateDialog(true)}>
-            <Wand2 className="h-4 w-4 mr-2" />
-            Generate Roster
-          </Button>
+          <div className="flex gap-2">
+            {selectedIds.size > 0 && (
+              <Button
+                variant="destructive"
+                onClick={confirmDeleteSelected}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4 mr-2" />
+                )}
+                Delete ({selectedIds.size})
+              </Button>
+            )}
+            <Button onClick={() => setShowGenerateDialog(true)}>
+              <Wand2 className="h-4 w-4 mr-2" />
+              Generate Roster
+            </Button>
+          </div>
         </div>
 
         {/* Transport Type Filter */}
@@ -429,50 +503,45 @@ export default function BusRosterPage() {
           ))}
         </div>
 
-        {/* Date Navigation - Modern Design */}
-        <div className="flex items-center justify-between bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 rounded-xl p-4 border">
+        {/* Date Navigation - Compact Design */}
+        <div className="flex items-center justify-center gap-3 bg-card/50 rounded-lg p-2 border">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigateDate("prev")}
-            className="h-10 w-10 rounded-full hover:bg-primary/10"
+            className="h-8 w-8 rounded-full hover:bg-primary/10"
           >
-            <ChevronLeft className="h-5 w-5" />
+            <ChevronLeft className="h-4 w-4" />
           </Button>
 
-          <div className="flex items-center gap-6">
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
-                {format(selectedDate, "EEEE")}
-              </p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-bold text-primary">
-                  {format(selectedDate, "d")}
-                </span>
-                <div className="text-left">
-                  <p className="text-sm font-medium">{format(selectedDate, "MMMM")}</p>
-                  <p className="text-xs text-muted-foreground">{format(selectedDate, "yyyy")}</p>
-                </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-bold text-primary">
+                {format(selectedDate, "d")}
+              </span>
+              <div className="text-left">
+                <p className="text-xs font-medium leading-tight">{format(selectedDate, "MMMM yyyy")}</p>
+                <p className="text-[10px] text-muted-foreground">{format(selectedDate, "EEEE")}</p>
               </div>
             </div>
 
-            <div className="h-12 w-px bg-border" />
+            <div className="h-6 w-px bg-border" />
 
-            <div className="relative">
-              <Input
+            <label className="relative w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center cursor-pointer hover:bg-primary/20 transition-colors">
+              <input
                 type="date"
                 value={format(selectedDate, "yyyy-MM-dd")}
-                onChange={(e) => setSelectedDate(new Date(e.target.value))}
-                className="w-10 h-10 p-0 border-0 bg-primary/10 rounded-full cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                onChange={(e) => e.target.value && setSelectedDate(new Date(e.target.value))}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
-              <Calendar className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-5 w-5 text-primary pointer-events-none" />
-            </div>
+              <Calendar className="h-4 w-4 text-primary pointer-events-none" />
+            </label>
 
             <Button
               variant={format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd") ? "default" : "outline"}
               size="sm"
               onClick={() => setSelectedDate(new Date())}
-              className="rounded-full px-4"
+              className="rounded-full px-3 h-7 text-xs"
             >
               Today
             </Button>
@@ -482,9 +551,9 @@ export default function BusRosterPage() {
             variant="ghost"
             size="icon"
             onClick={() => navigateDate("next")}
-            className="h-10 w-10 rounded-full hover:bg-primary/10"
+            className="h-8 w-8 rounded-full hover:bg-primary/10"
           >
-            <ChevronRight className="h-5 w-5" />
+            <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
 
@@ -532,6 +601,14 @@ export default function BusRosterPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[40px]">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.size === sortedRoster.length && sortedRoster.length > 0}
+                        onChange={toggleSelectAll}
+                        className="h-4 w-4 rounded border-gray-300 cursor-pointer"
+                      />
+                    </TableHead>
                     <TableHead>
                       <button onClick={() => handleSort("time")} className="flex items-center hover:text-foreground transition-colors">
                         Time <SortIcon field="time" />
@@ -562,7 +639,15 @@ export default function BusRosterPage() {
                 </TableHeader>
                 <TableBody>
                   {sortedRoster.map((assignment) => (
-                    <TableRow key={assignment.id}>
+                    <TableRow key={assignment.id} className={selectedIds.has(assignment.id) ? "bg-primary/5" : ""}>
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(assignment.id)}
+                          onChange={() => toggleSelect(assignment.id)}
+                          className="h-4 w-4 rounded border-gray-300 cursor-pointer"
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-muted-foreground" />
@@ -603,7 +688,7 @@ export default function BusRosterPage() {
                           />
                         </div>
                       </TableCell>
-                      <TableCell>{getStatusBadge(assignment.status)}</TableCell>
+                      <TableCell>{getStatusBadge(assignment)}</TableCell>
                       <TableCell>
                         {assignment.status === "scheduled" && (
                           <Button
@@ -623,6 +708,24 @@ export default function BusRosterPage() {
           </CardContent>
         </Card>
 
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete {selectedIds.size} assignments?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete the selected roster assignments. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={deleteSelectedAssignments} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         {/* Generate Roster Dialog */}
         <Dialog open={showGenerateDialog} onOpenChange={setShowGenerateDialog}>
           <DialogContent>
@@ -641,6 +744,7 @@ export default function BusRosterPage() {
                     type="date"
                     value={generateForm.startDate}
                     onChange={(e) => setGenerateForm({ ...generateForm, startDate: e.target.value })}
+                    className="[&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:opacity-50 [&::-webkit-calendar-picker-indicator]:hover:opacity-100"
                   />
                 </div>
                 <div className="space-y-2">
@@ -649,6 +753,7 @@ export default function BusRosterPage() {
                     type="date"
                     value={generateForm.endDate}
                     onChange={(e) => setGenerateForm({ ...generateForm, endDate: e.target.value })}
+                    className="[&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:opacity-50 [&::-webkit-calendar-picker-indicator]:hover:opacity-100"
                   />
                 </div>
               </div>

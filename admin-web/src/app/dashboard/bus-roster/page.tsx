@@ -463,7 +463,7 @@ export default function BusRosterPage() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Users className="h-6 w-6" />
-              Transport Roster
+              Bus Roster
             </h1>
             <p className="text-muted-foreground">Assign drivers and vehicles to scheduled departures</p>
           </div>

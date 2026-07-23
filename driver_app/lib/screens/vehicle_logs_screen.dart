@@ -1088,7 +1088,7 @@ class _AddLogSheetState extends State<AddLogSheet> {
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 style: TextStyle(color: context.textColor, fontSize: 16),
                 decoration: InputDecoration(
-                  hintText: 'Liters filled (optional)',
+                  hintText: 'Liters filled',
                   hintStyle: TextStyle(color: context.mutedColor.withValues(alpha: 0.5)),
                   suffixText: 'L',
                   suffixStyle: TextStyle(color: context.mutedColor),

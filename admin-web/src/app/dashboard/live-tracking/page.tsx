@@ -1,16 +1,30 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
+import dynamic from "next/dynamic"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import {
   Bus, Users, MapPin, AlertTriangle, RefreshCw, Bell, Check,
-  Navigation, Clock, ChevronRight
+  Navigation, Clock, ChevronRight, Map, List, Loader2
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
+
+const BusTrackingMap = dynamic(
+  () => import("@/components/bus-tracking-map").then(mod => mod.BusTrackingMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-full w-full flex items-center justify-center bg-muted rounded-lg">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+)
 
 interface BusLocation {
   id: string
@@ -52,7 +66,7 @@ export default function LiveTrackingPage() {
   const [alerts, setAlerts] = useState<BusFullAlert[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedBus, setSelectedBus] = useState<BusLocation | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [viewMode, setViewMode] = useState<"map" | "list">("map")
 
   useEffect(() => {
     loadData()
@@ -66,7 +80,6 @@ export default function LiveTrackingPage() {
   const loadData = async () => {
     setLoading(true)
 
-    // Load active bus locations
     const { data: busData } = await supabase
       .from("bus_location_tracking")
       .select(`
@@ -78,7 +91,6 @@ export default function LiveTrackingPage() {
       .eq("status", "in_progress")
       .order("last_updated_at", { ascending: false })
 
-    // Load unacknowledged alerts
     const { data: alertData } = await supabase
       .from("bus_full_alerts")
       .select("*")
@@ -91,7 +103,6 @@ export default function LiveTrackingPage() {
   }
 
   const setupRealtime = () => {
-    // Subscribe to bus location updates
     supabase
       .channel("bus_tracking")
       .on(
@@ -103,7 +114,6 @@ export default function LiveTrackingPage() {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "bus_full_alerts" },
         (payload) => {
-          // Play alert sound for new bus full alerts
           playAlertSound()
           toast.error(
             `Bus Full Alert: ${payload.new.route_name} at ${payload.new.stop_name}`,
@@ -121,23 +131,26 @@ export default function LiveTrackingPage() {
   }
 
   const playAlertSound = () => {
-    // Create a simple beep sound
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
-    const oscillator = audioContext.createOscillator()
-    const gainNode = audioContext.createGain()
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
 
-    oscillator.connect(gainNode)
-    gainNode.connect(audioContext.destination)
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
 
-    oscillator.frequency.value = 800
-    oscillator.type = "sine"
-    gainNode.gain.value = 0.3
+      oscillator.frequency.value = 800
+      oscillator.type = "sine"
+      gainNode.gain.value = 0.3
 
-    oscillator.start()
-    setTimeout(() => {
-      oscillator.stop()
-      audioContext.close()
-    }, 500)
+      oscillator.start()
+      setTimeout(() => {
+        oscillator.stop()
+        audioContext.close()
+      }, 500)
+    } catch (e) {
+      console.error("Audio error:", e)
+    }
   }
 
   const acknowledgeAlert = async (alertId: string) => {
@@ -173,7 +186,7 @@ export default function LiveTrackingPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-4 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -183,10 +196,24 @@ export default function LiveTrackingPage() {
           </h1>
           <p className="text-muted-foreground">Monitor bus locations and capacity in real-time</p>
         </div>
-        <Button onClick={loadData} variant="outline" size="sm">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "map" | "list")}>
+            <TabsList>
+              <TabsTrigger value="map" className="gap-2">
+                <Map className="h-4 w-4" />
+                Map
+              </TabsTrigger>
+              <TabsTrigger value="list" className="gap-2">
+                <List className="h-4 w-4" />
+                List
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Button onClick={loadData} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Alerts Section */}
@@ -238,139 +265,153 @@ export default function LiveTrackingPage() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <Bus className="h-6 w-6 text-primary" />
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Bus className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{buses.length}</p>
-                <p className="text-sm text-muted-foreground">Active Buses</p>
+                <p className="text-xs text-muted-foreground">Active Buses</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center">
-                <Users className="h-6 w-6 text-green-500" />
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
+                <Users className="h-5 w-5 text-green-500" />
               </div>
               <div>
                 <p className="text-2xl font-bold">
                   {buses.reduce((sum, b) => sum + b.passengers_on_board, 0)}
                 </p>
-                <p className="text-sm text-muted-foreground">Total Passengers</p>
+                <p className="text-xs text-muted-foreground">Total Passengers</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
-                <AlertTriangle className="h-6 w-6 text-red-500" />
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+                <AlertTriangle className="h-5 w-5 text-red-500" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{buses.filter(b => b.is_full).length}</p>
-                <p className="text-sm text-muted-foreground">Full Buses</p>
+                <p className="text-xs text-muted-foreground">Full Buses</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-orange-500/10 flex items-center justify-center">
-                <Bell className="h-6 w-6 text-orange-500" />
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center">
+                <Bell className="h-5 w-5 text-orange-500" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{alerts.length}</p>
-                <p className="text-sm text-muted-foreground">Pending Alerts</p>
+                <p className="text-xs text-muted-foreground">Pending Alerts</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Bus List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Active Buses</CardTitle>
-          <CardDescription>Real-time location and capacity of all active buses</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+      {/* Map or List View */}
+      {viewMode === "map" ? (
+        <Card className="overflow-hidden">
+          <CardContent className="p-0">
+            <div className="h-[600px]">
+              <BusTrackingMap
+                buses={buses}
+                selectedBusId={selectedBus?.id}
+                onBusClick={(bus) => setSelectedBus(bus)}
+              />
             </div>
-          ) : buses.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Bus className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No active buses at the moment</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {buses.map((bus) => (
-                <div
-                  key={bus.id}
-                  className={`p-4 rounded-lg border transition-colors cursor-pointer hover:bg-muted/50 ${
-                    bus.is_full ? "border-red-500/50 bg-red-500/5" : ""
-                  }`}
-                  onClick={() => setSelectedBus(bus)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                        bus.is_full ? "bg-red-500/20" : "bg-primary/10"
-                      }`}>
-                        <Bus className={`h-6 w-6 ${bus.is_full ? "text-red-500" : "text-primary"}`} />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold">{bus.route?.route_name || "Unknown Route"}</p>
-                          {bus.is_full && (
-                            <Badge variant="destructive" className="text-xs">FULL</Badge>
-                          )}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Active Buses</CardTitle>
+            <CardDescription>Real-time location and capacity of all active buses</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : buses.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Bus className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No active buses at the moment</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {buses.map((bus) => (
+                  <div
+                    key={bus.id}
+                    className={`p-4 rounded-lg border transition-colors cursor-pointer hover:bg-muted/50 ${
+                      bus.is_full ? "border-red-500/50 bg-red-500/5" : ""
+                    }`}
+                    onClick={() => setSelectedBus(bus)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                          bus.is_full ? "bg-red-500/20" : "bg-primary/10"
+                        }`}>
+                          <Bus className={`h-6 w-6 ${bus.is_full ? "text-red-500" : "text-primary"}`} />
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {bus.vehicle?.vehicle_number || "No Vehicle"} • {(bus.driver?.profile as any)?.full_name || "Unknown Driver"}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                          <MapPin className="h-3 w-3" />
-                          {bus.current_stop_name || `Stop ${bus.current_stop_index + 1}`}
-                          <span className="mx-1">•</span>
-                          <Clock className="h-3 w-3" />
-                          {formatDistanceToNow(new Date(bus.last_updated_at), { addSuffix: true })}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold">{bus.route?.route_name || "Unknown Route"}</p>
+                            {bus.is_full && (
+                              <Badge variant="destructive" className="text-xs">FULL</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {bus.vehicle?.vehicle_number || "No Vehicle"} • {(bus.driver?.profile as any)?.full_name || "Unknown Driver"}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                            <MapPin className="h-3 w-3" />
+                            {bus.current_stop_name || `Stop ${bus.current_stop_index + 1}`}
+                            <span className="mx-1">•</span>
+                            <Clock className="h-3 w-3" />
+                            {formatDistanceToNow(new Date(bus.last_updated_at), { addSuffix: true })}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <div className="flex items-center gap-2 justify-end">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-bold text-lg">
-                            {bus.passengers_on_board}/{bus.vehicle_capacity}
-                          </span>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="flex items-center gap-2 justify-end">
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-bold text-lg">
+                              {bus.passengers_on_board}/{bus.vehicle_capacity}
+                            </span>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className={`${getCapacityColor(bus.passengers_on_board, bus.vehicle_capacity)} text-white border-0 text-xs`}
+                          >
+                            {getCapacityText(bus.passengers_on_board, bus.vehicle_capacity)} Capacity
+                          </Badge>
                         </div>
-                        <Badge
-                          variant="outline"
-                          className={`${getCapacityColor(bus.passengers_on_board, bus.vehicle_capacity)} text-white border-0 text-xs`}
-                        >
-                          {getCapacityText(bus.passengers_on_board, bus.vehicle_capacity)} Capacity
-                        </Badge>
+                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
                       </div>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

@@ -60,6 +60,7 @@ interface VehicleChecklist {
   resolved_at: string | null
   resolved_by: string | null
   resolution_notes: string | null
+  running_hours: number | null
 }
 
 interface VehicleHealth {
@@ -118,6 +119,7 @@ const TABS = [
 
 const REPORT_TYPES = [
   { id: "fleet-health", name: "Fleet Health Summary", icon: Activity },
+  { id: "running-hours", name: "Running Hours History", icon: Gauge },
   { id: "all-issues", name: "All Vehicle Issues", icon: AlertTriangle },
   { id: "vehicle-checks", name: "Pre-trip Inspections", icon: ClipboardCheck },
   { id: "issue-breakdown", name: "Issue Breakdown", icon: BarChart3 },
@@ -199,6 +201,96 @@ function SortableItem({ item, openEditItem, toggleItemActive, setDeleteItemId }:
   )
 }
 
+function SortableCategoryCard({ cat, sensors, openEditCategory, toggleCategoryActive, setDeleteCategoryId, openAddItem, handleDragEnd, openEditItem, toggleItemActive, setDeleteItemId, ICON_MAP }: {
+  cat: ChecklistCategory
+  sensors: ReturnType<typeof useSensors>
+  openEditCategory: (cat: ChecklistCategory) => void
+  toggleCategoryActive: (cat: ChecklistCategory) => void
+  setDeleteCategoryId: (id: string) => void
+  openAddItem: (categoryId: string) => void
+  handleDragEnd: (event: DragEndEvent, categoryId: string) => void
+  openEditItem: (item: ChecklistItem) => void
+  toggleItemActive: (item: ChecklistItem) => void
+  setDeleteItemId: (id: string) => void
+  ICON_MAP: Record<string, React.ComponentType<{ className?: string }>>
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: cat.id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  const IconComponent = ICON_MAP[cat.icon] || ClipboardCheck
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <Card className={cn("p-4", !cat.is_active && "opacity-60", isDragging && "shadow-lg")}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing touch-none">
+              <GripVertical className="h-5 w-5 text-muted-foreground" />
+            </button>
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <IconComponent className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h4 className="font-semibold flex items-center gap-2">
+                {cat.name}
+                {!cat.is_active && <Badge variant="secondary">Inactive</Badge>}
+              </h4>
+              <p className="text-sm text-muted-foreground">{cat.items?.length || 0} items</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => openAddItem(cat.id)}>
+              Add Item
+            </Button>
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => openEditCategory(cat)}>
+                  <Pencil className="h-4 w-4 mr-2" /> Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => toggleCategoryActive(cat)}>
+                  {cat.is_active ? <XCircle className="h-4 w-4 mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                  {cat.is_active ? "Deactivate" : "Activate"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-red-600" onSelect={() => setDeleteCategoryId(cat.id)}>
+                  <Trash2 className="h-4 w-4 mr-2" /> Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        {cat.items && cat.items.length > 0 ? (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, cat.id)}>
+            <SortableContext items={cat.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-2 ml-4 border-l-2 border-muted pl-4">
+                {cat.items.map((item) => (
+                  <SortableItem
+                    key={item.id}
+                    item={item}
+                    openEditItem={openEditItem}
+                    toggleItemActive={toggleItemActive}
+                    setDeleteItemId={setDeleteItemId}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        ) : (
+          <p className="text-sm text-muted-foreground ml-4 italic">No items in this category</p>
+        )}
+      </Card>
+    </div>
+  )
+}
+
 export default function ChecklistsPage() {
   const supabase = createClient()
   const [activeTab, setActiveTab] = useState("checks")
@@ -239,6 +331,10 @@ export default function ChecklistsPage() {
 
   const [stats, setStats] = useState({ total: 0, withIssues: 0, passed: 0 })
 
+  // Running hours edit state
+  const [editingRunningHours, setEditingRunningHours] = useState<VehicleHealth | null>(null)
+  const [runningHoursForm, setRunningHoursForm] = useState({ current_running_hours: "", next_service_hours: "", service_interval_hours: "" })
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -271,6 +367,32 @@ export default function ChecklistsPage() {
       await Promise.all(updates)
     } catch (e) {
       toast.error("Failed to save order")
+      loadChecklistItems(false)
+    }
+  }
+
+  const handleCategoryDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = categories.findIndex(c => c.id === active.id)
+    const newIndex = categories.findIndex(c => c.id === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) return
+
+    const newCategories = arrayMove(categories, oldIndex, newIndex)
+
+    // Update local state immediately for smooth UX
+    setCategories(newCategories)
+
+    // Update sort_order in database
+    try {
+      const updates = newCategories.map((cat, index) =>
+        supabase.from("checklist_categories").update({ sort_order: index }).eq("id", cat.id)
+      )
+      await Promise.all(updates)
+    } catch (e) {
+      toast.error("Failed to save category order")
       loadChecklistItems(false)
     }
   }
@@ -483,6 +605,45 @@ export default function ChecklistsPage() {
     }
   }
 
+  const openEditRunningHours = (vehicle: VehicleHealth) => {
+    setEditingRunningHours(vehicle)
+    setRunningHoursForm({
+      current_running_hours: vehicle.current_running_hours.toString(),
+      next_service_hours: vehicle.next_service_hours?.toString() || "",
+      service_interval_hours: vehicle.service_interval_hours.toString()
+    })
+  }
+
+  const saveRunningHours = async () => {
+    if (!editingRunningHours) return
+    const currentHrs = parseFloat(runningHoursForm.current_running_hours)
+    if (isNaN(currentHrs) || currentHrs < 0) {
+      toast.error("Enter a valid running hours value")
+      return
+    }
+    setSaving(true)
+    try {
+      const updateData: Record<string, unknown> = {
+        current_running_hours: currentHrs,
+        last_running_hours_update: new Date().toISOString()
+      }
+      if (runningHoursForm.next_service_hours) {
+        updateData.next_service_hours = parseFloat(runningHoursForm.next_service_hours)
+      }
+      if (runningHoursForm.service_interval_hours) {
+        updateData.service_interval_hours = parseFloat(runningHoursForm.service_interval_hours)
+      }
+      await supabase.from("vehicle_types").update(updateData).eq("plate_no", editingRunningHours.vehicle_number)
+      toast.success("Running hours updated")
+      setEditingRunningHours(null)
+      loadFleetHealth()
+    } catch (e) {
+      toast.error("Failed to update running hours")
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const loadChecklists = async (showLoading = true) => {
     if (showLoading) setLoading(true)
     const start = (currentPage - 1) * PAGE_SIZE
@@ -642,7 +803,8 @@ export default function ChecklistsPage() {
   const filteredChecklists = checklists.filter(c => {
     if (!search) return true
     const s = search.toLowerCase()
-    return c.driver_name?.toLowerCase().includes(s) || c.vehicle_number?.toLowerCase().includes(s)
+    const vehicleDisplayName = vehicleHealthData.find(v => v.vehicle_number === c.vehicle_number)?.display_name?.toLowerCase() || ''
+    return c.driver_name?.toLowerCase().includes(s) || c.vehicle_number?.toLowerCase().includes(s) || vehicleDisplayName.includes(s)
   })
 
   const handleBulkDelete = async () => {
@@ -776,6 +938,20 @@ export default function ChecklistsPage() {
         rows = historyRows.map(h => ({ "Date": h.date, "Vehicle": h.vehicle, "Event": h.event, "Driver": h.driver, "Details": h.details }))
         filename = `vehicle_history_${new Date().toISOString().split("T")[0]}.csv`
         break
+      case "running-hours":
+        headers = ["Date", "Vehicle", "Driver", "Running Hours", "Service Due", "Status"]
+        rows = filtered.filter(c => c.running_hours != null).map(c => {
+          const vh = vehicleHealthData.find(v => v.vehicle_number === c.vehicle_number)
+          const nextService = vh?.next_service_hours || 0
+          const isOverdue = c.running_hours && nextService > 0 && c.running_hours >= nextService
+          return {
+            "Date": formatDateOnly(c.checked_at), "Vehicle": c.vehicle_number || "-", "Driver": c.driver_name || "-",
+            "Running Hours": String(c.running_hours), "Service Due": nextService > 0 ? String(nextService) : "-",
+            "Status": isOverdue ? "Service Overdue" : nextService > 0 && c.running_hours && (nextService - c.running_hours) <= 50 ? "Service Soon" : "OK",
+          }
+        })
+        filename = `running_hours_${new Date().toISOString().split("T")[0]}.csv`
+        break
     }
 
     if (rows.length === 0) { toast.error("No data to export"); setGenerating(false); return }
@@ -864,6 +1040,19 @@ export default function ChecklistsPage() {
         })
         hist.sort((a, b) => b.ts - a.ts)
         rows = hist.map(h => ({ "Date": h.date, "Vehicle": h.vehicle, "Event": h.event, "Driver": h.driver, "Details": h.details }))
+        break
+      case "running-hours":
+        headers = ["Date", "Vehicle", "Driver", "Hours", "Service Due", "Status"]
+        rows = filtered.filter(c => c.running_hours != null).map(c => {
+          const vh = vehicleHealthData.find(v => v.vehicle_number === c.vehicle_number)
+          const nextService = vh?.next_service_hours || 0
+          const isOverdue = c.running_hours && nextService > 0 && c.running_hours >= nextService
+          return {
+            "Date": formatDateOnly(c.checked_at), "Vehicle": c.vehicle_number || "-", "Driver": c.driver_name || "-",
+            "Hours": String(c.running_hours), "Service Due": nextService > 0 ? String(nextService) : "-",
+            "Status": isOverdue ? "Overdue" : nextService > 0 && c.running_hours && (nextService - c.running_hours) <= 50 ? "Soon" : "OK",
+          }
+        })
         break
     }
 
@@ -959,7 +1148,7 @@ export default function ChecklistsPage() {
             <div className="flex items-center gap-3 mb-4">
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search driver or vehicle..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+                <Input placeholder="Search driver, plate, or vehicle ID..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
               </div>
               <Select value={filter} onValueChange={(v) => { setFilter(v); setCurrentPage(1) }}>
                 <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
@@ -998,7 +1187,17 @@ export default function ChecklistsPage() {
                             <span className="font-medium text-sm">{checklist.driver_name}</span>
                           </div>
                         </TableCell>
-                        <TableCell><div className="flex items-center gap-1 text-sm"><Car className="h-4 w-4 text-muted-foreground" />{checklist.vehicle_number}</div></TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 text-sm">
+                            <Car className="h-4 w-4 text-muted-foreground" />
+                            <div>
+                              <span>{checklist.vehicle_number}</span>
+                              {vehicleHealthData.find(v => v.vehicle_number === checklist.vehicle_number)?.display_name && (
+                                <p className="text-xs text-muted-foreground">{vehicleHealthData.find(v => v.vehicle_number === checklist.vehicle_number)?.display_name}</p>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
                         <TableCell><Badge className={checklist.has_issues ? "bg-red-500" : "bg-green-500"}>{checklist.has_issues ? "Issues" : "Passed"}</Badge></TableCell>
                         <TableCell>
                           {failedItems.length > 0 ? (
@@ -1085,74 +1284,28 @@ export default function ChecklistsPage() {
               <Button variant="outline" className="mt-4" onClick={openAddCategory}>Add First Category</Button>
             </Card>
           ) : (
-            <div className="space-y-4">
-              {categories.map((cat) => (
-                <Card key={cat.id} className={cn("p-4", !cat.is_active && "opacity-60")}>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      {(() => {
-                        const IconComponent = ICON_MAP[cat.icon] || ClipboardCheck
-                        return (
-                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <IconComponent className="h-5 w-5 text-primary" />
-                          </div>
-                        )
-                      })()}
-                      <div>
-                        <h4 className="font-semibold flex items-center gap-2">
-                          {cat.name}
-                          {!cat.is_active && <Badge variant="secondary">Inactive</Badge>}
-                        </h4>
-                        <p className="text-sm text-muted-foreground">{cat.items?.length || 0} items</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => openAddItem(cat.id)}>
-                        Add Item
-                      </Button>
-                      <DropdownMenu modal={false}>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onSelect={() => openEditCategory(cat)}>
-                            <Pencil className="h-4 w-4 mr-2" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => toggleCategoryActive(cat)}>
-                            {cat.is_active ? <XCircle className="h-4 w-4 mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-                            {cat.is_active ? "Deactivate" : "Activate"}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600" onSelect={() => setDeleteCategoryId(cat.id)}>
-                            <Trash2 className="h-4 w-4 mr-2" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-
-                  {cat.items && cat.items.length > 0 ? (
-                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, cat.id)}>
-                      <SortableContext items={cat.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
-                        <div className="space-y-2 ml-4 border-l-2 border-muted pl-4">
-                          {cat.items.map((item) => (
-                            <SortableItem
-                              key={item.id}
-                              item={item}
-                              openEditItem={openEditItem}
-                              toggleItemActive={toggleItemActive}
-                              setDeleteItemId={setDeleteItemId}
-                            />
-                          ))}
-                        </div>
-                      </SortableContext>
-                    </DndContext>
-                  ) : (
-                    <p className="text-sm text-muted-foreground ml-4 italic">No items in this category</p>
-                  )}
-                </Card>
-              ))}
-            </div>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}>
+              <SortableContext items={categories.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-4">
+                  {categories.map((cat) => (
+                    <SortableCategoryCard
+                      key={cat.id}
+                      cat={cat}
+                      sensors={sensors}
+                      openEditCategory={openEditCategory}
+                      toggleCategoryActive={toggleCategoryActive}
+                      setDeleteCategoryId={setDeleteCategoryId}
+                      openAddItem={openAddItem}
+                      handleDragEnd={handleDragEnd}
+                      openEditItem={openEditItem}
+                      toggleItemActive={toggleItemActive}
+                      setDeleteItemId={setDeleteItemId}
+                      ICON_MAP={ICON_MAP}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           )}
         </div>
       )}
@@ -1195,10 +1348,14 @@ export default function ChecklistsPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
+                          <button
+                            className="flex items-center gap-2 hover:bg-primary/10 px-2 py-1 -mx-2 rounded transition-colors group/hrs"
+                            onClick={(e) => { e.stopPropagation(); openEditRunningHours(v) }}
+                          >
                             <span className="font-medium">{v.current_running_hours.toFixed(1)}</span>
                             <span className="text-muted-foreground text-xs">hrs</span>
-                          </div>
+                            <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/hrs:opacity-100 transition-opacity" />
+                          </button>
                         </TableCell>
                         <TableCell className={cn("font-bold", getHealthColor(v.health_score))}>{v.health_score}%</TableCell>
                         <TableCell><Badge variant={v.health_score >= 80 ? "default" : v.health_score >= 60 ? "secondary" : "destructive"}>{getHealthLabel(v.health_score)}</Badge></TableCell>
@@ -1250,8 +1407,10 @@ export default function ChecklistsPage() {
           setEndDate(preset === "lastMonth" ? today.toISOString().split("T")[0] : new Date(Date.now() + 86400000).toISOString().split("T")[0])
         }
 
+        const runningHoursRecords = filtered.filter(c => c.running_hours != null).length
         const reportStats: Record<string, { count: number; label: string; color: string }> = {
           "fleet-health": { count: avgHealth, label: `${avgHealth}% avg health`, color: avgHealth >= 80 ? "text-green-500" : avgHealth >= 60 ? "text-yellow-500" : "text-red-500" },
+          "running-hours": { count: runningHoursRecords, label: `${runningHoursRecords} records`, color: "text-cyan-500" },
           "all-issues": { count: issuesFound, label: `${issuesFound} issues`, color: issuesFound > 0 ? "text-orange-500" : "text-green-500" },
           "vehicle-checks": { count: totalChecks, label: `${totalChecks} inspections`, color: "text-blue-500" },
           "issue-breakdown": { count: Object.keys(filtered.reduce((acc, c) => { if (c.issues) Object.keys(c.issues).forEach(k => acc[k] = true); return acc }, {} as Record<string, boolean>)).length, label: "issue types", color: "text-purple-500" },
@@ -1262,7 +1421,7 @@ export default function ChecklistsPage() {
         }
 
         const REPORT_CATEGORIES = [
-          { title: "Health & Performance", ids: ["fleet-health", "vehicle-lifespan"] },
+          { title: "Health & Performance", ids: ["fleet-health", "running-hours", "vehicle-lifespan"] },
           { title: "Issues & Resolutions", ids: ["all-issues", "pending-issues", "resolved-issues", "issue-breakdown"] },
           { title: "History & Records", ids: ["vehicle-checks", "vehicle-history"] },
         ]
@@ -1366,7 +1525,7 @@ export default function ChecklistsPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 p-3 bg-muted rounded-lg text-sm">
                 <div><span className="text-muted-foreground">Driver:</span> {selectedChecklist.driver_name}</div>
-                <div><span className="text-muted-foreground">Vehicle:</span> {selectedChecklist.vehicle_number}</div>
+                <div><span className="text-muted-foreground">Vehicle:</span> {selectedChecklist.vehicle_number}{vehicleHealthData.find(v => v.vehicle_number === selectedChecklist.vehicle_number)?.display_name && ` (${vehicleHealthData.find(v => v.vehicle_number === selectedChecklist.vehicle_number)?.display_name})`}</div>
                 <div><span className="text-muted-foreground">Date:</span> {formatDate(selectedChecklist.checked_at)}</div>
                 <div><Badge className={selectedChecklist.has_issues ? "bg-red-500" : "bg-green-500"}>{selectedChecklist.has_issues ? "Issues Found" : "Passed"}</Badge></div>
               </div>
@@ -1682,6 +1841,57 @@ export default function ChecklistsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Running Hours Edit Dialog */}
+      <Dialog open={!!editingRunningHours} onOpenChange={(open) => { if (!open) setEditingRunningHours(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Gauge className="h-5 w-5 text-primary" />
+              Edit Running Hours - {editingRunningHours?.vehicle_number}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Current Running Hours *</label>
+              <Input
+                type="number"
+                step="0.1"
+                value={runningHoursForm.current_running_hours}
+                onChange={(e) => setRunningHoursForm({ ...runningHoursForm, current_running_hours: e.target.value })}
+                placeholder="e.g., 1234.5"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Service Interval (hours)</label>
+              <Input
+                type="number"
+                value={runningHoursForm.service_interval_hours}
+                onChange={(e) => setRunningHoursForm({ ...runningHoursForm, service_interval_hours: e.target.value })}
+                placeholder="e.g., 250"
+              />
+              <p className="text-xs text-muted-foreground">Hours between scheduled services</p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Next Service At (hours)</label>
+              <Input
+                type="number"
+                value={runningHoursForm.next_service_hours}
+                onChange={(e) => setRunningHoursForm({ ...runningHoursForm, next_service_hours: e.target.value })}
+                placeholder="e.g., 1500"
+              />
+              <p className="text-xs text-muted-foreground">Leave empty to use interval-based calculation</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingRunningHours(null)}>Cancel</Button>
+            <Button onClick={saveRunningHours} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
     </PermissionGate>
   )

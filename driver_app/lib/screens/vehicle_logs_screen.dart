@@ -947,18 +947,12 @@ class _AddLogSheetState extends State<AddLogSheet> {
   }
 
   Future<void> _save() async {
-    if (_amountController.text.isEmpty) {
-      HapticFeedback.heavyImpact();
-      AppSnackbar.error(context, 'Please enter an amount');
-      return;
-    }
-
     setState(() => _isSaving = true);
     HapticFeedback.mediumImpact();
 
     final result = await SupabaseService.addVehicleLog(
       logType: widget.logType,
-      amount: double.tryParse(_amountController.text),
+      amount: null,
       odometer: int.tryParse(_odometerController.text),
       notes: _notesController.text.isNotEmpty ? _notesController.text : null,
       logDate: _selectedDate,
@@ -1045,26 +1039,6 @@ class _AddLogSheetState extends State<AddLogSheet> {
               ],
             ),
             const SizedBox(height: 28),
-
-            // Amount field
-            Text('Amount', style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _amountController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              style: TextStyle(color: context.textColor, fontSize: 24, fontWeight: FontWeight.w700),
-              decoration: InputDecoration(
-                prefixText: 'MVR ',
-                prefixStyle: TextStyle(color: context.mutedColor, fontSize: 24, fontWeight: FontWeight.w700),
-                hintText: '0.00',
-                hintStyle: TextStyle(color: context.mutedColor.withValues(alpha: 0.5), fontSize: 24, fontWeight: FontWeight.w700),
-                filled: true,
-                fillColor: context.bgColor,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                contentPadding: const EdgeInsets.all(20),
-              ),
-            ),
-            const SizedBox(height: 20),
 
             // Fuel-specific fields
             if (widget.logType == 'fuel') ...[

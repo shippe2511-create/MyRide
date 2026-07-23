@@ -6,12 +6,14 @@ import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 import { toast } from "sonner"
 import {
   Bus, Users, AlertTriangle, RefreshCw, Bell, Check,
-  Navigation, Clock, ChevronRight, Loader2
+  Navigation, Clock, ChevronRight, Loader2, MapPin, X,
+  TrendingUp, ArrowUp, ArrowDown
 } from "lucide-react"
-import { formatDistanceToNow } from "date-fns"
+import { formatDistanceToNow, format } from "date-fns"
 
 const BusTrackingMap = dynamic(
   () => import("@/components/bus-tracking-map").then(mod => mod.BusTrackingMap),
@@ -59,12 +61,36 @@ interface BusFullAlert {
   created_at: string
 }
 
+interface StopPassengerCount {
+  id: string
+  stop_index: number
+  stop_name: string
+  boarded_count: number
+  alighted_count: number
+  recorded_at: string
+}
+
+interface DailySummary {
+  total_trips: number
+  completed_trips: number
+  total_passengers: number
+  avg_occupancy: number
+}
+
 export default function LiveTrackingPage() {
   const supabase = createClient()
   const [buses, setBuses] = useState<BusLocation[]>([])
   const [alerts, setAlerts] = useState<BusFullAlert[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedBus, setSelectedBus] = useState<BusLocation | null>(null)
+  const [stopCounts, setStopCounts] = useState<StopPassengerCount[]>([])
+  const [loadingStops, setLoadingStops] = useState(false)
+  const [summary, setSummary] = useState<DailySummary>({
+    total_trips: 0,
+    completed_trips: 0,
+    total_passengers: 0,
+    avg_occupancy: 0,
+  })
 
   useEffect(() => {
     loadData()
@@ -74,6 +100,15 @@ export default function LiveTrackingPage() {
       supabase.removeAllChannels()
     }
   }, [])
+
+  // Load stop counts when bus is selected
+  useEffect(() => {
+    if (selectedBus?.trip_id) {
+      loadStopCounts(selectedBus.trip_id)
+    } else {
+      setStopCounts([])
+    }
+  }, [selectedBus?.trip_id])
 
   const loadData = async () => {
     setLoading(true)
@@ -97,7 +132,52 @@ export default function LiveTrackingPage() {
 
     setBuses(busData || [])
     setAlerts(alertData || [])
+
+    // Load daily summary
+    const today = format(new Date(), "yyyy-MM-dd")
+
+    const { data: allTrips } = await supabase
+      .from("bus_trips")
+      .select("id, status")
+      .gte("actual_start_time", `${today}T00:00:00`)
+
+    const { data: allCounts } = await supabase
+      .from("stop_passenger_counts")
+      .select("boarded_count")
+      .gte("recorded_at", `${today}T00:00:00`)
+
+    const todayTrips = allTrips || []
+    const totalPassengers = allCounts?.reduce((sum, c) => sum + (c.boarded_count || 0), 0) || 0
+
+    let avgOccupancy = 0
+    if (busData && busData.length > 0) {
+      const occupancies = busData.map(bus => {
+        const capacity = bus.vehicle_capacity || 40
+        return Math.min(100, (bus.passengers_on_board / capacity) * 100)
+      })
+      avgOccupancy = occupancies.reduce((a, b) => a + b, 0) / occupancies.length
+    }
+
+    setSummary({
+      total_trips: todayTrips.length,
+      completed_trips: todayTrips.filter(t => t.status === "completed").length,
+      total_passengers: totalPassengers,
+      avg_occupancy: Math.round(avgOccupancy),
+    })
+
     setLoading(false)
+  }
+
+  const loadStopCounts = async (tripId: string) => {
+    setLoadingStops(true)
+    const { data } = await supabase
+      .from("stop_passenger_counts")
+      .select("*")
+      .eq("bus_trip_id", tripId)
+      .order("stop_index", { ascending: true })
+
+    setStopCounts(data || [])
+    setLoadingStops(false)
   }
 
   const setupRealtime = () => {
@@ -124,6 +204,16 @@ export default function LiveTrackingPage() {
         "postgres_changes",
         { event: "*", schema: "public", table: "bus_full_alerts" },
         () => loadData()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "stop_passenger_counts" },
+        () => {
+          loadData()
+          if (selectedBus?.trip_id) {
+            loadStopCounts(selectedBus.trip_id)
+          }
+        }
       )
       .subscribe()
   }
@@ -168,15 +258,6 @@ export default function LiveTrackingPage() {
     }
   }
 
-  const getCapacityColor = (passengers: number, capacity: number) => {
-    if (capacity === 0) return "bg-gray-500"
-    const ratio = passengers / capacity
-    if (ratio >= 1) return "bg-red-500"
-    if (ratio >= 0.8) return "bg-orange-500"
-    if (ratio >= 0.5) return "bg-yellow-500"
-    return "bg-green-500"
-  }
-
   const getStatusBadge = (bus: BusLocation) => {
     if (bus.is_full) {
       return <Badge className="bg-red-500 text-white text-xs">Full</Badge>
@@ -186,6 +267,13 @@ export default function LiveTrackingPage() {
       return <Badge className="bg-orange-500 text-white text-xs">Almost Full</Badge>
     }
     return <Badge className="bg-green-500 text-white text-xs">Available</Badge>
+  }
+
+  const getOccupancyColor = (percentage: number) => {
+    if (percentage >= 90) return "bg-red-500"
+    if (percentage >= 70) return "bg-orange-500"
+    if (percentage >= 50) return "bg-yellow-500"
+    return "bg-green-500"
   }
 
   const activeBuses = buses.filter(b => !b.is_full).length
@@ -200,7 +288,7 @@ export default function LiveTrackingPage() {
             <Navigation className="h-6 w-6" />
             Bus Live Tracking
           </h1>
-          <p className="text-muted-foreground">Real-time bus locations and capacity</p>
+          <p className="text-muted-foreground">Real-time bus locations, capacity & passenger counts</p>
         </div>
         <Button onClick={loadData} variant="outline" size="sm">
           <RefreshCw className="h-4 w-4 mr-2" />
@@ -209,55 +297,81 @@ export default function LiveTrackingPage() {
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-6 gap-3 mb-4">
         <Card className="bg-card border">
-          <CardContent className="py-3 px-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <Bus className="h-5 w-5 text-primary" />
+          <CardContent className="py-2 px-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Bus className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-primary">{buses.length}</p>
-                <p className="text-xs text-muted-foreground">Active</p>
+                <p className="text-xl font-bold text-primary">{buses.length}</p>
+                <p className="text-[10px] text-muted-foreground">Active</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card className="bg-card border">
-          <CardContent className="py-3 px-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
-                <Bus className="h-5 w-5 text-green-500" />
+          <CardContent className="py-2 px-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center">
+                <Bus className="h-4 w-4 text-green-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-green-500">{activeBuses}</p>
-                <p className="text-xs text-muted-foreground">Available</p>
+                <p className="text-xl font-bold text-green-500">{activeBuses}</p>
+                <p className="text-[10px] text-muted-foreground">Available</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card className="bg-card border">
-          <CardContent className="py-3 px-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
-                <AlertTriangle className="h-5 w-5 text-red-500" />
+          <CardContent className="py-2 px-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center">
+                <AlertTriangle className="h-4 w-4 text-red-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-red-500">{fullBuses}</p>
-                <p className="text-xs text-muted-foreground">Full</p>
+                <p className="text-xl font-bold text-red-500">{fullBuses}</p>
+                <p className="text-[10px] text-muted-foreground">Full</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card className="bg-card border">
-          <CardContent className="py-3 px-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center">
-                <Bell className="h-5 w-5 text-orange-500" />
+          <CardContent className="py-2 px-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
+                <Users className="h-4 w-4 text-blue-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-orange-500">{alerts.length}</p>
-                <p className="text-xs text-muted-foreground">Alerts</p>
+                <p className="text-xl font-bold text-blue-500">{summary.total_passengers}</p>
+                <p className="text-[10px] text-muted-foreground">Passengers</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border">
+          <CardContent className="py-2 px-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-yellow-500/10 flex items-center justify-center">
+                <TrendingUp className="h-4 w-4 text-yellow-500" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-yellow-500">{summary.avg_occupancy}%</p>
+                <p className="text-[10px] text-muted-foreground">Avg Occ.</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border">
+          <CardContent className="py-2 px-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-orange-500/10 flex items-center justify-center">
+                <Bell className="h-4 w-4 text-orange-500" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-orange-500">{alerts.length}</p>
+                <p className="text-[10px] text-muted-foreground">Alerts</p>
               </div>
             </div>
           </CardContent>
@@ -317,70 +431,202 @@ export default function LiveTrackingPage() {
           </CardContent>
         </Card>
 
-        {/* Sidebar - Active Buses List */}
+        {/* Sidebar */}
         <Card className="w-80 flex flex-col">
-          <CardContent className="p-4 flex flex-col h-full">
-            <div className="flex items-center gap-2 mb-4">
-              <Bus className="h-5 w-5 text-primary" />
-              <h3 className="font-semibold">Active Buses ({buses.length})</h3>
-            </div>
-
-            <div className="flex-1 overflow-y-auto space-y-2">
-              {loading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <CardContent className="p-4 flex flex-col h-full overflow-hidden">
+            {selectedBus ? (
+              // Selected Bus Detail View
+              <div className="flex flex-col h-full">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold">Bus Details</h3>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6"
+                    onClick={() => setSelectedBus(null)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
-              ) : buses.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Bus className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No active buses</p>
-                </div>
-              ) : (
-                buses.map((bus) => {
-                  const driverName = (bus.driver?.profile as any)?.full_name || "Unknown"
-                  const initial = driverName.charAt(0).toUpperCase()
 
-                  return (
-                    <div
-                      key={bus.id}
-                      onClick={() => setSelectedBus(bus)}
-                      className={`p-3 rounded-lg border cursor-pointer transition-all hover:bg-muted/50 ${
-                        selectedBus?.id === bus.id ? "border-primary bg-primary/5" : ""
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-lg font-semibold">
-                          {initial}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <p className="font-medium truncate">{driverName}</p>
-                            <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                {/* Bus Info */}
+                <div className="space-y-3 mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-xl font-semibold">
+                      {((selectedBus.driver?.profile as any)?.full_name || "U").charAt(0)}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">
+                        {(selectedBus.driver?.profile as any)?.full_name || "Unknown Driver"}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(selectedBus)}
+                        {selectedBus.vehicle && (
+                          <Badge variant="outline" className="text-xs">
+                            {selectedBus.vehicle.vehicle_number}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedBus.route && (
+                    <div className="p-2 rounded-lg bg-muted/50">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Navigation className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">{selectedBus.route.route_name}</span>
+                        <span className="text-muted-foreground">({selectedBus.route.route_code})</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Occupancy Bar */}
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm flex items-center gap-1">
+                        <Users className="h-4 w-4" />
+                        Occupancy
+                      </span>
+                      <span className="font-bold">
+                        {selectedBus.passengers_on_board}/{selectedBus.vehicle_capacity}
+                      </span>
+                    </div>
+                    <Progress
+                      value={(selectedBus.passengers_on_board / selectedBus.vehicle_capacity) * 100}
+                      className={`h-2 ${getOccupancyColor((selectedBus.passengers_on_board / selectedBus.vehicle_capacity) * 100)}`}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1 text-right">
+                      {Math.round((selectedBus.passengers_on_board / selectedBus.vehicle_capacity) * 100)}% full
+                    </p>
+                  </div>
+
+                  {selectedBus.current_stop_name && (
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 text-sm">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <span>Current: {selectedBus.current_stop_name}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    Updated {formatDistanceToNow(new Date(selectedBus.last_updated_at), { addSuffix: true })}
+                  </div>
+                </div>
+
+                {/* Per-Stop Passenger Counts */}
+                <div className="flex-1 overflow-hidden flex flex-col">
+                  <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    Stop Passenger Counts
+                  </h4>
+
+                  {loadingStops ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : stopCounts.length === 0 ? (
+                    <div className="text-center py-4 text-muted-foreground text-sm">
+                      No stop data yet
+                    </div>
+                  ) : (
+                    <div className="flex-1 overflow-y-auto space-y-2">
+                      {stopCounts.map((stop, idx) => (
+                        <div
+                          key={stop.id}
+                          className={`p-2 rounded-lg border text-sm ${
+                            idx === selectedBus.current_stop_index
+                              ? "border-primary bg-primary/5"
+                              : "bg-muted/30"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium truncate flex-1">
+                              {stop.stop_name || `Stop ${stop.stop_index + 1}`}
+                            </span>
+                            {idx === selectedBus.current_stop_index && (
+                              <Badge className="bg-primary text-[10px] ml-2">Current</Badge>
+                            )}
                           </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            {getStatusBadge(bus)}
-                            <span className="text-xs text-muted-foreground">
-                              {bus.passengers_on_board}/{bus.vehicle_capacity}
+                          <div className="flex items-center gap-4 text-xs">
+                            <span className="flex items-center gap-1 text-green-500">
+                              <ArrowUp className="h-3 w-3" />
+                              +{stop.boarded_count} boarded
+                            </span>
+                            <span className="flex items-center gap-1 text-red-500">
+                              <ArrowDown className="h-3 w-3" />
+                              -{stop.alighted_count} alighted
                             </span>
                           </div>
                         </div>
-                      </div>
-                      {bus.route && (
-                        <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1">
-                          <Navigation className="h-3 w-3" />
-                          {bus.route.route_name}
-                        </div>
-                      )}
-                      {bus.vehicle && (
-                        <Badge variant="outline" className="mt-1 text-xs">
-                          {bus.vehicle.vehicle_number}
-                        </Badge>
-                      )}
+                      ))}
                     </div>
-                  )
-                })
-              )}
-            </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              // Default Bus List View
+              <>
+                <div className="flex items-center gap-2 mb-4">
+                  <Bus className="h-5 w-5 text-primary" />
+                  <h3 className="font-semibold">Active Buses ({buses.length})</h3>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-2">
+                  {loading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : buses.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Bus className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No active buses</p>
+                    </div>
+                  ) : (
+                    buses.map((bus) => {
+                      const driverName = (bus.driver?.profile as any)?.full_name || "Unknown"
+                      const initial = driverName.charAt(0).toUpperCase()
+
+                      return (
+                        <div
+                          key={bus.id}
+                          onClick={() => setSelectedBus(bus)}
+                          className="p-3 rounded-lg border cursor-pointer transition-all hover:bg-muted/50"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-lg font-semibold">
+                              {initial}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <p className="font-medium truncate">{driverName}</p>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                {getStatusBadge(bus)}
+                                <span className="text-xs text-muted-foreground">
+                                  {bus.passengers_on_board}/{bus.vehicle_capacity}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          {bus.route && (
+                            <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1">
+                              <Navigation className="h-3 w-3" />
+                              {bus.route.route_name}
+                            </div>
+                          )}
+                          {bus.vehicle && (
+                            <Badge variant="outline" className="mt-1 text-xs">
+                              {bus.vehicle.vehicle_number}
+                            </Badge>
+                          )}
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

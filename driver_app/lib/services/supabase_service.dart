@@ -1095,8 +1095,9 @@ class SupabaseService {
     required Map<String, String> issues,
     required Map<String, bool> allItems,
     Map<String, List<File>>? issuePhotos,
+    double? runningHours,
   }) async {
-    debugPrint('Saving checklist for driver: $driverId, name: $driverName, vehicle: $vehicleNumber');
+    debugPrint('Saving checklist for driver: $driverId, name: $driverName, vehicle: $vehicleNumber, runningHours: $runningHours');
 
     // Upload photos and build issues with photo URLs
     final issuesWithPhotos = <String, Map<String, dynamic>>{};
@@ -1136,12 +1137,26 @@ class SupabaseService {
       'issues': issuesWithPhotos.isEmpty ? {} : issuesWithPhotos,
       'all_items': allItems,
       'checked_at': DateTime.now().toUtc().toIso8601String(),
+      if (runningHours != null) 'running_hours': runningHours,
     };
 
     debugPrint('Inserting checklist: $data');
 
     final response = await client.from('vehicle_checklists').insert(data).select();
     debugPrint('Checklist saved: $response');
+
+    // Update vehicle's current running hours
+    if (runningHours != null && vehicleNumber.isNotEmpty) {
+      try {
+        await client.from('vehicle_types').update({
+          'current_running_hours': runningHours,
+          'last_running_hours_update': DateTime.now().toUtc().toIso8601String(),
+        }).eq('plate_no', vehicleNumber);
+        debugPrint('Vehicle running hours updated to $runningHours');
+      } catch (e) {
+        debugPrint('Failed to update vehicle running hours: $e');
+      }
+    }
   }
 
   // Real-time subscriptions

@@ -37,6 +37,10 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core"
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import { GripVertical } from "lucide-react"
 
 interface IssueDetail {
   note: string
@@ -60,6 +64,7 @@ interface VehicleChecklist {
 
 interface VehicleHealth {
   vehicle_number: string
+  display_name: string
   total_checks: number
   total_issues: number
   pending_issues: number
@@ -71,6 +76,10 @@ interface VehicleHealth {
   issue_breakdown: Record<string, number>
   health_score: number
   days_in_service: number
+  current_running_hours: number
+  last_running_hours_update: string | null
+  next_service_hours: number | null
+  service_interval_hours: number
 }
 
 interface ChecklistCategory {
@@ -137,6 +146,59 @@ const ICON_MAP: Record<string, LucideIcon> = {
   eye: Eye,
 }
 
+function SortableItem({ item, openEditItem, toggleItemActive, setDeleteItemId }: {
+  item: ChecklistItem
+  openEditItem: (item: ChecklistItem) => void
+  toggleItemActive: (item: ChecklistItem) => void
+  setDeleteItemId: (id: string) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "flex items-center justify-between p-3 rounded-lg bg-muted/50",
+        !item.is_active && "opacity-60",
+        isDragging && "shadow-lg"
+      )}
+    >
+      <div className="flex items-center gap-3">
+        <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing touch-none">
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </button>
+        <CheckCircle className="h-4 w-4 text-muted-foreground" />
+        <div>
+          <p className="font-medium flex items-center gap-2">
+            {item.title}
+            {!item.is_active && <Badge variant="outline" className="text-xs">Inactive</Badge>}
+          </p>
+          {item.description && (
+            <p className="text-sm text-muted-foreground">{item.description}</p>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-1">
+        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEditItem(item) }}>
+          <Pencil className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); toggleItemActive(item) }}>
+          {item.is_active ? <XCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+        </Button>
+        <Button variant="ghost" size="icon" className="text-red-600" onClick={(e) => { e.stopPropagation(); setDeleteItemId(item.id) }}>
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export default function ChecklistsPage() {
   const supabase = createClient()
   const [activeTab, setActiveTab] = useState("checks")
@@ -176,6 +238,42 @@ export default function ChecklistsPage() {
   const [itemForm, setItemForm] = useState({ category_id: "", key: "", title: "", description: "", icon: "check" })
 
   const [stats, setStats] = useState({ total: 0, withIssues: 0, passed: 0 })
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
+
+  const handleDragEnd = async (event: DragEndEvent, categoryId: string) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const category = categories.find(c => c.id === categoryId)
+    if (!category?.items) return
+
+    const oldIndex = category.items.findIndex(i => i.id === active.id)
+    const newIndex = category.items.findIndex(i => i.id === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) return
+
+    const newItems = arrayMove(category.items, oldIndex, newIndex)
+
+    // Update local state immediately for smooth UX
+    setCategories(prev => prev.map(c =>
+      c.id === categoryId ? { ...c, items: newItems } : c
+    ))
+
+    // Update sort_order in database
+    try {
+      const updates = newItems.map((item, index) =>
+        supabase.from("checklist_items").update({ sort_order: index }).eq("id", item.id)
+      )
+      await Promise.all(updates)
+    } catch (e) {
+      toast.error("Failed to save order")
+      loadChecklistItems(false)
+    }
+  }
 
   useEffect(() => {
     loadData(true)
@@ -420,7 +518,7 @@ export default function ChecklistsPage() {
 
   const loadFleetHealth = async () => {
     const [vehiclesRes, checklistsRes] = await Promise.all([
-      supabase.from("vehicle_types").select("plate_no, display_name, is_active, created_at").eq("is_active", true),
+      supabase.from("vehicle_types").select("plate_no, display_name, is_active, created_at, current_running_hours, last_running_hours_update, next_service_hours, service_interval_hours").eq("is_active", true),
       supabase.from("vehicle_checklists").select("*").order("checked_at", { ascending: false }),
     ])
 
@@ -431,9 +529,15 @@ export default function ChecklistsPage() {
     for (const v of vehicles) {
       if (!v.plate_no) continue
       vehicleMap.set(v.plate_no, {
-        vehicle_number: v.plate_no, total_checks: 0, total_issues: 0, pending_issues: 0, fixed_issues: 0, deferred_issues: 0,
+        vehicle_number: v.plate_no,
+        display_name: v.display_name || '',
+        total_checks: 0, total_issues: 0, pending_issues: 0, fixed_issues: 0, deferred_issues: 0,
         last_check: null, first_check: v.created_at, most_common_issue: null, issue_breakdown: {}, health_score: 100,
         days_in_service: v.created_at ? Math.ceil((Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60 * 24)) : 0,
+        current_running_hours: v.current_running_hours || 0,
+        last_running_hours_update: v.last_running_hours_update || null,
+        next_service_hours: v.next_service_hours || null,
+        service_interval_hours: v.service_interval_hours || 250,
       })
     }
 
@@ -1028,38 +1132,21 @@ export default function ChecklistsPage() {
                   </div>
 
                   {cat.items && cat.items.length > 0 ? (
-                    <div className="space-y-2 ml-4 border-l-2 border-muted pl-4">
-                      {cat.items.map((item) => (
-                        <div key={item.id} className={cn(
-                          "flex items-center justify-between p-3 rounded-lg bg-muted/50",
-                          !item.is_active && "opacity-60"
-                        )}>
-                          <div className="flex items-center gap-3">
-                            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <p className="font-medium flex items-center gap-2">
-                                {item.title}
-                                {!item.is_active && <Badge variant="outline" className="text-xs">Inactive</Badge>}
-                              </p>
-                              {item.description && (
-                                <p className="text-sm text-muted-foreground">{item.description}</p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEditItem(item) }}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); toggleItemActive(item) }}>
-                              {item.is_active ? <XCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-                            </Button>
-                            <Button variant="ghost" size="icon" className="text-red-600" onClick={(e) => { e.stopPropagation(); setDeleteItemId(item.id) }}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, cat.id)}>
+                      <SortableContext items={cat.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
+                        <div className="space-y-2 ml-4 border-l-2 border-muted pl-4">
+                          {cat.items.map((item) => (
+                            <SortableItem
+                              key={item.id}
+                              item={item}
+                              openEditItem={openEditItem}
+                              toggleItemActive={toggleItemActive}
+                              setDeleteItemId={setDeleteItemId}
+                            />
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      </SortableContext>
+                    </DndContext>
                   ) : (
                     <p className="text-sm text-muted-foreground ml-4 italic">No items in this category</p>
                   )}
@@ -1078,29 +1165,57 @@ export default function ChecklistsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Vehicle</TableHead>
+                  <TableHead>Running Hrs</TableHead>
                   <TableHead>Health</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Checks</TableHead>
                   <TableHead>Issues</TableHead>
-                  <TableHead>Pending</TableHead>
-                  <TableHead>Common Issue</TableHead>
+                  <TableHead>Next Service</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {vehicleHealthData.length === 0 ? (
                   <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No vehicles found</TableCell></TableRow>
                 ) : (
-                  vehicleHealthData.map(v => (
-                    <TableRow key={v.vehicle_number} className="hover:bg-muted/30 cursor-pointer group" onClick={() => setSelectedVehicle(v.vehicle_number)}>
-                      <TableCell className="font-medium"><div className="flex items-center gap-2">{v.vehicle_number}<Eye className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" /></div></TableCell>
-                      <TableCell className={cn("font-bold", getHealthColor(v.health_score))}>{v.health_score}%</TableCell>
-                      <TableCell><Badge variant={v.health_score >= 80 ? "default" : v.health_score >= 60 ? "secondary" : "destructive"}>{getHealthLabel(v.health_score)}</Badge></TableCell>
-                      <TableCell>{v.total_checks}</TableCell>
-                      <TableCell className="text-orange-500">{v.total_issues}</TableCell>
-                      <TableCell className="text-yellow-500">{v.pending_issues}</TableCell>
-                      <TableCell className="text-muted-foreground">{v.most_common_issue ? (ITEM_LABELS[v.most_common_issue] || v.most_common_issue) : "-"}</TableCell>
-                    </TableRow>
-                  ))
+                  vehicleHealthData.map(v => {
+                    const hoursToService = v.next_service_hours ? v.next_service_hours - v.current_running_hours : v.service_interval_hours - (v.current_running_hours % v.service_interval_hours)
+                    const serviceOverdue = hoursToService <= 0
+                    const serviceSoon = hoursToService > 0 && hoursToService <= 50
+                    return (
+                      <TableRow key={v.vehicle_number} className="hover:bg-muted/30 cursor-pointer group" onClick={() => setSelectedVehicle(v.vehicle_number)}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                {v.vehicle_number}
+                                <Eye className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </div>
+                              {v.display_name && <p className="text-xs text-muted-foreground">{v.display_name}</p>}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{v.current_running_hours.toFixed(1)}</span>
+                            <span className="text-muted-foreground text-xs">hrs</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className={cn("font-bold", getHealthColor(v.health_score))}>{v.health_score}%</TableCell>
+                        <TableCell><Badge variant={v.health_score >= 80 ? "default" : v.health_score >= 60 ? "secondary" : "destructive"}>{getHealthLabel(v.health_score)}</Badge></TableCell>
+                        <TableCell>{v.total_checks}</TableCell>
+                        <TableCell className="text-orange-500">{v.total_issues}</TableCell>
+                        <TableCell>
+                          {serviceOverdue ? (
+                            <Badge variant="destructive" className="text-xs">Overdue</Badge>
+                          ) : serviceSoon ? (
+                            <Badge variant="secondary" className="text-xs bg-yellow-500/20 text-yellow-500">{Math.round(hoursToService)} hrs</Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">{Math.round(hoursToService)} hrs</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>

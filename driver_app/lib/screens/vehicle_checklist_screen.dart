@@ -38,6 +38,12 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
   List<_ChecklistCategory> _categories = [];
   bool _loadingItems = true;
 
+  // Running hours
+  final TextEditingController _runningHoursController = TextEditingController();
+  double? _previousRunningHours;
+  bool _loadingRunningHours = true;
+  String? _runningHoursError;
+
   // Fallback hardcoded categories (used if database fetch fails)
   final List<_ChecklistCategory> _fallbackCategories = [
     _ChecklistCategory(
@@ -133,6 +139,38 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
 
     _loadChecklistItems();
     _subscribeToChecklistChanges();
+    _loadPreviousRunningHours();
+  }
+
+  Future<void> _loadPreviousRunningHours() async {
+    try {
+      final driverState = context.read<DriverState>();
+      final vehicleNumber = driverState.vehicleNumber;
+      if (vehicleNumber.isEmpty) {
+        setState(() => _loadingRunningHours = false);
+        return;
+      }
+
+      // Get current running hours from vehicle
+      final vehicleData = await SupabaseService.client
+          .from('vehicle_types')
+          .select('current_running_hours')
+          .eq('plate_no', vehicleNumber)
+          .maybeSingle();
+
+      if (vehicleData != null && mounted) {
+        final hours = vehicleData['current_running_hours'];
+        setState(() {
+          _previousRunningHours = hours != null ? (hours as num).toDouble() : 0;
+          _loadingRunningHours = false;
+        });
+      } else {
+        setState(() => _loadingRunningHours = false);
+      }
+    } catch (e) {
+      debugPrint('Error loading running hours: $e');
+      setState(() => _loadingRunningHours = false);
+    }
   }
 
   void _subscribeToChecklistChanges() {
@@ -221,7 +259,30 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
     _checklistChannel?.unsubscribe();
     _progressController.dispose();
     _pulseController.dispose();
+    _runningHoursController.dispose();
     super.dispose();
+  }
+
+  bool _validateRunningHours() {
+    final text = _runningHoursController.text.trim();
+    if (text.isEmpty) {
+      setState(() => _runningHoursError = 'Running hours is required');
+      return false;
+    }
+
+    final hours = double.tryParse(text);
+    if (hours == null) {
+      setState(() => _runningHoursError = 'Enter a valid number');
+      return false;
+    }
+
+    if (_previousRunningHours != null && hours < _previousRunningHours!) {
+      setState(() => _runningHoursError = 'Cannot be less than previous (${_previousRunningHours!.toStringAsFixed(1)})');
+      return false;
+    }
+
+    setState(() => _runningHoursError = null);
+    return true;
   }
 
   int get _totalItems => _checklist.length;
@@ -271,6 +332,11 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
               // Quick actions
               SliverToBoxAdapter(
                 child: _buildQuickActions(context),
+              ),
+
+              // Running Hours Input
+              SliverToBoxAdapter(
+                child: _buildRunningHoursInput(context),
               ),
 
               // Categories
@@ -567,6 +633,138 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                 fontWeight: FontWeight.w600,
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRunningHoursInput(BuildContext context) {
+    if (_loadingRunningHours) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: context.cardColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: context.borderColor),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.yellow,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text('Loading running hours...', style: TextStyle(color: context.mutedColor)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: context.cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: _runningHoursError != null ? AppColors.error : AppColors.yellow.withValues(alpha: 0.5),
+            width: _runningHoursError != null ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.yellow.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.speed, color: AppColors.yellow, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Running Hours *',
+                        style: TextStyle(
+                          color: context.textColor,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (_previousRunningHours != null)
+                        Text(
+                          'Previous: ${_previousRunningHours!.toStringAsFixed(1)} hrs',
+                          style: TextStyle(
+                            color: context.mutedColor,
+                            fontSize: 12,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _runningHoursController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: TextStyle(
+                color: context.textColor,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Enter current running hours',
+                hintStyle: TextStyle(color: context.mutedColor, fontWeight: FontWeight.normal),
+                filled: true,
+                fillColor: context.bgColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.yellow, width: 2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                suffixText: 'hrs',
+                suffixStyle: TextStyle(color: context.mutedColor, fontSize: 14),
+              ),
+              onChanged: (_) {
+                if (_runningHoursError != null) {
+                  _validateRunningHours();
+                }
+              },
+            ),
+            if (_runningHoursError != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.error_outline, color: AppColors.error, size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    _runningHoursError!,
+                    style: TextStyle(color: AppColors.error, fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -913,8 +1111,16 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
               onTap: _allChecked
                   ? () async {
                       HapticFeedback.heavyImpact();
+
+                      // Validate running hours
+                      if (!_validateRunningHours()) {
+                        AppSnackbar.error(context, 'Enter running hours', subtitle: _runningHoursError);
+                        return;
+                      }
+
                       final driverState = context.read<DriverState>();
                       final allItems = _checklist.map((k, v) => MapEntry(k, v == CheckStatus.ok));
+                      final runningHours = double.parse(_runningHoursController.text.trim());
 
                       // Validate driver ID exists
                       if (driverState.driverId.isEmpty) {
@@ -932,6 +1138,7 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                           issues: _issueNotes,
                           allItems: allItems,
                           issuePhotos: _issuePhotos,
+                          runningHours: runningHours,
                         );
                         debugPrint('Checklist saved successfully');
                       } catch (e) {

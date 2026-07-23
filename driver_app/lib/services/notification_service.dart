@@ -165,6 +165,28 @@ class NotificationService {
     debugPrint('Break reminder cancelled');
   }
 
+  /// Schedule a notification at a specific time
+  Future<void> scheduleNotification({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime scheduledTime,
+  }) async {
+    await _scheduleLocalNotification(
+      id: id,
+      title: title,
+      body: body,
+      scheduledTime: scheduledTime,
+    );
+    debugPrint('Scheduled notification id=$id for $scheduledTime');
+  }
+
+  /// Cancel a specific notification by ID
+  Future<void> cancelNotification(int id) async {
+    await _notifications.cancel(id);
+    debugPrint('Cancelled notification id=$id');
+  }
+
   void showCustomerArrivedNotification({required String customerName, String? location}) {
     showNotification(
       title: 'Arrived at Pickup',

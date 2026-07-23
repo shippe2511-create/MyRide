@@ -15,8 +15,9 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
+import { ComboboxInput } from "@/components/ui/combobox-input"
 import { toast } from "sonner"
-import { Loader2, Clock, Calendar, Users, Car, ChevronLeft, ChevronRight, Wand2, Trash2 } from "lucide-react"
+import { Loader2, Clock, Calendar, Users, Car, ChevronLeft, ChevronRight, Wand2, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import { PermissionGate } from "@/components/permission-gate"
 import { format, addDays, subDays } from "date-fns"
 
@@ -28,8 +29,8 @@ interface Driver {
 
 interface Vehicle {
   id: string
-  plate_no: string
-  name: string
+  vehicle_number: string
+  vehicle_model: string
   capacity: number
 }
 
@@ -83,6 +84,9 @@ export default function BusRosterPage() {
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState<string | null>(null)
   const [transportType, setTransportType] = useState("internal_bus")
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
+  const [sortField, setSortField] = useState<"time" | "route" | "driver" | "vehicle" | "status">("time")
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
 
   const [generateForm, setGenerateForm] = useState({
     startDate: format(new Date(), "yyyy-MM-dd"),
@@ -99,8 +103,8 @@ export default function BusRosterPage() {
 
   const loadMasterData = async () => {
     const [driversRes, vehiclesRes, schedulesRes] = await Promise.all([
-      supabase.from("drivers").select("id, profile_id, profile:profiles(full_name)").eq("status", "approved"),
-      supabase.from("vehicles").select("id, plate_no, name, capacity").eq("is_active", true),
+      supabase.from("drivers").select("id, profile_id, profile:profiles(full_name)"),
+      supabase.from("vehicles").select("id, vehicle_number, vehicle_model, capacity").eq("is_active", true),
       supabase.from("route_schedules").select(`
         *,
         route:transport_routes(id, route_name, route_code, transport_type, direction)
@@ -122,24 +126,67 @@ export default function BusRosterPage() {
     setLoading(true)
     const dateStr = format(selectedDate, "yyyy-MM-dd")
 
-    const { data } = await supabase
+    // First get route IDs for this transport type
+    const { data: routes } = await supabase
+      .from("transport_routes")
+      .select("id")
+      .eq("transport_type", transportType)
+
+    if (!routes || routes.length === 0) {
+      setRoster([])
+      setLoading(false)
+      return
+    }
+
+    const routeIds = routes.map(r => r.id)
+
+    // Get roster assignments
+    const { data: assignments, error } = await supabase
       .from("roster_assignments")
-      .select(`
-        *,
-        route:transport_routes(id, route_name, route_code, transport_type, direction),
-        driver:drivers(id, profile_id, profile:profiles(full_name)),
-        vehicle:vehicles(id, plate_no, name, capacity)
-      `)
+      .select("*")
       .eq("service_date", dateStr)
+      .in("route_id", routeIds)
       .order("departure_time")
 
-    if (data) {
-      // Filter by transport type
-      const filtered = (data as RosterAssignment[]).filter(
-        r => r.route?.transport_type === transportType
-      )
-      setRoster(filtered)
+    if (error) {
+      console.error("Load roster error:", error)
+      setRoster([])
+      setLoading(false)
+      return
     }
+
+    if (!assignments || assignments.length === 0) {
+      setRoster([])
+      setLoading(false)
+      return
+    }
+
+    // Get related data separately
+    const { data: routeData } = await supabase
+      .from("transport_routes")
+      .select("id, route_name, route_code, transport_type, direction")
+      .in("id", routeIds)
+
+    const driverIds = assignments.map(a => a.driver_id).filter(Boolean)
+    const vehicleIds = assignments.map(a => a.vehicle_id).filter(Boolean)
+
+    const { data: driverData } = driverIds.length > 0
+      ? await supabase.from("drivers").select("id, profile_id, profile:profiles(full_name)").in("id", driverIds)
+      : { data: [] }
+
+    const { data: vehicleData } = vehicleIds.length > 0
+      ? await supabase.from("vehicles").select("id, plate_no, name, capacity").in("id", vehicleIds)
+      : { data: [] }
+
+    // Combine data
+    const combined = assignments.map(a => ({
+      ...a,
+      route: routeData?.find(r => r.id === a.route_id),
+      driver: driverData?.find(d => d.id === a.driver_id),
+      vehicle: vehicleData?.find(v => v.id === a.vehicle_id),
+    }))
+
+    setRoster(combined as RosterAssignment[])
     setLoading(false)
   }
 
@@ -157,8 +204,17 @@ export default function BusRosterPage() {
     if (error) {
       toast.error("Failed to update assignment")
     } else {
-      setRoster(roster.map(r => r.id === id ? { ...r, [field]: value } : r))
-      loadRoster()
+      setRoster(prev => prev.map(r => {
+        if (r.id !== id) return r
+        if (field === "driver_id") {
+          const driver = drivers.find(d => d.id === value)
+          return { ...r, driver_id: value, driver: driver || undefined }
+        } else {
+          const vehicle = vehicles.find(v => v.id === value)
+          return { ...r, vehicle_id: value, vehicle: vehicle || undefined }
+        }
+      }))
+      toast.success("Updated")
     }
     setSaving(null)
   }
@@ -173,51 +229,68 @@ export default function BusRosterPage() {
     }
 
     setGenerating(true)
-    let created = 0
-    let skipped = 0
 
-    // Map day names to day numbers (Mon=1, Sun=7)
-    const dayNameToNum: Record<string, number> = {
-      "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6, "Sun": 7
-    }
-
-    for (let date = start; date <= end; date = addDays(date, 1)) {
-      const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay()
-      const dateStr = format(date, "yyyy-MM-dd")
-
-      for (const schedule of schedules) {
-        // Check if schedule runs on this day
-        const scheduleDays = schedule.days_of_week?.map(d => dayNameToNum[d] || 0) || []
-        if (!scheduleDays.includes(dayOfWeek)) continue
-
-        // Check if assignment already exists
-        const { data: existing } = await supabase
-          .from("roster_assignments")
-          .select("id")
-          .eq("route_schedule_id", schedule.id)
-          .eq("service_date", dateStr)
-          .single()
-
-        if (existing) {
-          skipped++
-          continue
-        }
-
-        const { error } = await supabase.from("roster_assignments").insert({
-          route_schedule_id: schedule.id,
-          route_id: schedule.route_id,
-          departure_time: schedule.departure_time,
-          service_date: dateStr,
-          status: "scheduled",
-        })
-
-        if (!error) created++
+    try {
+      // Map day names to day numbers (Mon=1, Sun=7)
+      const dayNameToNum: Record<string, number> = {
+        "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6, "Sun": 7
       }
+
+      // Build all entries first
+      const entries: Array<{
+        route_schedule_id: string
+        route_id: string
+        departure_time: string
+        service_date: string
+        status: string
+      }> = []
+
+      for (let date = start; date <= end; date = addDays(date, 1)) {
+        const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay()
+        const dateStr = format(date, "yyyy-MM-dd")
+
+        for (const schedule of schedules) {
+          const scheduleDays = schedule.days_of_week?.map(d => dayNameToNum[d] || 0) || []
+          if (!scheduleDays.includes(dayOfWeek)) continue
+
+          entries.push({
+            route_schedule_id: schedule.id,
+            route_id: schedule.route_id,
+            departure_time: schedule.departure_time,
+            service_date: dateStr,
+            status: "scheduled",
+          })
+        }
+      }
+
+      if (entries.length === 0) {
+        toast.error("No entries to generate for this date range")
+        setGenerating(false)
+        return
+      }
+
+      // Batch insert with upsert (ignore conflicts)
+      const { error, count } = await supabase
+        .from("roster_assignments")
+        .upsert(entries, {
+          onConflict: "route_schedule_id,service_date",
+          ignoreDuplicates: true
+        })
+        .select()
+
+      if (error) {
+        console.error("Insert error:", error)
+        toast.error("Failed to generate roster: " + error.message)
+      } else {
+        toast.success(`Generated roster entries`)
+      }
+    } catch (e) {
+      console.error("Generate error:", e)
+      toast.error("Failed to generate roster")
     }
 
     setGenerating(false)
     setShowGenerateDialog(false)
-    toast.success(`Generated ${created} roster entries${skipped > 0 ? `, ${skipped} skipped (already exist)` : ""}`)
     loadRoster()
   }
 
@@ -247,6 +320,60 @@ export default function BusRosterPage() {
       </Badge>
     )
   }
+
+  const handleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
+    } else {
+      setSortField(field)
+      setSortDirection("asc")
+    }
+  }
+
+  const SortIcon = ({ field }: { field: typeof sortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />
+    return sortDirection === "asc"
+      ? <ArrowUp className="h-4 w-4 ml-1" />
+      : <ArrowDown className="h-4 w-4 ml-1" />
+  }
+
+  // Get unique routes from roster for filter tabs
+  const uniqueRoutes = roster.reduce((acc, item) => {
+    if (item.route && !acc.find(r => r.id === item.route?.id)) {
+      acc.push({
+        id: item.route.id,
+        name: item.route.route_name,
+        code: item.route.route_code,
+        direction: item.route.direction
+      })
+    }
+    return acc
+  }, [] as { id: string; name: string; code: string | null; direction: string }[])
+
+  // Filter by selected route
+  const filteredRoster = selectedRouteId
+    ? roster.filter(r => r.route?.id === selectedRouteId)
+    : roster
+
+  const sortedRoster = [...filteredRoster].sort((a, b) => {
+    const dir = sortDirection === "asc" ? 1 : -1
+    switch (sortField) {
+      case "time":
+        return dir * a.departure_time.localeCompare(b.departure_time)
+      case "route":
+        return dir * (a.route?.route_name || "").localeCompare(b.route?.route_name || "")
+      case "driver":
+        const driverA = (a.driver?.profile as { full_name?: string })?.full_name || ""
+        const driverB = (b.driver?.profile as { full_name?: string })?.full_name || ""
+        return dir * driverA.localeCompare(driverB)
+      case "vehicle":
+        return dir * (a.vehicle?.vehicle_model || "").localeCompare(b.vehicle?.vehicle_model || "")
+      case "status":
+        return dir * a.status.localeCompare(b.status)
+      default:
+        return 0
+    }
+  })
 
   const getTransportLabel = (type: string) => {
     switch (type) {
@@ -288,41 +415,94 @@ export default function BusRosterPage() {
           ))}
         </div>
 
-        {/* Date Navigation */}
-        <Card>
-          <CardContent className="py-4">
-            <div className="flex items-center justify-center gap-4">
-              <Button variant="outline" size="icon" onClick={() => navigateDate("prev")}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-muted-foreground" />
-                <Input
-                  type="date"
-                  value={format(selectedDate, "yyyy-MM-dd")}
-                  onChange={(e) => setSelectedDate(new Date(e.target.value))}
-                  className="w-40"
-                />
-                <span className="text-lg font-medium">
-                  {format(selectedDate, "EEEE, MMM d, yyyy")}
+        {/* Date Navigation - Modern Design */}
+        <div className="flex items-center justify-between bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 rounded-xl p-4 border">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigateDate("prev")}
+            className="h-10 w-10 rounded-full hover:bg-primary/10"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+
+          <div className="flex items-center gap-6">
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+                {format(selectedDate, "EEEE")}
+              </p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold text-primary">
+                  {format(selectedDate, "d")}
                 </span>
+                <div className="text-left">
+                  <p className="text-sm font-medium">{format(selectedDate, "MMMM")}</p>
+                  <p className="text-xs text-muted-foreground">{format(selectedDate, "yyyy")}</p>
+                </div>
               </div>
-              <Button variant="outline" size="icon" onClick={() => navigateDate("next")}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedDate(new Date())}>
-                Today
-              </Button>
             </div>
-          </CardContent>
-        </Card>
+
+            <div className="h-12 w-px bg-border" />
+
+            <div className="relative">
+              <Input
+                type="date"
+                value={format(selectedDate, "yyyy-MM-dd")}
+                onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                className="w-10 h-10 p-0 border-0 bg-primary/10 rounded-full cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+              />
+              <Calendar className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-5 w-5 text-primary pointer-events-none" />
+            </div>
+
+            <Button
+              variant={format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd") ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedDate(new Date())}
+              className="rounded-full px-4"
+            >
+              Today
+            </Button>
+          </div>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigateDate("next")}
+            className="h-10 w-10 rounded-full hover:bg-primary/10"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </Button>
+        </div>
+
+        {/* Route Filter Tabs */}
+        {uniqueRoutes.length > 1 && (
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant={selectedRouteId === null ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedRouteId(null)}
+            >
+              All Routes ({roster.length})
+            </Button>
+            {uniqueRoutes.map(route => (
+              <Button
+                key={route.id}
+                variant={selectedRouteId === route.id ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedRouteId(route.id)}
+              >
+                {route.name}
+              </Button>
+            ))}
+          </div>
+        )}
 
         {/* Roster Table */}
         <Card>
           <CardHeader>
             <CardTitle>Roster for {format(selectedDate, "MMMM d, yyyy")}</CardTitle>
             <CardDescription>
-              {roster.length} departures scheduled
+              {sortedRoster.length} departures {selectedRouteId ? "for this route" : "scheduled"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -338,16 +518,36 @@ export default function BusRosterPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Route</TableHead>
-                    <TableHead>Driver</TableHead>
-                    <TableHead>Vehicle</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>
+                      <button onClick={() => handleSort("time")} className="flex items-center hover:text-foreground transition-colors">
+                        Time <SortIcon field="time" />
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button onClick={() => handleSort("route")} className="flex items-center hover:text-foreground transition-colors">
+                        Route <SortIcon field="route" />
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button onClick={() => handleSort("driver")} className="flex items-center hover:text-foreground transition-colors">
+                        Driver <SortIcon field="driver" />
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button onClick={() => handleSort("vehicle")} className="flex items-center hover:text-foreground transition-colors">
+                        Vehicle <SortIcon field="vehicle" />
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button onClick={() => handleSort("status")} className="flex items-center hover:text-foreground transition-colors">
+                        Status <SortIcon field="status" />
+                      </button>
+                    </TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {roster.map((assignment) => (
+                  {sortedRoster.map((assignment) => (
                     <TableRow key={assignment.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -364,42 +564,30 @@ export default function BusRosterPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Select
-                          value={assignment.driver_id || "unassigned"}
-                          onValueChange={(v) => updateAssignment(assignment.id, "driver_id", v === "unassigned" ? null : v)}
-                          disabled={saving === assignment.id || assignment.status !== "scheduled"}
-                        >
-                          <SelectTrigger className="w-40">
-                            <SelectValue placeholder="Assign driver" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="unassigned">Unassigned</SelectItem>
-                            {drivers.map(d => (
-                              <SelectItem key={d.id} value={d.id}>
-                                {(d.profile as { full_name: string })?.full_name || "Unknown"}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="w-44">
+                          <ComboboxInput
+                            value={assignment.driver_id || ""}
+                            onChange={(v) => updateAssignment(assignment.id, "driver_id", v || null)}
+                            options={drivers.map(d => ({
+                              value: d.id,
+                              label: (d.profile as { full_name: string })?.full_name || "Unknown"
+                            }))}
+                            placeholder="Search driver..."
+                          />
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <Select
-                          value={assignment.vehicle_id || "unassigned"}
-                          onValueChange={(v) => updateAssignment(assignment.id, "vehicle_id", v === "unassigned" ? null : v)}
-                          disabled={saving === assignment.id || assignment.status !== "scheduled"}
-                        >
-                          <SelectTrigger className="w-40">
-                            <SelectValue placeholder="Assign vehicle" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="unassigned">Unassigned</SelectItem>
-                            {vehicles.map(v => (
-                              <SelectItem key={v.id} value={v.id}>
-                                {v.name} ({v.plate_no})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="w-44">
+                          <ComboboxInput
+                            value={assignment.vehicle_id || ""}
+                            onChange={(v) => updateAssignment(assignment.id, "vehicle_id", v || null)}
+                            options={vehicles.map(v => ({
+                              value: v.id,
+                              label: `${v.vehicle_model} (${v.vehicle_number})`
+                            }))}
+                            placeholder="Search vehicle..."
+                          />
+                        </div>
                       </TableCell>
                       <TableCell>{getStatusBadge(assignment.status)}</TableCell>
                       <TableCell>

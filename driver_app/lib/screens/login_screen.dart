@@ -162,13 +162,17 @@ class _LoginScreenState extends State<LoginScreen> {
         final driverState = Provider.of<DriverState>(context, listen: false);
 
         // Get driver record using profile UUID
+        debugPrint('LOGIN: Looking up driver with profile_id=${existingUser['id']}');
         final driverProfile = await SupabaseService.getDriverByProfileId(existingUser['id']);
 
         if (driverProfile == null) {
+          debugPrint('LOGIN: No driver found for profile_id=${existingUser['id']}');
           _showError('Driver profile not found');
           setState(() => _isLoading = false);
           return;
         }
+
+        debugPrint('LOGIN: Found driver record: id=${driverProfile['id']}, profile_id=${driverProfile['profile_id']}');
 
         String vehicleNumber = '';
         String vehicleModel = '';
@@ -182,10 +186,15 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         // Use the drivers.id (UUID) not employee_id
-        driverState.setDriverData(
+        final newDriverId = driverProfile['id'] as String;
+        final newProfileId = (driverProfile['profile_id'] ?? existingUser['id']) as String;
+        debugPrint('LOGIN: Setting driverId=$newDriverId, profileId=$newProfileId');
+
+        // IMPORTANT: await to ensure data is saved before navigating
+        await driverState.setDriverData(
           name: existingUser['full_name'] ?? 'Driver',
-          id: driverProfile['id'], // This is drivers.id (UUID)
-          profileId: driverProfile['profile_id'] ?? existingUser['id'], // profile UUID for SOS
+          id: newDriverId,
+          profileId: newProfileId,
           vehicleNumber: vehicleNumber,
           vehicleModel: vehicleModel,
           phone: fullPhone,
@@ -193,6 +202,9 @@ class _LoginScreenState extends State<LoginScreen> {
           avatarUrl: driverProfile['avatar_url'] ?? existingUser['avatar_url'] ?? '',
           employeeId: existingUser['employee_id'] ?? '',
         );
+
+        // Verify the data was set correctly
+        debugPrint('LOGIN: Verified driverId=${driverState.driverId}, profileId=${driverState.profileId}');
 
         // Register session - this will sign out other devices
         final profileId = driverProfile['profile_id'] ?? existingUser['id'];

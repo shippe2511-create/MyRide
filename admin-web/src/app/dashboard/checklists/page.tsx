@@ -980,20 +980,20 @@ export default function ChecklistsPage() {
                       <Button variant="outline" size="sm" onClick={() => openAddItem(cat.id)}>
                         Add Item
                       </Button>
-                      <DropdownMenu>
+                      <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditCategory(cat)}>
+                          <DropdownMenuItem onSelect={() => openEditCategory(cat)}>
                             <Pencil className="h-4 w-4 mr-2" /> Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => toggleCategoryActive(cat)}>
+                          <DropdownMenuItem onSelect={() => toggleCategoryActive(cat)}>
                             {cat.is_active ? <XCircle className="h-4 w-4 mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
                             {cat.is_active ? "Deactivate" : "Activate"}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600" onClick={() => setDeleteCategoryId(cat.id)}>
+                          <DropdownMenuItem className="text-red-600" onSelect={() => setDeleteCategoryId(cat.id)}>
                             <Trash2 className="h-4 w-4 mr-2" /> Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -1021,13 +1021,13 @@ export default function ChecklistsPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => openEditItem(item)}>
+                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEditItem(item) }}>
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => toggleItemActive(item)}>
+                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); toggleItemActive(item) }}>
                               {item.is_active ? <XCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
                             </Button>
-                            <Button variant="ghost" size="icon" className="text-red-600" onClick={() => setDeleteItemId(item.id)}>
+                            <Button variant="ghost" size="icon" className="text-red-600" onClick={(e) => { e.stopPropagation(); setDeleteItemId(item.id) }}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>

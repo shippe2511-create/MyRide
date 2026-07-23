@@ -80,6 +80,7 @@ class SupabaseService {
   }
 
   // Sign up with phone (for new drivers)
+  // Handles case where user already exists as customer
   static Future<Map<String, dynamic>> signUpWithPhone({
     required String phone,
     required String fullName,
@@ -103,36 +104,75 @@ class SupabaseService {
 
     debugPrint('Registering driver with status: $status');
 
-    final data = <String, dynamic>{
-      'phone': phone,
-      'full_name': fullName,
-      'gender': gender,
-      'employee_id': staffId,
-      'emergency_contacts': emergencyContacts,
-      'role': 'driver',
-      'status': status,
-    };
+    // First check if profile already exists (e.g., customer becoming driver)
+    final existingProfile = await checkPhoneExists(phone);
 
-    if (email != null && email.isNotEmpty) {
-      data['email'] = email;
+    Map<String, dynamic> response;
+
+    if (existingProfile != null) {
+      // User already has a profile (maybe from customer app)
+      // Update their profile to driver role
+      debugPrint('Existing profile found, upgrading to driver: ${existingProfile['id']}');
+
+      final updateData = <String, dynamic>{
+        'role': 'driver',
+        'status': status,
+        'full_name': fullName,
+        'gender': gender,
+        'employee_id': staffId,
+        'emergency_contacts': emergencyContacts,
+      };
+
+      if (email != null && email.isNotEmpty) {
+        updateData['email'] = email;
+      }
+
+      response = await client
+          .from('profiles')
+          .update(updateData)
+          .eq('id', existingProfile['id'])
+          .select()
+          .single();
+    } else {
+      // New user - create profile
+      final data = <String, dynamic>{
+        'phone': phone,
+        'full_name': fullName,
+        'gender': gender,
+        'employee_id': staffId,
+        'emergency_contacts': emergencyContacts,
+        'role': 'driver',
+        'status': status,
+      };
+
+      if (email != null && email.isNotEmpty) {
+        data['email'] = email;
+      }
+
+      response = await client.from('profiles').insert(data).select().single();
     }
 
-    // Use upsert to handle existing records
-    final response = await client.from('profiles').upsert(
-      data,
-      onConflict: 'employee_id',
-    ).select().single();
-
-    // If auto-approved, also create driver record
-    if (status == 'approved' && response['id'] != null) {
+    // Create driver record if it doesn't exist
+    if (response['id'] != null) {
       try {
-        await client.from('drivers').insert({
-          'profile_id': response['id'],
-          'rating': 0.0,
-          'total_trips': 0,
-          'is_online': false,
-        });
-        debugPrint('Created driver record for auto-approved driver');
+        // Check if driver record already exists
+        final existingDriver = await client
+            .from('drivers')
+            .select('id')
+            .eq('profile_id', response['id'])
+            .maybeSingle();
+
+        if (existingDriver == null) {
+          await client.from('drivers').insert({
+            'profile_id': response['id'],
+            'rating': 0.0,
+            'total_trips': 0,
+            'is_online': false,
+          });
+          debugPrint('Created driver record for profile: ${response['id']}');
+        } else {
+          debugPrint('Driver record already exists: ${existingDriver['id']}');
+        }
       } catch (e) {
         debugPrint('Error creating driver record: $e');
       }
@@ -2107,27 +2147,34 @@ class SupabaseService {
 
   /// Get driver's transport schedule (roster assignments)
   static Future<List<Map<String, dynamic>>> getMyBusSchedule(String driverId) async {
-    if (driverId.isEmpty) return [];
+    if (driverId.isEmpty) {
+      debugPrint('getMyBusSchedule: driverId is empty');
+      return [];
+    }
     try {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
       final endDate = today.add(const Duration(days: 7));
+      final todayStr = today.toIso8601String().split('T')[0];
+      final endStr = endDate.toIso8601String().split('T')[0];
+
+      debugPrint('getMyBusSchedule: driverId=$driverId, from=$todayStr to=$endStr');
 
       final response = await client
           .from('roster_assignments')
           .select('''
             *,
             route:transport_routes(id, route_name, route_code, direction, transport_type),
-            vehicle:vehicles(id, name, plate_no, capacity),
-            route_schedule:route_schedules(id, departure_time, days_of_week)
+            vehicle:vehicles(id, vehicle_model, vehicle_number, capacity)
           ''')
           .eq('driver_id', driverId)
-          .gte('service_date', today.toIso8601String().split('T')[0])
-          .lte('service_date', endDate.toIso8601String().split('T')[0])
+          .gte('service_date', todayStr)
+          .lte('service_date', endStr)
           .inFilter('status', ['scheduled', 'in_progress'])
           .order('service_date')
           .order('departure_time');
 
+      debugPrint('getMyBusSchedule: got ${response.length} assignments');
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint('Error getting bus schedule: $e');
@@ -2198,6 +2245,23 @@ class SupabaseService {
       return response;
     } catch (e) {
       debugPrint('Error getting bus trip: $e');
+      return null;
+    }
+  }
+
+  /// Get bus trip by roster assignment ID (for resuming in-progress trips)
+  static Future<Map<String, dynamic>?> getBusTripByAssignment(String assignmentId) async {
+    try {
+      final response = await client
+          .from('bus_trips')
+          .select()
+          .eq('roster_assignment_id', assignmentId)
+          .eq('status', 'in_progress')
+          .maybeSingle();
+
+      return response;
+    } catch (e) {
+      debugPrint('Error getting bus trip by assignment: $e');
       return null;
     }
   }
@@ -2292,7 +2356,7 @@ class SupabaseService {
             roster_assignment:roster_assignments!bus_trips_roster_assignment_id_fkey(
               *,
               route:transport_routes(id, route_name, route_code, direction),
-              vehicle:vehicles(id, name, plate_no)
+              vehicle:vehicles(id, vehicle_model, vehicle_number)
             )
           ''')
           .eq('status', 'in_progress')

@@ -288,9 +288,11 @@ class DriverState extends ChangeNotifier {
       // Fetch latest avatar from DB if logged in
       if (_isLoggedIn && _driverId.isNotEmpty) {
         _loadAvatarFromDb();
+        // Sync online state from database
+        _syncOnlineStateFromDb();
       }
 
-      // Load online state
+      // Load online state from local storage as fallback
       final wasOnline = prefs.getBool('isOnline') ?? false;
       if (wasOnline && _driverId.isNotEmpty) {
         _isOnline = true;
@@ -379,6 +381,40 @@ class DriverState extends ChangeNotifier {
     }
   }
 
+  Future<void> _syncOnlineStateFromDb() async {
+    if (_driverId.isEmpty) return;
+    try {
+      final driver = await SupabaseService.client
+          .from('drivers')
+          .select('is_online, is_on_break, break_type')
+          .eq('id', _driverId)
+          .maybeSingle();
+
+      if (driver != null) {
+        final dbOnline = driver['is_online'] == true;
+        final dbOnBreak = driver['is_on_break'] == true;
+
+        // If DB says offline but local says online, update local to match DB
+        // This handles cases where the app was force-closed without going offline
+        if (!dbOnline && _isOnline) {
+          _isOnline = false;
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('isOnline', false);
+          notifyListeners();
+        }
+
+        // Sync break state
+        if (dbOnBreak != _isOnBreak) {
+          _isOnBreak = dbOnBreak;
+          _breakType = driver['break_type'] as String? ?? '';
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error syncing online state from DB: $e');
+    }
+  }
+
   Future<void> setDriverData({
     required String name,
     required String id,
@@ -405,15 +441,18 @@ class DriverState extends ChangeNotifier {
     SupabaseService.setDriverId(id);
 
     final prefs = await SharedPreferences.getInstance();
-    prefs.setBool('loggedIn', true);
-    prefs.setString('driverName', name);
-    prefs.setString('driverId', id);
-    prefs.setString('profileId', profileId);
-    prefs.setString('employeeId', employeeId);
-    prefs.setString('vehicleNumber', vehicleNumber);
-    prefs.setString('vehicleModel', vehicleModel);
-    prefs.setString('phoneNumber', phone);
-    prefs.setString('avatarUrl', avatarUrl);
+    // Await all writes to ensure they're persisted
+    await prefs.setBool('loggedIn', true);
+    await prefs.setString('driverName', name);
+    await prefs.setString('driverId', id);
+    await prefs.setString('profileId', profileId);
+    await prefs.setString('employeeId', employeeId);
+    await prefs.setString('vehicleNumber', vehicleNumber);
+    await prefs.setString('vehicleModel', vehicleModel);
+    await prefs.setString('phoneNumber', phone);
+    await prefs.setString('avatarUrl', avatarUrl);
+
+    debugPrint('setDriverData: Saved driverId=$id to SharedPreferences');
 
     // Load shifts from database
     await loadShifts();
@@ -609,6 +648,7 @@ class DriverState extends ChangeNotifier {
   String? get vehicleInactiveReason => _vehicleInactiveReason;
 
   Future<bool> goOnline() async {
+    debugPrint('goOnline: driverId=$_driverId');
     // Check if vehicle is assigned and active before going online
     if (_driverId.isNotEmpty) {
       final vehicle = await SupabaseService.getDriverVehicle(_driverId);
@@ -1503,8 +1543,30 @@ class DriverState extends ChangeNotifier {
     _currentRide = null;
     _incomingRequests.clear();
 
+    // Clear all cached driver data
+    _driverId = '';
+    _profileId = '';
+    _driverName = '';
+    _vehicleNumber = '';
+    _vehicleModel = '';
+    _phoneNumber = '';
+    _employeeId = '';
+    _rating = 0.0;
+    _avatarUrl = '';
+
     final prefs = await SharedPreferences.getInstance();
     prefs.setBool('loggedIn', false);
+    prefs.remove('driverId');
+    prefs.remove('profileId');
+    prefs.remove('driverName');
+    prefs.remove('vehicleNumber');
+    prefs.remove('vehicleModel');
+    prefs.remove('phoneNumber');
+    prefs.remove('employeeId');
+    prefs.remove('avatarUrl');
+    prefs.remove('isOnline');
+
+    debugPrint('Logout: Cleared all driver data');
     notifyListeners();
   }
 

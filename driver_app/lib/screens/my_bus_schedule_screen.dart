@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import '../providers/driver_state.dart';
@@ -23,6 +25,8 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
   bool _isStartingTrip = false;
   late TabController _tabController;
   Set<String> _remindersSet = {}; // Track which assignments have reminders
+  RealtimeChannel? _rosterChannel;
+  String? _driverId;
 
   @override
   void initState() {
@@ -30,6 +34,31 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
     _tabController = TabController(length: 3, vsync: this);
     _loadReminders();
     _loadSchedule();
+  }
+
+  void _setupRealtimeSubscription() {
+    if (_driverId == null || _driverId!.isEmpty) return;
+
+    _rosterChannel?.unsubscribe();
+    _rosterChannel = SupabaseService.client
+        .channel('my_bus_schedule_$_driverId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'roster_assignments',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'driver_id',
+            value: _driverId!,
+          ),
+          callback: (payload) {
+            debugPrint('MyBusSchedule: Realtime update - ${payload.eventType}');
+            _loadSchedule();
+          },
+        )
+        .subscribe();
+
+    debugPrint('MyBusSchedule: Realtime subscription active for driver $_driverId');
   }
 
   Future<void> _loadReminders() async {
@@ -45,6 +74,7 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
 
   @override
   void dispose() {
+    _rosterChannel?.unsubscribe();
     _tabController.dispose();
     super.dispose();
   }
@@ -59,6 +89,12 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
         debugPrint('MyBusSchedule: ERROR - driverId is empty!');
         setState(() => _isLoading = false);
         return;
+      }
+
+      // Store driverId and setup realtime if not already done
+      if (_driverId != driverId) {
+        _driverId = driverId;
+        _setupRealtimeSubscription();
       }
 
       final assignments = await SupabaseService.getMyBusSchedule(driverId);
@@ -412,7 +448,7 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
                 ],
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
-                    padding: const EdgeInsets.fromLTRB(20, 100, 20, 0),
+                    padding: const EdgeInsets.fromLTRB(60, 100, 20, 0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

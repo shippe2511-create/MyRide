@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/supabase_service.dart';
 import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
@@ -91,6 +92,41 @@ class _BusTripScreenState extends State<BusTripScreen> {
       });
     } catch (e) {
       debugPrint('Error loading passenger counts: $e');
+    }
+  }
+
+  Future<void> _openNavigation() async {
+    HapticFeedback.lightImpact();
+
+    // Get current stop name for navigation
+    final currentStop = _stops.isNotEmpty && _currentStopIndex < _stops.length
+        ? _stops[_currentStopIndex]
+        : null;
+    final stopName = currentStop?['stop_name'] as String?;
+
+    if (stopName == null || stopName.isEmpty) {
+      AppSnackbar.error(context, 'No stop location available');
+      return;
+    }
+
+    // Open in maps - try Apple Maps first on iOS
+    final query = Uri.encodeComponent(stopName);
+    final appleMapsUrl = 'maps://?q=$query';
+    final googleMapsUrl = 'https://www.google.com/maps/search/?api=1&query=$query';
+
+    try {
+      // Try Apple Maps first
+      final uri = Uri.parse(appleMapsUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        // Fallback to Google Maps in browser
+        final gUri = Uri.parse(googleMapsUrl);
+        await launchUrl(gUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      debugPrint('Error opening maps: $e');
+      if (mounted) AppSnackbar.error(context, 'Could not open maps');
     }
   }
 
@@ -640,6 +676,19 @@ class _BusTripScreenState extends State<BusTripScreen> {
                     children: [
                       Row(
                         children: [
+                          // Back button
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AppColors.darkBg.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.arrow_back_rounded, color: AppColors.darkBg, size: 24),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
@@ -874,7 +923,21 @@ class _BusTripScreenState extends State<BusTripScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
+                      // Navigate button
+                      GestureDetector(
+                        onTap: _openNavigation,
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                          ),
+                          child: const Icon(Icons.navigation_rounded, color: Colors.blue, size: 24),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
                       // Next Stop / Complete button
                       Expanded(
                         child: _currentStopIndex >= _stops.length - 1

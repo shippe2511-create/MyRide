@@ -66,6 +66,7 @@ interface RosterAssignment {
 }
 
 const STATUS_COLORS: Record<string, string> = {
+  unassigned: "bg-gray-500",
   scheduled: "bg-blue-500",
   in_progress: "bg-yellow-500",
   completed: "bg-green-500",
@@ -196,9 +197,22 @@ export default function BusRosterPage() {
 
   const updateAssignment = async (id: string, field: "driver_id" | "vehicle_id", value: string | null) => {
     setSaving(id)
+
+    // Find current assignment to check if both driver and vehicle will be assigned
+    const current = roster.find(r => r.id === id)
+    const newDriverId = field === "driver_id" ? value : current?.driver_id
+    const newVehicleId = field === "vehicle_id" ? value : current?.vehicle_id
+
+    // Determine new status: "scheduled" only if both driver AND vehicle are assigned
+    // Keep existing status if already in_progress or completed
+    let newStatus = current?.status
+    if (current?.status === "scheduled" || current?.status === "unassigned") {
+      newStatus = (newDriverId && newVehicleId) ? "scheduled" : "unassigned"
+    }
+
     const { error } = await supabase
       .from("roster_assignments")
-      .update({ [field]: value || null })
+      .update({ [field]: value || null, status: newStatus })
       .eq("id", id)
 
     if (error) {
@@ -208,10 +222,10 @@ export default function BusRosterPage() {
         if (r.id !== id) return r
         if (field === "driver_id") {
           const driver = drivers.find(d => d.id === value)
-          return { ...r, driver_id: value, driver: driver || undefined }
+          return { ...r, driver_id: value, driver: driver || undefined, status: newStatus || r.status }
         } else {
           const vehicle = vehicles.find(v => v.id === value)
-          return { ...r, vehicle_id: value, vehicle: vehicle || undefined }
+          return { ...r, vehicle_id: value, vehicle: vehicle || undefined, status: newStatus || r.status }
         }
       }))
       toast.success("Updated")
@@ -258,7 +272,7 @@ export default function BusRosterPage() {
             route_id: schedule.route_id,
             departure_time: schedule.departure_time,
             service_date: dateStr,
-            status: "scheduled",
+            status: "unassigned",
           })
         }
       }

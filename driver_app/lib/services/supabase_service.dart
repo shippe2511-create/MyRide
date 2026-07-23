@@ -2349,6 +2349,8 @@ class SupabaseService {
     required String stopId,
     required int boarded,
     required int alighted,
+    int stopIndex = 0,
+    String? stopName,
   }) async {
     try {
       await client.from('stop_passenger_counts').insert({
@@ -2356,6 +2358,8 @@ class SupabaseService {
         'route_stop_id': stopId,
         'boarded_count': boarded,
         'alighted_count': alighted,
+        'stop_index': stopIndex,
+        'stop_name': stopName,
         'recorded_at': DateTime.now().toIso8601String(),
       });
 

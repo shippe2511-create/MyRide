@@ -218,6 +218,8 @@ class _BusTripScreenState extends State<BusTripScreen> {
       stopId: currentStop['id'],
       boarded: counts['boarded'] ?? 0,
       alighted: counts['alighted'] ?? 0,
+      stopIndex: _currentStopIndex,
+      stopName: currentStop['stop_name'] ?? currentStop['name'] ?? 'Stop ${_currentStopIndex + 1}',
     );
 
     final nextStop = _stops[_currentStopIndex + 1];

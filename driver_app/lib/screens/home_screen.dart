@@ -19,6 +19,8 @@ import 'profile_screen.dart';
 import 'ride_screen.dart';
 import 'chat_screen.dart';
 import 'inbox_screen.dart';
+import 'shift_schedule_screen.dart';
+import 'my_bus_schedule_screen.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -1026,22 +1028,28 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     _buildActionButton(
                       context,
-                      icon: Icons.history,
-                      label: 'History',
-                      color: AppColors.info,
+                      icon: Icons.schedule,
+                      label: 'Shift Schedule',
+                      color: AppColors.warning,
                       onTap: () {
                         HapticFeedback.lightImpact();
-                        _onTabChanged(2); // History tab
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ShiftScheduleScreen()),
+                        );
                       },
                     ),
                     _buildActionButton(
                       context,
-                      icon: Icons.warning_rounded,
-                      label: 'SOS',
-                      color: AppColors.error,
+                      icon: Icons.directions_bus,
+                      label: 'My Bus Schedule',
+                      color: AppColors.info,
                       onTap: () {
-                        HapticFeedback.heavyImpact();
-                        _showSOSDialog(context);
+                        HapticFeedback.lightImpact();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const MyBusScheduleScreen()),
+                        );
                       },
                     ),
                   ],

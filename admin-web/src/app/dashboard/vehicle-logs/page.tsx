@@ -35,6 +35,7 @@ interface VehicleLog {
   driver_id: string
   log_type: string
   amount: number | null
+  fuel_amount: number | null
   odometer: number | null
   notes: string | null
   log_date: string
@@ -83,10 +84,15 @@ export default function VehicleLogsPage() {
   const stats = LOG_TYPES.map(type => {
     const typeLogs = logs.filter(l => l.log_type === type.value)
     const total = typeLogs.reduce((sum, l) => sum + (l.amount || 0), 0)
+    // For fuel, also calculate total liters
+    const totalLiters = type.value === "fuel"
+      ? typeLogs.reduce((sum, l) => sum + (l.fuel_amount || 0), 0)
+      : 0
     return {
       ...type,
       count: typeLogs.length,
       total,
+      totalLiters,
     }
   })
 
@@ -457,7 +463,7 @@ export default function VehicleLogsPage() {
       <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
         {stats.map(stat => {
           const Icon = stat.icon
-          const percentage = totalSpent > 0 ? (stat.total / totalSpent * 100).toFixed(0) : 0
+          const isFuel = stat.value === "fuel"
           return (
             <Card key={stat.value} className={`p-4 ${stat.color.replace('bg-', 'bg-gradient-to-br from-')}/10 to-${stat.color.replace('bg-', '')}/5 border-${stat.color.replace('bg-', '')}/20 hover:border-${stat.color.replace('bg-', '')}/40 transition-colors`}>
               <div className="flex items-center gap-3">
@@ -465,7 +471,9 @@ export default function VehicleLogsPage() {
                   <Icon className={`h-4 w-4 ${stat.color.replace('bg-', 'text-')}`} />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xl font-bold tracking-tight">MVR {stat.total.toLocaleString()}</p>
+                  <p className="text-xl font-bold tracking-tight">
+                    {isFuel ? `${stat.totalLiters.toLocaleString()} L` : `MVR ${stat.total.toLocaleString()}`}
+                  </p>
                   <p className="text-xs text-muted-foreground truncate">{stat.label}</p>
                 </div>
                 <span className="text-xs font-medium text-muted-foreground ml-auto shrink-0">{stat.count}</span>

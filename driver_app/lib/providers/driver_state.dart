@@ -298,6 +298,9 @@ class DriverState extends ChangeNotifier {
         _isOnline = true;
         // Will re-initialize subscriptions in home_screen via goOnline check
 
+        // Sync to DB immediately so admin panel shows correct status
+        SupabaseService.updateDriverStatus(driverId: _driverId, isOnline: true);
+
         // Restore shift start time
         final shiftStartStr = prefs.getString('shiftStartTime');
         if (shiftStartStr != null) {
@@ -394,16 +397,7 @@ class DriverState extends ChangeNotifier {
         final dbOnline = driver['is_online'] == true;
         final dbOnBreak = driver['is_on_break'] == true;
 
-        // If DB says offline but local says online, update local to match DB
-        // This handles cases where the app was force-closed without going offline
-        if (!dbOnline && _isOnline) {
-          _isOnline = false;
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('isOnline', false);
-          notifyListeners();
-        }
-
-        // Sync break state
+        // Sync break state from DB
         if (dbOnBreak != _isOnBreak) {
           _isOnBreak = dbOnBreak;
           _breakType = driver['break_type'] as String? ?? '';

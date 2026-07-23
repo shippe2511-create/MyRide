@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import dynamic from "next/dynamic"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent } from "@/components/ui/card"
@@ -90,16 +90,29 @@ export default function LiveTrackingPage() {
     total_passengers: 0,
     avg_occupancy: 0,
   })
+  const [initialLoad, setInitialLoad] = useState(true)
+  const debounceRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Debounced load to prevent rapid refreshes
+  const debouncedLoad = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+    }
+    debounceRef.current = setTimeout(() => {
+      loadData(false)
+    }, 500)
+  }, [])
 
   useEffect(() => {
-    loadData()
+    loadData(true)
     const channel = setupRealtime()
 
-    // Also poll every 10 seconds as fallback
-    const pollInterval = setInterval(loadData, 10000)
+    // Poll every 30 seconds as fallback (increased from 10)
+    const pollInterval = setInterval(() => loadData(false), 30000)
 
     return () => {
       clearInterval(pollInterval)
+      if (debounceRef.current) clearTimeout(debounceRef.current)
       if (channel) supabase.removeChannel(channel)
     }
   }, [])
@@ -113,8 +126,8 @@ export default function LiveTrackingPage() {
     }
   }, [selectedBus?.trip_id])
 
-  const loadData = async () => {
-    setLoading(true)
+  const loadData = async (showLoading = false) => {
+    if (showLoading) setLoading(true)
 
     const { data: busData } = await supabase
       .from("bus_location_tracking")
@@ -189,7 +202,7 @@ export default function LiveTrackingPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bus_location_tracking" },
-        () => loadData()
+        () => debouncedLoad()
       )
       .on(
         "postgres_changes",
@@ -200,19 +213,19 @@ export default function LiveTrackingPage() {
             `Bus Full Alert: ${payload.new.route_name} at ${payload.new.stop_name}`,
             { duration: 10000 }
           )
-          loadData()
+          debouncedLoad()
         }
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "bus_full_alerts" },
-        () => loadData()
+        { event: "UPDATE", schema: "public", table: "bus_full_alerts" },
+        () => debouncedLoad()
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "stop_passenger_counts" },
         () => {
-          loadData()
+          debouncedLoad()
           if (selectedBus?.trip_id) {
             loadStopCounts(selectedBus.trip_id)
           }
@@ -295,7 +308,7 @@ export default function LiveTrackingPage() {
           </h1>
           <p className="text-muted-foreground">Real-time bus locations, capacity & passenger counts</p>
         </div>
-        <Button onClick={loadData} variant="outline" size="sm">
+        <Button onClick={() => loadData(true)} variant="outline" size="sm">
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>

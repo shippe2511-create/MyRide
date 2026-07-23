@@ -10,6 +10,7 @@ import '../services/notification_service.dart';
 import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_snackbar.dart';
+import '../utils/timezone_utils.dart';
 import 'bus_trip_screen.dart';
 
 class MyBusScheduleScreen extends StatefulWidget {
@@ -747,7 +748,8 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
         final timeParts = departureTime.split(':');
         final dateParts = serviceDate.split('-');
 
-        final departureDateTime = DateTime(
+        // Create departure time in Maldives timezone
+        final departureMaldives = DateTime(
           int.parse(dateParts[0]),
           int.parse(dateParts[1]),
           int.parse(dateParts[2]),
@@ -755,14 +757,23 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
           int.parse(timeParts[1]),
         );
 
-        final reminderTime = departureDateTime.subtract(Duration(minutes: result));
+        // Convert Maldives time to UTC for scheduling (subtract MVT offset)
+        final departureUtc = departureMaldives.subtract(const Duration(hours: 5));
+        final reminderUtc = departureUtc.subtract(Duration(minutes: result));
+        final nowUtc = DateTime.now().toUtc();
 
-        if (reminderTime.isAfter(DateTime.now())) {
+        debugPrint('Reminder: departureMaldives=$departureMaldives, departureUtc=$departureUtc, reminderUtc=$reminderUtc, nowUtc=$nowUtc');
+
+        if (reminderUtc.isAfter(nowUtc)) {
+          // Convert back to local time for the notification scheduler
+          final reminderLocal = reminderUtc.toLocal();
+          debugPrint('Scheduling reminder for local time: $reminderLocal');
+
           await NotificationService().scheduleNotification(
             id: assignmentId.hashCode,
             title: 'Bus Trip Reminder',
             body: '${route?['route_name'] ?? 'Your bus trip'} departs in $result minutes',
-            scheduledTime: reminderTime,
+            scheduledTime: reminderLocal,
           );
 
           setState(() => _remindersSet.add(assignmentId));

@@ -118,8 +118,10 @@ class NotificationService {
     try {
       // Initialize timezone
       tz.initializeTimeZones();
-      final location = tz.getLocation('Indian/Maldives');
+      // Use device's local timezone for scheduling
+      final location = tz.local;
       final tzScheduledTime = tz.TZDateTime.from(scheduledTime, location);
+      debugPrint('Scheduling notification: id=$id, scheduledTime=$scheduledTime, tzScheduledTime=$tzScheduledTime');
 
       const androidDetails = AndroidNotificationDetails(
         'break_reminder_channel',

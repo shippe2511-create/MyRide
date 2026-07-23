@@ -73,14 +73,8 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
   }
 
   Future<void> _submitReport() async {
-    final title = _titleController.text.trim();
+    var title = _titleController.text.trim();
     final description = _descriptionController.text.trim();
-
-    if (title.isEmpty) {
-      HapticFeedback.heavyImpact();
-      AppSnackbar.error(context, 'Please enter a title');
-      return;
-    }
 
     if (description.isEmpty) {
       HapticFeedback.heavyImpact();
@@ -88,24 +82,26 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
       return;
     }
 
+    // Auto-generate title if empty
+    if (title.isEmpty) {
+      final typeLabel = _incidentTypes.firstWhere(
+        (t) => t['value'] == _selectedType,
+        orElse: () => {'label': 'Incident'},
+      )['label'] as String;
+      title = '$typeLabel Report';
+    }
+
     setState(() => _isSubmitting = true);
     HapticFeedback.mediumImpact();
 
     try {
+      // Get profile and driver data, but don't fail if not available
       final driverProfile = await SupabaseService.getProfile();
       final driverData = await SupabaseService.getDriverProfile();
 
-      if (driverData == null || driverData['id'] == null) {
-        if (mounted) {
-          AppSnackbar.error(context, 'Driver profile not found. Please log in again.');
-        }
-        setState(() => _isSubmitting = false);
-        return;
-      }
+      debugPrint('IncidentReport: profile=${driverProfile != null}, driverData=${driverData != null}');
 
-      final result = await SupabaseService.client.from('incidents').insert({
-        'driver_id': driverData['id'],
-        'ride_id': widget.rideId,
+      final insertData = <String, dynamic>{
         'type': _selectedType,
         'severity': _selectedSeverity,
         'title': title,
@@ -115,22 +111,44 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
         'longitude': _longitude,
         'status': 'open',
         'reporter_name': driverProfile?['full_name'] ?? 'Driver',
-      }).select().single();
+      };
+
+      // Only add driver_id if available (not required by schema)
+      if (driverData != null && driverData['id'] != null) {
+        insertData['driver_id'] = driverData['id'];
+      }
+
+      // Only add ride_id if provided
+      if (widget.rideId != null && widget.rideId!.isNotEmpty) {
+        insertData['ride_id'] = widget.rideId;
+      }
+
+      debugPrint('Inserting incident: $insertData');
+
+      // Use simple insert without .select().single() to avoid potential issues
+      await SupabaseService.client.from('incidents').insert(insertData);
 
       if (mounted) {
         HapticFeedback.lightImpact();
         AppSnackbar.success(context, 'Incident reported successfully');
-        Navigator.pop(context, result);
+        Navigator.pop(context, true);
       }
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Error submitting incident: $e');
+      debugPrint('Stack trace: $stack');
       if (mounted) {
         String errorMsg = 'Failed to submit report';
-        if (e.toString().contains('title')) {
+        final errorStr = e.toString();
+        if (errorStr.contains('title')) {
           errorMsg = 'Please enter a title';
-        } else if (e.toString().contains('driver_id')) {
+        } else if (errorStr.contains('driver_id')) {
           errorMsg = 'Driver profile not found';
+        } else if (errorStr.contains('violates row-level security')) {
+          errorMsg = 'Permission denied. Please log in again.';
+        } else if (errorStr.contains('null value')) {
+          errorMsg = 'Missing required field';
         }
+        debugPrint('Showing error: $errorMsg (original: $errorStr)');
         AppSnackbar.error(context, errorMsg);
       }
     }

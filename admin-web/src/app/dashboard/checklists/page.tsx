@@ -273,7 +273,7 @@ export default function ChecklistsPage() {
         toast.success("Category added")
       }
       setCategoryDialogOpen(false)
-      loadChecklistItems()
+      loadChecklistItems(false)
     } catch (e) {
       toast.error("Failed to save category")
     } finally {
@@ -288,7 +288,7 @@ export default function ChecklistsPage() {
       await supabase.from("checklist_categories").delete().eq("id", deleteCategoryId)
       toast.success("Category deleted")
       setDeleteCategoryId(null)
-      loadChecklistItems()
+      loadChecklistItems(false)
     } catch (e) {
       toast.error("Failed to delete category")
     } finally {
@@ -299,7 +299,7 @@ export default function ChecklistsPage() {
   const toggleCategoryActive = async (cat: ChecklistCategory) => {
     try {
       await supabase.from("checklist_categories").update({ is_active: !cat.is_active }).eq("id", cat.id)
-      loadChecklistItems()
+      loadChecklistItems(false)
     } catch (e) {
       toast.error("Failed to update category")
     }
@@ -353,7 +353,7 @@ export default function ChecklistsPage() {
         toast.success("Item added")
       }
       setItemDialogOpen(false)
-      loadChecklistItems()
+      loadChecklistItems(false)
     } catch (e) {
       toast.error("Failed to save item")
     } finally {
@@ -368,7 +368,7 @@ export default function ChecklistsPage() {
       await supabase.from("checklist_items").delete().eq("id", deleteItemId)
       toast.success("Item deleted")
       setDeleteItemId(null)
-      loadChecklistItems()
+      loadChecklistItems(false)
     } catch (e) {
       toast.error("Failed to delete item")
     } finally {
@@ -379,7 +379,7 @@ export default function ChecklistsPage() {
   const toggleItemActive = async (item: ChecklistItem) => {
     try {
       await supabase.from("checklist_items").update({ is_active: !item.is_active }).eq("id", item.id)
-      loadChecklistItems()
+      loadChecklistItems(false)
     } catch (e) {
       toast.error("Failed to update item")
     }

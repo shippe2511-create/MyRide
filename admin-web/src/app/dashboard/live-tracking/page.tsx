@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import { toast } from "sonner"
 import {
   Bus, Users, AlertTriangle, RefreshCw, Bell, Check,
@@ -491,10 +490,12 @@ export default function LiveTrackingPage() {
                         {selectedBus.passengers_on_board}/{selectedBus.vehicle_capacity}
                       </span>
                     </div>
-                    <Progress
-                      value={(selectedBus.passengers_on_board / selectedBus.vehicle_capacity) * 100}
-                      className={`h-2 ${getOccupancyColor((selectedBus.passengers_on_board / selectedBus.vehicle_capacity) * 100)}`}
-                    />
+                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${getOccupancyColor((selectedBus.passengers_on_board / selectedBus.vehicle_capacity) * 100)}`}
+                        style={{ width: `${Math.min(100, (selectedBus.passengers_on_board / selectedBus.vehicle_capacity) * 100)}%` }}
+                      />
+                    </div>
                     <p className="text-xs text-muted-foreground mt-1 text-right">
                       {Math.round((selectedBus.passengers_on_board / selectedBus.vehicle_capacity) * 100)}% full
                     </p>

@@ -2407,6 +2407,13 @@ class SupabaseService {
     try {
       final isFull = vehicleCapacity > 0 && passengersOnBoard >= vehicleCapacity;
 
+      // First, mark any old tracking records for this driver as completed
+      await client.from('bus_location_tracking')
+          .update({'status': 'completed'})
+          .eq('driver_id', driverId)
+          .eq('status', 'in_progress')
+          .neq('trip_id', tripId);
+
       // Upsert location (update if exists, insert if not)
       await client.from('bus_location_tracking').upsert({
         'trip_id': tripId,

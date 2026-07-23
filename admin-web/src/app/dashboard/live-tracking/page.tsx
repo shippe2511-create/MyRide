@@ -610,6 +610,15 @@ export default function LiveTrackingPage() {
                               </div>
                             </div>
                           </div>
+                          {/* Occupancy Progress Bar */}
+                          <div className="mt-2">
+                            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${getOccupancyColor((bus.passengers_on_board / bus.vehicle_capacity) * 100)}`}
+                                style={{ width: `${Math.min(100, (bus.passengers_on_board / bus.vehicle_capacity) * 100)}%` }}
+                              />
+                            </div>
+                          </div>
                           {bus.route && (
                             <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1">
                               <Navigation className="h-3 w-3" />

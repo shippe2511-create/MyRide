@@ -93,10 +93,14 @@ export default function LiveTrackingPage() {
 
   useEffect(() => {
     loadData()
-    setupRealtime()
+    const channel = setupRealtime()
+
+    // Also poll every 10 seconds as fallback
+    const pollInterval = setInterval(loadData, 10000)
 
     return () => {
-      supabase.removeAllChannels()
+      clearInterval(pollInterval)
+      if (channel) supabase.removeChannel(channel)
     }
   }, [])
 
@@ -180,8 +184,8 @@ export default function LiveTrackingPage() {
   }
 
   const setupRealtime = () => {
-    supabase
-      .channel("bus_tracking")
+    const channel = supabase
+      .channel("bus_tracking_realtime")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bus_location_tracking" },
@@ -215,6 +219,8 @@ export default function LiveTrackingPage() {
         }
       )
       .subscribe()
+
+    return channel
   }
 
   const playAlertSound = () => {

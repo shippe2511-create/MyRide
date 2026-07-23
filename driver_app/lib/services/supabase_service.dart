@@ -2185,13 +2185,34 @@ class SupabaseService {
   /// Get stops for a transport route
   static Future<List<Map<String, dynamic>>> getBusRouteStops(String routeId) async {
     try {
+      // First try route_stops table
       final response = await client
           .from('route_stops')
           .select()
           .eq('route_id', routeId)
           .order('stop_order');
 
-      return List<Map<String, dynamic>>.from(response);
+      if (response.isNotEmpty) {
+        return List<Map<String, dynamic>>.from(response);
+      }
+
+      // Fallback: Get stops from transport_routes.stops JSON array
+      final route = await client
+          .from('transport_routes')
+          .select('stops')
+          .eq('id', routeId)
+          .maybeSingle();
+
+      if (route != null && route['stops'] != null) {
+        final stopsList = route['stops'] as List<dynamic>;
+        return stopsList.asMap().entries.map((entry) => {
+          'id': 'stop_${entry.key}',
+          'stop_name': entry.value.toString(),
+          'stop_order': entry.key + 1,
+        }).toList();
+      }
+
+      return [];
     } catch (e) {
       debugPrint('Error getting route stops: $e');
       return [];

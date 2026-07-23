@@ -773,32 +773,50 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
     final route = assignment['route'] as Map<String, dynamic>?;
     final vehicle = assignment['vehicle'] as Map<String, dynamic>?;
     final status = assignment['status'] as String?;
-    final isScheduled = status == 'scheduled';
     final transportType = route?['transport_type'] as String?;
     final transportColor = _getTransportColor(transportType);
     final assignmentId = assignment['id'] as String?;
     final hasReminder = assignmentId != null && _remindersSet.contains(assignmentId);
 
-    // Check if departure is far enough in the future for reminders (at least 10 min)
-    bool canSetReminder = false;
+    // Parse departure datetime
     final departureTime = assignment['departure_time'] as String?;
     final serviceDate = assignment['service_date'] as String?;
-    if (departureTime != null && serviceDate != null && isScheduled) {
+    DateTime? departureDateTime;
+    bool isPastDeparture = false;
+    bool canSetReminder = false;
+
+    if (departureTime != null && serviceDate != null) {
       try {
         final timeParts = departureTime.split(':');
         final dateParts = serviceDate.split('-');
-        final departureDateTime = DateTime(
+        departureDateTime = DateTime(
           int.parse(dateParts[0]),
           int.parse(dateParts[1]),
           int.parse(dateParts[2]),
           int.parse(timeParts[0]),
           int.parse(timeParts[1]),
         );
+        isPastDeparture = departureDateTime.isBefore(DateTime.now());
         // Can set reminder if departure is at least 5 minutes away
         canSetReminder = departureDateTime.isAfter(DateTime.now().add(const Duration(minutes: 5)));
       } catch (e) {
-        canSetReminder = false;
+        // ignore parse errors
       }
+    }
+
+    // Determine display status
+    final isScheduled = status == 'scheduled' && !isPastDeparture;
+    final isMissed = status == 'scheduled' && isPastDeparture;
+    final isCompleted = status == 'completed';
+    final isInProgress = status == 'in_progress';
+
+    // Get display status and color
+    String displayStatus = status?.toUpperCase().replaceAll('_', ' ') ?? 'UNKNOWN';
+    Color statusColor = _getStatusColor(status);
+
+    if (isMissed) {
+      displayStatus = 'MISSED';
+      statusColor = Colors.red;
     }
 
     return Container(
@@ -850,13 +868,13 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _getStatusColor(status).withValues(alpha: 0.15),
+                    color: statusColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    (status ?? 'unknown').toUpperCase().replaceAll('_', ' '),
+                    displayStatus,
                     style: TextStyle(
-                      color: _getStatusColor(status),
+                      color: statusColor,
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                     ),
@@ -977,7 +995,7 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
                   ),
                 ],
               ),
-            ] else if (status == 'in_progress') ...[
+            ] else if (isInProgress) ...[
               const SizedBox(height: 12),
               // Resume Trip Button for in-progress trips
               SizedBox(
@@ -1001,6 +1019,10 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
                   ),
                 ),
               ),
+            ] else if (isMissed) ...[
+              // No action buttons for missed trips - just show the status
+            ] else if (isCompleted) ...[
+              // No action buttons for completed trips
             ],
           ],
         ),

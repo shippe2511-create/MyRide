@@ -2290,14 +2290,19 @@ class SupabaseService {
   /// Advance to next stop
   static Future<bool> advanceToNextStop(String tripId, String nextStopId) async {
     try {
-      await client
+      debugPrint('Advancing trip $tripId to stop $nextStopId');
+
+      final response = await client
           .from('bus_trips')
           .update({'current_stop_id': nextStopId})
-          .eq('id', tripId);
+          .eq('id', tripId)
+          .select();
 
+      debugPrint('Advance response: $response');
       return true;
     } catch (e) {
       debugPrint('Error advancing to next stop: $e');
+      debugPrint('Trip ID: $tripId, Next Stop ID: $nextStopId');
       return false;
     }
   }

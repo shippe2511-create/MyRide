@@ -223,7 +223,9 @@ class _BusTripScreenState extends State<BusTripScreen> {
     );
 
     final nextStop = _stops[_currentStopIndex + 1];
-    final success = await SupabaseService.advanceToNextStop(widget.tripId, nextStop['id']);
+    final nextStopId = nextStop['id']?.toString() ?? 'stop_${_currentStopIndex + 1}';
+    debugPrint('Advancing to next stop: $nextStopId');
+    final success = await SupabaseService.advanceToNextStop(widget.tripId, nextStopId);
 
     if (success) {
       setState(() {

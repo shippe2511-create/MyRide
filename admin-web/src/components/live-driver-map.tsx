@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react"
-import { GoogleMap, useJsApiLoader, OverlayView, Polyline, TrafficLayer, HeatmapLayer, Circle } from "@react-google-maps/api"
+import { GoogleMap, OverlayView, Polyline, TrafficLayer, HeatmapLayer, Circle } from "@react-google-maps/api"
+import { useGoogleMaps } from "@/components/providers/google-maps-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -9,7 +10,6 @@ import {
   LocateFixed, Search, X, Volume2, VolumeX, Target
 } from "lucide-react"
 
-const libraries: ("visualization" | "drawing")[] = ["visualization", "drawing"]
 
 interface Driver {
   id: string
@@ -409,11 +409,7 @@ export function LiveDriverMap({
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const initialFitDoneRef = useRef(false)
 
-  const { isLoaded } = useJsApiLoader({
-    id: "google-map-script",
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
-    libraries,
-  })
+  const { isLoaded } = useGoogleMaps()
 
   // Initialize audio
   useEffect(() => {

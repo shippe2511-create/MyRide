@@ -7,6 +7,7 @@ import { SOSAlertListener } from "@/components/sos-alert-listener"
 import { SupportChatListener } from "@/components/support-chat-listener"
 import { GlobalSearch } from "@/components/global-search"
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts"
+import { GoogleMapsProvider } from "@/components/providers/google-maps-provider"
 import { Menu, X } from "lucide-react"
 
 export default function DashboardLayout({
@@ -54,6 +55,7 @@ export default function DashboardLayout({
   }, [])
 
   return (
+    <GoogleMapsProvider>
     <div className="flex h-screen w-screen overflow-hidden">
       <SOSAlertListener />
       <SupportChatListener />
@@ -100,5 +102,6 @@ export default function DashboardLayout({
         </main>
       </div>
     </div>
+    </GoogleMapsProvider>
   )
 }

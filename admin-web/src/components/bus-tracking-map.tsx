@@ -1,15 +1,14 @@
 "use client"
 
 import { useEffect, useState, useCallback, useRef } from "react"
-import { GoogleMap, useJsApiLoader, OverlayView, TrafficLayer } from "@react-google-maps/api"
+import { GoogleMap, OverlayView, TrafficLayer } from "@react-google-maps/api"
+import { useGoogleMaps } from "@/components/providers/google-maps-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   Layers, Bus, Satellite, Map as MapIcon, Maximize2, Minimize2,
   LocateFixed, Search, X, Volume2, VolumeX, Target, Users
 } from "lucide-react"
-
-const libraries: ("visualization" | "drawing")[] = ["visualization", "drawing"]
 
 interface BusLocation {
   id: string
@@ -148,11 +147,7 @@ export function BusTrackingMap({ buses, selectedBusId, onBusClick }: BusTracking
   const [soundEnabled, setSoundEnabled] = useState(true)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: "google-map-script",
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
-    libraries,
-  })
+  const { isLoaded, loadError } = useGoogleMaps()
 
   const onLoad = useCallback((map: google.maps.Map) => {
     setMap(map)

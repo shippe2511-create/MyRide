@@ -2170,7 +2170,7 @@ class SupabaseService {
           .eq('driver_id', driverId)
           .gte('service_date', todayStr)
           .lte('service_date', endStr)
-          .inFilter('status', ['scheduled', 'in_progress'])
+          .inFilter('status', ['scheduled', 'in_progress', 'completed'])
           .order('service_date')
           .order('departure_time');
 

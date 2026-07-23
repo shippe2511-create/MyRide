@@ -1029,7 +1029,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     _buildActionButton(
                       context,
                       icon: Icons.schedule,
-                      label: 'Shift Schedule',
+                      label: 'Schedule',
                       color: AppColors.warning,
                       onTap: () {
                         HapticFeedback.lightImpact();
@@ -1042,7 +1042,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     _buildActionButton(
                       context,
                       icon: Icons.directions_bus,
-                      label: 'My Bus Schedule',
+                      label: 'Bus',
                       color: AppColors.info,
                       onTap: () {
                         HapticFeedback.lightImpact();
@@ -1771,30 +1771,33 @@ class _HomeScreenState extends State<HomeScreen> {
     required Color color,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: color.withValues(alpha: 0.3)),
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Column(
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: color.withValues(alpha: 0.3)),
+              ),
+              child: Icon(icon, color: color, size: 26),
             ),
-            child: Icon(icon, color: color, size: 26),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: TextStyle(
-              color: context.textColor,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: context.textColor,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -329,12 +329,17 @@ class SupabaseService {
   // Profile methods
   static Future<Map<String, dynamic>?> getProfile() async {
     if (visibleUserId == null) return null;
-    final response = await client
-        .from('profiles')
-        .select()
-        .eq('id', visibleUserId!)
-        .single();
-    return response;
+    try {
+      final response = await client
+          .from('profiles')
+          .select()
+          .eq('id', visibleUserId!)
+          .maybeSingle();
+      return response;
+    } catch (e) {
+      debugPrint('Error getting profile: $e');
+      return null;
+    }
   }
 
   // Fields that require admin approval before updating
@@ -488,7 +493,10 @@ class SupabaseService {
     double? lat,
     double? lng,
   }) async {
-    if (driverId.isEmpty) return;
+    if (driverId.isEmpty) {
+      debugPrint('updateDriverStatus: driverId is empty, skipping');
+      return;
+    }
     final data = <String, dynamic>{};
     if (isOnline != null) data['is_online'] = isOnline;
     if (isOnBreak != null) {
@@ -504,10 +512,17 @@ class SupabaseService {
     if (lat != null) data['current_location_lat'] = lat;
     if (lng != null) data['current_location_lng'] = lng;
 
-    await client
-        .from('drivers')
-        .update(data)
-        .eq('id', driverId);
+    debugPrint('updateDriverStatus: updating driver $driverId with $data');
+
+    try {
+      await client
+          .from('drivers')
+          .update(data)
+          .eq('id', driverId);
+      debugPrint('updateDriverStatus: success');
+    } catch (e) {
+      debugPrint('updateDriverStatus: error - $e');
+    }
 
     // Also update driver_locations table for admin panel visibility
     if (isOnline != null) {

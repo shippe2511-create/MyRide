@@ -23,6 +23,7 @@ import 'shift_schedule_screen.dart';
 import 'my_bus_schedule_screen.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
+import '../services/app_settings_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -1006,16 +1007,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildActionButton(
-                      context,
-                      icon: Icons.mic,
-                      label: 'PTT',
-                      color: AppColors.success,
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        Navigator.pushNamed(context, '/push-to-talk');
-                      },
-                    ),
+                    if (AppSettingsService.pttEnabled)
+                      _buildActionButton(
+                        context,
+                        icon: Icons.mic,
+                        label: 'PTT',
+                        color: AppColors.success,
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          Navigator.pushNamed(context, '/push-to-talk');
+                        },
+                      ),
                     _buildActionButton(
                       context,
                       icon: Icons.coffee,

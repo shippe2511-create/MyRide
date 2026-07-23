@@ -51,6 +51,7 @@ class AppSettingsService {
   static bool get sosEnabled => _settings?['enable_sos'] ?? true;
   static bool get chatEnabled => _settings?['enable_chat'] ?? true;
   static bool get ratingsEnabled => _settings?['enable_ratings'] ?? true;
+  static bool get pttEnabled => _settings?['enable_ptt'] ?? false;
   static int get maxRideDistanceKm => _settings?['max_ride_distance_km'] ?? 50;
   static int get defaultWaitTimeMin => _settings?['default_wait_time_min'] ?? 10;
   static String get supportPhone => _settings?['support_phone'] ?? '+960 333-3333';

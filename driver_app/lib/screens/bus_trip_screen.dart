@@ -213,14 +213,48 @@ class _BusTripScreenState extends State<BusTripScreen> {
 
     // Record passenger counts for current stop
     final currentStop = _stops[_currentStopIndex];
+    final boarded = (counts['boarded'] as int?) ?? 0;
+    final alighted = (counts['alighted'] as int?) ?? 0;
+
     await SupabaseService.recordPassengerCount(
       tripId: widget.tripId,
       stopId: currentStop['id'],
-      boarded: counts['boarded'] ?? 0,
-      alighted: counts['alighted'] ?? 0,
+      boarded: boarded,
+      alighted: alighted,
       stopIndex: _currentStopIndex,
       stopName: currentStop['stop_name'] ?? currentStop['name'] ?? 'Stop ${_currentStopIndex + 1}',
     );
+
+    // Send bus full alert to admin if capacity is reached
+    final isFull = counts['isFull'] == true;
+    if (isFull && !_busFullAlertSent) {
+      final vehicle = widget.assignment['vehicle'] as Map<String, dynamic>?;
+      final route = widget.assignment['route'] as Map<String, dynamic>?;
+      final vehicleCapacity = vehicle?['capacity'] as int? ?? 0;
+      final afterStopCount = (counts['afterStopCount'] as int?) ?? _onBoardCount;
+
+      try {
+        final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
+        await SupabaseService.createBusFullAlert(
+          tripId: widget.tripId,
+          routeId: widget.assignment['route_id'] as String,
+          routeName: route?['route_name'] ?? 'Unknown Route',
+          stopName: currentStop['stop_name'] ?? 'Unknown Stop',
+          stopIndex: _currentStopIndex,
+          vehicleNumber: vehicle?['vehicle_number'],
+          passengersOnBoard: afterStopCount,
+          vehicleCapacity: vehicleCapacity,
+          latitude: position.latitude,
+          longitude: position.longitude,
+        );
+        _busFullAlertSent = true;
+        debugPrint('Bus full alert sent from passenger count dialog!');
+      } catch (e) {
+        debugPrint('Error sending bus full alert: $e');
+      }
+    }
 
     final nextStop = _stops[_currentStopIndex + 1];
     final nextStopId = nextStop['id']?.toString() ?? 'stop_${_currentStopIndex + 1}';
@@ -231,12 +265,12 @@ class _BusTripScreenState extends State<BusTripScreen> {
       setState(() {
         _currentStopIndex++;
         _stopCounts[currentStop['id']] = {
-          'boarded': counts['boarded'] ?? 0,
-          'alighted': counts['alighted'] ?? 0,
+          'boarded': boarded,
+          'alighted': alighted,
         };
-        _onBoardCount += (counts['boarded'] ?? 0) - (counts['alighted'] ?? 0);
+        _onBoardCount += boarded - alighted;
         _isAdvancing = false;
-        _busFullAlertSent = false; // Reset for next stop
+        if (!isFull) _busFullAlertSent = false; // Reset only if not full
       });
       // Update location immediately after advancing
       _updateLocation();
@@ -246,17 +280,27 @@ class _BusTripScreenState extends State<BusTripScreen> {
     }
   }
 
-  Future<Map<String, int>?> _showPassengerCountDialog() async {
+  Future<Map<String, dynamic>?> _showPassengerCountDialog() async {
     int boarded = 0;
     int alighted = 0;
     final currentStop = _stops[_currentStopIndex];
+    final vehicle = widget.assignment['vehicle'] as Map<String, dynamic>?;
+    final vehicleCapacity = vehicle?['capacity'] as int? ?? 0;
 
-    return showModalBottomSheet<Map<String, int>>(
+    return showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => Container(
+        builder: (context, setDialogState) {
+          final afterStopCount = _onBoardCount + boarded - alighted;
+          final isFull = vehicleCapacity > 0 && afterStopCount >= vehicleCapacity;
+          final isOverCapacity = vehicleCapacity > 0 && afterStopCount > vehicleCapacity;
+          final availableSeats = vehicleCapacity > 0
+              ? (vehicleCapacity - _onBoardCount + alighted).clamp(0, 99)
+              : 99;
+
+          return Container(
           decoration: BoxDecoration(
             color: context.cardColor,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -326,7 +370,7 @@ class _BusTripScreenState extends State<BusTripScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Current on-board display
+              // Current on-board display with capacity
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -350,6 +394,16 @@ class _BusTripScreenState extends State<BusTripScreen> {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if (vehicleCapacity > 0) ...[
+                      Text(
+                        ' / $vehicleCapacity',
+                        style: TextStyle(
+                          color: context.mutedColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -363,6 +417,7 @@ class _BusTripScreenState extends State<BusTripScreen> {
                 Colors.green,
                 boarded,
                 (val) => setDialogState(() => boarded = val),
+                max: availableSeats,
               ),
               const SizedBox(height: 12),
 
@@ -379,35 +434,120 @@ class _BusTripScreenState extends State<BusTripScreen> {
 
               const SizedBox(height: 20),
 
+              // Bus Full Warning Banner
+              if (isFull) ...[
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isOverCapacity
+                        ? Colors.red.withValues(alpha: 0.15)
+                        : Colors.orange.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isOverCapacity
+                          ? Colors.red.withValues(alpha: 0.4)
+                          : Colors.orange.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isOverCapacity ? Icons.warning_amber_rounded : Icons.info_outline_rounded,
+                        color: isOverCapacity ? Colors.red : Colors.orange,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isOverCapacity ? 'Over Capacity!' : 'Bus is Full',
+                              style: TextStyle(
+                                color: isOverCapacity ? Colors.red : Colors.orange,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Admin will be notified to send additional bus',
+                              style: TextStyle(
+                                color: isOverCapacity
+                                    ? Colors.red.withValues(alpha: 0.8)
+                                    : Colors.orange.withValues(alpha: 0.8),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
               // Preview of new count
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withValues(alpha: 0.1),
+                  color: isFull
+                      ? (isOverCapacity ? Colors.red : Colors.orange).withValues(alpha: 0.1)
+                      : Colors.blue.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: isFull
+                        ? (isOverCapacity ? Colors.red : Colors.orange).withValues(alpha: 0.3)
+                        : Colors.blue.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.trending_flat, color: Colors.blue, size: 24),
+                    Icon(
+                      Icons.trending_flat,
+                      color: isFull ? (isOverCapacity ? Colors.red : Colors.orange) : Colors.blue,
+                      size: 24,
+                    ),
                     const SizedBox(width: 10),
                     Text(
                       'After this stop: ',
-                      style: TextStyle(color: Colors.blue, fontSize: 15, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        color: isFull ? (isOverCapacity ? Colors.red : Colors.orange) : Colors.blue,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     Text(
-                      '${_onBoardCount + boarded - alighted}',
-                      style: const TextStyle(
-                        color: Colors.blue,
+                      '$afterStopCount',
+                      style: TextStyle(
+                        color: isFull ? (isOverCapacity ? Colors.red : Colors.orange) : Colors.blue,
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const Text(
-                      ' passengers',
-                      style: TextStyle(color: Colors.blue, fontSize: 15, fontWeight: FontWeight.w500),
-                    ),
+                    if (vehicleCapacity > 0) ...[
+                      Text(
+                        '/$vehicleCapacity',
+                        style: TextStyle(
+                          color: isFull
+                              ? (isOverCapacity ? Colors.red : Colors.orange).withValues(alpha: 0.7)
+                              : Colors.blue.withValues(alpha: 0.7),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ] else ...[
+                      Text(
+                        ' passengers',
+                        style: TextStyle(
+                          color: Colors.blue,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -436,7 +576,12 @@ class _BusTripScreenState extends State<BusTripScreen> {
                   Expanded(
                     flex: 2,
                     child: ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx, {'boarded': boarded, 'alighted': alighted}),
+                      onPressed: () => Navigator.pop(ctx, {
+                        'boarded': boarded,
+                        'alighted': alighted,
+                        'isFull': isFull,
+                        'afterStopCount': afterStopCount,
+                      }),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.yellow,
                         foregroundColor: Colors.black,
@@ -458,7 +603,8 @@ class _BusTripScreenState extends State<BusTripScreen> {
               ),
             ],
           ),
-        ),
+        );
+        },
       ),
     );
   }

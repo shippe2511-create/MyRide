@@ -149,11 +149,38 @@ export default function PushToTalkPage() {
   }
 
   const fetchSettings = async () => {
-    const { data } = await supabase
+    // First check how many rows exist
+    const { data: allRows, error: countError } = await supabase
       .from("voice_settings")
       .select("*")
-      .single()
-    if (data) setSettings(data)
+
+    console.log("All voice_settings rows:", allRows, countError)
+
+    if (allRows && allRows.length > 0) {
+      // Use the first row
+      setSettings(allRows[0])
+    } else {
+      // No row exists, create default settings
+      const { data: newSettings, error: insertError } = await supabase
+        .from("voice_settings")
+        .insert({
+          feature_enabled: false,
+          max_duration_seconds: 60,
+          allowed_senders: ['admin'],
+          broadcast_enabled: false,
+        })
+        .select()
+        .single()
+
+      console.log("Created new voice settings:", newSettings, insertError)
+
+      if (newSettings) {
+        setSettings(newSettings)
+      } else if (insertError) {
+        console.error("Error creating voice settings:", insertError)
+        toast.error("Failed to initialize voice settings")
+      }
+    }
   }
 
   const fetchMessages = async () => {
@@ -181,19 +208,32 @@ export default function PushToTalkPage() {
   }
 
   const updateSettings = async (updates: Partial<VoiceSettings>) => {
-    if (!settings) return
+    if (!settings) {
+      console.error("No settings to update")
+      return
+    }
     setSaving(true)
 
-    const { error } = await supabase
+    console.log("Updating settings:", settings.id, updates)
+
+    const { data, error } = await supabase
       .from("voice_settings")
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq("id", settings.id)
+      .select()
+      .single()
+
+    console.log("Update result:", data, error)
 
     if (error) {
-      toast.error("Failed to update settings")
-    } else {
-      setSettings({ ...settings, ...updates })
+      console.error("Error updating settings:", error)
+      toast.error("Failed to update settings: " + error.message)
+    } else if (data) {
+      setSettings(data)
       toast.success("Settings updated")
+    } else {
+      console.error("No data returned from update")
+      toast.error("Update failed - no data returned")
     }
     setSaving(false)
   }

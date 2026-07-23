@@ -125,7 +125,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
 
       debugPrint('Inserting incident: $insertData');
 
-      // Use simple insert without .select().single() to avoid potential issues
+      // Simple insert without .select() to avoid RLS issues
       await SupabaseService.client.from('incidents').insert(insertData);
 
       if (mounted) {
@@ -137,19 +137,8 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
       debugPrint('Error submitting incident: $e');
       debugPrint('Stack trace: $stack');
       if (mounted) {
-        String errorMsg = 'Failed to submit report';
-        final errorStr = e.toString();
-        if (errorStr.contains('title')) {
-          errorMsg = 'Please enter a title';
-        } else if (errorStr.contains('driver_id')) {
-          errorMsg = 'Driver profile not found';
-        } else if (errorStr.contains('violates row-level security')) {
-          errorMsg = 'Permission denied. Please log in again.';
-        } else if (errorStr.contains('null value')) {
-          errorMsg = 'Missing required field';
-        }
-        debugPrint('Showing error: $errorMsg (original: $errorStr)');
-        AppSnackbar.error(context, errorMsg);
+        // Show full error for debugging
+        AppSnackbar.error(context, e.toString().length > 100 ? e.toString().substring(0, 100) : e.toString());
       }
     }
 

@@ -33,8 +33,8 @@ interface Driver {
 
 interface Vehicle {
   id: string
-  vehicle_number: string
-  vehicle_model: string
+  plate_no: string
+  display_name: string
   capacity: number
 }
 
@@ -113,7 +113,7 @@ export default function BusRosterPage() {
   const loadMasterData = async () => {
     const [driversRes, vehiclesRes, schedulesRes] = await Promise.all([
       supabase.from("drivers").select("id, profile_id, profile:profiles(full_name)"),
-      supabase.from("vehicles").select("id, vehicle_number, vehicle_model, capacity").eq("is_active", true),
+      supabase.from("vehicle_types").select("id, plate_no, display_name, capacity").eq("is_active", true),
       supabase.from("route_schedules").select(`
         *,
         route:transport_routes(id, route_name, route_code, transport_type, direction)
@@ -184,7 +184,7 @@ export default function BusRosterPage() {
       : { data: [] }
 
     const { data: vehicleData } = vehicleIds.length > 0
-      ? await supabase.from("vehicles").select("id, plate_no, name, capacity").in("id", vehicleIds)
+      ? await supabase.from("vehicle_types").select("id, plate_no, display_name, capacity").in("id", vehicleIds)
       : { data: [] }
 
     // Combine data
@@ -439,7 +439,7 @@ export default function BusRosterPage() {
         const driverB = (b.driver?.profile as { full_name?: string })?.full_name || ""
         return dir * driverA.localeCompare(driverB)
       case "vehicle":
-        return dir * (a.vehicle?.vehicle_model || "").localeCompare(b.vehicle?.vehicle_model || "")
+        return dir * (a.vehicle?.display_name || "").localeCompare(b.vehicle?.display_name || "")
       case "status":
         return dir * a.status.localeCompare(b.status)
       default:
@@ -682,7 +682,7 @@ export default function BusRosterPage() {
                             onChange={(v) => updateAssignment(assignment.id, "vehicle_id", v || null)}
                             options={vehicles.map(v => ({
                               value: v.id,
-                              label: `${v.vehicle_model} (${v.vehicle_number})`
+                              label: `${v.display_name} (${v.plate_no})`
                             }))}
                             placeholder="Search vehicle..."
                           />

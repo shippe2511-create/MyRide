@@ -38,6 +38,7 @@ interface BusLocation {
   current_stop_index: number
   passengers_on_board: number
   vehicle_capacity: number
+  vehicle_number?: string | null
   is_full: boolean
   status: string
   last_updated_at: string

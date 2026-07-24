@@ -80,7 +80,7 @@ function BusMarker({
         : "#22c55e"
 
   const driverName = (bus.driver?.profile as any)?.full_name || "Unknown"
-  const vehicleNumber = bus.vehicle?.vehicle_number || "N/A"
+  const vehicleNumber = bus.vehicle_number || bus.vehicle?.vehicle_number || "N/A"
 
   return (
     <div

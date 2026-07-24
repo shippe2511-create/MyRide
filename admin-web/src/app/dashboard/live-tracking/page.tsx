@@ -525,6 +525,17 @@ export default function LiveTrackingPage() {
                     </div>
                   )}
 
+                  {/* Vehicle Info */}
+                  {selectedBus.vehicle_number && (
+                    <div className="p-2 rounded-lg bg-muted/50">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Bus className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">{selectedBus.vehicle_number}</span>
+                        <span className="text-muted-foreground">({selectedBus.vehicle_capacity} seats)</span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Occupancy Bar */}
                   <div>
                     <div className="flex justify-between items-center mb-1">

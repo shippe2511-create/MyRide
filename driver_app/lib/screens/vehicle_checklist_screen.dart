@@ -748,7 +748,7 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.yellow, width: 2),
+                  borderSide: BorderSide.none,
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 suffixText: 'hrs',

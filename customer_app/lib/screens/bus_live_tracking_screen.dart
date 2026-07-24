@@ -276,7 +276,7 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
         final position = LatLng(lat, lng);
         final isSelected = _selectedBus?['id'] == bus['id'];
         final vehicleInfo = bus['vehicle_types'];
-        final plateNo = vehicleInfo?['plate_no'] ?? 'Bus';
+        final plateNo = bus['vehicle_number'] ?? vehicleInfo?['plate_no'] ?? 'Bus';
 
         markers.add(Marker(
           markerId: MarkerId('bus_${bus['id']}'),
@@ -286,7 +286,7 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
           ),
           infoWindow: InfoWindow(
             title: plateNo,
-            snippet: 'Passengers: ${bus['passengers_on_board'] ?? 0}/${bus['vehicle_capacity'] ?? '-'}',
+            snippet: '${bus['passengers_on_board'] ?? 0}/${bus['vehicle_capacity'] ?? '-'} passengers',
           ),
           zIndex: 100.0,
           onTap: () => _onBusTapped(bus),
@@ -683,7 +683,7 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
-                                        vehicleInfo?['plate_no'] ?? 'Bus',
+                                        bus['vehicle_number'] ?? vehicleInfo?['plate_no'] ?? 'Bus',
                                         style: TextStyle(
                                           color: context.textColor,
                                           fontSize: 14,

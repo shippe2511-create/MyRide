@@ -1044,23 +1044,26 @@ class _BusTripScreenState extends State<BusTripScreen> {
                               color: AppColors.darkBg.withValues(alpha: 0.2),
                             ),
                             const SizedBox(width: 12),
-                            Expanded(
-                              child: Row(
-                                children: [
-                                  Icon(Icons.directions_bus_filled_rounded, color: AppColors.darkBg.withValues(alpha: 0.7), size: 18),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      vehicle != null
-                                          ? '${vehicle['vehicle_number']} (${vehicle['capacity'] ?? 0} seats)'
-                                          : '',
-                                      style: TextStyle(color: AppColors.darkBg, fontSize: 13, fontWeight: FontWeight.w600),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
+                            if (vehicle != null) ...[
+                              Icon(Icons.directions_bus_filled_rounded, color: AppColors.darkBg.withValues(alpha: 0.7), size: 18),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${vehicle['vehicle_number']}',
+                                style: TextStyle(color: AppColors.darkBg, fontSize: 12, fontWeight: FontWeight.w600),
                               ),
-                            ),
+                              const SizedBox(width: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.darkBg.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '${vehicle['capacity'] ?? 0} seats',
+                                  style: TextStyle(color: AppColors.darkBg, fontSize: 10, fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),

@@ -683,10 +683,15 @@ export default function LiveTrackingPage() {
                               {bus.route.route_name}
                             </div>
                           )}
-                          {bus.vehicle && (
-                            <Badge variant="outline" className="mt-1 text-xs">
-                              {bus.vehicle.vehicle_number}
-                            </Badge>
+                          {(bus.vehicle_number || bus.vehicle) && (
+                            <div className="mt-1 flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                {bus.vehicle_number || bus.vehicle?.vehicle_number}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {bus.vehicle_capacity} seats
+                              </span>
+                            </div>
                           )}
                         </div>
                       )

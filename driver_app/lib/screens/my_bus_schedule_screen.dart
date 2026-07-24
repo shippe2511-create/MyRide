@@ -86,6 +86,9 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
       final driverState = context.read<DriverState>();
       final driverId = driverState.driverId;
 
+      debugPrint('MyBusSchedule: driverId from state = "$driverId"');
+      debugPrint('MyBusSchedule: Expected driverId = "effc5e46-0b39-48f0-a8a8-ea4561299a14"');
+
       if (driverId.isEmpty) {
         debugPrint('MyBusSchedule: ERROR - driverId is empty!');
         setState(() => _isLoading = false);
@@ -99,7 +102,7 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
       }
 
       final assignments = await SupabaseService.getMyBusSchedule(driverId);
-      debugPrint('MyBusSchedule: Got ${assignments.length} assignments');
+      debugPrint('MyBusSchedule: Got ${assignments.length} assignments for driverId=$driverId');
       setState(() {
         _assignments = assignments;
         _isLoading = false;

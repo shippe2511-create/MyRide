@@ -2197,8 +2197,7 @@ class SupabaseService {
           .from('roster_assignments')
           .select('''
             *,
-            route:transport_routes(id, route_name, route_code, direction, transport_type),
-            vehicle:vehicles(id, vehicle_model, vehicle_number, capacity)
+            route:transport_routes(id, route_name, route_code, direction, transport_type)
           ''')
           .eq('driver_id', driverId)
           .gte('service_date', todayStr)
@@ -2208,7 +2207,27 @@ class SupabaseService {
           .order('departure_time');
 
       debugPrint('getMyBusSchedule: got ${response.length} assignments');
-      return List<Map<String, dynamic>>.from(response);
+
+      // Fetch vehicle info separately for each assignment that has a vehicle_id
+      final results = <Map<String, dynamic>>[];
+      for (final assignment in response) {
+        final map = Map<String, dynamic>.from(assignment);
+        final vehicleId = map['vehicle_id'];
+        if (vehicleId != null && vehicleId.toString().isNotEmpty) {
+          try {
+            final vehicleData = await client
+                .from('vehicles')
+                .select('id, vehicle_model, vehicle_number, capacity')
+                .eq('id', vehicleId)
+                .maybeSingle();
+            map['vehicle'] = vehicleData;
+          } catch (e) {
+            debugPrint('Error fetching vehicle $vehicleId: $e');
+          }
+        }
+        results.add(map);
+      }
+      return results;
     } catch (e) {
       debugPrint('Error getting bus schedule: $e');
       return [];
@@ -2457,10 +2476,10 @@ class SupabaseService {
           .neq('trip_id', tripId);
 
       // Upsert location (update if exists, insert if not)
-      await client.from('bus_location_tracking').upsert({
+      // Only include vehicle_id if it's not null (FK constraint)
+      final data = {
         'trip_id': tripId,
         'driver_id': driverId,
-        'vehicle_id': vehicleId,
         'route_id': routeId,
         'latitude': latitude,
         'longitude': longitude,
@@ -2471,7 +2490,11 @@ class SupabaseService {
         'is_full': isFull,
         'status': 'in_progress',
         'last_updated_at': DateTime.now().toIso8601String(),
-      }, onConflict: 'trip_id');
+      };
+      if (vehicleId != null && vehicleId.isNotEmpty) {
+        data['vehicle_id'] = vehicleId;
+      }
+      await client.from('bus_location_tracking').upsert(data, onConflict: 'trip_id');
 
       return true;
     } catch (e) {

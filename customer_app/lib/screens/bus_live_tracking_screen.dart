@@ -185,9 +185,9 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
     try {
       final response = await _supabase
           .from('bus_location_tracking')
-          .select('*, drivers:driver_id(full_name, phone), vehicle_types:vehicle_id(plate_no, display_name)')
+          .select('*, driver:drivers!driver_id(profile:profiles(full_name, phone))')
           .eq('route_id', widget.routeId)
-          .eq('status', 'active')
+          .eq('status', 'in_progress')
           .order('last_updated_at', ascending: false);
 
       setState(() {

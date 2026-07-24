@@ -129,16 +129,13 @@ export default function LiveTrackingPage() {
   const loadData = async (showLoading = false) => {
     if (showLoading) setLoading(true)
 
-    const { data: busData } = await supabase
+    const { data: busData, error: busError } = await supabase
       .from("bus_location_tracking")
-      .select(`
-        *,
-        route:transport_routes(route_name, route_code),
-        vehicle:vehicles(vehicle_number),
-        driver:drivers(profile:profiles(full_name))
-      `)
+      .select("*")
       .eq("status", "in_progress")
       .order("last_updated_at", { ascending: false })
+
+    console.log("Bus query result:", { busData, busError, count: busData?.length })
 
     const { data: alertData } = await supabase
       .from("bus_full_alerts")

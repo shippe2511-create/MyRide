@@ -343,7 +343,7 @@ export default function LiveTrackingPage() {
     setSelectedVehicle("")
     setAssignDialogOpen(true)
 
-    // Load available drivers (online and not on active trip)
+    // Load all drivers (show online first, then offline)
     const { data: drivers } = await supabase
       .from("drivers")
       .select(`
@@ -352,7 +352,7 @@ export default function LiveTrackingPage() {
         is_online,
         profile:profiles(full_name)
       `)
-      .eq("is_online", true)
+      .order("is_online", { ascending: false })
 
     // Load available vehicles
     const { data: vehicles } = await supabase
@@ -892,13 +892,14 @@ export default function LiveTrackingPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {availableDrivers.length === 0 ? (
-                      <SelectItem value="_none" disabled>No online drivers</SelectItem>
+                      <SelectItem value="_none" disabled>No drivers available</SelectItem>
                     ) : (
                       availableDrivers.map((driver) => (
                         <SelectItem key={driver.id} value={driver.id}>
                           <div className="flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-green-500" />
+                            <span className={`h-2 w-2 rounded-full ${driver.is_online ? 'bg-green-500' : 'bg-gray-400'}`} />
                             {(driver.profile as any)?.full_name || "Unknown Driver"}
+                            {!driver.is_online && <span className="text-xs text-muted-foreground">(offline)</span>}
                           </div>
                         </SelectItem>
                       ))

@@ -61,6 +61,7 @@ function SortableRow({
   toggleRouteStatus,
   setEditingRoute,
   openTimesDialog,
+  openStopsDialog,
   setDeleteId,
 }: {
   route: TransportRoute
@@ -69,6 +70,7 @@ function SortableRow({
   toggleRouteStatus: (route: TransportRoute) => void
   setEditingRoute: (route: TransportRoute) => void
   openTimesDialog: (route: TransportRoute) => void
+  openStopsDialog: (route: TransportRoute) => void
   setDeleteId: (id: string) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: route.id })
@@ -135,6 +137,10 @@ function SortableRow({
                 <Clock className="h-4 w-4 mr-2" />
                 Manage Times
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => openStopsDialog(route)}>
+                <MapPin className="h-4 w-4 mr-2" />
+                Manage Stops
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setEditingRoute(route)}>
                 <Pencil className="h-4 w-4 mr-2" />
                 Edit
@@ -191,6 +197,15 @@ export default function SchedulingPage() {
   const [routeStops, setRouteStops] = useState("")
   const [importSaving, setImportSaving] = useState(false)
   const [draggedStopIndex, setDraggedStopIndex] = useState<number | null>(null)
+
+  // Stops management states
+  const [stopsRoute, setStopsRoute] = useState<TransportRoute | null>(null)
+  const [routeStopsData, setRouteStopsData] = useState<{ id: string; stop_name: string; latitude: number; longitude: number; stop_order: number }[]>([])
+  const [loadingStops, setLoadingStops] = useState(false)
+  const [stopForm, setStopForm] = useState({ stop_name: "", latitude: "", longitude: "" })
+  const [showAddStop, setShowAddStop] = useState(false)
+  const [editingStop, setEditingStop] = useState<{ id: string; stop_name: string; latitude: number; longitude: number; stop_order: number } | null>(null)
+  const [savingStop, setSavingStop] = useState(false)
 
   const isSavingRef = useRef(false)
 
@@ -381,6 +396,91 @@ export default function SchedulingPage() {
       .eq("route_id", route.id)
       .order("departure_time")
     setSchedules(data || [])
+  }
+
+  const openStopsDialog = async (route: TransportRoute) => {
+    setStopsRoute(route)
+    setLoadingStops(true)
+    const { data } = await supabase
+      .from("route_stops")
+      .select("*")
+      .eq("route_id", route.id)
+      .order("stop_order")
+    setRouteStopsData(data || [])
+    setLoadingStops(false)
+  }
+
+  const addStop = async () => {
+    if (!stopsRoute || !stopForm.stop_name || !stopForm.latitude || !stopForm.longitude) {
+      toast.error("Please fill all fields")
+      return
+    }
+    setSavingStop(true)
+    const lat = parseFloat(stopForm.latitude)
+    const lng = parseFloat(stopForm.longitude)
+    if (isNaN(lat) || isNaN(lng)) {
+      toast.error("Invalid coordinates")
+      setSavingStop(false)
+      return
+    }
+
+    if (editingStop) {
+      const { error } = await supabase
+        .from("route_stops")
+        .update({ stop_name: stopForm.stop_name, latitude: lat, longitude: lng })
+        .eq("id", editingStop.id)
+      if (error) {
+        toast.error("Failed to update stop")
+      } else {
+        toast.success("Stop updated")
+        setShowAddStop(false)
+        setEditingStop(null)
+        openStopsDialog(stopsRoute)
+      }
+    } else {
+      const nextOrder = routeStopsData.length > 0 ? Math.max(...routeStopsData.map(s => s.stop_order)) + 1 : 1
+      const { error } = await supabase.from("route_stops").insert({
+        route_id: stopsRoute.id,
+        stop_name: stopForm.stop_name,
+        latitude: lat,
+        longitude: lng,
+        stop_order: nextOrder,
+      })
+      if (error) {
+        toast.error("Failed to add stop")
+      } else {
+        toast.success("Stop added")
+        setShowAddStop(false)
+        openStopsDialog(stopsRoute)
+      }
+    }
+    setStopForm({ stop_name: "", latitude: "", longitude: "" })
+    setSavingStop(false)
+  }
+
+  const deleteStop = async (stopId: string) => {
+    if (!stopsRoute) return
+    const { error } = await supabase.from("route_stops").delete().eq("id", stopId)
+    if (!error) {
+      toast.success("Stop deleted")
+      openStopsDialog(stopsRoute)
+    } else {
+      toast.error("Failed to delete stop")
+    }
+  }
+
+  const moveStop = async (stopId: string, direction: "up" | "down") => {
+    const stopIndex = routeStopsData.findIndex(s => s.id === stopId)
+    if (stopIndex === -1) return
+    const swapIndex = direction === "up" ? stopIndex - 1 : stopIndex + 1
+    if (swapIndex < 0 || swapIndex >= routeStopsData.length) return
+
+    const stop = routeStopsData[stopIndex]
+    const swapStop = routeStopsData[swapIndex]
+
+    await supabase.from("route_stops").update({ stop_order: swapStop.stop_order }).eq("id", stop.id)
+    await supabase.from("route_stops").update({ stop_order: stop.stop_order }).eq("id", swapStop.id)
+    openStopsDialog(stopsRoute!)
   }
 
   const addSchedule = async () => {
@@ -743,6 +843,7 @@ export default function SchedulingPage() {
                           toggleRouteStatus={toggleRouteStatus}
                           setEditingRoute={setEditingRoute}
                           openTimesDialog={openTimesDialog}
+                          openStopsDialog={openStopsDialog}
                           setDeleteId={setDeleteId}
                         />
                       ))}
@@ -1420,6 +1521,103 @@ export default function SchedulingPage() {
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Manage Stops Dialog */}
+      <Dialog open={!!stopsRoute} onOpenChange={(open) => !open && setStopsRoute(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Manage Stops - {stopsRoute?.route_name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {loadingStops ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-between items-center">
+                  <p className="text-sm text-muted-foreground">{routeStopsData.length} stops</p>
+                  <Button size="sm" onClick={() => { setShowAddStop(true); setEditingStop(null); setStopForm({ stop_name: "", latitude: "", longitude: "" }) }}>
+                    <Plus className="h-4 w-4 mr-1" /> Add Stop
+                  </Button>
+                </div>
+
+                {routeStopsData.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No stops added yet</p>
+                ) : (
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {routeStopsData.map((stop, index) => (
+                      <div key={stop.id} className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                        <div className="flex flex-col gap-1">
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => moveStop(stop.id, "up")} disabled={index === 0}>
+                            <span className="text-xs">▲</span>
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => moveStop(stop.id, "down")} disabled={index === routeStopsData.length - 1}>
+                            <span className="text-xs">▼</span>
+                          </Button>
+                        </div>
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
+                          {stop.stop_order}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium">{stop.stop_name}</p>
+                          <p className="text-xs text-muted-foreground">{stop.latitude}, {stop.longitude}</p>
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={() => {
+                          setEditingStop(stop)
+                          setStopForm({ stop_name: stop.stop_name, latitude: stop.latitude.toString(), longitude: stop.longitude.toString() })
+                          setShowAddStop(true)
+                        }}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => deleteStop(stop.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {showAddStop && (
+                  <div className="border-t pt-4 space-y-3">
+                    <h4 className="font-medium">{editingStop ? "Edit Stop" : "Add Stop"}</h4>
+                    <Input
+                      value={stopForm.stop_name}
+                      onChange={(e) => setStopForm({ ...stopForm, stop_name: e.target.value })}
+                      placeholder="Stop name"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        value={stopForm.latitude}
+                        onChange={(e) => setStopForm({ ...stopForm, latitude: e.target.value })}
+                        placeholder="Latitude"
+                        type="number"
+                        step="any"
+                      />
+                      <Input
+                        value={stopForm.longitude}
+                        onChange={(e) => setStopForm({ ...stopForm, longitude: e.target.value })}
+                        placeholder="Longitude"
+                        type="number"
+                        step="any"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={addStop} disabled={savingStop}>
+                        {savingStop && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        {editingStop ? "Update" : "Add"}
+                      </Button>
+                      <Button variant="outline" onClick={() => { setShowAddStop(false); setEditingStop(null) }}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

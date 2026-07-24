@@ -32,11 +32,12 @@ interface BusRoute {
 interface RouteStop {
   id: string
   route_id: string
-  name: string
+  stop_name: string
   latitude: number
   longitude: number
   stop_order: number
-  is_active: boolean
+  is_pickup: boolean
+  is_dropoff: boolean
 }
 
 export default function BusRoutesPage() {
@@ -58,7 +59,7 @@ export default function BusRoutesPage() {
   })
 
   const [stopForm, setStopForm] = useState({
-    name: "",
+    stop_name: "",
     latitude: "",
     longitude: "",
   })
@@ -81,7 +82,7 @@ export default function BusRoutesPage() {
       const routesWithCounts = await Promise.all(
         routesData.map(async (route) => {
           const { count } = await supabase
-            .from("bus_route_stops")
+            .from("route_stops")
             .select("*", { count: "exact", head: true })
             .eq("route_id", route.id)
           return { ...route, stops_count: count || 0 }
@@ -95,7 +96,7 @@ export default function BusRoutesPage() {
   const loadStops = async (routeId: string) => {
     setLoadingStops(true)
     const { data } = await supabase
-      .from("bus_route_stops")
+      .from("route_stops")
       .select("*")
       .eq("route_id", routeId)
       .order("stop_order")
@@ -180,7 +181,7 @@ export default function BusRoutesPage() {
   }
 
   const saveStop = async () => {
-    if (!selectedRoute || !stopForm.name || !stopForm.latitude || !stopForm.longitude) {
+    if (!selectedRoute || !stopForm.stop_name || !stopForm.latitude || !stopForm.longitude) {
       toast.error("Please fill in all fields")
       return
     }
@@ -197,9 +198,9 @@ export default function BusRoutesPage() {
 
     if (editingStop) {
       const { error } = await supabase
-        .from("bus_route_stops")
+        .from("route_stops")
         .update({
-          name: stopForm.name,
+          stop_name: stopForm.stop_name,
           latitude: lat,
           longitude: lng,
         })
@@ -215,10 +216,10 @@ export default function BusRoutesPage() {
     } else {
       const nextOrder = stops.length > 0 ? Math.max(...stops.map(s => s.stop_order)) + 1 : 1
       const { error } = await supabase
-        .from("bus_route_stops")
+        .from("route_stops")
         .insert({
           route_id: selectedRoute.id,
-          name: stopForm.name,
+          stop_name: stopForm.stop_name,
           latitude: lat,
           longitude: lng,
           stop_order: nextOrder,
@@ -232,13 +233,13 @@ export default function BusRoutesPage() {
         loadRoutes()
       }
     }
-    setStopForm({ name: "", latitude: "", longitude: "" })
+    setStopForm({ stop_name: "", latitude: "", longitude: "" })
     setSaving(false)
   }
 
   const deleteStop = async (stop: RouteStop) => {
     if (!selectedRoute) return
-    const { error } = await supabase.from("bus_route_stops").delete().eq("id", stop.id)
+    const { error } = await supabase.from("route_stops").delete().eq("id", stop.id)
     if (!error) {
       toast.success("Stop deleted")
       loadStops(selectedRoute.id)
@@ -253,15 +254,15 @@ export default function BusRoutesPage() {
     if (swapIndex < 0 || swapIndex >= stops.length) return
 
     const swapStop = stops[swapIndex]
-    await supabase.from("bus_route_stops").update({ stop_order: swapStop.stop_order }).eq("id", stop.id)
-    await supabase.from("bus_route_stops").update({ stop_order: stop.stop_order }).eq("id", swapStop.id)
+    await supabase.from("route_stops").update({ stop_order: swapStop.stop_order }).eq("id", stop.id)
+    await supabase.from("route_stops").update({ stop_order: stop.stop_order }).eq("id", swapStop.id)
     loadStops(selectedRoute.id)
   }
 
   const openEditStop = (stop: RouteStop) => {
     setEditingStop(stop)
     setStopForm({
-      name: stop.name,
+      stop_name: stop.stop_name,
       latitude: stop.latitude.toString(),
       longitude: stop.longitude.toString(),
     })
@@ -446,7 +447,7 @@ export default function BusRoutesPage() {
                         {stop.stop_order}
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium">{stop.name}</p>
+                        <p className="font-medium">{stop.stop_name}</p>
                         <p className="text-xs text-muted-foreground">
                           {stop.latitude.toFixed(6)}, {stop.longitude.toFixed(6)}
                         </p>
@@ -466,8 +467,8 @@ export default function BusRoutesPage() {
                 <div className="border rounded-lg p-4 space-y-3">
                   <h4 className="font-medium">{editingStop ? "Edit Stop" : "Add Stop"}</h4>
                   <Input
-                    value={stopForm.name}
-                    onChange={(e) => setStopForm({ ...stopForm, name: e.target.value })}
+                    value={stopForm.stop_name}
+                    onChange={(e) => setStopForm({ ...stopForm, stop_name: e.target.value })}
                     placeholder="Stop name"
                   />
                   <div className="grid grid-cols-2 gap-2">
@@ -496,7 +497,7 @@ export default function BusRoutesPage() {
                       onClick={() => {
                         setShowAddStop(false)
                         setEditingStop(null)
-                        setStopForm({ name: "", latitude: "", longitude: "" })
+                        setStopForm({ stop_name: "", latitude: "", longitude: "" })
                       }}
                     >
                       Cancel

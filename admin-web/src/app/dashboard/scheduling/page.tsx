@@ -206,6 +206,10 @@ export default function SchedulingPage() {
   const [showAddStop, setShowAddStop] = useState(false)
   const [editingStop, setEditingStop] = useState<{ id: string; stop_name: string; latitude: number; longitude: number; stop_order: number } | null>(null)
   const [savingStop, setSavingStop] = useState(false)
+  const [showMapPicker, setShowMapPicker] = useState(false)
+  const mapPickerRef = useRef<HTMLDivElement>(null)
+  const mapInstanceRef = useRef<google.maps.Map | null>(null)
+  const markerRef = useRef<google.maps.Marker | null>(null)
 
   const isSavingRef = useRef(false)
 
@@ -482,6 +486,68 @@ export default function SchedulingPage() {
     await supabase.from("route_stops").update({ stop_order: stop.stop_order }).eq("id", swapStop.id)
     openStopsDialog(stopsRoute!)
   }
+
+  const initMapPicker = () => {
+    if (!mapPickerRef.current || !window.google) return
+
+    // Default to Maldives center
+    const defaultCenter = { lat: 4.1755, lng: 73.5093 }
+    const initialLat = stopForm.latitude ? parseFloat(stopForm.latitude) : defaultCenter.lat
+    const initialLng = stopForm.longitude ? parseFloat(stopForm.longitude) : defaultCenter.lng
+
+    const map = new google.maps.Map(mapPickerRef.current, {
+      center: { lat: initialLat, lng: initialLng },
+      zoom: 15,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+    })
+    mapInstanceRef.current = map
+
+    const marker = new google.maps.Marker({
+      position: { lat: initialLat, lng: initialLng },
+      map,
+      draggable: true,
+    })
+    markerRef.current = marker
+
+    map.addListener("click", (e: google.maps.MapMouseEvent) => {
+      if (e.latLng) {
+        marker.setPosition(e.latLng)
+        setStopForm(prev => ({
+          ...prev,
+          latitude: e.latLng!.lat().toFixed(7),
+          longitude: e.latLng!.lng().toFixed(7),
+        }))
+      }
+    })
+
+    marker.addListener("dragend", () => {
+      const pos = marker.getPosition()
+      if (pos) {
+        setStopForm(prev => ({
+          ...prev,
+          latitude: pos.lat().toFixed(7),
+          longitude: pos.lng().toFixed(7),
+        }))
+      }
+    })
+  }
+
+  useEffect(() => {
+    if (showMapPicker && mapPickerRef.current) {
+      // Load Google Maps if not loaded
+      if (!window.google) {
+        const script = document.createElement("script")
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}`
+        script.async = true
+        script.onload = initMapPicker
+        document.head.appendChild(script)
+      } else {
+        initMapPicker()
+      }
+    }
+  }, [showMapPicker])
 
   const addSchedule = async () => {
     if (!timesRoute || !newTime) {
@@ -1588,22 +1654,40 @@ export default function SchedulingPage() {
                       onChange={(e) => setStopForm({ ...stopForm, stop_name: e.target.value })}
                       placeholder="Stop name"
                     />
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        value={stopForm.latitude}
-                        onChange={(e) => setStopForm({ ...stopForm, latitude: e.target.value })}
-                        placeholder="Latitude"
-                        type="number"
-                        step="any"
-                      />
-                      <Input
-                        value={stopForm.longitude}
-                        onChange={(e) => setStopForm({ ...stopForm, longitude: e.target.value })}
-                        placeholder="Longitude"
-                        type="number"
-                        step="any"
-                      />
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1 grid grid-cols-2 gap-2">
+                        <Input
+                          value={stopForm.latitude}
+                          onChange={(e) => setStopForm({ ...stopForm, latitude: e.target.value })}
+                          placeholder="Latitude"
+                          type="number"
+                          step="any"
+                        />
+                        <Input
+                          value={stopForm.longitude}
+                          onChange={(e) => setStopForm({ ...stopForm, longitude: e.target.value })}
+                          placeholder="Longitude"
+                          type="number"
+                          step="any"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setShowMapPicker(!showMapPicker)}
+                        title="Pick from map"
+                      >
+                        <MapPin className="h-4 w-4" />
+                      </Button>
                     </div>
+                    {showMapPicker && (
+                      <div
+                        ref={mapPickerRef}
+                        className="h-64 w-full rounded-lg border"
+                        style={{ minHeight: "256px" }}
+                      />
+                    )}
                     <div className="flex gap-2">
                       <Button onClick={addStop} disabled={savingStop}>
                         {savingStop && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

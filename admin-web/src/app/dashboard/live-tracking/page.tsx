@@ -348,6 +348,7 @@ export default function LiveTrackingPage() {
       .from("drivers")
       .select(`
         id,
+        profile_id,
         is_online,
         profile:profiles(full_name)
       `)
@@ -372,19 +373,20 @@ export default function LiveTrackingPage() {
     setAssigningBackup(true)
 
     try {
-      // Get vehicle info
+      // Get vehicle and driver info
       const vehicle = availableVehicles.find(v => v.id === selectedVehicle)
+      const driver = availableDrivers.find(d => d.id === selectedDriver)
       const vehicleName = vehicle?.name || ""
       const parts = vehicleName.split("_")
       const vehicleNumber = parts.length === 2
         ? `${parts[0].toUpperCase()} (${parts[1].toUpperCase()})`
         : vehicleName
 
-      // Create urgent notification for driver
+      // Create urgent notification for driver (use profile_id for notifications table)
       const { error: notifError } = await supabase
         .from("notifications")
         .insert({
-          user_id: selectedDriver,
+          user_id: driver?.profile_id || selectedDriver,
           title: "🚨 URGENT: Backup Bus Required",
           message: `Start trip immediately from ${selectedAlert.stop_name} on route ${selectedAlert.route_name}. Bus is full and passengers are waiting!`,
           notification_type: "urgent_backup",

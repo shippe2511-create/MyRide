@@ -440,7 +440,8 @@ export default function LiveTrackingPage() {
 
       toast.success(`Backup assigned! ${vehicleNumber} notified to start from ${selectedAlert.stop_name}`)
       setAssignDialogOpen(false)
-      loadData()
+      // Remove the alert from local state instead of full reload
+      setAlerts(prev => prev.filter(a => a.id !== selectedAlert.id))
     } catch (error) {
       console.error("Error assigning backup:", error)
       toast.error("Failed to assign backup bus")

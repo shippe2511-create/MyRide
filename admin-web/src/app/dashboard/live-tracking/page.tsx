@@ -42,7 +42,7 @@ interface BusLocation {
   is_full: boolean
   status: string
   last_updated_at: string
-  route?: { route_name: string; route_code: string }
+  route?: { route_name: string; route_code: string; direction?: string }
   vehicle?: { vehicle_number: string }
   driver?: { profile?: { full_name: string } }
 }
@@ -134,7 +134,7 @@ export default function LiveTrackingPage() {
       .from("bus_location_tracking")
       .select(`
         *,
-        route:transport_routes(route_name, route_code)
+        route:transport_routes(route_name, route_code, direction)
       `)
       .eq("status", "in_progress")
       .order("last_updated_at", { ascending: false })
@@ -681,6 +681,16 @@ export default function LiveTrackingPage() {
                             <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1">
                               <Navigation className="h-3 w-3" />
                               {bus.route.route_name}
+                              {bus.route.direction && (
+                                <span className="text-primary">→ {bus.route.direction}</span>
+                              )}
+                            </div>
+                          )}
+                          {bus.current_stop_name && (
+                            <div className="mt-1 text-xs flex items-center gap-1">
+                              <MapPin className="h-3 w-3 text-blue-500" />
+                              <span className="text-muted-foreground">At:</span>
+                              <span className="font-medium text-foreground">{bus.current_stop_name}</span>
                             </div>
                           )}
                           {(bus.vehicle_number || bus.vehicle) && (

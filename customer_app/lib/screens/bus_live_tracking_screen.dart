@@ -1,10 +1,22 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
+
+const String _darkMapStyle = '''
+[
+  {"elementType": "geometry", "stylers": [{"color": "#212121"}]},
+  {"elementType": "labels.icon", "stylers": [{"visibility": "off"}]},
+  {"elementType": "labels.text.fill", "stylers": [{"color": "#757575"}]},
+  {"elementType": "labels.text.stroke", "stylers": [{"color": "#212121"}]},
+  {"featureType": "road", "elementType": "geometry.fill", "stylers": [{"color": "#2c2c2c"}]},
+  {"featureType": "road.arterial", "elementType": "geometry", "stylers": [{"color": "#373737"}]},
+  {"featureType": "road.highway", "elementType": "geometry", "stylers": [{"color": "#3c3c3c"}]},
+  {"featureType": "water", "elementType": "geometry", "stylers": [{"color": "#000000"}]}
+]
+''';
 
 class BusLiveTrackingScreen extends StatefulWidget {
   final String routeId;
@@ -31,16 +43,17 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
   Map<String, dynamic>? _selectedBus;
   Set<Marker> _markers = {};
   Set<Polyline> _polylines = {};
+  Set<Circle> _circles = {};
+  List<LatLng> _routePoints = []; // Road-following route from Directions API
 
   bool _isLoading = true;
   int? _selectedStopIndex;
+  MapType _mapType = MapType.normal;
+  bool _trafficEnabled = false;
 
   RealtimeChannel? _busLocationChannel;
   Timer? _refreshTimer;
   late AnimationController _pulseController;
-
-  String? _darkMapStyle;
-  String? _lightMapStyle;
 
   @override
   void initState() {
@@ -49,7 +62,6 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat();
-    _loadMapStyles();
     _loadData();
     _setupRealtimeSubscription();
     _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) => _loadActiveBuses());
@@ -62,15 +74,6 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
     _pulseController.dispose();
     _mapController?.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadMapStyles() async {
-    try {
-      _darkMapStyle = await rootBundle.loadString('assets/map_style_dark.json');
-      _lightMapStyle = await rootBundle.loadString('assets/map_style_light.json');
-    } catch (e) {
-      debugPrint('Map styles not found, using default');
-    }
   }
 
   void _setupRealtimeSubscription() {
@@ -114,9 +117,65 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
       setState(() {
         _stops = List<Map<String, dynamic>>.from(response);
       });
+      // Build route directly from stops (internal bus routes don't need Directions API)
+      _buildRouteFromStops();
     } catch (e) {
       debugPrint('Error loading stops: $e');
     }
+  }
+
+  void _buildRouteFromStops() {
+    // Build route directly from stops - straight lines between consecutive stops
+    // This is appropriate for internal bus routes where Google Directions
+    // may route incorrectly (through other islands, etc.)
+    List<LatLng> routePoints = [];
+
+    for (final stop in _stops) {
+      final lat = double.tryParse(stop['latitude']?.toString() ?? '');
+      final lng = double.tryParse(stop['longitude']?.toString() ?? '');
+      if (lat != null && lng != null) {
+        routePoints.add(LatLng(lat, lng));
+      }
+    }
+
+    setState(() {
+      _routePoints = routePoints;
+    });
+    _updateMapElements();
+  }
+
+  List<LatLng> _decodePolyline(String encoded) {
+    List<LatLng> points = [];
+    int index = 0;
+    int lat = 0;
+    int lng = 0;
+
+    while (index < encoded.length) {
+      int shift = 0;
+      int result = 0;
+      int b;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lng += dlng;
+
+      points.add(LatLng(lat / 1E5, lng / 1E5));
+    }
+
+    return points;
   }
 
   Future<void> _loadActiveBuses() async {
@@ -146,9 +205,16 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
   void _updateMapElements() {
     Set<Marker> markers = {};
     Set<Polyline> polylines = {};
-    List<LatLng> routePoints = [];
+    Set<Circle> circles = {};
 
-    // Add stop markers
+    // Determine current stop index from active bus (if any)
+    int currentStopIndex = -1;
+    if (_activeBuses.isNotEmpty) {
+      final bus = _selectedBus ?? _activeBuses.first;
+      currentStopIndex = bus['current_stop_index'] as int? ?? -1;
+    }
+
+    // Add stop circles
     for (int i = 0; i < _stops.length; i++) {
       final stop = _stops[i];
       final lat = double.tryParse(stop['latitude']?.toString() ?? '');
@@ -156,24 +222,42 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
 
       if (lat != null && lng != null) {
         final position = LatLng(lat, lng);
-        routePoints.add(position);
 
         final isFirst = i == 0;
         final isLast = i == _stops.length - 1;
+        final isCompleted = currentStopIndex > i;
+        final isCurrent = currentStopIndex == i;
         final isSelected = _selectedStopIndex == i;
 
+        // Use circles for stops
+        circles.add(Circle(
+          circleId: CircleId('stop_$i'),
+          center: position,
+          radius: isSelected || isCurrent ? 25 : 18,
+          fillColor: isCompleted
+              ? Colors.green.withValues(alpha: 0.9)
+              : isCurrent
+                  ? Colors.blue.withValues(alpha: 0.9)
+                  : isFirst
+                      ? Colors.green.withValues(alpha: 0.7)
+                      : isLast
+                          ? Colors.red.withValues(alpha: 0.7)
+                          : AppColors.yellow.withValues(alpha: 0.8),
+          strokeColor: isSelected ? Colors.white : Colors.black54,
+          strokeWidth: isSelected ? 3 : 2,
+          consumeTapEvents: true,
+          onTap: () => _onStopTapped(i),
+        ));
+
+        // Add number label as marker
         markers.add(Marker(
-          markerId: MarkerId('stop_$i'),
+          markerId: MarkerId('stop_label_$i'),
           position: position,
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            isFirst ? BitmapDescriptor.hueGreen :
-            isLast ? BitmapDescriptor.hueRed :
-            isSelected ? BitmapDescriptor.hueAzure :
-            BitmapDescriptor.hueOrange,
-          ),
+          icon: BitmapDescriptor.defaultMarker,
+          alpha: 0.01, // Nearly invisible, just for tap handling
           infoWindow: InfoWindow(
             title: stop['stop_name'] ?? 'Stop ${i + 1}',
-            snippet: isFirst ? 'Start' : isLast ? 'End' : 'Stop ${i + 1}',
+            snippet: isCompleted ? 'Completed' : isCurrent ? 'Current Stop' : isFirst ? 'Start' : isLast ? 'End' : 'Stop ${i + 1}',
           ),
           onTap: () => _onStopTapped(i),
         ));
@@ -207,20 +291,20 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
       }
     }
 
-    // Draw route polyline
-    if (routePoints.length >= 2) {
+    // Draw route polyline using Directions API route (follows roads)
+    if (_routePoints.length >= 2) {
       polylines.add(Polyline(
         polylineId: const PolylineId('route'),
-        points: routePoints,
-        color: AppColors.yellow.withValues(alpha: 0.8),
-        width: 4,
-        patterns: [PatternItem.dash(20), PatternItem.gap(10)],
+        points: _routePoints,
+        color: AppColors.yellow.withValues(alpha: 0.9),
+        width: 5,
       ));
     }
 
     setState(() {
       _markers = markers;
       _polylines = polylines;
+      _circles = circles;
     });
   }
 
@@ -293,6 +377,29 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
     return '$eta mins';
   }
 
+  Widget _buildMapControlButton({
+    required IconData icon,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.yellow : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          icon,
+          color: isActive ? Colors.black : Colors.white70,
+          size: 22,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -309,19 +416,65 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
             ),
             onMapCreated: (controller) {
               _mapController = controller;
-              if (isDark && _darkMapStyle != null) {
+              if (isDark && _mapType == MapType.normal) {
                 controller.setMapStyle(_darkMapStyle);
-              } else if (!isDark && _lightMapStyle != null) {
-                controller.setMapStyle(_lightMapStyle);
               }
               Future.delayed(const Duration(milliseconds: 500), _fitAllMarkers);
             },
+            style: _mapType == MapType.normal && isDark ? _darkMapStyle : null,
             markers: _markers,
             polylines: _polylines,
+            circles: _circles,
+            mapType: _mapType,
+            trafficEnabled: _trafficEnabled,
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             mapToolbarEnabled: false,
+          ),
+
+          // Map controls (bottom right) - 3 buttons in dark card
+          Positioned(
+            right: 16,
+            bottom: MediaQuery.of(context).size.height * 0.35 + 16,
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF1C1C1E),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  // Fit all / Center map (yellow when active)
+                  _buildMapControlButton(
+                    icon: Icons.map_outlined,
+                    isActive: true,
+                    onTap: _fitAllMarkers,
+                  ),
+                  Container(height: 1, width: 32, color: Colors.white12),
+                  // Traffic toggle
+                  _buildMapControlButton(
+                    icon: Icons.traffic_outlined,
+                    isActive: _trafficEnabled,
+                    onTap: () {
+                      setState(() {
+                        _trafficEnabled = !_trafficEnabled;
+                      });
+                    },
+                  ),
+                  Container(height: 1, width: 32, color: Colors.white12),
+                  // Layers / Satellite toggle
+                  _buildMapControlButton(
+                    icon: Icons.layers_outlined,
+                    isActive: _mapType == MapType.satellite,
+                    onTap: () {
+                      setState(() {
+                        _mapType = _mapType == MapType.normal ? MapType.satellite : MapType.normal;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
           ),
 
           // Loading overlay
@@ -577,9 +730,11 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
 
           // Bottom stops list
           DraggableScrollableSheet(
-            initialChildSize: 0.35,
-            minChildSize: 0.1,
-            maxChildSize: 0.7,
+            initialChildSize: 0.32,
+            minChildSize: 0.12,
+            maxChildSize: 0.75,
+            snap: true,
+            snapSizes: const [0.12, 0.32, 0.75],
             builder: (context, scrollController) {
               return Container(
                 decoration: BoxDecoration(
@@ -595,14 +750,22 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
                 ),
                 child: Column(
                   children: [
-                    // Handle
-                    Container(
-                      margin: const EdgeInsets.only(top: 12, bottom: 8),
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: context.mutedColor.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(2),
+                    // Drag handle - larger tap area
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        child: Center(
+                          child: Container(
+                            width: 48,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: context.mutedColor.withValues(alpha: 0.4),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                     // Title

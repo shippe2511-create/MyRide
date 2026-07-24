@@ -208,8 +208,10 @@ export default function SchedulingPage() {
   const [savingStop, setSavingStop] = useState(false)
   const [showMapPicker, setShowMapPicker] = useState(false)
   const mapPickerRef = useRef<HTMLDivElement>(null)
-  const mapInstanceRef = useRef<google.maps.Map | null>(null)
-  const markerRef = useRef<google.maps.Marker | null>(null)
+  const leafletMapRef = useRef<any>(null)
+  const leafletMarkerRef = useRef<any>(null)
+  const setStopFormRef = useRef(setStopForm)
+  setStopFormRef.current = setStopForm
 
   const isSavingRef = useRef(false)
 
@@ -487,64 +489,134 @@ export default function SchedulingPage() {
     openStopsDialog(stopsRoute!)
   }
 
-  const initMapPicker = () => {
-    if (!mapPickerRef.current || !window.google) return
+  const initLeafletMap = async () => {
+    if (!mapPickerRef.current) return
+    if (leafletMapRef.current) return // Already initialized
 
-    // Default to Maldives center
+    const L = (await import("leaflet")).default
+    await import("leaflet/dist/leaflet.css")
+
+    // Fix marker icon paths
+    delete (L.Icon.Default.prototype as any)._getIconUrl
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+      iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+      shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+    })
+
     const defaultCenter = { lat: 4.1755, lng: 73.5093 }
     const initialLat = stopForm.latitude ? parseFloat(stopForm.latitude) : defaultCenter.lat
     const initialLng = stopForm.longitude ? parseFloat(stopForm.longitude) : defaultCenter.lng
 
-    const map = new google.maps.Map(mapPickerRef.current, {
-      center: { lat: initialLat, lng: initialLng },
+    const map = L.map(mapPickerRef.current, {
+      center: [initialLat, initialLng],
       zoom: 15,
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: false,
+      zoomControl: false, // We'll add custom zoom control
     })
-    mapInstanceRef.current = map
+    leafletMapRef.current = map
 
-    const marker = new google.maps.Marker({
-      position: { lat: initialLat, lng: initialLng },
-      map,
+    // Dark tile layer matching Service Zones
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      attribution: '&copy; <a href="https://carto.com/">CartoDB</a>',
+      maxZoom: 19,
+    }).addTo(map)
+
+    // Custom yellow marker - larger and more visible
+    const yellowIcon = L.divIcon({
+      className: "stop-marker-icon",
+      html: `<div style="width: 32px; height: 32px; background: #FFD60A; border: 4px solid #000; border-radius: 50%; box-shadow: 0 4px 12px rgba(255,214,10,0.5); cursor: grab;"></div>`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+    })
+
+    const marker = L.marker([initialLat, initialLng], {
+      icon: yellowIcon,
       draggable: true,
-    })
-    markerRef.current = marker
+    }).addTo(map)
+    leafletMarkerRef.current = marker
 
-    map.addListener("click", (e: google.maps.MapMouseEvent) => {
-      if (e.latLng) {
-        marker.setPosition(e.latLng)
-        setStopForm(prev => ({
-          ...prev,
-          latitude: e.latLng!.lat().toFixed(7),
-          longitude: e.latLng!.lng().toFixed(7),
-        }))
+    // Auto-fill coordinates on map load if empty
+    if (!stopForm.latitude || !stopForm.longitude) {
+      setStopFormRef.current(prev => ({
+        ...prev,
+        latitude: initialLat.toFixed(7),
+        longitude: initialLng.toFixed(7),
+      }))
+    }
+
+    // Click on map to move marker
+    map.on("click", (e: L.LeafletMouseEvent) => {
+      marker.setLatLng(e.latlng)
+      setStopFormRef.current(prev => ({
+        ...prev,
+        latitude: e.latlng.lat.toFixed(7),
+        longitude: e.latlng.lng.toFixed(7),
+      }))
+    })
+
+    // Drag marker
+    marker.on("dragend", () => {
+      const pos = marker.getLatLng()
+      setStopFormRef.current(prev => ({
+        ...prev,
+        latitude: pos.lat.toFixed(7),
+        longitude: pos.lng.toFixed(7),
+      }))
+    })
+
+    // Add layer control for satellite view
+    const baseLayers: Record<string, L.TileLayer> = {
+      "Dark": L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        maxZoom: 19,
+      }),
+      "Satellite": L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+        maxZoom: 19,
+      }),
+    }
+
+    L.control.layers(baseLayers, {}, { position: "topright" }).addTo(map)
+
+    // Add zoom control at bottom right
+    L.control.zoom({ position: "bottomright" }).addTo(map)
+
+    // Add center button
+    const CenterControl = L.Control.extend({
+      onAdd: function() {
+        const container = L.DomUtil.create("div", "leaflet-bar leaflet-control")
+        const btn = L.DomUtil.create("a", "", container)
+        btn.href = "#"
+        btn.innerHTML = "⊕"
+        btn.title = "Center on marker"
+        btn.style.cssText = "width: 30px; height: 30px; line-height: 30px; display: block; text-align: center; font-size: 18px; text-decoration: none; color: #333; background: white;"
+        L.DomEvent.on(btn, "click", function(e) {
+          L.DomEvent.preventDefault(e)
+          const pos = marker.getLatLng()
+          map.setView(pos, 17)
+        })
+        return container
       }
     })
+    new CenterControl({ position: "bottomright" }).addTo(map)
 
-    marker.addListener("dragend", () => {
-      const pos = marker.getPosition()
-      if (pos) {
-        setStopForm(prev => ({
-          ...prev,
-          latitude: pos.lat().toFixed(7),
-          longitude: pos.lng().toFixed(7),
-        }))
-      }
-    })
+    // Force map to resize after render
+    setTimeout(() => map.invalidateSize(), 100)
   }
 
   useEffect(() => {
-    if (showMapPicker && mapPickerRef.current) {
-      // Load Google Maps if not loaded
-      if (!window.google) {
-        const script = document.createElement("script")
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}`
-        script.async = true
-        script.onload = initMapPicker
-        document.head.appendChild(script)
-      } else {
-        initMapPicker()
+    if (showMapPicker) {
+      // Wait for container to be in DOM then init map
+      const timer = setTimeout(() => {
+        if (mapPickerRef.current && !leafletMapRef.current) {
+          initLeafletMap()
+        }
+      }, 200)
+      return () => clearTimeout(timer)
+    } else {
+      // Cleanup when hidden
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove()
+        leafletMapRef.current = null
+        leafletMarkerRef.current = null
       }
     }
   }, [showMapPicker])
@@ -956,85 +1028,7 @@ export default function SchedulingPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <label className="text-sm font-medium">Stops</label>
-              <div className="flex gap-2 mt-1">
-                <Input
-                  id="add-stop-input"
-                  placeholder="Type stop name and press Enter"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      const input = e.currentTarget
-                      const val = input.value.trim()
-                      if (val && !formData.stops.includes(val)) {
-                        setFormData({ ...formData, stops: [...formData.stops, val] })
-                        input.value = ''
-                      }
-                    }
-                  }}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    const input = document.getElementById('add-stop-input') as HTMLInputElement
-                    const val = input?.value.trim()
-                    if (val && !formData.stops.includes(val)) {
-                      setFormData({ ...formData, stops: [...formData.stops, val] })
-                      input.value = ''
-                    }
-                  }}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              {formData.stops.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {formData.stops.map((stop, i) => (
-                    <span
-                      key={i}
-                      draggable
-                      onDragStart={(e) => {
-                        setDraggedStopIndex(i)
-                        e.dataTransfer.effectAllowed = 'move'
-                      }}
-                      onDragOver={(e) => {
-                        e.preventDefault()
-                        e.dataTransfer.dropEffect = 'move'
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault()
-                        if (draggedStopIndex !== null && draggedStopIndex !== i) {
-                          const newStops = [...formData.stops]
-                          const [dragged] = newStops.splice(draggedStopIndex, 1)
-                          newStops.splice(i, 0, dragged)
-                          setFormData({ ...formData, stops: newStops })
-                        }
-                        setDraggedStopIndex(null)
-                      }}
-                      onDragEnd={() => setDraggedStopIndex(null)}
-                      className={`inline-flex items-center gap-1 px-2 py-1 bg-muted rounded-md text-sm cursor-grab active:cursor-grabbing ${draggedStopIndex === i ? 'opacity-50 ring-2 ring-primary' : ''}`}
-                    >
-                      <GripVertical className="h-3 w-3 text-muted-foreground" />
-                      {stop}
-                      <button
-                        type="button"
-                        onClick={() => setFormData({
-                          ...formData,
-                          stops: formData.stops.filter((_, idx) => idx !== i)
-                        })}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2">
               <Checkbox
                 checked={formData.is_active}
                 onCheckedChange={c => setFormData({ ...formData, is_active: !!c })}
@@ -1090,91 +1084,7 @@ export default function SchedulingPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <label className="text-sm font-medium">Stops</label>
-                <div className="flex gap-2 mt-1">
-                  <Input
-                    id="edit-stop-input"
-                    placeholder="Type stop name and press Enter"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        const input = e.currentTarget
-                        const val = input.value.trim()
-                        if (val && !editingRoute.stops?.includes(val)) {
-                          setEditingRoute({
-                            ...editingRoute,
-                            stops: [...(editingRoute.stops || []), val]
-                          })
-                          input.value = ''
-                        }
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const input = document.getElementById('edit-stop-input') as HTMLInputElement
-                      const val = input?.value.trim()
-                      if (val && !editingRoute.stops?.includes(val)) {
-                        setEditingRoute({
-                          ...editingRoute,
-                          stops: [...(editingRoute.stops || []), val]
-                        })
-                        input.value = ''
-                      }
-                    }}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                {editingRoute.stops && editingRoute.stops.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {editingRoute.stops.map((stop, i) => (
-                      <span
-                        key={i}
-                        draggable
-                        onDragStart={(e) => {
-                          setDraggedStopIndex(i)
-                          e.dataTransfer.effectAllowed = 'move'
-                        }}
-                        onDragOver={(e) => {
-                          e.preventDefault()
-                          e.dataTransfer.dropEffect = 'move'
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault()
-                          if (draggedStopIndex !== null && draggedStopIndex !== i) {
-                            const newStops = [...(editingRoute.stops || [])]
-                            const [dragged] = newStops.splice(draggedStopIndex, 1)
-                            newStops.splice(i, 0, dragged)
-                            setEditingRoute({ ...editingRoute, stops: newStops })
-                          }
-                          setDraggedStopIndex(null)
-                        }}
-                        onDragEnd={() => setDraggedStopIndex(null)}
-                        className={`inline-flex items-center gap-1 px-2 py-1 bg-muted rounded-md text-sm cursor-grab active:cursor-grabbing ${draggedStopIndex === i ? 'opacity-50 ring-2 ring-primary' : ''}`}
-                      >
-                        <GripVertical className="h-3 w-3 text-muted-foreground" />
-                        {stop}
-                        <button
-                          type="button"
-                          onClick={() => setEditingRoute({
-                            ...editingRoute,
-                            stops: editingRoute.stops?.filter((_, idx) => idx !== i)
-                          })}
-                          className="text-muted-foreground hover:text-foreground"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2">
                 <Checkbox
                   id="edit-active"
                   checked={editingRoute.is_active}
@@ -1684,8 +1594,8 @@ export default function SchedulingPage() {
                     {showMapPicker && (
                       <div
                         ref={mapPickerRef}
-                        className="h-64 w-full rounded-lg border"
-                        style={{ minHeight: "256px" }}
+                        className="h-96 w-full rounded-lg border"
+                        style={{ minHeight: "384px" }}
                       />
                     )}
                     <div className="flex gap-2">

@@ -10,7 +10,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import { Download, FileSpreadsheet, FileText, Loader2, Calendar, Users, Car, Star, BarChart3, TrendingUp, Package, AlertTriangle, Shield, ClipboardCheck, Fuel, Coffee, Clock, MessageSquare, Ticket, FileCheck, Truck, Bell, Activity, MessagesSquare, FileDown, CheckCircle } from "lucide-react"
+import { Download, FileSpreadsheet, FileText, Loader2, Calendar, Users, Car, Star, BarChart3, TrendingUp, Package, AlertTriangle, Shield, ClipboardCheck, Fuel, Coffee, Clock, MessageSquare, Ticket, FileCheck, Truck, Bell, Activity, MessagesSquare, FileDown, CheckCircle, MapPin } from "lucide-react"
 import { toast } from "sonner"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -121,6 +121,13 @@ const reportTypes = [
   { id: "resolved_issues", name: "Resolved Issues", description: "Fixed issues with resolution notes", icon: CheckCircle },
   { id: "vehicle_lifespan", name: "Vehicle Lifespan", description: "Vehicle age and replacement recommendations", icon: TrendingUp },
   { id: "vehicle_history", name: "Vehicle Change History", description: "All vehicle changes, assignments, and logs", icon: Activity },
+  { id: "bus_routes", name: "Bus Routes", description: "All bus routes with stops and schedules", icon: Truck },
+  { id: "bus_stops", name: "Bus Stops", description: "All stops with coordinates and route info", icon: MapPin },
+  { id: "bus_roster", name: "Bus Roster Assignments", description: "Driver and vehicle assignments per route", icon: Users },
+  { id: "bus_statistics", name: "Bus Statistics", description: "Route usage, schedules, and passenger stats", icon: BarChart3 },
+  { id: "bus_passenger_counts", name: "Bus Passenger Counts", description: "Passenger boarding/alighting per stop", icon: Users },
+  { id: "bus_trips", name: "Bus Trips", description: "Completed trips with duration and status", icon: Truck },
+  { id: "bus_full_alerts", name: "Bus Full Alerts", description: "Alerts when bus reached capacity", icon: AlertTriangle },
 ]
 
 // Friendly column names mapping (cleaned - no internal UUIDs)
@@ -411,6 +418,69 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Event": "event_type",
     "Driver": "driver_name",
     "Details": "details",
+  },
+  bus_routes: {
+    "Route Name": "route_name",
+    "Code": "route_code",
+    "Type": "transport_type",
+    "Direction": "direction",
+    "Stops": "stops_count",
+    "Schedules": "schedules_count",
+    "Active": "is_active",
+  },
+  bus_stops: {
+    "Stop Name": "stop_name",
+    "Route": "route_name",
+    "Order": "stop_order",
+    "Latitude": "latitude",
+    "Longitude": "longitude",
+    "Pickup": "is_pickup",
+    "Dropoff": "is_dropoff",
+  },
+  bus_roster: {
+    "Date": "service_date",
+    "Route": "route_name",
+    "Departure": "departure_time",
+    "Driver": "driver_name",
+    "Vehicle": "vehicle_name",
+    "Status": "status",
+  },
+  bus_statistics: {
+    "Route": "route_name",
+    "Code": "route_code",
+    "Total Stops": "total_stops",
+    "Schedules": "total_schedules",
+    "Roster Assignments": "roster_count",
+    "Completed Trips": "trips_completed",
+    "Active": "is_active",
+  },
+  bus_passenger_counts: {
+    "Date": "date",
+    "Route": "route_name",
+    "Stop": "stop_name",
+    "Stop Order": "stop_order",
+    "Boarded": "boarded_count",
+    "Alighted": "alighted_count",
+    "Driver": "driver_name",
+  },
+  bus_trips: {
+    "Date": "date",
+    "Route": "route_name",
+    "Driver": "driver_name",
+    "Vehicle": "vehicle",
+    "Started": "start_time",
+    "Ended": "end_time",
+    "Duration": "duration",
+    "Status": "status",
+  },
+  bus_full_alerts: {
+    "Date": "date",
+    "Route": "route_name",
+    "Stop": "stop_name",
+    "Vehicle": "vehicle_number",
+    "Passengers": "passengers",
+    "Capacity": "capacity",
+    "Acknowledged": "acknowledged",
   },
 }
 
@@ -1634,6 +1704,262 @@ export default function ReportsPage() {
           break
         }
 
+        case "bus_routes": {
+          const [routesRes, stopsRes, schedulesRes] = await Promise.all([
+            supabase.from("transport_routes").select("*").order("sort_order"),
+            supabase.from("route_stops").select("route_id"),
+            supabase.from("route_schedules").select("route_id"),
+          ])
+
+          const routes = routesRes.data || []
+          const stops = stopsRes.data || []
+          const schedules = schedulesRes.data || []
+
+          const stopCounts = stops.reduce((acc: Record<string, number>, s: { route_id: string }) => {
+            acc[s.route_id] = (acc[s.route_id] || 0) + 1
+            return acc
+          }, {})
+
+          const scheduleCounts = schedules.reduce((acc: Record<string, number>, s: { route_id: string }) => {
+            acc[s.route_id] = (acc[s.route_id] || 0) + 1
+            return acc
+          }, {})
+
+          rows = routes.map((r: Record<string, unknown>) => ({
+            "Route Name": String(r.route_name || ""),
+            "Code": String(r.route_code || "-"),
+            "Type": String(r.transport_type || "bus"),
+            "Direction": formatStatus(String(r.direction || "")),
+            "Stops": String(stopCounts[String(r.id)] || 0),
+            "Schedules": String(scheduleCounts[String(r.id)] || 0),
+            "Active": r.is_active ? "Yes" : "No",
+          }))
+          filename = `bus_routes_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "bus_stops": {
+          const { data: stops } = await supabase
+            .from("route_stops")
+            .select(`*, route:transport_routes!route_stops_route_id_fkey(route_name)`)
+            .order("route_id")
+            .order("stop_order")
+
+          rows = (stops || []).map((s: Record<string, unknown>) => {
+            const route = s.route as Record<string, unknown> | null
+            return {
+              "Stop Name": String(s.stop_name || ""),
+              "Route": String(route?.route_name || "-"),
+              "Order": String(s.stop_order || ""),
+              "Latitude": String(s.latitude || "-"),
+              "Longitude": String(s.longitude || "-"),
+              "Pickup": s.is_pickup ? "Yes" : "No",
+              "Dropoff": s.is_dropoff ? "Yes" : "No",
+            }
+          })
+          filename = `bus_stops_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "bus_roster": {
+          let query = supabase
+            .from("roster_assignments")
+            .select(`
+              service_date, departure_time, status,
+              route:transport_routes!roster_assignments_route_id_fkey(route_name),
+              driver:drivers!roster_assignments_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name)),
+              vehicle:vehicle_types!roster_assignments_vehicle_id_fkey(name, plate_no)
+            `)
+            .order("service_date", { ascending: false })
+            .order("departure_time")
+
+          if (dateFilter) {
+            query = query.gte("service_date", dateFilter.start).lte("service_date", dateFilter.end)
+          }
+
+          const { data: roster } = await query
+
+          rows = (roster || []).map((r: Record<string, unknown>) => {
+            const route = r.route as Record<string, unknown> | null
+            const driver = r.driver as Record<string, unknown> | null
+            const profile = driver?.profile as Record<string, unknown> | null
+            const vehicle = r.vehicle as Record<string, unknown> | null
+            return {
+              "Date": formatDate(String(r.service_date || "")),
+              "Route": String(route?.route_name || "-"),
+              "Departure": String(r.departure_time || "").slice(0, 5),
+              "Driver": String(profile?.full_name || "-"),
+              "Vehicle": vehicle ? `${vehicle.name || ""} (${vehicle.plate_no || ""})` : "-",
+              "Status": formatStatus(String(r.status || "scheduled")),
+            }
+          })
+          filename = `bus_roster_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "bus_statistics": {
+          const [routesRes, stopsRes, schedulesRes, rosterRes, tripsRes] = await Promise.all([
+            supabase.from("transport_routes").select("*").order("sort_order"),
+            supabase.from("route_stops").select("route_id"),
+            supabase.from("route_schedules").select("route_id, is_active"),
+            supabase.from("roster_assignments").select("route_id"),
+            supabase.from("bus_trips").select("roster_assignment_id, status"),
+          ])
+
+          const routes = routesRes.data || []
+          const stops = stopsRes.data || []
+          const schedules = schedulesRes.data || []
+          const roster = rosterRes.data || []
+          const trips = tripsRes.data || []
+
+          const stopCounts = stops.reduce((acc: Record<string, number>, s: { route_id: string }) => {
+            acc[s.route_id] = (acc[s.route_id] || 0) + 1
+            return acc
+          }, {})
+
+          const scheduleCounts = schedules.reduce((acc: Record<string, number>, s: { route_id: string; is_active: boolean }) => {
+            if (s.is_active) acc[s.route_id] = (acc[s.route_id] || 0) + 1
+            return acc
+          }, {})
+
+          const rosterCounts = roster.reduce((acc: Record<string, number>, r: { route_id: string }) => {
+            acc[r.route_id] = (acc[r.route_id] || 0) + 1
+            return acc
+          }, {})
+
+          const completedTrips = trips.filter((t: { status: string }) => t.status === "completed").length
+
+          rows = routes.map((r: Record<string, unknown>) => ({
+            "Route": String(r.route_name || ""),
+            "Code": String(r.route_code || "-"),
+            "Total Stops": String(stopCounts[String(r.id)] || 0),
+            "Schedules": String(scheduleCounts[String(r.id)] || 0),
+            "Roster Assignments": String(rosterCounts[String(r.id)] || 0),
+            "Completed Trips": String(completedTrips),
+            "Active": r.is_active ? "Yes" : "No",
+          }))
+          filename = `bus_statistics_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "bus_passenger_counts": {
+          let query = supabase
+            .from("stop_passenger_counts")
+            .select(`
+              boarded_count, alighted_count, stop_index, stop_name, recorded_at,
+              bus_trip:bus_trips!stop_passenger_counts_bus_trip_id_fkey(
+                roster_assignment:roster_assignments!bus_trips_roster_assignment_id_fkey(
+                  route:transport_routes!roster_assignments_route_id_fkey(route_name),
+                  driver:drivers!roster_assignments_driver_id_fkey(
+                    profile:profiles!drivers_profile_id_fkey(full_name)
+                  )
+                )
+              )
+            `)
+            .order("recorded_at", { ascending: false })
+
+          if (dateFilter) {
+            query = query.gte("recorded_at", dateFilter.start).lte("recorded_at", dateFilter.end + "T23:59:59")
+          }
+
+          const { data: counts } = await query
+
+          rows = (counts || []).map((c: Record<string, unknown>) => {
+            const busTripData = c.bus_trip as Record<string, unknown> | null
+            const rosterData = busTripData?.roster_assignment as Record<string, unknown> | null
+            const routeData = rosterData?.route as Record<string, unknown> | null
+            const driverData = rosterData?.driver as Record<string, unknown> | null
+            const profileData = driverData?.profile as Record<string, unknown> | null
+            return {
+              "Date": formatDateTime(String(c.recorded_at || "")),
+              "Route": String(routeData?.route_name || "-"),
+              "Stop": String(c.stop_name || "-"),
+              "Stop Order": String((c.stop_index as number || 0) + 1),
+              "Boarded": String(c.boarded_count || 0),
+              "Alighted": String(c.alighted_count || 0),
+              "Driver": String(profileData?.full_name || "-"),
+            }
+          })
+          filename = `bus_passenger_counts_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "bus_trips": {
+          let query = supabase
+            .from("bus_trips")
+            .select(`
+              actual_start_time, actual_end_time, status, created_at,
+              roster_assignment:roster_assignments!bus_trips_roster_assignment_id_fkey(
+                route:transport_routes!roster_assignments_route_id_fkey(route_name),
+                driver:drivers!roster_assignments_driver_id_fkey(
+                  profile:profiles!drivers_profile_id_fkey(full_name)
+                ),
+                vehicle:vehicle_types!roster_assignments_vehicle_id_fkey(name, plate_no)
+              )
+            `)
+            .order("created_at", { ascending: false })
+
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+
+          const { data: trips } = await query
+
+          rows = (trips || []).map((t: Record<string, unknown>) => {
+            const ra = t.roster_assignment as Record<string, unknown> | null
+            const rt = ra?.route as Record<string, unknown> | null
+            const dr = ra?.driver as Record<string, unknown> | null
+            const pr = dr?.profile as Record<string, unknown> | null
+            const vh = ra?.vehicle as Record<string, unknown> | null
+
+            let duration = "-"
+            if (t.actual_start_time && t.actual_end_time) {
+              const start = new Date(String(t.actual_start_time))
+              const end = new Date(String(t.actual_end_time))
+              const mins = Math.round((end.getTime() - start.getTime()) / 60000)
+              duration = `${mins} min`
+            }
+
+            return {
+              "Date": formatDate(String(t.created_at || "")),
+              "Route": String(rt?.route_name || "-"),
+              "Driver": String(pr?.full_name || "-"),
+              "Vehicle": vh ? `${vh.name || ""} (${vh.plate_no || ""})` : "-",
+              "Started": t.actual_start_time ? formatTime(String(t.actual_start_time)) : "-",
+              "Ended": t.actual_end_time ? formatTime(String(t.actual_end_time)) : "-",
+              "Duration": duration,
+              "Status": formatStatus(String(t.status || "")),
+            }
+          })
+          filename = `bus_trips_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "bus_full_alerts": {
+          let query = supabase
+            .from("bus_full_alerts")
+            .select("*")
+            .order("created_at", { ascending: false })
+
+          if (dateFilter) {
+            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+
+          const { data: alerts } = await query
+
+          rows = (alerts || []).map((a: Record<string, unknown>) => ({
+            "Date": formatDateTime(String(a.created_at || "")),
+            "Route": String(a.route_name || "-"),
+            "Stop": String(a.stop_name || "-"),
+            "Vehicle": String(a.vehicle_number || "-"),
+            "Passengers": String(a.passengers_on_board || 0),
+            "Capacity": String(a.vehicle_capacity || 0),
+            "Acknowledged": a.is_acknowledged ? "Yes" : "No",
+          }))
+          filename = `bus_full_alerts_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
         default: {
           toast.error(`Unknown report type: ${reportType}`)
           if (showLoading) setLoading(null)
@@ -2322,6 +2648,67 @@ export default function ReportsPage() {
           rows = historyRows.map(h => ({ "Date": h.date, "Vehicle": h.vehicle, "Event": h.event, "Driver": h.driver, "Details": h.details }))
           break
         }
+        case "bus_routes": {
+          const [routesRes, stopsRes, schedulesRes] = await Promise.all([
+            supabase.from("transport_routes").select("*").order("sort_order"),
+            supabase.from("route_stops").select("route_id"),
+            supabase.from("route_schedules").select("route_id"),
+          ])
+          const routes = routesRes.data || []
+          const stopCounts = (stopsRes.data || []).reduce((acc: Record<string, number>, s: { route_id: string }) => { acc[s.route_id] = (acc[s.route_id] || 0) + 1; return acc }, {})
+          const scheduleCounts = (schedulesRes.data || []).reduce((acc: Record<string, number>, s: { route_id: string }) => { acc[s.route_id] = (acc[s.route_id] || 0) + 1; return acc }, {})
+          rows = routes.map((r: Record<string, unknown>) => ({ "Route Name": String(r.route_name || ""), "Code": String(r.route_code || "-"), "Type": String(r.transport_type || "bus"), "Direction": formatStatus(String(r.direction || "")), "Stops": String(stopCounts[String(r.id)] || 0), "Schedules": String(scheduleCounts[String(r.id)] || 0), "Active": r.is_active ? "Yes" : "No" }))
+          break
+        }
+        case "bus_stops": {
+          const { data: stops } = await supabase.from("route_stops").select(`*, route:transport_routes!route_stops_route_id_fkey(route_name)`).order("route_id").order("stop_order")
+          rows = (stops || []).map((s: Record<string, unknown>) => { const route = s.route as Record<string, unknown> | null; return { "Stop Name": String(s.stop_name || ""), "Route": String(route?.route_name || "-"), "Order": String(s.stop_order || ""), "Latitude": String(s.latitude || "-"), "Longitude": String(s.longitude || "-"), "Pickup": s.is_pickup ? "Yes" : "No", "Dropoff": s.is_dropoff ? "Yes" : "No" } })
+          break
+        }
+        case "bus_roster": {
+          let query = supabase.from("roster_assignments").select(`service_date, departure_time, status, route:transport_routes!roster_assignments_route_id_fkey(route_name), driver:drivers!roster_assignments_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name)), vehicle:vehicle_types!roster_assignments_vehicle_id_fkey(name, plate_no)`).order("service_date", { ascending: false }).order("departure_time")
+          if (dateFilter) { query = query.gte("service_date", dateFilter.start).lte("service_date", dateFilter.end) }
+          const { data: roster } = await query
+          rows = (roster || []).map((r: Record<string, unknown>) => { const route = r.route as Record<string, unknown> | null; const driver = r.driver as Record<string, unknown> | null; const profile = driver?.profile as Record<string, unknown> | null; const vehicle = r.vehicle as Record<string, unknown> | null; return { "Date": formatDate(String(r.service_date || "")), "Route": String(route?.route_name || "-"), "Departure": String(r.departure_time || "").slice(0, 5), "Driver": String(profile?.full_name || "-"), "Vehicle": vehicle ? `${vehicle.name || ""} (${vehicle.plate_no || ""})` : "-", "Status": formatStatus(String(r.status || "scheduled")) } })
+          break
+        }
+        case "bus_statistics": {
+          const [routesRes, stopsRes, schedulesRes, rosterRes, tripsRes] = await Promise.all([
+            supabase.from("transport_routes").select("*").order("sort_order"),
+            supabase.from("route_stops").select("route_id"),
+            supabase.from("route_schedules").select("route_id, is_active"),
+            supabase.from("roster_assignments").select("route_id"),
+            supabase.from("bus_trips").select("roster_assignment_id, status"),
+          ])
+          const routes = routesRes.data || []
+          const stopCounts = (stopsRes.data || []).reduce((acc: Record<string, number>, s: { route_id: string }) => { acc[s.route_id] = (acc[s.route_id] || 0) + 1; return acc }, {})
+          const scheduleCounts = (schedulesRes.data || []).reduce((acc: Record<string, number>, s: { route_id: string; is_active: boolean }) => { if (s.is_active) acc[s.route_id] = (acc[s.route_id] || 0) + 1; return acc }, {})
+          const rosterCounts = (rosterRes.data || []).reduce((acc: Record<string, number>, r: { route_id: string }) => { acc[r.route_id] = (acc[r.route_id] || 0) + 1; return acc }, {})
+          const completedTrips = (tripsRes.data || []).filter((t: { status: string }) => t.status === "completed").length
+          rows = routes.map((r: Record<string, unknown>) => ({ "Route": String(r.route_name || ""), "Code": String(r.route_code || "-"), "Total Stops": String(stopCounts[String(r.id)] || 0), "Schedules": String(scheduleCounts[String(r.id)] || 0), "Roster Assignments": String(rosterCounts[String(r.id)] || 0), "Completed Trips": String(completedTrips), "Active": r.is_active ? "Yes" : "No" }))
+          break
+        }
+        case "bus_passenger_counts": {
+          let query = supabase.from("stop_passenger_counts").select(`boarded_count, alighted_count, stop_index, stop_name, recorded_at, bus_trip:bus_trips!stop_passenger_counts_bus_trip_id_fkey(roster_assignment:roster_assignments!bus_trips_roster_assignment_id_fkey(route:transport_routes!roster_assignments_route_id_fkey(route_name), driver:drivers!roster_assignments_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))))`).order("recorded_at", { ascending: false })
+          if (dateFilter) { query = query.gte("recorded_at", dateFilter.start).lte("recorded_at", dateFilter.end + "T23:59:59") }
+          const { data: counts } = await query
+          rows = (counts || []).map((c: Record<string, unknown>) => { const bt = c.bus_trip as Record<string, unknown> | null; const ra = bt?.roster_assignment as Record<string, unknown> | null; const rt = ra?.route as Record<string, unknown> | null; const dr = ra?.driver as Record<string, unknown> | null; const pr = dr?.profile as Record<string, unknown> | null; return { "Date": formatDateTime(String(c.recorded_at || "")), "Route": String(rt?.route_name || "-"), "Stop": String(c.stop_name || "-"), "Stop Order": String((c.stop_index as number || 0) + 1), "Boarded": String(c.boarded_count || 0), "Alighted": String(c.alighted_count || 0), "Driver": String(pr?.full_name || "-") } })
+          break
+        }
+        case "bus_trips": {
+          let query = supabase.from("bus_trips").select(`actual_start_time, actual_end_time, status, created_at, roster_assignment:roster_assignments!bus_trips_roster_assignment_id_fkey(route:transport_routes!roster_assignments_route_id_fkey(route_name), driver:drivers!roster_assignments_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name)), vehicle:vehicle_types!roster_assignments_vehicle_id_fkey(name, plate_no))`).order("created_at", { ascending: false })
+          if (dateFilter) { query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59") }
+          const { data: trips } = await query
+          rows = (trips || []).map((t: Record<string, unknown>) => { const ra = t.roster_assignment as Record<string, unknown> | null; const rt = ra?.route as Record<string, unknown> | null; const dr = ra?.driver as Record<string, unknown> | null; const pr = dr?.profile as Record<string, unknown> | null; const vh = ra?.vehicle as Record<string, unknown> | null; let duration = "-"; if (t.actual_start_time && t.actual_end_time) { const mins = Math.round((new Date(String(t.actual_end_time)).getTime() - new Date(String(t.actual_start_time)).getTime()) / 60000); duration = `${mins} min` } return { "Date": formatDate(String(t.created_at || "")), "Route": String(rt?.route_name || "-"), "Driver": String(pr?.full_name || "-"), "Vehicle": vh ? `${vh.name || ""} (${vh.plate_no || ""})` : "-", "Started": t.actual_start_time ? formatTime(String(t.actual_start_time)) : "-", "Ended": t.actual_end_time ? formatTime(String(t.actual_end_time)) : "-", "Duration": duration, "Status": formatStatus(String(t.status || "")) } })
+          break
+        }
+        case "bus_full_alerts": {
+          let query = supabase.from("bus_full_alerts").select("*").order("created_at", { ascending: false })
+          if (dateFilter) { query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59") }
+          const { data: alerts } = await query
+          rows = (alerts || []).map((a: Record<string, unknown>) => ({ "Date": formatDateTime(String(a.created_at || "")), "Route": String(a.route_name || "-"), "Stop": String(a.stop_name || "-"), "Vehicle": String(a.vehicle_number || "-"), "Passengers": String(a.passengers_on_board || 0), "Capacity": String(a.vehicle_capacity || 0), "Acknowledged": a.is_acknowledged ? "Yes" : "No" }))
+          break
+        }
         default: {
           toast.error("PDF not available for this report type")
           setLoading(null)
@@ -2407,6 +2794,7 @@ export default function ReportsPage() {
     { name: "Safety", reports: ["sos_alerts", "incidents"] },
     { name: "Vehicles", reports: ["vehicles", "vehicle_checks", "vehicle_logs"] },
     { name: "Fleet", reports: ["service_zones", "driver_availability"] },
+    { name: "Bus", reports: ["bus_routes", "bus_stops", "bus_roster", "bus_statistics", "bus_passenger_counts", "bus_trips", "bus_full_alerts"] },
     { name: "Documents", reports: ["documents"] },
     { name: "Communications", reports: ["announcements", "chat_messages"] },
     { name: "Analytics", reports: ["usage", "activity_logs", "peak_hours", "popular_routes"] },

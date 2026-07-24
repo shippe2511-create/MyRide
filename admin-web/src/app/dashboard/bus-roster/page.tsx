@@ -95,6 +95,7 @@ export default function BusRosterPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [deleting, setDeleting] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
 
   const [generateForm, setGenerateForm] = useState({
     startDate: format(new Date(), "yyyy-MM-dd"),
@@ -315,15 +316,20 @@ export default function BusRosterPage() {
     loadRoster()
   }
 
-  const deleteAssignment = async (id: string) => {
-    if (!confirm("Delete this roster assignment?")) return
-    const { error } = await supabase.from("roster_assignments").delete().eq("id", id)
+  const confirmDeleteSingle = (id: string) => {
+    setDeleteTargetId(id)
+  }
+
+  const deleteAssignment = async () => {
+    if (!deleteTargetId) return
+    const { error } = await supabase.from("roster_assignments").delete().eq("id", deleteTargetId)
     if (error) {
       toast.error("Failed to delete")
     } else {
       toast.success("Deleted")
       loadRoster()
     }
+    setDeleteTargetId(null)
   }
 
   const confirmDeleteSelected = () => {
@@ -694,7 +700,7 @@ export default function BusRosterPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => deleteAssignment(assignment.id)}
+                            onClick={() => confirmDeleteSingle(assignment.id)}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
@@ -708,7 +714,25 @@ export default function BusRosterPage() {
           </CardContent>
         </Card>
 
-        {/* Delete Confirmation Dialog */}
+        {/* Single Delete Confirmation Dialog */}
+        <AlertDialog open={!!deleteTargetId} onOpenChange={(open) => !open && setDeleteTargetId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this assignment?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete this roster assignment. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={deleteAssignment} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Bulk Delete Confirmation Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
           <AlertDialogContent>
             <AlertDialogHeader>

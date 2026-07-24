@@ -405,6 +405,30 @@ export default function LiveTrackingPage() {
 
       if (notifError) throw notifError
 
+      // Create a backup roster assignment for today
+      const today = new Date().toISOString().split('T')[0]
+      const now = new Date()
+      const startTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+
+      const { error: rosterError } = await supabase
+        .from("roster_assignments")
+        .insert({
+          driver_id: selectedDriver,
+          route_id: selectedAlert.route_id,
+          vehicle_id: selectedVehicle,
+          assignment_date: today,
+          start_time: startTime,
+          status: 'pending',
+          is_backup: true,
+          backup_start_stop_index: selectedAlert.stop_index,
+          backup_for_trip_id: selectedAlert.trip_id,
+        })
+
+      if (rosterError) {
+        console.error("Roster error:", rosterError)
+        // Continue anyway - notification was sent
+      }
+
       // Mark alert as acknowledged with backup assigned
       await supabase
         .from("bus_full_alerts")

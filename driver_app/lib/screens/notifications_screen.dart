@@ -207,6 +207,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     IconData icon;
     Color iconColor;
+    bool isUrgent = type == 'urgent_backup';
     switch (type) {
       case 'ride':
         icon = Icons.local_taxi;
@@ -219,6 +220,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'announcement':
         icon = Icons.campaign;
         iconColor = AppColors.info;
+        break;
+      case 'urgent_backup':
+        icon = Icons.warning_amber_rounded;
+        iconColor = Colors.red;
         break;
       default:
         icon = Icons.notifications;
@@ -245,8 +250,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: context.cardColor,
+            color: isUrgent ? Colors.red.withValues(alpha: 0.15) : context.cardColor,
             borderRadius: BorderRadius.circular(18),
+            border: isUrgent ? Border.all(color: Colors.red.withValues(alpha: 0.5), width: 2) : null,
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,

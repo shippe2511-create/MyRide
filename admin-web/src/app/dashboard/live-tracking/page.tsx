@@ -10,8 +10,21 @@ import { toast } from "sonner"
 import {
   Bus, Users, AlertTriangle, RefreshCw, Bell, Check,
   Navigation, Clock, ChevronRight, Loader2, MapPin, X,
-  TrendingUp, ArrowUp, ArrowDown
+  TrendingUp, ArrowUp, ArrowDown, UserPlus, Send
 } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { formatDistanceToNow, format } from "date-fns"
 
 const BusTrackingMap = dynamic(
@@ -51,6 +64,7 @@ interface BusLocation {
 interface BusFullAlert {
   id: string
   trip_id: string
+  route_id: string
   route_name: string
   stop_name: string
   stop_index: number
@@ -94,6 +108,15 @@ export default function LiveTrackingPage() {
   })
   const [initialLoad, setInitialLoad] = useState(true)
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Backup assignment state
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
+  const [selectedAlert, setSelectedAlert] = useState<BusFullAlert | null>(null)
+  const [availableDrivers, setAvailableDrivers] = useState<any[]>([])
+  const [availableVehicles, setAvailableVehicles] = useState<any[]>([])
+  const [selectedDriver, setSelectedDriver] = useState<string>("")
+  const [selectedVehicle, setSelectedVehicle] = useState<string>("")
+  const [assigningBackup, setAssigningBackup] = useState(false)
 
   // Debounced load to prevent rapid refreshes
   const debouncedLoad = useCallback(() => {
@@ -314,6 +337,92 @@ export default function LiveTrackingPage() {
     }
   }
 
+  const openAssignBackupDialog = async (alert: BusFullAlert) => {
+    setSelectedAlert(alert)
+    setSelectedDriver("")
+    setSelectedVehicle("")
+    setAssignDialogOpen(true)
+
+    // Load available drivers (online and not on active trip)
+    const { data: drivers } = await supabase
+      .from("drivers")
+      .select(`
+        id,
+        is_online,
+        profile:profiles(full_name)
+      `)
+      .eq("is_online", true)
+
+    // Load available vehicles
+    const { data: vehicles } = await supabase
+      .from("vehicle_types")
+      .select("id, name, capacity")
+      .order("name")
+
+    setAvailableDrivers(drivers || [])
+    setAvailableVehicles(vehicles || [])
+  }
+
+  const assignBackupBus = async () => {
+    if (!selectedAlert || !selectedDriver || !selectedVehicle) {
+      toast.error("Please select both driver and vehicle")
+      return
+    }
+
+    setAssigningBackup(true)
+
+    try {
+      // Get vehicle info
+      const vehicle = availableVehicles.find(v => v.id === selectedVehicle)
+      const vehicleName = vehicle?.name || ""
+      const parts = vehicleName.split("_")
+      const vehicleNumber = parts.length === 2
+        ? `${parts[0].toUpperCase()} (${parts[1].toUpperCase()})`
+        : vehicleName
+
+      // Create urgent notification for driver
+      const { error: notifError } = await supabase
+        .from("notifications")
+        .insert({
+          user_id: selectedDriver,
+          title: "🚨 URGENT: Backup Bus Required",
+          body: `Start trip immediately from ${selectedAlert.stop_name} on route ${selectedAlert.route_name}. Bus is full and passengers are waiting!`,
+          type: "urgent_backup",
+          data: {
+            route_id: selectedAlert.route_id,
+            route_name: selectedAlert.route_name,
+            start_stop: selectedAlert.stop_name,
+            start_stop_index: selectedAlert.stop_index,
+            vehicle_id: selectedVehicle,
+            vehicle_number: vehicleNumber,
+            vehicle_capacity: vehicle?.capacity,
+            original_trip_id: selectedAlert.trip_id,
+          },
+          is_read: false,
+        })
+
+      if (notifError) throw notifError
+
+      // Mark alert as acknowledged with backup assigned
+      await supabase
+        .from("bus_full_alerts")
+        .update({
+          is_acknowledged: true,
+          acknowledged_at: new Date().toISOString(),
+        })
+        .eq("id", selectedAlert.id)
+
+      toast.success(`Backup assigned! ${vehicleNumber} notified to start from ${selectedAlert.stop_name}`)
+      setAssignDialogOpen(false)
+      loadData()
+    } catch (error) {
+      console.error("Error assigning backup:", error)
+      toast.error("Failed to assign backup bus")
+    } finally {
+      setAssigningBackup(false)
+    }
+  }
+
   const getStatusBadge = (bus: BusLocation) => {
     if (bus.is_full) {
       return <Badge className="bg-red-500 text-white text-xs">Full</Badge>
@@ -459,14 +568,25 @@ export default function LiveTrackingPage() {
                       </p>
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => acknowledgeAlert(alert.id)}
-                    className="text-red-500 hover:bg-red-500/10"
-                  >
-                    <Check className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openAssignBackupDialog(alert)}
+                      className="text-yellow-500 border-yellow-500/50 hover:bg-yellow-500/10"
+                    >
+                      <UserPlus className="h-4 w-4 mr-1" />
+                      Assign Backup
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => acknowledgeAlert(alert.id)}
+                      className="text-red-500 hover:bg-red-500/10"
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -713,6 +833,112 @@ export default function LiveTrackingPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Assign Backup Dialog */}
+      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              Assign Backup Bus
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedAlert && (
+            <div className="space-y-4">
+              {/* Alert Info */}
+              <div className="p-3 bg-red-500/10 rounded-lg border border-red-500/30">
+                <p className="font-medium text-red-500">{selectedAlert.route_name}</p>
+                <p className="text-sm text-muted-foreground">
+                  Bus full at <strong>{selectedAlert.stop_name}</strong>
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Passengers waiting: {selectedAlert.passengers_on_board}/{selectedAlert.vehicle_capacity}
+                </p>
+              </div>
+
+              {/* Driver Selection */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Select Available Driver</label>
+                <Select value={selectedDriver} onValueChange={setSelectedDriver}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a driver..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableDrivers.length === 0 ? (
+                      <SelectItem value="_none" disabled>No online drivers</SelectItem>
+                    ) : (
+                      availableDrivers.map((driver) => (
+                        <SelectItem key={driver.id} value={driver.id}>
+                          <div className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-green-500" />
+                            {(driver.profile as any)?.full_name || "Unknown Driver"}
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Vehicle Selection */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Select Vehicle</label>
+                <Select value={selectedVehicle} onValueChange={setSelectedVehicle}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a vehicle..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableVehicles.map((vehicle) => {
+                      const parts = vehicle.name?.split("_") || []
+                      const displayName = parts.length === 2
+                        ? `${parts[0].toUpperCase()} (${parts[1].toUpperCase()})`
+                        : vehicle.name
+                      return (
+                        <SelectItem key={vehicle.id} value={vehicle.id}>
+                          <div className="flex items-center justify-between w-full">
+                            <span>{displayName}</span>
+                            <span className="text-xs text-muted-foreground ml-2">
+                              {vehicle.capacity} seats
+                            </span>
+                          </div>
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setAssignDialogOpen(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={assignBackupBus}
+                  disabled={!selectedDriver || !selectedVehicle || assigningBackup}
+                  className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black"
+                >
+                  {assigningBackup ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-2" />
+                  )}
+                  Send Urgent Alert
+                </Button>
+              </div>
+
+              <p className="text-xs text-muted-foreground text-center">
+                Driver will receive an urgent notification to start the trip from {selectedAlert.stop_name}
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

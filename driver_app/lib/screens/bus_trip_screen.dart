@@ -298,309 +298,253 @@ class _BusTripScreenState extends State<BusTripScreen> {
           final isFull = vehicleCapacity > 0 && afterStopCount >= vehicleCapacity;
           final isOverCapacity = vehicleCapacity > 0 && afterStopCount > vehicleCapacity;
           final availableSeats = vehicleCapacity > 0
-              ? (vehicleCapacity - _onBoardCount + alighted).clamp(0, 99)
+              ? (vehicleCapacity - _onBoardCount - boarded + alighted).clamp(0, 99)
               : 99;
+          final occupancyPercent = vehicleCapacity > 0
+              ? (afterStopCount / vehicleCapacity).clamp(0.0, 1.0)
+              : 0.0;
+
+          Color getOccupancyColor() {
+            if (isOverCapacity) return Colors.red;
+            if (isFull) return Colors.orange;
+            if (occupancyPercent > 0.7) return Colors.amber;
+            return Colors.green;
+          }
 
           return Container(
           decoration: BoxDecoration(
             color: context.cardColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
           padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 24,
-            bottom: MediaQuery.of(ctx).padding.bottom + 24,
+            left: 20,
+            right: 20,
+            top: 12,
+            bottom: MediaQuery.of(ctx).padding.bottom + 20,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Drag handle
               Container(
-                width: 40,
+                width: 36,
                 height: 4,
                 decoration: BoxDecoration(
                   color: context.mutedColor.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 24),
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.blue, Colors.blue.withValues(alpha: 0.7)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: const Icon(Icons.people_alt_rounded, size: 32, color: Colors.white),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Passenger Count',
-                style: TextStyle(
-                  color: context.textColor,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.yellow.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.location_on, color: AppColors.yellow, size: 16),
-                    const SizedBox(width: 6),
-                    Text(
-                      currentStop['stop_name'] ?? 'Current Stop',
-                      style: TextStyle(
-                        color: AppColors.yellow,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Current on-board display with capacity
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: context.bgColor,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.people, color: context.mutedColor, size: 24),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Currently on board: ',
-                      style: TextStyle(color: context.mutedColor, fontSize: 15),
-                    ),
-                    Text(
-                      '$_onBoardCount',
-                      style: TextStyle(
-                        color: context.textColor,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    if (vehicleCapacity > 0) ...[
-                      Text(
-                        ' / $vehicleCapacity',
-                        style: TextStyle(
-                          color: context.mutedColor,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
               const SizedBox(height: 20),
 
-              // Boarded counter
-              _buildCounterRow(
+              // Header with capacity ring
+              Row(
+                children: [
+                  // Circular capacity indicator
+                  SizedBox(
+                    width: 72,
+                    height: 72,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        SizedBox(
+                          width: 72,
+                          height: 72,
+                          child: CircularProgressIndicator(
+                            value: occupancyPercent,
+                            strokeWidth: 6,
+                            backgroundColor: context.borderColor,
+                            valueColor: AlwaysStoppedAnimation(getOccupancyColor()),
+                          ),
+                        ),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '$afterStopCount',
+                              style: TextStyle(
+                                color: context.textColor,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            if (vehicleCapacity > 0)
+                              Text(
+                                '/$vehicleCapacity',
+                                style: TextStyle(
+                                  color: context.mutedColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          currentStop['stop_name'] ?? 'Current Stop',
+                          style: TextStyle(
+                            color: context.textColor,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        // Available seats chip
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: availableSeats > 0
+                                ? Colors.green.withValues(alpha: 0.15)
+                                : Colors.red.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                availableSeats > 0 ? Icons.event_seat : Icons.block,
+                                color: availableSeats > 0 ? Colors.green : Colors.red,
+                                size: 14,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                availableSeats > 0 ? '$availableSeats seats available' : 'No seats',
+                                style: TextStyle(
+                                  color: availableSeats > 0 ? Colors.green : Colors.red,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Boarded section - Modern style
+              _buildModernCounter(
                 context,
-                'Boarded',
-                Icons.arrow_circle_up_rounded,
+                'Boarding',
+                Icons.login_rounded,
                 Colors.green,
                 boarded,
                 (val) => setDialogState(() => boarded = val),
-                max: availableSeats,
+                max: vehicleCapacity > 0 ? availableSeats + boarded : 99,
               ),
               const SizedBox(height: 12),
 
-              // Alighted counter
-              _buildCounterRow(
+              // Alighted section
+              _buildModernCounter(
                 context,
-                'Alighted',
-                Icons.arrow_circle_down_rounded,
+                'Alighting',
+                Icons.logout_rounded,
                 Colors.orange,
                 alighted,
                 (val) => setDialogState(() => alighted = val),
                 max: _onBoardCount + boarded,
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
-              // Bus Full Warning Banner
-              if (isFull) ...[
+              // Warning banner
+              if (isFull)
                 Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: isOverCapacity
-                        ? Colors.red.withValues(alpha: 0.15)
-                        : Colors.orange.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: isOverCapacity
-                          ? Colors.red.withValues(alpha: 0.4)
-                          : Colors.orange.withValues(alpha: 0.4),
+                    gradient: LinearGradient(
+                      colors: isOverCapacity
+                          ? [Colors.red.withValues(alpha: 0.2), Colors.red.withValues(alpha: 0.1)]
+                          : [Colors.orange.withValues(alpha: 0.2), Colors.orange.withValues(alpha: 0.1)],
                     ),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     children: [
-                      Icon(
-                        isOverCapacity ? Icons.warning_amber_rounded : Icons.info_outline_rounded,
-                        color: isOverCapacity ? Colors.red : Colors.orange,
-                        size: 24,
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isOverCapacity ? Colors.red : Colors.orange,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isOverCapacity ? Icons.warning_rounded : Icons.info_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              isOverCapacity ? 'Over Capacity!' : 'Bus is Full',
-                              style: TextStyle(
-                                color: isOverCapacity ? Colors.red : Colors.orange,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Admin will be notified to send additional bus',
-                              style: TextStyle(
-                                color: isOverCapacity
-                                    ? Colors.red.withValues(alpha: 0.8)
-                                    : Colors.orange.withValues(alpha: 0.8),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          isOverCapacity
+                              ? 'Over capacity! Reduce passengers.'
+                              : 'Bus full - Admin notified for backup',
+                          style: TextStyle(
+                            color: isOverCapacity ? Colors.red : Colors.orange,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
-              ],
 
-              // Preview of new count
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isFull
-                      ? (isOverCapacity ? Colors.red : Colors.orange).withValues(alpha: 0.1)
-                      : Colors.blue.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isFull
-                        ? (isOverCapacity ? Colors.red : Colors.orange).withValues(alpha: 0.3)
-                        : Colors.blue.withValues(alpha: 0.3),
+              // Confirm button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: isOverCapacity ? null : () => Navigator.pop(ctx, {
+                    'boarded': boarded,
+                    'alighted': alighted,
+                    'isFull': isFull,
+                    'afterStopCount': afterStopCount,
+                  }),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.yellow,
+                    foregroundColor: Colors.black,
+                    disabledBackgroundColor: context.borderColor,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    elevation: 0,
                   ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.trending_flat,
-                      color: isFull ? (isOverCapacity ? Colors.red : Colors.orange) : Colors.blue,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'After this stop: ',
-                      style: TextStyle(
-                        color: isFull ? (isOverCapacity ? Colors.red : Colors.orange) : Colors.blue,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Text(
-                      '$afterStopCount',
-                      style: TextStyle(
-                        color: isFull ? (isOverCapacity ? Colors.red : Colors.orange) : Colors.blue,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    if (vehicleCapacity > 0) ...[
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_rounded, size: 20, color: isOverCapacity ? context.mutedColor : Colors.black),
+                      const SizedBox(width: 8),
                       Text(
-                        '/$vehicleCapacity',
+                        'Confirm & Continue',
                         style: TextStyle(
-                          color: isFull
-                              ? (isOverCapacity ? Colors.red : Colors.orange).withValues(alpha: 0.7)
-                              : Colors.blue.withValues(alpha: 0.7),
+                          fontWeight: FontWeight.w700,
                           fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ] else ...[
-                      Text(
-                        ' passengers',
-                        style: TextStyle(
-                          color: Colors.blue,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
+                          color: isOverCapacity ? context.mutedColor : Colors.black,
                         ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
               ),
-
-              const SizedBox(height: 24),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(ctx, null),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          side: BorderSide(color: context.borderColor),
-                        ),
-                      ),
-                      child: Text(
-                        'Cancel',
-                        style: TextStyle(color: context.mutedColor, fontWeight: FontWeight.w600, fontSize: 16),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx, {
-                        'boarded': boarded,
-                        'alighted': alighted,
-                        'isFull': isFull,
-                        'afterStopCount': afterStopCount,
-                      }),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.yellow,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        elevation: 0,
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.check_rounded, size: 22),
-                          SizedBox(width: 8),
-                          Text('Confirm & Next', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 8),
+              // Skip button
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, null),
+                child: Text(
+                  'Skip this stop',
+                  style: TextStyle(color: context.mutedColor, fontSize: 14),
+                ),
               ),
             ],
           ),
@@ -610,7 +554,7 @@ class _BusTripScreenState extends State<BusTripScreen> {
     );
   }
 
-  Widget _buildCounterRow(
+  Widget _buildModernCounter(
     BuildContext context,
     String label,
     IconData icon,
@@ -620,84 +564,121 @@ class _BusTripScreenState extends State<BusTripScreen> {
     int max = 99,
   }) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: context.bgColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(color: value > 0 ? color.withValues(alpha: 0.5) : context.borderColor),
       ),
       child: Column(
         children: [
           Row(
             children: [
+              // Icon with label
               Container(
-                width: 40,
-                height: 40,
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color,
+                  color: color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: Colors.white, size: 22),
+                child: Icon(icon, color: color, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: context.textColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: context.textColor,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (value > 0)
+                      Text(
+                        '+$value passengers',
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              // Minus button
-              GestureDetector(
-                onTap: value > 0 ? () {
-                  HapticFeedback.lightImpact();
-                  onChanged(value - 1);
-                } : null,
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: value > 0 ? color : context.borderColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.remove, color: Colors.white, size: 24),
-                ),
-              ),
+              // Counter controls
               Container(
-                width: 60,
-                alignment: Alignment.center,
-                child: Text(
-                  '$value',
-                  style: TextStyle(
-                    color: context.textColor,
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                  ),
+                decoration: BoxDecoration(
+                  color: context.cardColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: context.borderColor),
                 ),
-              ),
-              // Plus button
-              GestureDetector(
-                onTap: value < max ? () {
-                  HapticFeedback.lightImpact();
-                  onChanged(value + 1);
-                } : null,
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: value < max ? color : context.borderColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.add, color: Colors.white, size: 24),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Minus
+                    GestureDetector(
+                      onTap: value > 0 ? () {
+                        HapticFeedback.lightImpact();
+                        onChanged(value - 1);
+                      } : null,
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: value > 0 ? color : Colors.transparent,
+                          borderRadius: const BorderRadius.horizontal(left: Radius.circular(11)),
+                        ),
+                        child: Icon(
+                          Icons.remove,
+                          color: value > 0 ? Colors.white : context.mutedColor,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                    // Value
+                    Container(
+                      width: 52,
+                      height: 44,
+                      alignment: Alignment.center,
+                      child: Text(
+                        '$value',
+                        style: TextStyle(
+                          color: context.textColor,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    // Plus
+                    GestureDetector(
+                      onTap: value < max ? () {
+                        HapticFeedback.lightImpact();
+                        onChanged(value + 1);
+                      } : null,
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: value < max ? color : Colors.transparent,
+                          borderRadius: const BorderRadius.horizontal(right: Radius.circular(11)),
+                        ),
+                        child: Icon(
+                          Icons.add,
+                          color: value < max ? Colors.white : context.mutedColor,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          // Quick add buttons
+          const SizedBox(height: 10),
+          // Quick add chips
           Row(
             children: [
               for (final preset in [1, 5, 10])
@@ -709,18 +690,26 @@ class _BusTripScreenState extends State<BusTripScreen> {
                         HapticFeedback.mediumImpact();
                         onChanged(value + preset);
                       } : null,
-                      child: Container(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: (value + preset) <= max ? color.withValues(alpha: 0.2) : context.borderColor.withValues(alpha: 0.3),
+                          color: (value + preset) <= max
+                              ? color.withValues(alpha: 0.12)
+                              : context.borderColor.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: (value + preset) <= max
+                                ? color.withValues(alpha: 0.3)
+                                : Colors.transparent,
+                          ),
                         ),
                         child: Text(
                           '+$preset',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: (value + preset) <= max ? color : context.mutedColor,
-                            fontSize: 16,
+                            fontSize: 15,
                             fontWeight: FontWeight.w700,
                           ),
                         ),

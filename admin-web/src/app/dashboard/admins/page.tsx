@@ -54,11 +54,13 @@ interface Department {
   is_active: boolean
 }
 
-// 3-tier RBAC system
+// 5-tier RBAC system
 const ROLES: { value: Role; label: string; color: string }[] = [
   { value: "super_admin", label: ROLE_LABELS["super_admin"], color: ROLE_COLORS["super_admin"] },
   { value: "manager", label: ROLE_LABELS["manager"], color: ROLE_COLORS["manager"] },
   { value: "operator", label: ROLE_LABELS["operator"], color: ROLE_COLORS["operator"] },
+  { value: "support", label: ROLE_LABELS["support"], color: ROLE_COLORS["support"] },
+  { value: "viewer", label: ROLE_LABELS["viewer"], color: ROLE_COLORS["viewer"] },
 ]
 
 export default function AdminsPage() {
@@ -93,7 +95,7 @@ export default function AdminsPage() {
     loadAdmins()
     loadDepartments()
 
-    const adminRoles = ['super_admin', 'manager', 'operator']
+    const adminRoles = ['super_admin', 'manager', 'operator', 'support', 'viewer']
 
     const channel = supabase
       .channel('admins_realtime')
@@ -138,7 +140,7 @@ export default function AdminsPage() {
     const { data } = await supabase
       .from("profiles")
       .select("*, dept_relation:departments(id, name)")
-      .in("role", ["super_admin", "manager", "operator"])
+      .in("role", ["super_admin", "manager", "operator", "support", "viewer"])
       .order("created_at", { ascending: false })
 
     setAdmins(data || [])

@@ -135,8 +135,8 @@ export default function AdminsPage() {
     }
   }, [])
 
-  const loadAdmins = async () => {
-    setLoading(true)
+  const loadAdmins = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
     const { data } = await supabase
       .from("profiles")
       .select("*, dept_relation:departments(id, name)")
@@ -144,7 +144,7 @@ export default function AdminsPage() {
       .order("created_at", { ascending: false })
 
     setAdmins(data || [])
-    setLoading(false)
+    if (showLoading) setLoading(false)
   }
 
   const loadDepartments = async () => {
@@ -187,7 +187,7 @@ export default function AdminsPage() {
       } else {
         toast.success("Admin updated")
         closeDialog()
-        loadAdmins()
+        loadAdmins(false)
       }
     } else {
       const { error } = await supabase.from("profiles").insert({
@@ -204,7 +204,7 @@ export default function AdminsPage() {
       } else {
         toast.success("Admin created")
         closeDialog()
-        loadAdmins()
+        loadAdmins(false)
       }
     }
     setSaving(false)
@@ -269,7 +269,7 @@ export default function AdminsPage() {
       toast.error("Failed to remove admin")
     } else {
       toast.success("Admin removed")
-      loadAdmins()
+      loadAdmins(false)
     }
   }
 
@@ -356,7 +356,7 @@ export default function AdminsPage() {
     } else {
       toast.success("Permissions saved")
       setPermissionsAdmin(null)
-      loadAdmins()
+      loadAdmins(false)
     }
     setSavingPermissions(false)
   }
@@ -380,7 +380,7 @@ export default function AdminsPage() {
     } else {
       toast.success(`${idsToDelete.length} admin(s) removed`)
       setSelectedIds(new Set())
-      loadAdmins()
+      loadAdmins(false)
     }
   }
 

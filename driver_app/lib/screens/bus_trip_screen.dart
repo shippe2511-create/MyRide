@@ -1051,7 +1051,9 @@ class _BusTripScreenState extends State<BusTripScreen> {
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      vehicle != null ? '${vehicle['vehicle_number']}' : '',
+                                      vehicle != null
+                                          ? '${vehicle['vehicle_number']} (${vehicle['capacity'] ?? 0} seats)'
+                                          : '',
                                       style: TextStyle(color: AppColors.darkBg, fontSize: 13, fontWeight: FontWeight.w600),
                                       overflow: TextOverflow.ellipsis,
                                     ),

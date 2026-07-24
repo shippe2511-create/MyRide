@@ -2215,12 +2215,26 @@ class SupabaseService {
         final vehicleId = map['vehicle_id'];
         if (vehicleId != null && vehicleId.toString().isNotEmpty) {
           try {
+            // Try vehicle_types table first (bus roster uses this)
             final vehicleData = await client
-                .from('vehicles')
-                .select('id, vehicle_model, vehicle_number, capacity')
+                .from('vehicle_types')
+                .select('id, name, capacity')
                 .eq('id', vehicleId)
                 .maybeSingle();
-            map['vehicle'] = vehicleData;
+            if (vehicleData != null) {
+              // Parse name like "st26_c1290" to "ST26 (C1290)"
+              final name = vehicleData['name'] as String? ?? '';
+              final parts = name.split('_');
+              String vehicleNumber = name;
+              if (parts.length == 2) {
+                vehicleNumber = '${parts[0].toUpperCase()} (${parts[1].toUpperCase()})';
+              }
+              map['vehicle'] = {
+                'id': vehicleData['id'],
+                'vehicle_number': vehicleNumber,
+                'capacity': vehicleData['capacity'],
+              };
+            }
           } catch (e) {
             debugPrint('Error fetching vehicle $vehicleId: $e');
           }

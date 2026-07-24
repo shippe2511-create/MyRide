@@ -912,6 +912,9 @@ class DriverState extends ChangeNotifier {
     _locationTimer?.cancel();
     _locationTimer = null;
 
+    // Stop background location service immediately
+    BackgroundLocationService().stopTracking();
+
     // Mark driver as offline in database
     if (_driverId.isNotEmpty) {
       SupabaseService.setDriverOnlineStatus(_driverId, false);

@@ -28,6 +28,7 @@ import 'services/push_to_talk_service.dart';
 import 'theme/app_theme.dart';
 import 'services/supabase_service.dart';
 import 'services/notification_service.dart';
+import 'services/background_location_service.dart';
 import 'services/voice_service.dart';
 import 'services/offline_service.dart';
 import 'services/app_settings_service.dart';
@@ -350,6 +351,8 @@ class _DriverAppState extends State<DriverApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    // Stop location tracking when app is disposed
+    BackgroundLocationService().stopTracking();
     super.dispose();
   }
 
@@ -358,6 +361,11 @@ class _DriverAppState extends State<DriverApp> with WidgetsBindingObserver {
     // Track app foreground/background state for smart notifications
     final isInForeground = state == AppLifecycleState.resumed;
     NotificationService.setAppInForeground(isInForeground);
+
+    // Stop location when app is detached/terminated
+    if (state == AppLifecycleState.detached) {
+      BackgroundLocationService().stopTracking();
+    }
   }
 
   @override

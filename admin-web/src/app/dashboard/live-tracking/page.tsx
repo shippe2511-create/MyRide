@@ -36,6 +36,7 @@ interface BusLocation {
   longitude: number
   current_stop_name: string | null
   current_stop_index: number
+  total_stops?: number
   passengers_on_board: number
   vehicle_capacity: number
   vehicle_number?: string | null
@@ -163,6 +164,15 @@ export default function LiveTrackingPage() {
           enrichedBus.vehicle_number = vehicle.vehicle_number
           enrichedBus.vehicle_capacity = enrichedBus.vehicle_capacity || vehicle.capacity
         }
+      }
+
+      // Get total stops for the route
+      if (bus.route_id) {
+        const { count } = await supabase
+          .from("route_stops")
+          .select("*", { count: "exact", head: true })
+          .eq("route_id", bus.route_id)
+        enrichedBus.total_stops = count || 0
       }
 
       return enrichedBus
@@ -668,15 +678,21 @@ export default function LiveTrackingPage() {
                               </div>
                             </div>
                           </div>
-                          {/* Occupancy Progress Bar */}
-                          <div className="mt-2">
-                            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all ${getOccupancyColor((bus.passengers_on_board / bus.vehicle_capacity) * 100)}`}
-                                style={{ width: `${Math.min(100, (bus.passengers_on_board / bus.vehicle_capacity) * 100)}%` }}
-                              />
+                          {/* Trip Progress Bar (by stops) */}
+                          {bus.total_stops && bus.total_stops > 0 && (
+                            <div className="mt-2">
+                              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                                <span>Stop {bus.current_stop_index + 1} of {bus.total_stops}</span>
+                                <span>{Math.round(((bus.current_stop_index + 1) / bus.total_stops) * 100)}%</span>
+                              </div>
+                              <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full transition-all bg-blue-500"
+                                  style={{ width: `${Math.min(100, ((bus.current_stop_index + 1) / bus.total_stops) * 100)}%` }}
+                                />
+                              </div>
                             </div>
-                          </div>
+                          )}
                           {bus.route && (
                             <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1">
                               <Navigation className="h-3 w-3" />

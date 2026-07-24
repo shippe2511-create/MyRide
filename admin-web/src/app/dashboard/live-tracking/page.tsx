@@ -131,11 +131,25 @@ export default function LiveTrackingPage() {
 
     const { data: busData, error: busError } = await supabase
       .from("bus_location_tracking")
-      .select("*")
+      .select(`
+        *,
+        route:transport_routes(route_name, route_code)
+      `)
       .eq("status", "in_progress")
       .order("last_updated_at", { ascending: false })
 
-    console.log("Bus query result:", { busData, busError, count: busData?.length })
+    // Fetch driver names separately since nested joins can fail
+    const enrichedBuses = await Promise.all((busData || []).map(async (bus) => {
+      if (bus.driver_id) {
+        const { data: driver } = await supabase
+          .from("drivers")
+          .select("profile:profiles(full_name)")
+          .eq("id", bus.driver_id)
+          .single()
+        return { ...bus, driver }
+      }
+      return bus
+    }))
 
     const { data: alertData } = await supabase
       .from("bus_full_alerts")
@@ -143,7 +157,7 @@ export default function LiveTrackingPage() {
       .eq("is_acknowledged", false)
       .order("created_at", { ascending: false })
 
-    setBuses(busData || [])
+    setBuses(enrichedBuses || [])
     setAlerts(alertData || [])
 
     // Load daily summary

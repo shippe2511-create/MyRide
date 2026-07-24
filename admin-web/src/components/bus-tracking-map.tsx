@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   Layers, Bus, Satellite, Map as MapIcon, Maximize2, Minimize2,
-  LocateFixed, Search, X, Volume2, VolumeX, Target, Navigation, Car
+  LocateFixed, Search, X, Volume2, VolumeX, Target, Navigation, Car,
+  Sun, Moon
 } from "lucide-react"
 
 interface BusLocation {
@@ -141,24 +142,27 @@ export function BusTrackingMap({ buses, selectedBusId, onBusClick }: BusTracking
   const [showSearch, setShowSearch] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [isDark, setIsDark] = useState(true)
+  const [manualTheme, setManualTheme] = useState<"auto" | "dark" | "light">("dark")
   const containerRef = useRef<HTMLDivElement>(null)
   const initialFitDoneRef = useRef(false)
 
   const { isLoaded, loadError } = useGoogleMaps()
 
-  // Theme detection
+  // Theme detection - manual override takes precedence
   useEffect(() => {
-    const checkTheme = () => {
-      const dark = document.documentElement.classList.contains("dark")
-      setIsDark(dark)
+    if (manualTheme === "auto") {
+      const checkTheme = () => {
+        const dark = document.documentElement.classList.contains("dark")
+        setIsDark(dark)
+      }
+      checkTheme()
+      const observer = new MutationObserver(checkTheme)
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] })
+      return () => observer.disconnect()
+    } else {
+      setIsDark(manualTheme === "dark")
     }
-
-    checkTheme()
-    const observer = new MutationObserver(checkTheme)
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] })
-
-    return () => observer.disconnect()
-  }, [])
+  }, [manualTheme])
 
   // Heatmap data from bus locations
   const heatmapData = buses.map(bus =>
@@ -427,6 +431,17 @@ export function BusTrackingMap({ buses, selectedBusId, onBusClick }: BusTracking
           title={soundEnabled ? "Mute alerts" : "Enable sound alerts"}
         >
           {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+        </Button>
+
+        {/* Theme Toggle */}
+        <Button
+          variant={isDark ? "default" : "secondary"}
+          size="icon"
+          className="shadow-lg h-8 w-8"
+          onClick={() => setManualTheme(isDark ? "light" : "dark")}
+          title={isDark ? "Light map" : "Dark map"}
+        >
+          {isDark ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
         </Button>
 
         {/* Divider */}

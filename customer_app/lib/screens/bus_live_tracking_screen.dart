@@ -44,7 +44,7 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
   Set<Marker> _markers = {};
   Set<Polyline> _polylines = {};
   Set<Circle> _circles = {};
-  List<LatLng> _routePoints = []; // Road-following route from Directions API
+  List<LatLng> _routePoints = []; // Straight lines between consecutive stops
 
   bool _isLoading = true;
   int? _selectedStopIndex;
@@ -117,19 +117,56 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
       setState(() {
         _stops = List<Map<String, dynamic>>.from(response);
       });
-      // Build route directly from stops (internal bus routes don't need Directions API)
-      _buildRouteFromStops();
+      // Build route - uses custom polyline if available, else straight lines
+      await _buildRouteFromStops();
     } catch (e) {
       debugPrint('Error loading stops: $e');
     }
   }
 
-  void _buildRouteFromStops() {
-    // Build route directly from stops - straight lines between consecutive stops
-    // This is appropriate for internal bus routes where Google Directions
-    // may route incorrectly (through other islands, etc.)
-    List<LatLng> routePoints = [];
+  Future<void> _buildRouteFromStops() async {
+    if (_stops.length < 2) {
+      _updateMapElements();
+      return;
+    }
 
+    // Try to load custom route polyline from database
+    try {
+      final routeData = await _supabase
+          .from('transport_routes')
+          .select('route_polyline')
+          .eq('id', widget.routeId)
+          .single();
+
+      final polylineStr = routeData['route_polyline'] as String?;
+      if (polylineStr != null && polylineStr.isNotEmpty) {
+        // Parse stored polyline: "lat1,lng1;lat2,lng2;..."
+        final points = polylineStr.split(';').map((point) {
+          final coords = point.split(',');
+          if (coords.length == 2) {
+            final lat = double.tryParse(coords[0]);
+            final lng = double.tryParse(coords[1]);
+            if (lat != null && lng != null) {
+              return LatLng(lat, lng);
+            }
+          }
+          return null;
+        }).whereType<LatLng>().toList();
+
+        if (points.length >= 2) {
+          setState(() {
+            _routePoints = points;
+          });
+          _updateMapElements();
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('No custom polyline: $e');
+    }
+
+    // Fallback: straight lines between stops
+    List<LatLng> routePoints = [];
     for (final stop in _stops) {
       final lat = double.tryParse(stop['latitude']?.toString() ?? '');
       final lng = double.tryParse(stop['longitude']?.toString() ?? '');
@@ -142,40 +179,6 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
       _routePoints = routePoints;
     });
     _updateMapElements();
-  }
-
-  List<LatLng> _decodePolyline(String encoded) {
-    List<LatLng> points = [];
-    int index = 0;
-    int lat = 0;
-    int lng = 0;
-
-    while (index < encoded.length) {
-      int shift = 0;
-      int result = 0;
-      int b;
-      do {
-        b = encoded.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-      lat += dlat;
-
-      shift = 0;
-      result = 0;
-      do {
-        b = encoded.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-      lng += dlng;
-
-      points.add(LatLng(lat / 1E5, lng / 1E5));
-    }
-
-    return points;
   }
 
   Future<void> _loadActiveBuses() async {
@@ -291,10 +294,10 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
       }
     }
 
-    // Draw route polyline using Directions API route (follows roads)
+    // Draw route polyline - follows roads via Directions API
     if (_routePoints.length >= 2) {
       polylines.add(Polyline(
-        polylineId: const PolylineId('route'),
+        polylineId: const PolylineId('bus_route_line'),
         points: _routePoints,
         color: AppColors.yellow.withValues(alpha: 0.9),
         width: 5,
@@ -462,13 +465,23 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
                     },
                   ),
                   Container(height: 1, width: 32, color: Colors.white12),
-                  // Layers / Satellite toggle
+                  // Map type: normal → satellite → terrain
                   _buildMapControlButton(
-                    icon: Icons.layers_outlined,
-                    isActive: _mapType == MapType.satellite,
+                    icon: _mapType == MapType.satellite
+                        ? Icons.satellite_alt
+                        : _mapType == MapType.terrain
+                            ? Icons.terrain
+                            : Icons.layers_outlined,
+                    isActive: _mapType != MapType.normal,
                     onTap: () {
                       setState(() {
-                        _mapType = _mapType == MapType.normal ? MapType.satellite : MapType.normal;
+                        if (_mapType == MapType.normal) {
+                          _mapType = MapType.satellite;
+                        } else if (_mapType == MapType.satellite) {
+                          _mapType = MapType.terrain;
+                        } else {
+                          _mapType = MapType.normal;
+                        }
                       });
                     },
                   ),

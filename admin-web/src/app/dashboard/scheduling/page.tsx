@@ -62,6 +62,7 @@ function SortableRow({
   setEditingRoute,
   openTimesDialog,
   openStopsDialog,
+  openDrawRoute,
   setDeleteId,
 }: {
   route: TransportRoute
@@ -71,6 +72,7 @@ function SortableRow({
   setEditingRoute: (route: TransportRoute) => void
   openTimesDialog: (route: TransportRoute) => void
   openStopsDialog: (route: TransportRoute) => void
+  openDrawRoute: (route: TransportRoute) => void
   setDeleteId: (id: string) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: route.id })
@@ -140,6 +142,13 @@ function SortableRow({
               <DropdownMenuItem onClick={() => openStopsDialog(route)}>
                 <MapPin className="h-4 w-4 mr-2" />
                 Manage Stops
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => openDrawRoute(route)}>
+                <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 17l6-6 4 4 8-8" />
+                  <circle cx="21" cy="9" r="2" />
+                </svg>
+                Draw Route
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setEditingRoute(route)}>
                 <Pencil className="h-4 w-4 mr-2" />
@@ -215,6 +224,16 @@ export default function SchedulingPage() {
   const leafletMarkerRef = useRef<any>(null)
   const setStopFormRef = useRef(setStopForm)
   setStopFormRef.current = setStopForm
+
+  // Draw Route states
+  const [drawRouteOpen, setDrawRouteOpen] = useState(false)
+  const [drawingRoute, setDrawingRoute] = useState<TransportRoute | null>(null)
+  const [drawnPoints, setDrawnPoints] = useState<{ lat: number; lng: number }[]>([])
+  const [savingPolyline, setSavingPolyline] = useState(false)
+  const drawMapRef = useRef<HTMLDivElement>(null)
+  const drawLeafletMapRef = useRef<any>(null)
+  const drawnPolylinesRef = useRef<any[]>([])
+  const drawnMarkersRef = useRef<any[]>([])
 
   const isSavingRef = useRef(false)
 
@@ -417,6 +436,73 @@ export default function SchedulingPage() {
       .order("stop_order")
     setRouteStopsData(data || [])
     setLoadingStops(false)
+  }
+
+  const openDrawRoute = async (route: TransportRoute) => {
+    setDrawingRoute(route)
+    setDrawRouteOpen(true)
+
+    // Load existing polyline if any
+    const { data } = await supabase
+      .from("transport_routes")
+      .select("route_polyline")
+      .eq("id", route.id)
+      .single()
+
+    if (data?.route_polyline) {
+      const points = data.route_polyline.split(";").map((p: string) => {
+        const [lat, lng] = p.split(",").map(Number)
+        return { lat, lng }
+      }).filter((p: any) => !isNaN(p.lat) && !isNaN(p.lng))
+      setDrawnPoints(points)
+    } else {
+      // Initialize with stop locations
+      const { data: stops } = await supabase
+        .from("route_stops")
+        .select("latitude, longitude")
+        .eq("route_id", route.id)
+        .order("stop_order")
+      if (stops) {
+        setDrawnPoints(stops.map((s: any) => ({ lat: parseFloat(s.latitude), lng: parseFloat(s.longitude) })))
+      } else {
+        setDrawnPoints([])
+      }
+    }
+  }
+
+  const saveRoutePolyline = async () => {
+    if (!drawingRoute || drawnPoints.length < 2) {
+      toast.error("Draw at least 2 points")
+      return
+    }
+    setSavingPolyline(true)
+    const polyline = drawnPoints.map(p => `${p.lat},${p.lng}`).join(";")
+    console.log("Saving polyline for route:", drawingRoute.id)
+    console.log("Polyline data:", polyline)
+    console.log("Points count:", drawnPoints.length)
+
+    const { error, data } = await supabase
+      .from("transport_routes")
+      .update({ route_polyline: polyline })
+      .eq("id", drawingRoute.id)
+      .select()
+
+    console.log("Update result:", { error, data })
+
+    if (error) {
+      console.error("Save route error:", error)
+      toast.error(`Failed to save route: ${error.message}`)
+    } else {
+      toast.success(`Route saved! (${drawnPoints.length} points)`)
+      setDrawRouteOpen(false)
+      setDrawingRoute(null)
+      setDrawnPoints([])
+    }
+    setSavingPolyline(false)
+  }
+
+  const clearDrawnRoute = () => {
+    setDrawnPoints([])
   }
 
   const addStop = async () => {
@@ -623,6 +709,121 @@ export default function SchedulingPage() {
       }
     }
   }, [showMapPicker])
+
+  // Draw Route Map
+  const initDrawRouteMap = async () => {
+    if (!drawMapRef.current) return
+    if (drawLeafletMapRef.current) return
+
+    const L = (await import("leaflet")).default
+    await import("leaflet/dist/leaflet.css")
+
+    const defaultCenter = { lat: 4.1875, lng: 73.5300 }
+    const map = L.map(drawMapRef.current, {
+      center: [defaultCenter.lat, defaultCenter.lng],
+      zoom: 15,
+    })
+    drawLeafletMapRef.current = map
+
+    // Satellite layer for better visibility of airport
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+      attribution: "&copy; Esri",
+      maxZoom: 19,
+    }).addTo(map)
+
+    // Click to add points
+    map.on("click", (e: any) => {
+      setDrawnPoints(prev => [...prev, { lat: e.latlng.lat, lng: e.latlng.lng }])
+    })
+
+    setTimeout(() => map.invalidateSize(), 100)
+  }
+
+  // Update polylines when points change
+  useEffect(() => {
+    if (!drawLeafletMapRef.current) return
+
+    const L = require("leaflet")
+
+    // Clear existing polylines and markers
+    drawnPolylinesRef.current.forEach(p => p.remove())
+    drawnMarkersRef.current.forEach(m => m.remove())
+    drawnPolylinesRef.current = []
+    drawnMarkersRef.current = []
+
+    // Draw polyline
+    if (drawnPoints.length >= 2) {
+      const polyline = L.polyline(
+        drawnPoints.map(p => [p.lat, p.lng]),
+        { color: "#FFD60A", weight: 5 }
+      ).addTo(drawLeafletMapRef.current)
+      drawnPolylinesRef.current.push(polyline)
+    }
+
+    // Draw markers for each point
+    drawnPoints.forEach((point, i) => {
+      const marker = L.circleMarker([point.lat, point.lng], {
+        radius: 8,
+        fillColor: i === 0 ? "#22c55e" : i === drawnPoints.length - 1 ? "#ef4444" : "#FFD60A",
+        color: "#000",
+        weight: 2,
+        fillOpacity: 1,
+      }).addTo(drawLeafletMapRef.current)
+      drawnMarkersRef.current.push(marker)
+    })
+  }, [drawnPoints])
+
+  useEffect(() => {
+    if (drawRouteOpen) {
+      const timer = setTimeout(async () => {
+        if (drawMapRef.current && !drawLeafletMapRef.current) {
+          await initDrawRouteMap()
+          // Redraw points after map is ready
+          if (drawnPoints.length > 0) {
+            const L = (await import("leaflet")).default
+            // Clear and redraw
+            drawnPolylinesRef.current.forEach(p => p.remove())
+            drawnMarkersRef.current.forEach(m => m.remove())
+            drawnPolylinesRef.current = []
+            drawnMarkersRef.current = []
+
+            if (drawnPoints.length >= 2) {
+              const polyline = L.polyline(
+                drawnPoints.map(p => [p.lat, p.lng]),
+                { color: "#FFD60A", weight: 5 }
+              ).addTo(drawLeafletMapRef.current)
+              drawnPolylinesRef.current.push(polyline)
+            }
+
+            drawnPoints.forEach((point, i) => {
+              const marker = L.circleMarker([point.lat, point.lng], {
+                radius: 8,
+                fillColor: i === 0 ? "#22c55e" : i === drawnPoints.length - 1 ? "#ef4444" : "#FFD60A",
+                color: "#000",
+                weight: 2,
+                fillOpacity: 1,
+              }).addTo(drawLeafletMapRef.current)
+              drawnMarkersRef.current.push(marker)
+            })
+
+            // Fit bounds to points
+            if (drawnPoints.length > 0) {
+              const bounds = L.latLngBounds(drawnPoints.map(p => [p.lat, p.lng]))
+              drawLeafletMapRef.current.fitBounds(bounds, { padding: [50, 50] })
+            }
+          }
+        }
+      }, 300)
+      return () => clearTimeout(timer)
+    } else {
+      if (drawLeafletMapRef.current) {
+        drawLeafletMapRef.current.remove()
+        drawLeafletMapRef.current = null
+        drawnPolylinesRef.current = []
+        drawnMarkersRef.current = []
+      }
+    }
+  }, [drawRouteOpen, drawnPoints])
 
   const searchMapLocation = async (query: string) => {
     if (!query.trim()) {
@@ -1026,6 +1227,7 @@ export default function SchedulingPage() {
                           setEditingRoute={setEditingRoute}
                           openTimesDialog={openTimesDialog}
                           openStopsDialog={openStopsDialog}
+                          openDrawRoute={openDrawRoute}
                           setDeleteId={setDeleteId}
                         />
                       ))}
@@ -1686,6 +1888,43 @@ export default function SchedulingPage() {
                 )}
               </>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Draw Route Dialog */}
+      <Dialog open={drawRouteOpen} onOpenChange={(open) => { if (!open) { setDrawRouteOpen(false); setDrawingRoute(null); setDrawnPoints([]) } }}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Draw Route - {drawingRoute?.route_name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Click on the map to add points. The route will follow these points in order.
+            </p>
+            <div className="flex gap-2 items-center">
+              <Badge variant="secondary">{drawnPoints.length} points</Badge>
+              <Button variant="outline" size="sm" onClick={() => setDrawnPoints(drawnPoints.slice(0, -1))} disabled={drawnPoints.length === 0}>
+                Undo Last
+              </Button>
+              <Button variant="outline" size="sm" onClick={clearDrawnRoute} disabled={drawnPoints.length === 0}>
+                Clear All
+              </Button>
+            </div>
+            <div
+              ref={drawMapRef}
+              className="w-full rounded-lg border bg-muted"
+              style={{ height: "500px" }}
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setDrawRouteOpen(false); setDrawingRoute(null); setDrawnPoints([]) }}>
+                Cancel
+              </Button>
+              <Button onClick={saveRoutePolyline} disabled={savingPolyline || drawnPoints.length < 2}>
+                {savingPolyline && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save Route
+              </Button>
+            </DialogFooter>
           </div>
         </DialogContent>
       </Dialog>

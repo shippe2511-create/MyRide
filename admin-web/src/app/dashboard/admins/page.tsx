@@ -464,7 +464,7 @@ export default function AdminsPage() {
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <Button variant="outline" size="sm" onClick={loadAdmins}>
+          <Button variant="outline" size="sm" onClick={() => loadAdmins()}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>

@@ -386,8 +386,8 @@ export default function LiveTrackingPage() {
         .insert({
           user_id: selectedDriver,
           title: "🚨 URGENT: Backup Bus Required",
-          body: `Start trip immediately from ${selectedAlert.stop_name} on route ${selectedAlert.route_name}. Bus is full and passengers are waiting!`,
-          type: "urgent_backup",
+          message: `Start trip immediately from ${selectedAlert.stop_name} on route ${selectedAlert.route_name}. Bus is full and passengers are waiting!`,
+          notification_type: "urgent_backup",
           data: {
             route_id: selectedAlert.route_id,
             route_name: selectedAlert.route_name,

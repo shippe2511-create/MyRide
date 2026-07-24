@@ -199,7 +199,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Widget _buildNotificationCard(BuildContext context, Map<String, dynamic> notification, int index) {
     final isRead = notification['is_read'] == true;
-    final type = notification['type'] as String? ?? 'system';
+    final type = notification['notification_type'] as String? ?? notification['type'] as String? ?? 'system';
     final title = notification['title'] as String? ?? 'Notification';
     final message = notification['message'] as String? ?? '';
     final timeStr = notification['created_at'] as String?;

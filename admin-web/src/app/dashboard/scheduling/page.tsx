@@ -207,6 +207,9 @@ export default function SchedulingPage() {
   const [editingStop, setEditingStop] = useState<{ id: string; stop_name: string; latitude: number; longitude: number; stop_order: number } | null>(null)
   const [savingStop, setSavingStop] = useState(false)
   const [showMapPicker, setShowMapPicker] = useState(false)
+  const [mapSearchQuery, setMapSearchQuery] = useState("")
+  const [mapSearchResults, setMapSearchResults] = useState<{ name: string; lat: number; lng: number }[]>([])
+  const [searchingMap, setSearchingMap] = useState(false)
   const mapPickerRef = useRef<HTMLDivElement>(null)
   const leafletMapRef = useRef<any>(null)
   const leafletMarkerRef = useRef<any>(null)
@@ -620,6 +623,47 @@ export default function SchedulingPage() {
       }
     }
   }, [showMapPicker])
+
+  const searchMapLocation = async (query: string) => {
+    if (!query.trim()) {
+      setMapSearchResults([])
+      return
+    }
+    setSearchingMap(true)
+    try {
+      // Use Nominatim for geocoding (free, no API key needed)
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=mv&limit=5`
+      )
+      const data = await response.json()
+      setMapSearchResults(
+        data.map((item: { display_name: string; lat: string; lon: string }) => ({
+          name: item.display_name.split(",")[0],
+          lat: parseFloat(item.lat),
+          lng: parseFloat(item.lon),
+        }))
+      )
+    } catch {
+      setMapSearchResults([])
+    } finally {
+      setSearchingMap(false)
+    }
+  }
+
+  const selectSearchResult = (result: { name: string; lat: number; lng: number }) => {
+    if (leafletMapRef.current && leafletMarkerRef.current) {
+      leafletMapRef.current.setView([result.lat, result.lng], 17)
+      leafletMarkerRef.current.setLatLng([result.lat, result.lng])
+      setStopFormRef.current(prev => ({
+        ...prev,
+        stop_name: prev.stop_name || result.name,
+        latitude: result.lat.toFixed(7),
+        longitude: result.lng.toFixed(7),
+      }))
+    }
+    setMapSearchQuery("")
+    setMapSearchResults([])
+  }
 
   const addSchedule = async () => {
     if (!timesRoute || !newTime) {
@@ -1592,11 +1636,42 @@ export default function SchedulingPage() {
                       </Button>
                     </div>
                     {showMapPicker && (
-                      <div
-                        ref={mapPickerRef}
-                        className="h-96 w-full rounded-lg border"
-                        style={{ minHeight: "384px" }}
-                      />
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <Input
+                            placeholder="Search location..."
+                            value={mapSearchQuery}
+                            onChange={(e) => {
+                              setMapSearchQuery(e.target.value)
+                              searchMapLocation(e.target.value)
+                            }}
+                            className="pr-8"
+                          />
+                          {searchingMap && (
+                            <Loader2 className="absolute right-2 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                          )}
+                          {mapSearchResults.length > 0 && (
+                            <div className="absolute z-50 w-full mt-1 bg-card border rounded-lg shadow-lg max-h-48 overflow-auto">
+                              {mapSearchResults.map((result, i) => (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  onClick={() => selectSearchResult(result)}
+                                  className="w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2"
+                                >
+                                  <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                                  <span className="truncate">{result.name}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div
+                          ref={mapPickerRef}
+                          className="w-full rounded-lg border"
+                          style={{ height: "450px" }}
+                        />
+                      </div>
                     )}
                     <div className="flex gap-2">
                       <Button onClick={addStop} disabled={savingStop}>

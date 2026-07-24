@@ -2457,6 +2457,7 @@ class SupabaseService {
     required String tripId,
     required String driverId,
     String? vehicleId,
+    String? vehicleNumber,
     required String routeId,
     required double latitude,
     required double longitude,
@@ -2493,6 +2494,9 @@ class SupabaseService {
       };
       if (vehicleId != null && vehicleId.isNotEmpty) {
         data['vehicle_id'] = vehicleId;
+      }
+      if (vehicleNumber != null && vehicleNumber.isNotEmpty) {
+        data['vehicle_number'] = vehicleNumber;
       }
       await client.from('bus_location_tracking').upsert(data, onConflict: 'trip_id');
 

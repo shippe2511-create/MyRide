@@ -138,17 +138,33 @@ export default function LiveTrackingPage() {
       .eq("status", "in_progress")
       .order("last_updated_at", { ascending: false })
 
-    // Fetch driver names separately since nested joins can fail
+    // Fetch driver names and vehicle info separately since nested joins can fail
     const enrichedBuses = await Promise.all((busData || []).map(async (bus) => {
+      let enrichedBus = { ...bus }
+
       if (bus.driver_id) {
         const { data: driver } = await supabase
           .from("drivers")
           .select("profile:profiles(full_name)")
           .eq("id", bus.driver_id)
           .single()
-        return { ...bus, driver }
+        enrichedBus.driver = driver
       }
-      return bus
+
+      // Get vehicle info if not already in record
+      if (bus.vehicle_id && !bus.vehicle_number) {
+        const { data: vehicle } = await supabase
+          .from("vehicles")
+          .select("vehicle_number, capacity")
+          .eq("id", bus.vehicle_id)
+          .single()
+        if (vehicle) {
+          enrichedBus.vehicle_number = vehicle.vehicle_number
+          enrichedBus.vehicle_capacity = enrichedBus.vehicle_capacity || vehicle.capacity
+        }
+      }
+
+      return enrichedBus
     }))
 
     const { data: alertData } = await supabase

@@ -76,6 +76,7 @@ class _BusTripScreenState extends State<BusTripScreen> {
         tripId: widget.tripId,
         driverId: driverState.driverId,
         vehicleId: widget.assignment['vehicle_id'] as String?,
+        vehicleNumber: vehicle?['vehicle_number'] as String?,
         routeId: widget.assignment['route_id'] as String,
         latitude: position.latitude,
         longitude: position.longitude,

@@ -132,8 +132,8 @@ export default function BusRosterPage() {
     }
   }
 
-  const loadRoster = async () => {
-    setLoading(true)
+  const loadRoster = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
     const dateStr = format(selectedDate, "yyyy-MM-dd")
 
     // First get route IDs for this transport type
@@ -327,7 +327,7 @@ export default function BusRosterPage() {
       toast.error("Failed to delete")
     } else {
       toast.success("Deleted")
-      loadRoster()
+      loadRoster(false)
     }
     setDeleteTargetId(null)
   }
@@ -350,7 +350,7 @@ export default function BusRosterPage() {
     } else {
       toast.success(`Deleted ${selectedIds.size} assignments`)
       setSelectedIds(new Set())
-      loadRoster()
+      loadRoster(false)
     }
     setDeleting(false)
   }

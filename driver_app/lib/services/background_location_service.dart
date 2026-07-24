@@ -78,9 +78,9 @@ class BackgroundLocationService {
         accuracy: LocationAccuracy.bestForNavigation,
         activityType: ActivityType.automotiveNavigation,
         distanceFilter: 0,
-        pauseLocationUpdatesAutomatically: false,
-        showBackgroundLocationIndicator: true,
-        allowBackgroundLocationUpdates: true,
+        pauseLocationUpdatesAutomatically: true,
+        showBackgroundLocationIndicator: false,
+        allowBackgroundLocationUpdates: false,
       );
     } else {
       locationSettings = const LocationSettings(

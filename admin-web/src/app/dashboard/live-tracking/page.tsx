@@ -693,22 +693,6 @@ export default function LiveTrackingPage() {
                               </div>
                             </div>
                           )}
-                          {bus.route && (
-                            <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1">
-                              <Navigation className="h-3 w-3" />
-                              {bus.route.route_name}
-                              {bus.route.direction && (
-                                <span className="text-primary">→ {bus.route.direction}</span>
-                              )}
-                            </div>
-                          )}
-                          {bus.current_stop_name && (
-                            <div className="mt-1 text-xs flex items-center gap-1">
-                              <MapPin className="h-3 w-3 text-blue-500" />
-                              <span className="text-muted-foreground">At:</span>
-                              <span className="font-medium text-foreground">{bus.current_stop_name}</span>
-                            </div>
-                          )}
                           {(bus.vehicle_number || bus.vehicle) && (
                             <div className="mt-1 flex items-center gap-2">
                               <Badge variant="outline" className="text-xs">

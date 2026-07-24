@@ -245,7 +245,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         child: const Icon(Icons.delete, color: Colors.white),
       ),
       child: GestureDetector(
-        onTap: () => _markAsRead(index),
+        onTap: () => _handleNotificationTap(notification, index),
         child: Container(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           padding: const EdgeInsets.all(16),
@@ -328,6 +328,169 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     if (diff.inDays < 7) return '${diff.inDays}d ago';
     return '${time.day}/${time.month}/${time.year}';
+  }
+
+  void _handleNotificationTap(Map<String, dynamic> notification, int index) async {
+    final type = notification['notification_type'] as String? ?? notification['type'] as String? ?? 'system';
+
+    // Mark as read first
+    _markAsRead(index);
+
+    // Handle urgent backup - show action dialog
+    if (type == 'urgent_backup') {
+      final data = notification['data'] as Map<String, dynamic>? ?? {};
+      _showUrgentBackupDialog(data);
+    }
+  }
+
+  void _showUrgentBackupDialog(Map<String, dynamic> data) {
+    final routeName = data['route_name'] as String? ?? 'Unknown Route';
+    final startStop = data['start_stop'] as String? ?? 'Unknown Stop';
+    final vehicleNumber = data['vehicle_number'] as String? ?? 'Unknown Vehicle';
+    final vehicleCapacity = data['vehicle_capacity'] as int? ?? 0;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: context.cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: MediaQuery.of(ctx).padding.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: context.mutedColor.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 40),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Urgent Backup Required',
+              style: TextStyle(
+                color: context.textColor,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Passengers are waiting!',
+              style: TextStyle(
+                color: Colors.red,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Route info
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: context.bgColor,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                children: [
+                  _buildInfoRow(Icons.route_rounded, 'Route', routeName),
+                  const SizedBox(height: 12),
+                  _buildInfoRow(Icons.location_on, 'Start From', startStop),
+                  const SizedBox(height: 12),
+                  _buildInfoRow(Icons.directions_bus, 'Vehicle', '$vehicleNumber ($vehicleCapacity seats)'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Start button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  // Navigate to bus mode / schedule screen
+                  Navigator.pushReplacementNamed(context, '/home');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Go to Bus Schedule to start the backup trip'),
+                      backgroundColor: AppColors.yellow,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.play_arrow_rounded, size: 24),
+                    SizedBox(width: 8),
+                    Text('Go to Schedule', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(
+                'Dismiss',
+                style: TextStyle(color: context.mutedColor, fontSize: 14),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, color: context.mutedColor, size: 20),
+        const SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(color: context.mutedColor, fontSize: 12),
+            ),
+            Text(
+              value,
+              style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
   void _markAsRead(int index) async {

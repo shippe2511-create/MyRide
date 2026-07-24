@@ -748,8 +748,8 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
         final timeParts = departureTime.split(':');
         final dateParts = serviceDate.split('-');
 
-        // Create departure time in Maldives timezone
-        final departureMaldives = DateTime(
+        // Create departure time as local DateTime (device is in Maldives timezone)
+        final departureLocal = DateTime(
           int.parse(dateParts[0]),
           int.parse(dateParts[1]),
           int.parse(dateParts[2]),
@@ -757,16 +757,13 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
           int.parse(timeParts[1]),
         );
 
-        // Convert Maldives time to UTC for scheduling (subtract MVT offset)
-        final departureUtc = departureMaldives.subtract(const Duration(hours: 5));
-        final reminderUtc = departureUtc.subtract(Duration(minutes: result));
-        final nowUtc = DateTime.now().toUtc();
+        // Calculate reminder time in local timezone
+        final reminderLocal = departureLocal.subtract(Duration(minutes: result));
+        final now = DateTime.now();
 
-        debugPrint('Reminder: departureMaldives=$departureMaldives, departureUtc=$departureUtc, reminderUtc=$reminderUtc, nowUtc=$nowUtc');
+        debugPrint('Reminder: departureLocal=$departureLocal, reminderLocal=$reminderLocal, now=$now');
 
-        if (reminderUtc.isAfter(nowUtc)) {
-          // Convert back to local time for the notification scheduler
-          final reminderLocal = reminderUtc.toLocal();
+        if (reminderLocal.isAfter(now)) {
           debugPrint('Scheduling reminder for local time: $reminderLocal');
 
           await NotificationService().scheduleNotification(

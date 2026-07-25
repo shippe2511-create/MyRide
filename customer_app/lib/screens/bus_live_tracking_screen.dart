@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
@@ -71,23 +73,72 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
   }
 
   Future<void> _createStopIcons() async {
-    // Create stop icons with different colors
-    _stopIcons['green'] = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(32, 32)),
-      'assets/images/stop_green.png',
-    ).catchError((_) => BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen));
-    _stopIcons['yellow'] = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(32, 32)),
-      'assets/images/stop_yellow.png',
-    ).catchError((_) => BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow));
-    _stopIcons['red'] = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(32, 32)),
-      'assets/images/stop_red.png',
-    ).catchError((_) => BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed));
-    _stopIcons['blue'] = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(32, 32)),
-      'assets/images/stop_blue.png',
-    ).catchError((_) => BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue));
+    // Create modern circular stop icons
+    _stopIcons['green'] = await _createCircleMarker(Colors.green, '✓');
+    _stopIcons['yellow'] = await _createCircleMarker(AppColors.yellow, '');
+    _stopIcons['red'] = await _createCircleMarker(Colors.red, '');
+    _stopIcons['blue'] = await _createCircleMarker(Colors.blue, '🚌');
+    _stopIcons['start'] = await _createCircleMarker(Colors.green, 'A');
+    _stopIcons['end'] = await _createCircleMarker(Colors.red, 'B');
+  }
+
+  Future<BitmapDescriptor> _createCircleMarker(Color color, String label) async {
+    final size = 44.0;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+
+    // Outer glow/shadow
+    final shadowPaint = Paint()
+      ..color = color.withValues(alpha: 0.3)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    canvas.drawCircle(Offset(size / 2, size / 2), size / 2 - 2, shadowPaint);
+
+    // Main circle with gradient
+    final gradient = ui.Gradient.radial(
+      Offset(size / 2, size / 2 - 4),
+      size / 2,
+      [color.withValues(alpha: 1.0), color.withValues(alpha: 0.8)],
+    );
+    final circlePaint = Paint()
+      ..shader = gradient
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(size / 2, size / 2), size / 2 - 4, circlePaint);
+
+    // White border
+    final borderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+    canvas.drawCircle(Offset(size / 2, size / 2), size / 2 - 4, borderPaint);
+
+    // Label text
+    if (label.isNotEmpty) {
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: label.length == 1 ? 18 : 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+      textPainter.paint(
+        canvas,
+        Offset(
+          (size - textPainter.width) / 2,
+          (size - textPainter.height) / 2,
+        ),
+      );
+    }
+
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(size.toInt(), size.toInt());
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+
+    return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
   }
 
   @override
@@ -253,24 +304,18 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
         final isCompleted = currentStopIndex > i;
         final isCurrent = currentStopIndex == i;
 
-        // Determine marker color/icon
+        // Determine marker icon
         BitmapDescriptor icon;
-        double hue;
         if (isCompleted) {
-          hue = BitmapDescriptor.hueGreen;
-          icon = _stopIcons['green'] ?? BitmapDescriptor.defaultMarkerWithHue(hue);
+          icon = _stopIcons['green'] ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
         } else if (isCurrent) {
-          hue = BitmapDescriptor.hueBlue;
-          icon = _stopIcons['blue'] ?? BitmapDescriptor.defaultMarkerWithHue(hue);
+          icon = _stopIcons['blue'] ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue);
         } else if (isFirst) {
-          hue = BitmapDescriptor.hueGreen;
-          icon = _stopIcons['green'] ?? BitmapDescriptor.defaultMarkerWithHue(hue);
+          icon = _stopIcons['start'] ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
         } else if (isLast) {
-          hue = BitmapDescriptor.hueRed;
-          icon = _stopIcons['red'] ?? BitmapDescriptor.defaultMarkerWithHue(hue);
+          icon = _stopIcons['end'] ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
         } else {
-          hue = BitmapDescriptor.hueYellow;
-          icon = _stopIcons['yellow'] ?? BitmapDescriptor.defaultMarkerWithHue(hue);
+          icon = _stopIcons['yellow'] ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow);
         }
 
         markers.add(Marker(

@@ -211,6 +211,11 @@ export default function RemindersPage() {
     }
   }
 
+  const getCleanTitle = (title: string) => {
+    // Remove doc:<uuid> prefix if present
+    return title.replace(/^doc:[a-f0-9-]+ - /, "")
+  }
+
   const pendingReminders = reminders.filter(r => !r.is_sent && r.is_active)
   const sentReminders = reminders.filter(r => r.is_sent)
 
@@ -278,7 +283,7 @@ export default function RemindersPage() {
                 <div key={reminder.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-medium">{reminder.title}</h3>
+                      <h3 className="font-medium">{getCleanTitle(reminder.title)}</h3>
                       <Badge variant="outline">{getTargetLabel(reminder)}</Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">{reminder.message}</p>
@@ -329,7 +334,7 @@ export default function RemindersPage() {
                 <div key={reminder.id} className="flex items-center justify-between p-4 border rounded-lg opacity-60">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-medium">{reminder.title}</h3>
+                      <h3 className="font-medium">{getCleanTitle(reminder.title)}</h3>
                       <Badge variant="secondary">{getTargetLabel(reminder)}</Badge>
                       <Badge variant="outline" className="text-green-500 border-green-500">Sent</Badge>
                     </div>
@@ -430,6 +435,7 @@ export default function RemindersPage() {
                   type="date"
                   value={form.remind_date}
                   onChange={e => setForm(f => ({ ...f, remind_date: e.target.value }))}
+                  className="[color-scheme:dark] dark:[color-scheme:dark]"
                 />
               </div>
               <div className="space-y-2">
@@ -438,6 +444,7 @@ export default function RemindersPage() {
                   type="time"
                   value={form.remind_time}
                   onChange={e => setForm(f => ({ ...f, remind_time: e.target.value }))}
+                  className="[color-scheme:dark] dark:[color-scheme:dark]"
                 />
               </div>
             </div>

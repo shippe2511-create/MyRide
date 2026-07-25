@@ -52,6 +52,7 @@ import {
   Building2,
   Bell,
   MonitorPlay,
+  FileWarning,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -85,6 +86,7 @@ const navigationSections: NavSection[] = [
       { name: "Pending Changes", href: "/dashboard/pending-changes", icon: Clock, permission: "customers:view" },
       { name: "Eligibility", href: "/dashboard/eligibility", icon: Ticket, permission: "eligibility:view" },
       { name: "Service Pools", href: "/dashboard/pools", icon: Layers, permission: "pools:view" },
+      { name: "Document Expiry", href: "/dashboard/document-expiry", icon: FileWarning, permission: "drivers:view" },
     ]
   },
   {
@@ -142,7 +144,6 @@ const navigationSections: NavSection[] = [
       { name: "App Config", href: "/dashboard/app-config", icon: Smartphone, permission: "settings:view" },
       { name: "Content", href: "/dashboard/content", icon: FileText, permission: "content:view" },
       { name: "Chat", href: "/dashboard/chat", icon: MessageSquare, permission: "chat:view" },
-      { name: "Reminders", href: "/dashboard/reminders", icon: Bell, permission: "settings:view" },
       { name: "Users", href: "/dashboard/admins", icon: Shield, permission: "staff:view" },
       { name: "Departments", href: "/dashboard/departments", icon: Building2, permission: "departments:view" },
       { name: "Settings", href: "/dashboard/settings", icon: Settings, permission: "settings:view" },

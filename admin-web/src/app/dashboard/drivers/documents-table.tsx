@@ -50,8 +50,6 @@ import {
   FileText,
   ExternalLink,
   Loader2,
-  Bell,
-  Calendar,
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { formatDate } from "@/lib/utils"
@@ -95,54 +93,21 @@ export function DocumentsTable() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [typeFilter, setTypeFilter] = useState("all")
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
-  const [dialogType, setDialogType] = useState<"view" | "delete" | "reminder" | null>(null)
+  const [dialogType, setDialogType] = useState<"view" | "delete" | null>(null)
   const [updating, setUpdating] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [bulkLoading, setBulkLoading] = useState(false)
   const [driverFilter, setDriverFilter] = useState("all")
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
-  const [reminderForm, setReminderForm] = useState({
-    title: "",
-    message: "",
-    remind_date: "",
-    remind_time: "08:00",
-  })
-  const [documentReminders, setDocumentReminders] = useState<Record<string, { date: string; sent: boolean }>>({})
-
-  const loadReminders = async () => {
-    const { data } = await supabase
-      .from("reminders")
-      .select("title, remind_date, is_sent")
-      .eq("target_type", "specific_driver")
-      .like("title", "doc:%")
-
-    if (data) {
-      const reminderMap: Record<string, { date: string; sent: boolean }> = {}
-      data.forEach(r => {
-        // Title format: "doc:<document_id> - Document Expiry"
-        const match = r.title.match(/^doc:([a-f0-9-]+)/)
-        if (match) {
-          const docId = match[1]
-          reminderMap[docId] = { date: r.remind_date, sent: r.is_sent }
-        }
-      })
-      setDocumentReminders(reminderMap)
-    }
-  }
-
   useEffect(() => {
     loadDocuments(true)
     loadCurrentUser()
-    loadReminders()
 
     const channel = supabase
       .channel('documents-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
         loadDocuments(false)
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reminders' }, () => {
-        loadReminders()
       })
       .subscribe()
 
@@ -508,7 +473,6 @@ export function DocumentsTable() {
               <TableHead>Document Type</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Expiry Date</TableHead>
-              <TableHead>Reminder</TableHead>
               <TableHead>Uploaded</TableHead>
               <TableHead className="w-24"></TableHead>
             </TableRow>
@@ -516,7 +480,7 @@ export function DocumentsTable() {
           <TableBody>
             {filteredDocuments.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   No documents found
                 </TableCell>
               </TableRow>
@@ -582,21 +546,6 @@ export function DocumentsTable() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    {documentReminders[doc.id] ? (
-                      <div className="flex items-center gap-2">
-                        <Bell className="h-3 w-3" />
-                        <span className="text-sm">
-                          {formatDate(documentReminders[doc.id].date)}
-                        </span>
-                        {documentReminders[doc.id].sent && (
-                          <Badge variant="outline" className="text-xs text-green-500 border-green-500">Sent</Badge>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
                     <span className="text-sm" title={formatDate(doc.uploaded_at)}>
                       {formatRelativeDate(doc.uploaded_at)}
                     </span>
@@ -636,22 +585,6 @@ export function DocumentsTable() {
                           }}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => {
-                            setSelectedDocument(doc)
-                            const driverName = doc.driver?.profile?.full_name || "Driver"
-                            const docType = getDocTypeLabel(doc.document_type)
-                            const expiryDate = doc.expiry_date ? new Date(doc.expiry_date).toLocaleDateString("en-US", { timeZone: "Indian/Maldives", month: "short", day: "numeric", year: "numeric" }) : "N/A"
-                            setReminderForm({
-                              title: `Document Expiry Reminder`,
-                              message: `Your ${docType} expires on ${expiryDate}. Please renew it before expiry.`,
-                              remind_date: new Date().toISOString().split("T")[0],
-                              remind_time: "08:00",
-                            })
-                            setDialogType("reminder")
-                          }}>
-                            <Bell className="mr-2 h-4 w-4" />
-                            Set Reminder
                           </DropdownMenuItem>
                           {doc.status !== "rejected" && (
                             <DropdownMenuItem onSelect={() => handleReject(doc)}>
@@ -826,142 +759,6 @@ export function DocumentsTable() {
         </DialogContent>
       </Dialog>
 
-      {/* Set Reminder Dialog */}
-      <Dialog open={dialogType === "reminder"} onOpenChange={(open) => !open && setDialogType(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5" />
-              Set Document Reminder
-            </DialogTitle>
-            <DialogDescription>
-              Send a reminder to {selectedDocument?.driver?.profile?.full_name} about their {selectedDocument && getDocTypeLabel(selectedDocument.document_type)}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Title</label>
-              <Input
-                value={reminderForm.title}
-                onChange={(e) => setReminderForm(f => ({ ...f, title: e.target.value }))}
-                placeholder="Reminder title"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Message</label>
-              <Input
-                value={reminderForm.message}
-                onChange={(e) => setReminderForm(f => ({ ...f, message: e.target.value }))}
-                placeholder="Reminder message"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Date</label>
-                <Input
-                  type="date"
-                  className="[color-scheme:dark]"
-                  value={reminderForm.remind_date}
-                  onChange={(e) => setReminderForm(f => ({ ...f, remind_date: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Time</label>
-                <Input
-                  type="time"
-                  className="[color-scheme:dark]"
-                  value={reminderForm.remind_time}
-                  onChange={(e) => setReminderForm(f => ({ ...f, remind_time: e.target.value }))}
-                />
-              </div>
-            </div>
-          </div>
-          <DialogFooter className="flex justify-between">
-            <div>
-              {selectedDocument && documentReminders[selectedDocument.id] && (
-                <Button
-                  variant="destructive"
-                  onClick={async () => {
-                    if (!selectedDocument) return
-                    setUpdating(true)
-                    const { error } = await supabase
-                      .from("reminders")
-                      .delete()
-                      .like("title", `doc:${selectedDocument.id}%`)
-                    if (error) {
-                      toast.error("Failed to remove reminder")
-                    } else {
-                      toast.success("Reminder removed")
-                      setDialogType(null)
-                      loadReminders()
-                    }
-                    setUpdating(false)
-                  }}
-                  disabled={updating}
-                >
-                  Remove Reminder
-                </Button>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setDialogType(null)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={async () => {
-                  if (!selectedDocument || !reminderForm.title || !reminderForm.remind_date) {
-                    toast.error("Please fill in all fields")
-                    return
-                  }
-                  setUpdating(true)
-
-                  // Delete existing reminder first
-                  await supabase
-                    .from("reminders")
-                    .delete()
-                    .like("title", `doc:${selectedDocument.id}%`)
-
-                  // Get driver profile ID
-                  const { data: driverData, error: driverError } = await supabase
-                    .from("drivers")
-                    .select("profile_id")
-                    .eq("id", selectedDocument.driver_id)
-                    .single()
-
-                  if (driverError || !driverData?.profile_id) {
-                    console.error("Driver lookup error:", driverError)
-                    toast.error("Could not find driver profile")
-                    setUpdating(false)
-                    return
-                  }
-
-                  const { error } = await supabase.rpc("create_reminder", {
-                    p_title: `doc:${selectedDocument.id} - ${reminderForm.title}`,
-                    p_message: reminderForm.message,
-                    p_target_type: "specific_driver",
-                    p_target_id: driverData.profile_id,
-                    p_remind_date: reminderForm.remind_date,
-                    p_remind_time: reminderForm.remind_time,
-                  })
-
-                  if (error) {
-                    console.error("Reminder insert error:", error)
-                    toast.error("Failed to create reminder: " + error.message)
-                  } else {
-                    toast.success("Reminder scheduled")
-                    setDialogType(null)
-                    loadReminders()
-                  }
-                  setUpdating(false)
-                }}
-                disabled={updating}
-              >
-                {updating ? "Saving..." : "Schedule Reminder"}
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

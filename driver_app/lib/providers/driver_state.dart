@@ -292,14 +292,15 @@ class DriverState extends ChangeNotifier {
         _syncOnlineStateFromDb();
       }
 
-      // Load online state from local storage as fallback
+      // Load online state from local storage and sync to DB
       final wasOnline = prefs.getBool('isOnline') ?? false;
+      if (_driverId.isNotEmpty) {
+        // Always sync local state to DB so admin panel shows correct status
+        SupabaseService.updateDriverStatus(driverId: _driverId, isOnline: wasOnline);
+      }
       if (wasOnline && _driverId.isNotEmpty) {
         _isOnline = true;
         // Will re-initialize subscriptions in home_screen via goOnline check
-
-        // Sync to DB immediately so admin panel shows correct status
-        SupabaseService.updateDriverStatus(driverId: _driverId, isOnline: true);
 
         // Restore shift start time
         final shiftStartStr = prefs.getString('shiftStartTime');

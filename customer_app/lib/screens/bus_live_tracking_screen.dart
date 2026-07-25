@@ -357,10 +357,10 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
 
     _mapController?.animateCamera(CameraUpdate.newLatLngBounds(
       LatLngBounds(
-        southwest: LatLng(minLat - 0.005, minLng - 0.005),
-        northeast: LatLng(maxLat + 0.005, maxLng + 0.005),
+        southwest: LatLng(minLat - 0.002, minLng - 0.002),
+        northeast: LatLng(maxLat + 0.002, maxLng + 0.002),
       ),
-      50,
+      80,
     ));
   }
 
@@ -415,7 +415,7 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
           GoogleMap(
             initialCameraPosition: const CameraPosition(
               target: LatLng(4.1755, 73.5093),
-              zoom: 14,
+              zoom: 15,
             ),
             onMapCreated: (controller) {
               _mapController = controller;

@@ -236,7 +236,7 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
         circles.add(Circle(
           circleId: CircleId('stop_$i'),
           center: position,
-          radius: isSelected || isCurrent ? 25 : 18,
+          radius: isSelected || isCurrent ? 45 : 35,
           fillColor: isCompleted
               ? Colors.green.withValues(alpha: 0.9)
               : isCurrent
@@ -247,7 +247,7 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
                           ? Colors.red.withValues(alpha: 0.7)
                           : AppColors.yellow.withValues(alpha: 0.8),
           strokeColor: isSelected ? Colors.white : Colors.black54,
-          strokeWidth: isSelected ? 3 : 2,
+          strokeWidth: isSelected ? 4 : 3,
           consumeTapEvents: true,
           onTap: () => _onStopTapped(i),
         ));

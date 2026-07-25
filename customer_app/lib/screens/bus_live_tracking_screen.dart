@@ -43,11 +43,13 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
   Map<String, dynamic>? _selectedBus;
   Set<Marker> _markers = {};
   Set<Polyline> _polylines = {};
-  Set<Circle> _circles = {};
   List<LatLng> _routePoints = []; // Straight lines between consecutive stops
 
   bool _isLoading = true;
   int? _selectedStopIndex;
+
+  // Cached stop marker icons
+  final Map<String, BitmapDescriptor> _stopIcons = {};
   MapType _mapType = MapType.normal;
   bool _trafficEnabled = false;
 
@@ -62,9 +64,30 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat();
+    _createStopIcons();
     _loadData();
     _setupRealtimeSubscription();
     _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) => _loadActiveBuses());
+  }
+
+  Future<void> _createStopIcons() async {
+    // Create stop icons with different colors
+    _stopIcons['green'] = await BitmapDescriptor.asset(
+      const ImageConfiguration(size: Size(32, 32)),
+      'assets/images/stop_green.png',
+    ).catchError((_) => BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen));
+    _stopIcons['yellow'] = await BitmapDescriptor.asset(
+      const ImageConfiguration(size: Size(32, 32)),
+      'assets/images/stop_yellow.png',
+    ).catchError((_) => BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow));
+    _stopIcons['red'] = await BitmapDescriptor.asset(
+      const ImageConfiguration(size: Size(32, 32)),
+      'assets/images/stop_red.png',
+    ).catchError((_) => BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed));
+    _stopIcons['blue'] = await BitmapDescriptor.asset(
+      const ImageConfiguration(size: Size(32, 32)),
+      'assets/images/stop_blue.png',
+    ).catchError((_) => BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue));
   }
 
   @override
@@ -208,7 +231,6 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
   void _updateMapElements() {
     Set<Marker> markers = {};
     Set<Polyline> polylines = {};
-    Set<Circle> circles = {};
 
     // Determine current stop index from active bus (if any)
     int currentStopIndex = -1;
@@ -217,7 +239,7 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
       currentStopIndex = bus['current_stop_index'] as int? ?? -1;
     }
 
-    // Add stop circles
+    // Add stop markers (fixed size regardless of zoom)
     for (int i = 0; i < _stops.length; i++) {
       final stop = _stops[i];
       final lat = double.tryParse(stop['latitude']?.toString() ?? '');
@@ -230,37 +252,35 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
         final isLast = i == _stops.length - 1;
         final isCompleted = currentStopIndex > i;
         final isCurrent = currentStopIndex == i;
-        final isSelected = _selectedStopIndex == i;
 
-        // Use circles for stops
-        circles.add(Circle(
-          circleId: CircleId('stop_$i'),
-          center: position,
-          radius: isSelected || isCurrent ? 45 : 35,
-          fillColor: isCompleted
-              ? Colors.green.withValues(alpha: 0.9)
-              : isCurrent
-                  ? Colors.blue.withValues(alpha: 0.9)
-                  : isFirst
-                      ? Colors.green.withValues(alpha: 0.7)
-                      : isLast
-                          ? Colors.red.withValues(alpha: 0.7)
-                          : AppColors.yellow.withValues(alpha: 0.8),
-          strokeColor: isSelected ? Colors.white : Colors.black54,
-          strokeWidth: isSelected ? 4 : 3,
-          consumeTapEvents: true,
-          onTap: () => _onStopTapped(i),
-        ));
+        // Determine marker color/icon
+        BitmapDescriptor icon;
+        double hue;
+        if (isCompleted) {
+          hue = BitmapDescriptor.hueGreen;
+          icon = _stopIcons['green'] ?? BitmapDescriptor.defaultMarkerWithHue(hue);
+        } else if (isCurrent) {
+          hue = BitmapDescriptor.hueBlue;
+          icon = _stopIcons['blue'] ?? BitmapDescriptor.defaultMarkerWithHue(hue);
+        } else if (isFirst) {
+          hue = BitmapDescriptor.hueGreen;
+          icon = _stopIcons['green'] ?? BitmapDescriptor.defaultMarkerWithHue(hue);
+        } else if (isLast) {
+          hue = BitmapDescriptor.hueRed;
+          icon = _stopIcons['red'] ?? BitmapDescriptor.defaultMarkerWithHue(hue);
+        } else {
+          hue = BitmapDescriptor.hueYellow;
+          icon = _stopIcons['yellow'] ?? BitmapDescriptor.defaultMarkerWithHue(hue);
+        }
 
-        // Add number label as marker
         markers.add(Marker(
-          markerId: MarkerId('stop_label_$i'),
+          markerId: MarkerId('stop_$i'),
           position: position,
-          icon: BitmapDescriptor.defaultMarker,
-          alpha: 0.01, // Nearly invisible, just for tap handling
+          icon: icon,
+          anchor: const Offset(0.5, 0.5),
           infoWindow: InfoWindow(
             title: stop['stop_name'] ?? 'Stop ${i + 1}',
-            snippet: isCompleted ? 'Completed' : isCurrent ? 'Current Stop' : isFirst ? 'Start' : isLast ? 'End' : 'Stop ${i + 1}',
+            snippet: isCompleted ? 'Passed' : isCurrent ? 'Bus Here' : isFirst ? 'Start' : isLast ? 'End' : 'Stop ${i + 1}',
           ),
           onTap: () => _onStopTapped(i),
         ));
@@ -307,7 +327,6 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
     setState(() {
       _markers = markers;
       _polylines = polylines;
-      _circles = circles;
     });
   }
 
@@ -427,7 +446,6 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
             style: _mapType == MapType.normal && isDark ? _darkMapStyle : null,
             markers: _markers,
             polylines: _polylines,
-            circles: _circles,
             mapType: _mapType,
             trafficEnabled: _trafficEnabled,
             myLocationEnabled: true,

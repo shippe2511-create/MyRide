@@ -134,8 +134,10 @@ class _LoginScreenState extends State<LoginScreen> {
       final existingUser = await SupabaseService.checkPhoneExists(fullPhone);
 
       if (existingUser != null) {
-        if (existingUser['role'] != 'driver') {
-          _showError('Please use the Customer app to login');
+        // Check if user is in drivers table (any role can be a driver)
+        final driverRecord = await SupabaseService.getDriverByProfileId(existingUser['id']);
+        if (driverRecord == null) {
+          _showError('Not registered as a driver. Please register first.');
           setState(() => _isLoading = false);
           return;
         }
@@ -161,17 +163,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
         final driverState = Provider.of<DriverState>(context, listen: false);
 
-        // Get driver record using profile UUID
-        debugPrint('LOGIN: Looking up driver with profile_id=${existingUser['id']}');
-        final driverProfile = await SupabaseService.getDriverByProfileId(existingUser['id']);
-
-        if (driverProfile == null) {
-          debugPrint('LOGIN: No driver found for profile_id=${existingUser['id']}');
-          _showError('Driver profile not found');
-          setState(() => _isLoading = false);
-          return;
-        }
-
+        // Already verified driver exists above
+        final driverProfile = driverRecord;
         debugPrint('LOGIN: Found driver record: id=${driverProfile['id']}, profile_id=${driverProfile['profile_id']}');
 
         String vehicleNumber = '';

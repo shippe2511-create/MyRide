@@ -23,51 +23,72 @@ function useDriversData(search?: string, status?: string, page: number = 1) {
       const start = (page - 1) * pageSize
       const end = start + pageSize - 1
 
+      // Query from drivers table joined with profiles (not filtered by role)
       let query = supabase
-        .from("profiles")
-        .select("*", { count: "exact" })
-        .eq("role", "driver")
-        .order("full_name", { ascending: true })
-
-      if (search) {
-        query = query.or(`full_name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`)
-      }
+        .from("drivers")
+        .select(`
+          id,
+          profile_id,
+          vehicle_id,
+          department_id,
+          is_online,
+          is_on_break,
+          break_type,
+          break_start_time,
+          total_trips,
+          rating,
+          updated_at,
+          profiles!inner(id, full_name, email, phone, avatar_url, status, employee_id, role),
+          vehicle:vehicle_types(id, display_name, plate_no),
+          department:departments(id, name)
+        `, { count: "exact" })
+        .order("profiles(full_name)", { ascending: true })
 
       if (status) {
-        query = query.eq("status", status)
+        query = query.eq("profiles.status", status)
       }
 
       query = query.range(start, end)
 
-      const [driversRes, driverRecordsRes, totalRes, activeRes, pendingRes] = await Promise.all([
+      const [driversRes, totalRes, activeRes, pendingRes] = await Promise.all([
         query,
-        supabase.from("drivers").select("id, profile_id, vehicle_id, department_id, is_online, is_on_break, break_type, break_start_time, total_trips, rating, updated_at, vehicle:vehicle_types(id, display_name, plate_no), department:departments(id, name)"),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver"),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver").eq("status", "approved"),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver").eq("status", "pending"),
+        supabase.from("drivers").select("*", { count: "exact", head: true }),
+        supabase.from("drivers").select("*, profiles!inner(*)", { count: "exact", head: true }).eq("profiles.status", "approved"),
+        supabase.from("drivers").select("*, profiles!inner(*)", { count: "exact", head: true }).eq("profiles.status", "pending"),
       ])
 
-      const driverRecords = driverRecordsRes.data || []
-      const driversWithVehicles = (driversRes.data || []).map(profile => {
-        const driverRecord = driverRecords.find(d => d.profile_id === profile.id)
+      // Transform driver records to match expected format
+      let driversWithVehicles = (driversRes.data || []).map(driver => {
+        const profile = driver.profiles as any
         return {
           ...profile,
-          driver_record: driverRecord ? {
-            id: driverRecord.id,
-            vehicle_id: driverRecord.vehicle_id,
-            vehicle: driverRecord.vehicle,
-            department_id: driverRecord.department_id,
-            department: driverRecord.department,
-            is_online: driverRecord.is_online,
-            is_on_break: driverRecord.is_on_break,
-            break_type: driverRecord.break_type,
-            break_start_time: driverRecord.break_start_time,
-            total_trips: driverRecord.total_trips,
-            rating: driverRecord.rating,
-            updated_at: driverRecord.updated_at,
-          } : null
+          driver_record: {
+            id: driver.id,
+            vehicle_id: driver.vehicle_id,
+            vehicle: driver.vehicle,
+            department_id: driver.department_id,
+            department: driver.department,
+            is_online: driver.is_online,
+            is_on_break: driver.is_on_break,
+            break_type: driver.break_type,
+            break_start_time: driver.break_start_time,
+            total_trips: driver.total_trips,
+            rating: driver.rating,
+            updated_at: driver.updated_at,
+          }
         }
       })
+
+      // Client-side search filter (Supabase doesn't support .or() on nested fields)
+      if (search) {
+        const searchLower = search.toLowerCase()
+        driversWithVehicles = driversWithVehicles.filter(d =>
+          d.full_name?.toLowerCase().includes(searchLower) ||
+          d.phone?.toLowerCase().includes(searchLower) ||
+          d.email?.toLowerCase().includes(searchLower) ||
+          d.employee_id?.toLowerCase().includes(searchLower)
+        )
+      }
 
       return {
         drivers: driversWithVehicles,

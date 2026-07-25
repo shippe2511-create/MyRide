@@ -1844,39 +1844,36 @@ export default function ReportsPage() {
 
         case "bus_passenger_counts": {
           let query = supabase
-            .from("stop_passenger_counts")
+            .from("bus_location_tracking")
             .select(`
-              boarded_count, alighted_count, stop_index, stop_name, recorded_at,
-              bus_trip:bus_trips!stop_passenger_counts_bus_trip_id_fkey(
-                roster_assignment:roster_assignments!bus_trips_roster_assignment_id_fkey(
-                  route:transport_routes!roster_assignments_route_id_fkey(route_name),
-                  driver:drivers!roster_assignments_driver_id_fkey(
-                    profile:profiles!drivers_profile_id_fkey(full_name)
-                  )
-                )
+              current_stop_name, current_stop_index, passengers_on_board, vehicle_capacity,
+              is_full, last_updated_at, vehicle_number,
+              route:transport_routes!bus_location_tracking_route_id_fkey(route_name),
+              driver:drivers!bus_location_tracking_driver_id_fkey(
+                profile:profiles!drivers_profile_id_fkey(full_name)
               )
             `)
-            .order("recorded_at", { ascending: false })
+            .order("last_updated_at", { ascending: false })
 
           if (dateFilter) {
-            query = query.gte("recorded_at", dateFilter.start).lte("recorded_at", dateFilter.end + "T23:59:59")
+            query = query.gte("last_updated_at", dateFilter.start).lte("last_updated_at", dateFilter.end + "T23:59:59")
           }
 
           const { data: counts } = await query
 
           rows = (counts || []).map((c: Record<string, unknown>) => {
-            const busTripData = c.bus_trip as Record<string, unknown> | null
-            const rosterData = busTripData?.roster_assignment as Record<string, unknown> | null
-            const routeData = rosterData?.route as Record<string, unknown> | null
-            const driverData = rosterData?.driver as Record<string, unknown> | null
+            const routeData = c.route as Record<string, unknown> | null
+            const driverData = c.driver as Record<string, unknown> | null
             const profileData = driverData?.profile as Record<string, unknown> | null
             return {
-              "Date": formatDateTime(String(c.recorded_at || "")),
+              "Date": formatDateTime(String(c.last_updated_at || "")),
               "Route": String(routeData?.route_name || "-"),
-              "Stop": String(c.stop_name || "-"),
-              "Stop Order": String((c.stop_index as number || 0) + 1),
-              "Boarded": String(c.boarded_count || 0),
-              "Alighted": String(c.alighted_count || 0),
+              "Stop": String(c.current_stop_name || "-"),
+              "Stop #": String((c.current_stop_index as number || 0) + 1),
+              "Passengers": String(c.passengers_on_board || 0),
+              "Capacity": String(c.vehicle_capacity || 0),
+              "Full": c.is_full ? "Yes" : "No",
+              "Vehicle": String(c.vehicle_number || "-"),
               "Driver": String(profileData?.full_name || "-"),
             }
           })
@@ -2689,10 +2686,10 @@ export default function ReportsPage() {
           break
         }
         case "bus_passenger_counts": {
-          let query = supabase.from("stop_passenger_counts").select(`boarded_count, alighted_count, stop_index, stop_name, recorded_at, bus_trip:bus_trips!stop_passenger_counts_bus_trip_id_fkey(roster_assignment:roster_assignments!bus_trips_roster_assignment_id_fkey(route:transport_routes!roster_assignments_route_id_fkey(route_name), driver:drivers!roster_assignments_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))))`).order("recorded_at", { ascending: false })
-          if (dateFilter) { query = query.gte("recorded_at", dateFilter.start).lte("recorded_at", dateFilter.end + "T23:59:59") }
+          let query = supabase.from("bus_location_tracking").select(`current_stop_name, current_stop_index, passengers_on_board, vehicle_capacity, is_full, last_updated_at, vehicle_number, route:transport_routes!bus_location_tracking_route_id_fkey(route_name), driver:drivers!bus_location_tracking_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`).order("last_updated_at", { ascending: false })
+          if (dateFilter) { query = query.gte("last_updated_at", dateFilter.start).lte("last_updated_at", dateFilter.end + "T23:59:59") }
           const { data: counts } = await query
-          rows = (counts || []).map((c: Record<string, unknown>) => { const bt = c.bus_trip as Record<string, unknown> | null; const ra = bt?.roster_assignment as Record<string, unknown> | null; const rt = ra?.route as Record<string, unknown> | null; const dr = ra?.driver as Record<string, unknown> | null; const pr = dr?.profile as Record<string, unknown> | null; return { "Date": formatDateTime(String(c.recorded_at || "")), "Route": String(rt?.route_name || "-"), "Stop": String(c.stop_name || "-"), "Stop Order": String((c.stop_index as number || 0) + 1), "Boarded": String(c.boarded_count || 0), "Alighted": String(c.alighted_count || 0), "Driver": String(pr?.full_name || "-") } })
+          rows = (counts || []).map((c: Record<string, unknown>) => { const rt = c.route as Record<string, unknown> | null; const dr = c.driver as Record<string, unknown> | null; const pr = dr?.profile as Record<string, unknown> | null; return { "Date": formatDateTime(String(c.last_updated_at || "")), "Route": String(rt?.route_name || "-"), "Stop": String(c.current_stop_name || "-"), "Stop #": String((c.current_stop_index as number || 0) + 1), "Passengers": String(c.passengers_on_board || 0), "Capacity": String(c.vehicle_capacity || 0), "Full": c.is_full ? "Yes" : "No", "Vehicle": String(c.vehicle_number || "-"), "Driver": String(pr?.full_name || "-") } })
           break
         }
         case "bus_trips": {

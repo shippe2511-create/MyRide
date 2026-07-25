@@ -1797,14 +1797,14 @@ class SupabaseService {
             .select()
             .eq('driver_id', id)
             .eq('log_type', logType)
-            .order('log_date', ascending: false)
+            .order('created_at', ascending: false)
             .limit(limit);
       } else {
         response = await client
             .from('vehicle_logs')
             .select()
             .eq('driver_id', id)
-            .order('log_date', ascending: false)
+            .order('created_at', ascending: false)
             .limit(limit);
       }
       return List<Map<String, dynamic>>.from(response);

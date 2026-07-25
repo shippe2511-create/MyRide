@@ -28,6 +28,21 @@ export default function DocumentExpiryPage() {
 
   useEffect(() => {
     loadExpiringDocuments()
+
+    // Realtime subscription for documents changes
+    const channel = supabase
+      .channel('document-expiry-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
+        loadExpiringDocuments()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'document_expiry_reminders' }, () => {
+        loadExpiringDocuments()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const loadExpiringDocuments = async () => {

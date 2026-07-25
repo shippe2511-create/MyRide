@@ -83,6 +83,7 @@ export default function AdminsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [departments, setDepartments] = useState<Department[]>([])
+  const [searchQuery, setSearchQuery] = useState("")
 
   const [formData, setFormData] = useState({
     full_name: "",
@@ -472,7 +473,7 @@ export default function AdminsPage() {
           {isSuperAdmin && (
             <Button size="sm" onClick={() => setDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Add Admin
+              Add User
             </Button>
           )}
         </div>
@@ -495,6 +496,21 @@ export default function AdminsPage() {
             </Card>
           )
         })}
+      </div>
+
+      {/* Search */}
+      <div className="flex items-center gap-3">
+        <Input
+          placeholder="Search by name, email, or phone..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="max-w-sm"
+        />
+        {searchQuery && (
+          <Button variant="ghost" size="sm" onClick={() => setSearchQuery("")}>
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       {/* Bulk Action Bar */}
@@ -521,13 +537,25 @@ export default function AdminsPage() {
       )}
 
       <Card className="p-4">
+        {(() => {
+          const filteredAdmins = admins.filter(admin => {
+            if (!searchQuery) return true
+            const q = searchQuery.toLowerCase()
+            return (
+              admin.full_name?.toLowerCase().includes(q) ||
+              admin.email?.toLowerCase().includes(q) ||
+              admin.phone?.toLowerCase().includes(q) ||
+              admin.dept_relation?.name?.toLowerCase().includes(q)
+            )
+          })
+          return (
         <Table>
           <TableHeader>
             <TableRow>
               {isSuperAdmin && (
                 <TableHead className="w-12">
                   <Checkbox
-                    checked={admins.length > 0 && selectedIds.size === admins.length}
+                    checked={filteredAdmins.length > 0 && selectedIds.size === filteredAdmins.length}
                     onCheckedChange={toggleSelectAll}
                   />
                 </TableHead>
@@ -542,14 +570,14 @@ export default function AdminsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {admins.length === 0 ? (
+            {filteredAdmins.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={isSuperAdmin ? 8 : 7} className="text-center py-8 text-muted-foreground">
-                  No admin users found
+                  {searchQuery ? "No matching users found" : "No admin users found"}
                 </TableCell>
               </TableRow>
             ) : (
-              admins.map(admin => (
+              filteredAdmins.map(admin => (
                 <TableRow key={admin.id} className={`group hover:bg-muted/50 transition-colors ${selectedIds.has(admin.id) ? 'bg-muted/50' : ''}`}>
                   {isSuperAdmin && (
                     <TableCell>
@@ -645,6 +673,8 @@ export default function AdminsPage() {
             )}
           </TableBody>
         </Table>
+          )
+        })()}
       </Card>
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>

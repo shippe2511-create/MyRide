@@ -469,14 +469,17 @@ class SupabaseService {
       final today = DateTime.now();
       final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
+      debugPrint('Checking bus assignment for driver $driverId on $todayStr');
+
       final result = await client
           .from('roster_assignments')
           .select('id')
           .eq('driver_id', driverId)
-          .eq('date', todayStr)
+          .eq('service_date', todayStr)
           .limit(1);
 
-      return (result as List).isNotEmpty;
+      debugPrint('Bus assignment result: ${(result as List).length} found');
+      return result.isNotEmpty;
     } catch (e) {
       debugPrint('Error checking bus assignment: $e');
       return false;

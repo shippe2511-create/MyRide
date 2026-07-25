@@ -49,6 +49,7 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
 
   bool _isLoading = true;
   int? _selectedStopIndex;
+  bool _hasInitialFit = false;
 
   // Cached stop marker icons
   final Map<String, BitmapDescriptor> _stopIcons = {};
@@ -373,6 +374,12 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
       _markers = markers;
       _polylines = polylines;
     });
+
+    // Fit map to show all markers after first load
+    if (markers.isNotEmpty && _mapController != null && !_hasInitialFit) {
+      _hasInitialFit = true;
+      Future.delayed(const Duration(milliseconds: 300), _fitAllMarkers);
+    }
   }
 
   void _onStopTapped(int index) {

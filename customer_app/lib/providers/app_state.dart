@@ -238,8 +238,9 @@ class AppState extends ChangeNotifier {
     if (_profileId == null) return;
     try {
       final profile = await SupabaseService.getProfile();
+      // Always clear first to avoid showing previous user's contacts
+      _emergencyContacts.clear();
       if (profile != null && profile['emergency_contacts'] != null) {
-        _emergencyContacts.clear();
         final contacts = profile['emergency_contacts'] as List<dynamic>;
         for (final c in contacts) {
           _emergencyContacts.add({
@@ -248,8 +249,8 @@ class AppState extends ChangeNotifier {
             'relation': c['relation']?.toString() ?? '',
           });
         }
-        notifyListeners();
       }
+      notifyListeners();
     } catch (e) {
       debugPrint('Error loading emergency contacts: $e');
     }
@@ -259,8 +260,9 @@ class AppState extends ChangeNotifier {
     if (_profileId == null) return;
     try {
       final profile = await SupabaseService.getProfile();
+      // Always clear first to avoid showing previous user's data
+      _blockedUsers.clear();
       if (profile != null && profile['blocked_users'] != null) {
-        _blockedUsers.clear();
         final blocked = profile['blocked_users'] as List<dynamic>;
         for (final b in blocked) {
           _blockedUsers.add(b.toString());
@@ -335,7 +337,8 @@ class AppState extends ChangeNotifier {
     _userPhone = phone;
     if (staffId != null) _staffId = staffId;
     if (profileId != null) _profileId = profileId;
-    if (avatarUrl != null && avatarUrl.isNotEmpty) _avatarUrl = avatarUrl;
+    // Always set avatar (even if null) to avoid showing previous user's photo
+    _avatarUrl = (avatarUrl != null && avatarUrl.isNotEmpty) ? avatarUrl : null;
     _userInitials = name.isNotEmpty
         ? name.split(' ').map((n) => n.isNotEmpty ? n[0] : '').take(2).join().toUpperCase()
         : 'U';
@@ -348,6 +351,8 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     if (_avatarUrl != null) {
       await prefs.setString('avatar_url', _avatarUrl!);
+    } else {
+      await prefs.remove('avatar_url');
     }
   }
 
@@ -1080,6 +1085,7 @@ class AppState extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error signing out: $e');
     }
+    // Clear all user data
     _profileId = null;
     _userName = '';
     _userInitials = '';
@@ -1090,6 +1096,11 @@ class AppState extends ChangeNotifier {
     _isSuspended = false;
     _profileSubscription?.unsubscribe();
     _profileSubscription = null;
+
+    // Clear user-specific cached data
+    _emergencyContacts.clear();
+    _blockedUsers.clear();
+    _tripHistory.clear();
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('profile_id');

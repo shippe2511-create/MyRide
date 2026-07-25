@@ -1228,7 +1228,10 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="customer">Customer</SelectItem>
+                    <SelectItem value="viewer">Viewer</SelectItem>
+                    <SelectItem value="support">Support</SelectItem>
                     <SelectItem value="operator">Operator</SelectItem>
+                    <SelectItem value="supervisor">Supervisor</SelectItem>
                     <SelectItem value="manager">Manager</SelectItem>
                     <SelectItem value="super_admin">Super Admin</SelectItem>
                   </SelectContent>

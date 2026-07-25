@@ -41,8 +41,8 @@ export const ALL_PERMISSIONS = [
 
 export type Permission = typeof ALL_PERMISSIONS[number]
 
-// 5-tier RBAC: super_admin > manager > operator > support > viewer
-export type Role = "super_admin" | "manager" | "operator" | "support" | "viewer"
+// 6-tier RBAC: super_admin > manager > supervisor > operator > support > viewer
+export type Role = "super_admin" | "manager" | "supervisor" | "operator" | "support" | "viewer"
 
 // Permission categories for UI grouping
 export const PERMISSION_CATEGORIES: Record<string, { label: string; permissions: Permission[] }> = {
@@ -128,6 +128,25 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "ratings:view", "ratings:manage",
     "reports:view", "reports:export",
     "audit:view",
+  ],
+
+  // Supervisor: Oversee operations (view all, manage rides/schedules/drivers). NO settings/staff
+  "supervisor": [
+    "dashboard:view",
+    "customers:view",
+    "drivers:view", "drivers:manage",
+    "vehicles:view",
+    "rides:view", "rides:manage",
+    "tracking:view",
+    "schedules:view", "schedules:manage",
+    "pretrip:view",
+    "pools:view",
+    "content:view",
+    "zones:view",
+    "chat:view", "chat:manage",
+    "sos:view", "sos:manage",
+    "ratings:view", "ratings:manage",
+    "reports:view",
   ],
 
   // Operator: Dispatch/support (view rides, live tracking, handle active trips). NO management
@@ -249,6 +268,7 @@ export function getPermissionLabel(permission: Permission): string {
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
   "super_admin": "Full system access including staff management and all settings",
   "manager": "Manage operations: drivers, vehicles, pools, customers, reports. Cannot manage staff or settings.",
+  "supervisor": "Oversee operations: manage drivers, rides, schedules. View reports. No customer/vehicle management.",
   "operator": "Dispatch & support: view rides, live tracking, handle active trips. Limited management access.",
   "support": "Customer support: chat, SOS alerts, ratings. No dispatch or management access.",
   "viewer": "Read-only access to all pages. Cannot make any changes.",
@@ -257,6 +277,7 @@ export const ROLE_DESCRIPTIONS: Record<Role, string> = {
 export const ROLE_COLORS: Record<Role, string> = {
   "super_admin": "bg-red-500",
   "manager": "bg-blue-500",
+  "supervisor": "bg-orange-500",
   "operator": "bg-green-500",
   "support": "bg-purple-500",
   "viewer": "bg-gray-500",
@@ -265,10 +286,11 @@ export const ROLE_COLORS: Record<Role, string> = {
 export const ROLE_LABELS: Record<Role, string> = {
   "super_admin": "Super Admin",
   "manager": "Manager",
+  "supervisor": "Supervisor",
   "operator": "Operator",
   "support": "Support",
   "viewer": "Viewer",
 }
 
 // All valid staff roles
-export const STAFF_ROLES: Role[] = ["super_admin", "manager", "operator", "support", "viewer"]
+export const STAFF_ROLES: Role[] = ["super_admin", "manager", "supervisor", "operator", "support", "viewer"]

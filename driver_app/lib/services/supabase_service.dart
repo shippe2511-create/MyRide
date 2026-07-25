@@ -2222,13 +2222,23 @@ class SupabaseService {
                 .eq('id', vehicleId)
                 .maybeSingle();
             if (vehicleData != null) {
-              // Parse name like "st26_c1290" to "ST26 (C1290)"
+              // Parse name like "st26_c1290" or "st_34_c1305" to "ST26 (C1290)" or "ST34 (C1305)"
               final name = vehicleData['name'] as String? ?? '';
-              final parts = name.split('_');
-              String vehicleNumber = name;
-              if (parts.length == 2) {
-                vehicleNumber = '${parts[0].toUpperCase()} (${parts[1].toUpperCase()})';
+              String vehicleNumber = name.toUpperCase();
+
+              // Try to extract plate and code from various formats
+              final regex = RegExp(r'[Ss][Tt]_?(\d+)_[Cc](\d+)');
+              final match = regex.firstMatch(name);
+              if (match != null) {
+                vehicleNumber = 'ST${match.group(1)} (C${match.group(2)})';
+              } else if (name.contains('_')) {
+                // Fallback: split by underscore and format
+                final parts = name.split('_');
+                if (parts.length == 2) {
+                  vehicleNumber = '${parts[0].toUpperCase()} (${parts[1].toUpperCase()})';
+                }
               }
+
               map['vehicle'] = {
                 'id': vehicleData['id'],
                 'vehicle_number': vehicleNumber,

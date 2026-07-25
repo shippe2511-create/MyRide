@@ -83,7 +83,7 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
   }
 
   Future<BitmapDescriptor> _createCircleMarker(Color color, String label) async {
-    final size = 44.0;
+    final size = 28.0;
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
 
@@ -108,7 +108,7 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
     final borderPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3;
+      ..strokeWidth = 2;
     canvas.drawCircle(Offset(size / 2, size / 2), size / 2 - 4, borderPaint);
 
     // Label text
@@ -118,7 +118,7 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
           text: label,
           style: TextStyle(
             color: Colors.white,
-            fontSize: label.length == 1 ? 18 : 14,
+            fontSize: label.length == 1 ? 12 : 10,
             fontWeight: FontWeight.bold,
           ),
         ),

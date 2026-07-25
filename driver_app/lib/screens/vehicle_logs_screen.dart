@@ -475,7 +475,7 @@ class _VehicleLogsScreenState extends State<VehicleLogsScreen> with SingleTicker
         ),
         confirmDismiss: (_) async {
           HapticFeedback.mediumImpact();
-          return await showDialog<bool>(
+          final confirm = await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
               backgroundColor: context.cardColor,
@@ -494,10 +494,24 @@ class _VehicleLogsScreenState extends State<VehicleLogsScreen> with SingleTicker
               ],
             ),
           ) ?? false;
+
+          if (confirm) {
+            // Actually delete from database and wait for it
+            final success = await SupabaseService.deleteVehicleLog(log['id']);
+            if (success) {
+              setState(() => _logs.removeAt(index));
+              return true;
+            } else {
+              if (mounted) {
+                AppSnackbar.error(context, 'Failed to delete');
+              }
+              return false;
+            }
+          }
+          return false;
         },
         onDismissed: (_) {
-          SupabaseService.deleteVehicleLog(log['id']);
-          setState(() => _logs.removeAt(index));
+          // Already handled in confirmDismiss
         },
         child: Container(
           margin: const EdgeInsets.only(bottom: 12),

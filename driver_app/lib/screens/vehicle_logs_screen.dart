@@ -418,6 +418,7 @@ class _VehicleLogsScreenState extends State<VehicleLogsScreen> with SingleTicker
   Widget _buildLogCard(Map<String, dynamic> log, int index) {
     final type = log['log_type'] ?? 'fuel';
     final amount = (log['amount'] ?? 0).toDouble();
+    final fuelAmount = (log['fuel_amount'] ?? 0).toDouble(); // Liters for fuel
     final odometer = log['odometer'];
     final notes = log['notes'] ?? '';
     final dateStr = log['log_date'] ?? '';
@@ -582,16 +583,18 @@ class _VehicleLogsScreenState extends State<VehicleLogsScreen> with SingleTicker
                         ],
                       ),
                     ),
-                    // Amount
+                    // Amount/Liters display
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          'MVR',
+                          type == 'fuel' ? 'Liters' : 'MVR',
                           style: TextStyle(color: context.mutedColor, fontSize: 11, fontWeight: FontWeight.w500),
                         ),
                         Text(
-                          NumberFormat('#,##0.00').format(amount),
+                          type == 'fuel'
+                            ? NumberFormat('#,##0.0').format(fuelAmount)
+                            : NumberFormat('#,##0.00').format(amount),
                           style: TextStyle(
                             color: context.textColor,
                             fontWeight: FontWeight.w800,
@@ -615,7 +618,7 @@ class _VehicleLogsScreenState extends State<VehicleLogsScreen> with SingleTicker
       return const Center(child: CircularProgressIndicator(color: AppColors.yellow));
     }
 
-    final fuelTotal = (_stats['fuel_total'] ?? 0).toDouble();
+    final fuelLiters = (_stats['fuel_liters'] ?? 0).toDouble();  // Liters for fuel
     final fuelCount = _stats['fuel_count'] ?? 0;
     final maintenanceTotal = (_stats['maintenance_total'] ?? 0).toDouble();
     final maintenanceCount = _stats['maintenance_count'] ?? 0;
@@ -623,7 +626,7 @@ class _VehicleLogsScreenState extends State<VehicleLogsScreen> with SingleTicker
     final repairCount = _stats['repair_count'] ?? 0;
     final cleaningTotal = (_stats['cleaning_total'] ?? 0).toDouble();
     final cleaningCount = _stats['cleaning_count'] ?? 0;
-    final total = (_stats['total'] ?? 0).toDouble();
+    final total = (_stats['total'] ?? 0).toDouble();  // Total expenses (service + repair + cleaning)
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -702,7 +705,7 @@ class _VehicleLogsScreenState extends State<VehicleLogsScreen> with SingleTicker
             crossAxisSpacing: 12,
             childAspectRatio: 1.3,
             children: [
-              _buildStatCard('Fuel', fuelTotal, fuelCount, Icons.local_gas_station_rounded, Colors.orange),
+              _buildStatCard('Fuel', fuelLiters, fuelCount, Icons.local_gas_station_rounded, Colors.orange, isLiters: true),
               _buildStatCard('Service', maintenanceTotal, maintenanceCount, Icons.build_rounded, Colors.blue),
               _buildStatCard('Repair', repairTotal, repairCount, Icons.handyman_rounded, Colors.red),
               _buildStatCard('Cleaning', cleaningTotal, cleaningCount, Icons.cleaning_services_rounded, Colors.green),
@@ -738,15 +741,15 @@ class _VehicleLogsScreenState extends State<VehicleLogsScreen> with SingleTicker
                 ),
                 const SizedBox(height: 16),
                 _buildInsightRow(
-                  'Fuel is your biggest expense',
-                  '${((fuelTotal / (total > 0 ? total : 1)) * 100).toStringAsFixed(0)}% of total',
+                  'Total fuel consumption',
+                  '${NumberFormat('#,##0.0').format(fuelLiters)} liters this month',
                   Icons.local_gas_station_rounded,
                   Colors.orange,
                 ),
                 const SizedBox(height: 12),
                 _buildInsightRow(
-                  'Average fuel cost',
-                  'MVR ${(fuelCount > 0 ? fuelTotal / fuelCount : 0).toStringAsFixed(0)} per fill',
+                  'Average per fill',
+                  '${(fuelCount > 0 ? fuelLiters / fuelCount : 0).toStringAsFixed(1)} liters',
                   Icons.analytics_rounded,
                   Colors.blue,
                 ),
@@ -784,7 +787,7 @@ class _VehicleLogsScreenState extends State<VehicleLogsScreen> with SingleTicker
     );
   }
 
-  Widget _buildStatCard(String label, double amount, int count, IconData icon, Color color) {
+  Widget _buildStatCard(String label, double amount, int count, IconData icon, Color color, {bool isLiters = false}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -826,7 +829,9 @@ class _VehicleLogsScreenState extends State<VehicleLogsScreen> with SingleTicker
           ),
           const SizedBox(height: 4),
           Text(
-            'MVR ${NumberFormat('#,##0').format(amount)}',
+            isLiters
+              ? '${NumberFormat('#,##0.0').format(amount)} L'
+              : 'MVR ${NumberFormat('#,##0').format(amount)}',
             style: TextStyle(
               color: context.textColor,
               fontSize: 18,
@@ -952,7 +957,7 @@ class _AddLogSheetState extends State<AddLogSheet> {
 
     final result = await SupabaseService.addVehicleLog(
       logType: widget.logType,
-      amount: null,
+      amount: double.tryParse(_amountController.text),
       odometer: int.tryParse(_odometerController.text),
       notes: _notesController.text.isNotEmpty ? _notesController.text : null,
       logDate: _selectedDate,
@@ -1040,6 +1045,26 @@ class _AddLogSheetState extends State<AddLogSheet> {
             ),
             const SizedBox(height: 28),
 
+            // Amount field (for all log types)
+            Text('Amount (MVR)', style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _amountController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: TextStyle(color: context.textColor, fontSize: 16),
+              decoration: InputDecoration(
+                hintText: 'Cost in MVR',
+                hintStyle: TextStyle(color: context.mutedColor.withValues(alpha: 0.5)),
+                prefixText: 'MVR ',
+                prefixStyle: TextStyle(color: context.mutedColor),
+                filled: true,
+                fillColor: context.bgColor,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.all(20),
+              ),
+            ),
+            const SizedBox(height: 20),
+
             // Fuel-specific fields
             if (widget.logType == 'fuel') ...[
               // Fuel Type
@@ -1075,25 +1100,27 @@ class _AddLogSheetState extends State<AddLogSheet> {
               const SizedBox(height: 20),
             ],
 
-            // Odometer field
-            Text('Odometer', style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _odometerController,
-              keyboardType: TextInputType.number,
-              style: TextStyle(color: context.textColor, fontSize: 16),
-              decoration: InputDecoration(
-                hintText: 'Current mileage (optional)',
-                hintStyle: TextStyle(color: context.mutedColor.withValues(alpha: 0.5)),
-                suffixText: 'km',
-                suffixStyle: TextStyle(color: context.mutedColor),
-                filled: true,
-                fillColor: context.bgColor,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                contentPadding: const EdgeInsets.all(20),
+            // Odometer field (only for Fuel and Service)
+            if (widget.logType == 'fuel' || widget.logType == 'maintenance') ...[
+              Text('Odometer', style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _odometerController,
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: context.textColor, fontSize: 16),
+                decoration: InputDecoration(
+                  hintText: 'Current mileage (optional)',
+                  hintStyle: TextStyle(color: context.mutedColor.withValues(alpha: 0.5)),
+                  suffixText: 'km',
+                  suffixStyle: TextStyle(color: context.mutedColor),
+                  filled: true,
+                  fillColor: context.bgColor,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  contentPadding: const EdgeInsets.all(20),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
+            ],
 
             // Notes field
             Text('Notes', style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600)),

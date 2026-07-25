@@ -60,6 +60,7 @@ const PAGE_SIZE = 15
 export default function VehicleLogsPage() {
   const supabase = createClient()
   const [logs, setLogs] = useState<VehicleLog[]>([])
+  const [allLogs, setAllLogs] = useState<VehicleLog[]>([]) // For stats calculation
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -80,9 +81,9 @@ export default function VehicleLogsPage() {
     log_date: new Date().toISOString().split("T")[0],
   })
 
-  // Calculate stats
+  // Calculate stats from ALL logs (not paginated)
   const stats = LOG_TYPES.map(type => {
-    const typeLogs = logs.filter(l => l.log_type === type.value)
+    const typeLogs = allLogs.filter(l => l.log_type === type.value)
     const total = typeLogs.reduce((sum, l) => sum + (l.amount || 0), 0)
     // For fuel, also calculate total liters
     const totalLiters = type.value === "fuel"
@@ -96,18 +97,18 @@ export default function VehicleLogsPage() {
     }
   })
 
-  const totalSpent = logs.reduce((sum, l) => sum + (l.amount || 0), 0)
+  const totalSpent = allLogs.reduce((sum, l) => sum + (l.amount || 0), 0)
 
   // This month stats
   const now = new Date()
-  const thisMonthLogs = logs.filter(l => {
+  const thisMonthLogs = allLogs.filter(l => {
     const logDate = new Date(l.log_date)
     return logDate.getMonth() === now.getMonth() && logDate.getFullYear() === now.getFullYear()
   })
   const thisMonthSpent = thisMonthLogs.reduce((sum, l) => sum + (l.amount || 0), 0)
 
   // Last month stats for comparison
-  const lastMonthLogs = logs.filter(l => {
+  const lastMonthLogs = allLogs.filter(l => {
     const logDate = new Date(l.log_date)
     const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1
     const lastMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
@@ -117,11 +118,11 @@ export default function VehicleLogsPage() {
   const monthOverMonthChange = lastMonthSpent > 0 ? ((thisMonthSpent - lastMonthSpent) / lastMonthSpent * 100) : 0
 
   // Average per log
-  const avgPerLog = logs.length > 0 ? totalSpent / logs.length : 0
+  const avgPerLog = allLogs.length > 0 ? totalSpent / allLogs.length : 0
 
   // Top spending driver
   const driverSpending: { [name: string]: number } = {}
-  logs.forEach(log => {
+  allLogs.forEach(log => {
     const name = log.driver?.profile?.full_name || "Unknown"
     driverSpending[name] = (driverSpending[name] || 0) + (log.amount || 0)
   })
@@ -140,7 +141,7 @@ export default function VehicleLogsPage() {
       LOG_TYPES.forEach(t => months[key][t.value] = 0)
     }
 
-    logs.forEach(log => {
+    allLogs.forEach(log => {
       const logDate = new Date(log.log_date)
       const monthKey = logDate.toLocaleDateString("en-US", { timeZone: "Indian/Maldives", month: "short" })
       if (months[monthKey] && log.amount) {
@@ -162,6 +163,7 @@ export default function VehicleLogsPage() {
     const start = (currentPage - 1) * PAGE_SIZE
     const end = start + PAGE_SIZE - 1
 
+    // Paginated query for table
     let query = supabase
       .from("vehicle_logs")
       .select(`
@@ -175,13 +177,25 @@ export default function VehicleLogsPage() {
 
     let countQuery = supabase.from("vehicle_logs").select("*", { count: "exact", head: true })
 
+    // Query ALL logs for stats (no pagination, no filter)
+    const allLogsQuery = supabase
+      .from("vehicle_logs")
+      .select(`
+        *,
+        driver:drivers!vehicle_logs_driver_id_fkey(
+          profile:profiles(full_name)
+        )
+      `)
+      .order("log_date", { ascending: false })
+
     if (filterType !== "all") {
       query = query.eq("log_type", filterType)
       countQuery = countQuery.eq("log_type", filterType)
     }
 
-    const [{ data }, { count }] = await Promise.all([query, countQuery])
+    const [{ data }, { count }, { data: allData }] = await Promise.all([query, countQuery, allLogsQuery])
     setLogs(data || [])
+    setAllLogs(allData || [])
     setTotalCount(count || 0)
     setLoading(false)
   }

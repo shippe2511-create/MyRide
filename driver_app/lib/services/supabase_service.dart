@@ -1866,13 +1866,13 @@ class SupabaseService {
 
       final response = await client
           .from('vehicle_logs')
-          .select('log_type, amount')
+          .select('log_type, amount, fuel_amount')
           .eq('driver_id', id)
           .gte('log_date', monthStart.toIso8601String().split('T')[0]);
 
       final logs = List<Map<String, dynamic>>.from(response);
 
-      double fuelTotal = 0;
+      double fuelLiters = 0;  // Total liters for fuel
       double maintenanceTotal = 0;
       double repairTotal = 0;
       double cleaningTotal = 0;
@@ -1883,9 +1883,10 @@ class SupabaseService {
 
       for (final log in logs) {
         final amount = (log['amount'] ?? 0).toDouble();
+        final fuelAmount = (log['fuel_amount'] ?? 0).toDouble();
         switch (log['log_type']) {
           case 'fuel':
-            fuelTotal += amount;
+            fuelLiters += fuelAmount;  // Use liters for fuel
             fuelCount++;
             break;
           case 'maintenance':
@@ -1904,7 +1905,7 @@ class SupabaseService {
       }
 
       return {
-        'fuel_total': fuelTotal,
+        'fuel_liters': fuelLiters,  // Liters for fuel
         'fuel_count': fuelCount,
         'maintenance_total': maintenanceTotal,
         'maintenance_count': maintenanceCount,
@@ -1912,7 +1913,7 @@ class SupabaseService {
         'repair_count': repairCount,
         'cleaning_total': cleaningTotal,
         'cleaning_count': cleaningCount,
-        'total': fuelTotal + maintenanceTotal + repairTotal + cleaningTotal,
+        'total': maintenanceTotal + repairTotal + cleaningTotal,  // Total expenses (excluding fuel liters)
       };
     } catch (e) {
       debugPrint('Error getting vehicle log stats: $e');

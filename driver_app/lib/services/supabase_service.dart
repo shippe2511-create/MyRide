@@ -2202,7 +2202,7 @@ class SupabaseService {
           .eq('driver_id', driverId)
           .gte('service_date', todayStr)
           .lte('service_date', endStr)
-          .inFilter('status', ['scheduled', 'in_progress', 'completed'])
+          .inFilter('status', ['scheduled', 'pending', 'in_progress', 'completed'])
           .order('service_date')
           .order('departure_time');
 
@@ -2249,6 +2249,25 @@ class SupabaseService {
             debugPrint('Error fetching vehicle $vehicleId: $e');
           }
         }
+
+        // Fetch backup start stop name if this is a backup assignment
+        if (map['is_backup'] == true && map['backup_start_stop_index'] != null && map['route_id'] != null) {
+          try {
+            final stopIndex = map['backup_start_stop_index'] as int;
+            final stops = await client
+                .from('route_stops')
+                .select('stop_name')
+                .eq('route_id', map['route_id'])
+                .eq('stop_order', stopIndex + 1) // stop_order is 1-indexed
+                .maybeSingle();
+            if (stops != null) {
+              map['backup_start_stop_name'] = stops['stop_name'];
+            }
+          } catch (e) {
+            debugPrint('Error fetching backup stop name: $e');
+          }
+        }
+
         results.add(map);
       }
       return results;
@@ -2298,22 +2317,34 @@ class SupabaseService {
   /// Start a bus trip from roster assignment
   static Future<Map<String, dynamic>?> startBusTrip(String assignmentId) async {
     try {
-      // Get first stop of the route
+      // Get assignment details including backup info
       final assignment = await client
           .from('roster_assignments')
-          .select('route_id')
+          .select('route_id, is_backup, backup_start_stop_index')
           .eq('id', assignmentId)
           .single();
 
       final routeId = assignment['route_id'] as String;
+      final isBackup = assignment['is_backup'] == true;
+      final backupStartStopIndex = assignment['backup_start_stop_index'] as int?;
+
       final stops = await getBusRouteStops(routeId);
-      final firstStopId = stops.isNotEmpty ? stops.first['id'] : null;
+
+      // For backup trips, start from the backup stop index
+      // For regular trips, start from the first stop
+      String? startStopId;
+      if (isBackup && backupStartStopIndex != null && backupStartStopIndex < stops.length) {
+        startStopId = stops[backupStartStopIndex]['id'];
+        debugPrint('Starting backup trip from stop index $backupStartStopIndex: ${stops[backupStartStopIndex]['stop_name']}');
+      } else {
+        startStopId = stops.isNotEmpty ? stops.first['id'] : null;
+      }
 
       // Create bus trip
       final trip = await client.from('bus_trips').insert({
         'roster_assignment_id': assignmentId,
         'actual_start_time': DateTime.now().toIso8601String(),
-        'current_stop_id': firstStopId,
+        'current_stop_id': startStopId,
         'status': 'in_progress',
       }).select().single();
 

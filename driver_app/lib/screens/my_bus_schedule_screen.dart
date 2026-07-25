@@ -852,10 +852,12 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
     }
 
     // Determine display status
-    final isScheduled = status == 'scheduled' && !isPastDeparture;
+    final isPending = status == 'pending';
+    final isScheduled = (status == 'scheduled' || isPending) && !isPastDeparture;
     final isMissed = status == 'scheduled' && isPastDeparture;
     final isCompleted = status == 'completed';
     final isInProgress = status == 'in_progress';
+    final isBackup = assignment['is_backup'] == true;
 
     // Get display status and color
     String displayStatus = status?.toUpperCase().replaceAll('_', ' ') ?? 'UNKNOWN';
@@ -864,6 +866,12 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
     if (isMissed) {
       displayStatus = 'MISSED';
       statusColor = Colors.red;
+    } else if (isBackup && isPending) {
+      displayStatus = 'BACKUP';
+      statusColor = Colors.orange;
+    } else if (isPending) {
+      displayStatus = 'READY';
+      statusColor = AppColors.yellow;
     }
 
     return Container(
@@ -990,8 +998,54 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
               ),
             ),
 
-            // Action buttons
-            if (isScheduled) ...[
+            // Backup trip info and button - only show button when not completed
+            if (isBackup && assignment['backup_start_stop_index'] != null && !isCompleted) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.location_on_rounded, size: 16, color: Colors.orange),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Start from: ${assignment['backup_start_stop_name'] ?? 'Stop #${(assignment['backup_start_stop_index'] as int) + 1}'}',
+                        style: TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Start Trip button for backup trips
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => _startTrip(assignment),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.play_arrow_rounded, size: 20),
+                      SizedBox(width: 6),
+                      Text('Start Backup Trip', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                    ],
+                  ),
+                ),
+              ),
+            ] else if (isScheduled && !isBackup) ...[
+              // Action buttons for regular scheduled trips
               const SizedBox(height: 12),
               Row(
                 children: [

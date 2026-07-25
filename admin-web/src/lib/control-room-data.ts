@@ -55,7 +55,9 @@ export interface ActiveShuttle {
   last_updated_at: string
   // Joined data
   route?: { route_name: string; route_code: string }
+  driver_name?: string
   total_stops?: number
+  has_backup_assigned?: boolean
 }
 
 export interface DriverStatus {
@@ -281,10 +283,13 @@ export async function getActiveShuttles(
       id, trip_id, driver_id, vehicle_id, route_id,
       current_stop_name, current_stop_index, passengers_on_board,
       vehicle_capacity, is_full, status, vehicle_number, last_updated_at,
-      route:transport_routes(route_name, route_code)
+      route:transport_routes(route_name, route_code),
+      driver:drivers!bus_location_tracking_driver_id_fkey(
+        profile:profiles(full_name)
+      )
     `)
     .in('status', ['active', 'in_progress'])
-    .order('last_updated_at', { ascending: false })
+    .order('vehicle_number', { ascending: true })
 
   if (error) {
     console.error('Error fetching active shuttles:', error)
@@ -292,10 +297,16 @@ export async function getActiveShuttles(
   }
 
   // Transform Supabase nested arrays to single objects
-  const shuttles = (data || []).map((row: any) => ({
-    ...row,
-    route: Array.isArray(row.route) ? row.route[0] : row.route,
-  })) as ActiveShuttle[]
+  const shuttles = (data || []).map((row: any) => {
+    const route = Array.isArray(row.route) ? row.route[0] : row.route
+    const driver = Array.isArray(row.driver) ? row.driver[0] : row.driver
+    const profile = driver?.profile ? (Array.isArray(driver.profile) ? driver.profile[0] : driver.profile) : null
+    return {
+      ...row,
+      route,
+      driver_name: profile?.full_name || null,
+    }
+  }) as ActiveShuttle[]
 
   // Fetch stop counts for routes
   const routeIds = [...new Set(shuttles.map(s => s.route_id))]
@@ -313,6 +324,27 @@ export async function getActiveShuttles(
 
     shuttles.forEach(s => {
       s.total_stops = countByRoute[s.route_id] || 0
+    })
+  }
+
+  // Check for backup assignments for FULL shuttles
+  const fullShuttleTripIds = shuttles.filter(s => s.is_full).map(s => s.trip_id)
+  if (fullShuttleTripIds.length > 0) {
+    const { data: backupTrips } = await supabase
+      .from('bus_trips')
+      .select('roster_assignment:roster_assignments!bus_trips_roster_assignment_id_fkey(backup_for_trip_id)')
+      .in('status', ['scheduled', 'active', 'in_progress'])
+
+    const tripsWithBackup = new Set<string>()
+    ;(backupTrips || []).forEach((bt: any) => {
+      const ra = Array.isArray(bt.roster_assignment) ? bt.roster_assignment[0] : bt.roster_assignment
+      if (ra?.backup_for_trip_id) {
+        tripsWithBackup.add(ra.backup_for_trip_id)
+      }
+    })
+
+    shuttles.forEach(s => {
+      s.has_backup_assigned = tripsWithBackup.has(s.trip_id)
     })
   }
 

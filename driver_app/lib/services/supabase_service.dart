@@ -2372,10 +2372,24 @@ class SupabaseService {
         'status': 'in_progress',
       }).select().single();
 
-      // Update roster assignment status
+      // Update roster assignment status and ensure driver_id is set
+      // This handles cases where a driver starts an unassigned slot
+      final updateData = {'status': 'in_progress'};
+      // Get current driver_id to set on assignment if not already set
+      if (driverId != null && driverId!.isNotEmpty) {
+        // Only update driver_id - don't overwrite if already set
+        final currentAssignment = await client
+            .from('roster_assignments')
+            .select('driver_id')
+            .eq('id', assignmentId)
+            .single();
+        if (currentAssignment['driver_id'] == null) {
+          (updateData as Map<String, dynamic>)['driver_id'] = driverId;
+        }
+      }
       await client
           .from('roster_assignments')
-          .update({'status': 'in_progress'})
+          .update(updateData)
           .eq('id', assignmentId);
 
       return trip;

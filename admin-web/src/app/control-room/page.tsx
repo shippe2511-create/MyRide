@@ -927,12 +927,17 @@ export default function ControlRoomPage() {
                       ? ((shuttle.current_stop_index + 1) / shuttle.total_stops) * 100
                       : 0
 
+                    // If backup is assigned, don't show as urgent
+                    const showUrgentFull = shuttle.is_full && !shuttle.has_backup_assigned
+
                     return (
                       <div
                         key={shuttle.id}
                         className={`p-3 rounded-lg border transition-all ${
-                          shuttle.is_full
+                          showUrgentFull
                             ? "border-red-500/50 bg-red-500/5 animate-pulse"
+                            : shuttle.is_full && shuttle.has_backup_assigned
+                            ? "border-green-500/50 bg-green-500/5"
                             : isNearCapacity
                             ? "border-amber-500/50 bg-amber-500/5"
                             : "bg-muted/30 border-transparent"
@@ -942,7 +947,9 @@ export default function ControlRoomPage() {
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <div className={`w-2 h-2 rounded-full ${
-                              shuttle.is_full ? "bg-red-500" : isNearCapacity ? "bg-amber-500" : "bg-green-500"
+                              showUrgentFull ? "bg-red-500" :
+                              shuttle.is_full && shuttle.has_backup_assigned ? "bg-green-500" :
+                              isNearCapacity ? "bg-amber-500" : "bg-green-500"
                             }`} />
                             <span className="font-bold text-sm">
                               {shuttle.route?.route_code || "BUS"}
@@ -952,13 +959,20 @@ export default function ControlRoomPage() {
                             </span>
                           </div>
                           {shuttle.is_full && (
-                            <Badge className="bg-red-500 text-white text-[9px]">FULL</Badge>
+                            shuttle.has_backup_assigned ? (
+                              <Badge className="bg-green-500 text-white text-[9px]">BACKUP SENT</Badge>
+                            ) : (
+                              <Badge className="bg-red-500 text-white text-[9px]">FULL</Badge>
+                            )
                           )}
                         </div>
 
-                        {/* Route name */}
+                        {/* Route name + Driver */}
                         <div className="text-[10px] text-muted-foreground mb-2 truncate">
                           {shuttle.route?.route_name}
+                          {shuttle.driver_name && (
+                            <span className="ml-2 text-primary">• {shuttle.driver_name}</span>
+                          )}
                         </div>
 
                         {/* Occupancy bar */}

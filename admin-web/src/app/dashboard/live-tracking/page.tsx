@@ -408,7 +408,7 @@ export default function LiveTrackingPage() {
       // Create a backup roster assignment for today
       const today = new Date().toISOString().split('T')[0]
       const now = new Date()
-      const startTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+      const departureTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:00`
 
       const { error: rosterError } = await supabase
         .from("roster_assignments")
@@ -416,8 +416,8 @@ export default function LiveTrackingPage() {
           driver_id: selectedDriver,
           route_id: selectedAlert.route_id,
           vehicle_id: selectedVehicle,
-          assignment_date: today,
-          start_time: startTime,
+          service_date: today,
+          departure_time: departureTime,
           status: 'pending',
           is_backup: true,
           backup_start_stop_index: selectedAlert.stop_index,

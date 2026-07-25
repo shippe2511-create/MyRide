@@ -1866,7 +1866,7 @@ class SupabaseService {
 
       final response = await client
           .from('vehicle_logs')
-          .select('log_type, amount, fuel_amount')
+          .select('log_type, amount, liters')
           .eq('driver_id', id)
           .gte('log_date', monthStart.toIso8601String().split('T')[0]);
 
@@ -1883,7 +1883,7 @@ class SupabaseService {
 
       for (final log in logs) {
         final amount = (log['amount'] ?? 0).toDouble();
-        final fuelAmount = (log['fuel_amount'] ?? 0).toDouble();
+        final fuelAmount = (log['liters'] ?? 0).toDouble();
         switch (log['log_type']) {
           case 'fuel':
             fuelLiters += fuelAmount;  // Use liters for fuel

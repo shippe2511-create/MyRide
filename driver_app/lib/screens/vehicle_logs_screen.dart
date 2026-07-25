@@ -417,8 +417,11 @@ class _VehicleLogsScreenState extends State<VehicleLogsScreen> with SingleTicker
 
   Widget _buildLogCard(Map<String, dynamic> log, int index) {
     final type = log['log_type'] ?? 'fuel';
-    final amount = (log['amount'] ?? 0).toDouble();
-    final fuelAmount = (log['fuel_amount'] ?? 0).toDouble(); // Liters for fuel
+    // Handle both numeric and string types from Supabase
+    final rawAmount = log['amount'];
+    final amount = rawAmount == null ? 0.0 : (rawAmount is num ? rawAmount.toDouble() : double.tryParse(rawAmount.toString()) ?? 0.0);
+    final rawLiters = log['liters'];
+    final fuelAmount = rawLiters == null ? 0.0 : (rawLiters is num ? rawLiters.toDouble() : double.tryParse(rawLiters.toString()) ?? 0.0);
     final odometer = log['odometer'];
     final notes = log['notes'] ?? '';
     final dateStr = log['log_date'] ?? '';

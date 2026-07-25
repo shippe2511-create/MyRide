@@ -2391,6 +2391,12 @@ class SupabaseService {
           .update({'status': 'completed'})
           .eq('id', assignmentId);
 
+      // Mark bus location tracking as completed
+      await client
+          .from('bus_location_tracking')
+          .update({'status': 'completed'})
+          .eq('trip_id', tripId);
+
       return true;
     } catch (e) {
       debugPrint('Error completing bus trip: $e');

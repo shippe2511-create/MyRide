@@ -462,6 +462,27 @@ class SupabaseService {
     }
   }
 
+  /// Check if driver has any bus roster assignment for today
+  /// Bus drivers don't have directly assigned vehicles - they get them via roster
+  static Future<bool> hasTodayBusAssignment(String driverId) async {
+    try {
+      final today = DateTime.now();
+      final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+      final result = await client
+          .from('roster_assignments')
+          .select('id')
+          .eq('driver_id', driverId)
+          .eq('date', todayStr)
+          .limit(1);
+
+      return (result as List).isNotEmpty;
+    } catch (e) {
+      debugPrint('Error checking bus assignment: $e');
+      return false;
+    }
+  }
+
   /// Check if the driver's assigned vehicle is active
   /// Returns false if: no vehicle assigned, vehicle is inactive, or driver not found
   static Future<bool> isDriverVehicleActive(String driverId) async {

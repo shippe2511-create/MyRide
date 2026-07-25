@@ -140,6 +140,43 @@ export interface HourlyTrend {
   cancelled: number
 }
 
+export interface SOSAlert {
+  id: string
+  user_id: string
+  ride_id: string | null
+  status: string
+  created_at: string
+  location_lat: number | null
+  location_lng: number | null
+  user_name?: string
+  user_phone?: string
+}
+
+export interface ShiftWarning {
+  driver_id: string
+  driver_name: string
+  shift_end_time: string
+  minutes_remaining: number
+  has_active_ride: boolean
+}
+
+export interface ScheduledRide {
+  id: string
+  customer_name: string
+  pickup_name: string
+  scheduled_time: string
+  minutes_until: number
+}
+
+export interface RecentRating {
+  id: string
+  rating: number
+  comment: string | null
+  created_at: string
+  customer_name: string
+  driver_name: string
+}
+
 export interface ComputedMetrics {
   activeTrips: number
   awaitingDriver: number
@@ -685,6 +722,200 @@ export async function getHourlyTrends(
     .sort((a, b) => a.hour - b.hour)
 }
 
+/**
+ * Get active SOS alerts
+ */
+export async function getSOSAlerts(
+  supabase: SupabaseClient
+): Promise<SOSAlert[]> {
+  const { data, error } = await supabase
+    .from('sos_alerts')
+    .select(`
+      id, user_id, ride_id, status, created_at, location_lat, location_lng,
+      user:profiles!sos_alerts_user_id_fkey(full_name, phone)
+    `)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  if (error) {
+    console.error('Error fetching SOS alerts:', error)
+    return []
+  }
+
+  return (data || []).map((row: any) => {
+    const user = Array.isArray(row.user) ? row.user[0] : row.user
+    return {
+      id: row.id,
+      user_id: row.user_id,
+      ride_id: row.ride_id,
+      status: row.status,
+      created_at: row.created_at,
+      location_lat: row.location_lat,
+      location_lng: row.location_lng,
+      user_name: user?.full_name || 'Unknown',
+      user_phone: user?.phone || null
+    }
+  })
+}
+
+/**
+ * Get drivers whose shifts end soon (within 30 minutes)
+ */
+export async function getShiftWarnings(
+  supabase: SupabaseClient,
+  departmentId?: string | null
+): Promise<ShiftWarning[]> {
+  const today = new Date().toISOString().split('T')[0]
+  const now = new Date()
+  const nowTime = now.toTimeString().slice(0, 8)
+  const soon = new Date(now.getTime() + 30 * 60 * 1000)
+  const soonTime = soon.toTimeString().slice(0, 8)
+
+  const { data, error } = await supabase
+    .from('shifts')
+    .select(`
+      driver_id, end_time,
+      driver:drivers!shifts_driver_id_fkey(
+        id, department_id,
+        profile:profiles(full_name)
+      )
+    `)
+    .eq('shift_date', today)
+    .in('status', ['active', 'scheduled'])
+    .gte('end_time', nowTime)
+    .lte('end_time', soonTime)
+
+  if (error) {
+    console.error('Error fetching shift warnings:', error)
+    return []
+  }
+
+  // Get active rides to check if driver has active ride
+  const { data: activeRides } = await supabase
+    .from('rides')
+    .select('driver_id')
+    .in('status', ['accepted', 'arrived', 'in_progress'])
+
+  const driversWithRides = new Set((activeRides || []).map((r: any) => r.driver_id))
+
+  let warnings = (data || []).map((row: any) => {
+    const driver = Array.isArray(row.driver) ? row.driver[0] : row.driver
+    const profile = driver?.profile ? (Array.isArray(driver.profile) ? driver.profile[0] : driver.profile) : null
+    const endTime = row.end_time
+    const [h, m] = endTime.split(':').map(Number)
+    const shiftEnd = new Date()
+    shiftEnd.setHours(h, m, 0, 0)
+    const minutesRemaining = Math.max(0, Math.round((shiftEnd.getTime() - now.getTime()) / 60000))
+
+    return {
+      driver_id: row.driver_id,
+      driver_name: profile?.full_name || 'Unknown',
+      shift_end_time: endTime,
+      minutes_remaining: minutesRemaining,
+      has_active_ride: driversWithRides.has(row.driver_id),
+      department_id: driver?.department_id
+    }
+  }) as (ShiftWarning & { department_id?: string })[]
+
+  if (departmentId) {
+    warnings = warnings.filter(w => w.department_id === departmentId)
+  }
+
+  return warnings.sort((a, b) => a.minutes_remaining - b.minutes_remaining)
+}
+
+/**
+ * Get scheduled rides coming up in next 2 hours
+ */
+export async function getScheduledRides(
+  supabase: SupabaseClient,
+  departmentId?: string | null
+): Promise<ScheduledRide[]> {
+  const now = new Date()
+  const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000)
+
+  const { data, error } = await supabase
+    .from('rides')
+    .select(`
+      id, pickup_name, scheduled_pickup_time,
+      customer:profiles!rides_customer_id_fkey(full_name, department_id)
+    `)
+    .eq('status', 'scheduled')
+    .gte('scheduled_pickup_time', now.toISOString())
+    .lte('scheduled_pickup_time', twoHoursLater.toISOString())
+    .order('scheduled_pickup_time', { ascending: true })
+    .limit(10)
+
+  if (error) {
+    console.error('Error fetching scheduled rides:', error)
+    return []
+  }
+
+  let rides = (data || []).map((row: any) => {
+    const customer = Array.isArray(row.customer) ? row.customer[0] : row.customer
+    const scheduledTime = new Date(row.scheduled_pickup_time)
+    const minutesUntil = Math.round((scheduledTime.getTime() - now.getTime()) / 60000)
+
+    return {
+      id: row.id,
+      customer_name: customer?.full_name || 'Unknown',
+      pickup_name: row.pickup_name,
+      scheduled_time: row.scheduled_pickup_time,
+      minutes_until: minutesUntil,
+      department_id: customer?.department_id
+    }
+  }) as (ScheduledRide & { department_id?: string })[]
+
+  if (departmentId) {
+    rides = rides.filter(r => r.department_id === departmentId)
+  }
+
+  return rides
+}
+
+/**
+ * Get recent ratings (last 10)
+ */
+export async function getRecentRatings(
+  supabase: SupabaseClient
+): Promise<RecentRating[]> {
+  const { data, error } = await supabase
+    .from('ratings')
+    .select(`
+      id, rating, comment, created_at,
+      ride:rides!ratings_ride_id_fkey(
+        customer:profiles!rides_customer_id_fkey(full_name),
+        driver:drivers!rides_driver_id_fkey(
+          profile:profiles(full_name)
+        )
+      )
+    `)
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  if (error) {
+    console.error('Error fetching recent ratings:', error)
+    return []
+  }
+
+  return (data || []).map((row: any) => {
+    const ride = Array.isArray(row.ride) ? row.ride[0] : row.ride
+    const customer = ride?.customer ? (Array.isArray(ride.customer) ? ride.customer[0] : ride.customer) : null
+    const driver = ride?.driver ? (Array.isArray(ride.driver) ? ride.driver[0] : ride.driver) : null
+    const driverProfile = driver?.profile ? (Array.isArray(driver.profile) ? driver.profile[0] : driver.profile) : null
+
+    return {
+      id: row.id,
+      rating: row.rating,
+      comment: row.comment,
+      created_at: row.created_at,
+      customer_name: customer?.full_name || 'Unknown',
+      driver_name: driverProfile?.full_name || 'Unknown'
+    }
+  })
+}
+
 // ============================================================================
 // COMPUTED METRICS
 // ============================================================================
@@ -811,6 +1042,8 @@ export interface ControlRoomSubscriptions {
   drivers: RealtimeChannel
   busTrips: RealtimeChannel
   driverLocations: RealtimeChannel
+  sosAlerts: RealtimeChannel
+  ratings: RealtimeChannel
 }
 
 /**
@@ -866,12 +1099,32 @@ export function subscribeToControlRoomUpdates(
     })
     .subscribe()
 
+  // Subscribe to SOS alerts for emergency updates
+  const sosAlertsChannel = supabase
+    .channel('control-room-sos-alerts')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'sos_alerts' }, () => {
+      console.log('[ControlRoom] SOS alert update received')
+      onUpdate()
+    })
+    .subscribe()
+
+  // Subscribe to ratings for live ratings ticker
+  const ratingsChannel = supabase
+    .channel('control-room-ratings')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ratings' }, () => {
+      console.log('[ControlRoom] New rating received')
+      onUpdate()
+    })
+    .subscribe()
+
   return {
     rides: ridesChannel,
     drivers: driversChannel,
     busTracking: busTrackingChannel,
     busTrips: busTripsChannel,
-    driverLocations: driverLocationsChannel
+    driverLocations: driverLocationsChannel,
+    sosAlerts: sosAlertsChannel,
+    ratings: ratingsChannel
   }
 }
 
@@ -887,6 +1140,8 @@ export function unsubscribeFromControlRoom(
   supabase.removeChannel(subscriptions.busTracking)
   supabase.removeChannel(subscriptions.busTrips)
   supabase.removeChannel(subscriptions.driverLocations)
+  supabase.removeChannel(subscriptions.sosAlerts)
+  supabase.removeChannel(subscriptions.ratings)
 }
 
 // ============================================================================

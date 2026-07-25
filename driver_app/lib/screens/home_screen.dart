@@ -333,6 +333,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _handleGoOnline(DriverState state) async {
+    debugPrint('_handleGoOnline called, isOnline=${state.isOnline}, checklistCompleted=${state.checklistCompleted}');
     if (state.isOnline) {
       state.goOffline();
       return;
@@ -848,7 +849,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     // Header ~80, stats card ~120, bottom nav ~80, checklist ~50 if shown
     final usedHeight = topPadding + 80 + 120 + bottomPadding + 80 + (state.checklistCompleted ? 60 : 0);
-    final availableHeight = screenHeight - usedHeight;
+    final availableHeight = (screenHeight - usedHeight).clamp(300.0, double.infinity);
 
     return Column(
       children: [
@@ -941,6 +942,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 32),
                     ElevatedButton.icon(
                       onPressed: () {
+                        debugPrint('Go Online button tapped!');
                         HapticFeedback.heavyImpact();
                         _handleGoOnline(state);
                       },

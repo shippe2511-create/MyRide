@@ -643,20 +643,26 @@ class DriverState extends ChangeNotifier {
   String? get vehicleInactiveReason => _vehicleInactiveReason;
 
   Future<bool> goOnline() async {
-    debugPrint('goOnline: driverId=$_driverId');
+    debugPrint('goOnline: driverId=$_driverId, isBusMode=$_isBusMode');
     // Check if vehicle is assigned and active before going online
-    if (_driverId.isNotEmpty) {
+    // Skip vehicle check for bus mode drivers - they get vehicles via roster assignments
+    if (_driverId.isNotEmpty && !_isBusMode) {
       final vehicle = await SupabaseService.getDriverVehicle(_driverId);
       if (vehicle == null) {
-        _vehicleInactiveReason = 'No vehicle assigned. Please contact admin.';
-        _isOnline = false;
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('isOnline', false);
-        await SupabaseService.updateDriverStatus(driverId: _driverId, isOnline: false);
-        notifyListeners();
-        return false;
-      }
-      if (vehicle['is_active'] != true) {
+        // Check if driver has any bus roster assignments for today
+        final hasBusAssignment = await SupabaseService.hasTodayBusAssignment(_driverId);
+        if (!hasBusAssignment) {
+          _vehicleInactiveReason = 'No vehicle assigned. Please contact admin.';
+          _isOnline = false;
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('isOnline', false);
+          await SupabaseService.updateDriverStatus(driverId: _driverId, isOnline: false);
+          notifyListeners();
+          return false;
+        }
+        // Driver has bus assignment, allow going online
+        debugPrint('goOnline: Driver has bus roster assignment, allowing online');
+      } else if (vehicle['is_active'] != true) {
         _vehicleInactiveReason = 'Your vehicle is disabled. Please contact admin.';
         _isOnline = false;
         final prefs = await SharedPreferences.getInstance();

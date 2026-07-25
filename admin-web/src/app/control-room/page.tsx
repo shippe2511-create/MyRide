@@ -11,6 +11,10 @@ import {
   getRosterGaps,
   getDriverLocations,
   getHourlyTrends,
+  getSOSAlerts,
+  getShiftWarnings,
+  getScheduledRides,
+  getRecentRatings,
   computeMetrics,
   subscribeToControlRoomUpdates,
   unsubscribeFromControlRoom,
@@ -25,6 +29,10 @@ import {
   type HourlyTrend,
   type ControlRoomSubscriptions,
   type MapMarker,
+  type SOSAlert,
+  type ShiftWarning,
+  type ScheduledRide,
+  type RecentRating,
 } from "@/lib/control-room-data"
 import dynamic from "next/dynamic"
 
@@ -41,7 +49,8 @@ import {
   RefreshCw, Maximize2, Minimize2, X, Coffee, Moon, UserX,
   Navigation, Route, Loader2, Circle, Activity, Timer, Percent,
   ChevronUp, ChevronDown, Filter, Eye, PhoneCall, XCircle,
-  ArrowUpDown, Volume2, VolumeX, Keyboard
+  ArrowUpDown, Volume2, VolumeX, Keyboard, Siren, Star, CalendarClock,
+  UserMinus
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -94,6 +103,10 @@ export default function ControlRoomPage() {
   const [metrics, setMetrics] = useState<ComputedMetrics | null>(null)
   const [rosterGaps, setRosterGaps] = useState<RosterGap[]>([])
   const [hourlyTrends, setHourlyTrends] = useState<HourlyTrend[]>([])
+  const [sosAlerts, setSOSAlerts] = useState<SOSAlert[]>([])
+  const [shiftWarnings, setShiftWarnings] = useState<ShiftWarning[]>([])
+  const [scheduledRides, setScheduledRides] = useState<ScheduledRide[]>([])
+  const [recentRatings, setRecentRatings] = useState<RecentRating[]>([])
   const [departmentId, setDepartmentId] = useState<string | null>(null)
 
   // UI state
@@ -105,6 +118,7 @@ export default function ControlRoomPage() {
   const [isUpdating, setIsUpdating] = useState(false)
   const wakeLockRef = useRef<WakeLockSentinel | null>(null)
   const prevPendingCountRef = useRef(0)
+  const prevSOSCountRef = useRef(0)
 
   // Trips table state
   const [tripsSortBy, setTripsSortBy] = useState<"wait" | "status" | "customer">("wait")
@@ -144,6 +158,37 @@ export default function ControlRoomPage() {
     }
   }, [audioEnabled])
 
+  // Play urgent SOS alarm (louder, more urgent)
+  const playSOSAlarm = useCallback(() => {
+    if (!audioEnabled) return
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+
+      // Siren-like sound pattern
+      oscillator.type = "sawtooth"
+      gainNode.gain.value = 0.5
+
+      const now = audioContext.currentTime
+      oscillator.frequency.setValueAtTime(600, now)
+      oscillator.frequency.linearRampToValueAtTime(1200, now + 0.2)
+      oscillator.frequency.linearRampToValueAtTime(600, now + 0.4)
+      oscillator.frequency.linearRampToValueAtTime(1200, now + 0.6)
+
+      oscillator.start()
+      setTimeout(() => {
+        oscillator.stop()
+        audioContext.close()
+      }, 600)
+    } catch (e) {
+      console.error("SOS Audio error:", e)
+    }
+  }, [audioEnabled])
+
   // Check for new pending trips and play alert
   useEffect(() => {
     const currentPendingCount = activeTrips.filter(t => t.status === "pending").length
@@ -153,6 +198,15 @@ export default function ControlRoomPage() {
     }
     prevPendingCountRef.current = currentPendingCount
   }, [activeTrips, playAlertSound])
+
+  // Check for new SOS alerts and play urgent alarm
+  useEffect(() => {
+    if (sosAlerts.length > prevSOSCountRef.current && prevSOSCountRef.current >= 0) {
+      playSOSAlarm()
+      toast.error("EMERGENCY: New SOS Alert!", { duration: 10000 })
+    }
+    prevSOSCountRef.current = sosAlerts.length
+  }, [sosAlerts, playSOSAlarm])
 
   // Screen wake lock to prevent display sleep
   useEffect(() => {
@@ -220,7 +274,7 @@ export default function ControlRoomPage() {
   // Load all data
   const loadData = useCallback(async () => {
     setIsUpdating(true)
-    const [trips, shuttles, fleetData, locations, todayStats, yesterdayStats, gaps, trends] = await Promise.all([
+    const [trips, shuttles, fleetData, locations, todayStats, yesterdayStats, gaps, trends, sos, shifts, scheduled, ratings] = await Promise.all([
       getActiveTrips(supabase, departmentId),
       getActiveShuttles(supabase),
       getFleetStatus(supabase, departmentId),
@@ -229,6 +283,10 @@ export default function ControlRoomPage() {
       getYesterdayStats(supabase, departmentId),
       getRosterGaps(supabase),
       getHourlyTrends(supabase, departmentId),
+      getSOSAlerts(supabase),
+      getShiftWarnings(supabase, departmentId),
+      getScheduledRides(supabase, departmentId),
+      getRecentRatings(supabase),
     ])
 
     setActiveTrips(trips)
@@ -237,6 +295,10 @@ export default function ControlRoomPage() {
     setDriverLocations(locations)
     setRosterGaps(gaps)
     setHourlyTrends(trends)
+    setSOSAlerts(sos)
+    setShiftWarnings(shifts)
+    setScheduledRides(scheduled)
+    setRecentRatings(ratings)
 
     const computedMetrics = computeMetrics(trips, shuttles, fleetData, todayStats, yesterdayStats, gaps)
     setMetrics(computedMetrics)
@@ -720,7 +782,49 @@ export default function ControlRoomPage() {
 
         {/* Center Column - Map + Alerts */}
         <div className="col-span-4 flex flex-col gap-4 min-h-0">
-          {/* Alerts Panel */}
+          {/* SOS Alerts Panel - TOP PRIORITY */}
+          {sosAlerts.length > 0 && (
+            <Card className="shrink-0 border-red-500 bg-red-500/10 p-3 animate-pulse">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 text-red-500">
+                  <Siren className="h-5 w-5" />
+                  <span className="text-sm font-bold uppercase tracking-wide">SOS Alerts</span>
+                </div>
+                <Badge className="bg-red-500 text-white">{sosAlerts.length} Active</Badge>
+              </div>
+              <div className="space-y-2 max-h-[120px] overflow-y-auto">
+                {sosAlerts.map((alert) => (
+                  <div
+                    key={alert.id}
+                    className="flex items-center justify-between p-2 rounded bg-red-500/20 border border-red-500/50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                      <div>
+                        <div className="font-medium text-sm">{alert.user_name}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {formatDistanceToNow(new Date(alert.created_at), { addSuffix: true })}
+                        </div>
+                      </div>
+                    </div>
+                    {alert.user_phone && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="h-7 gap-1"
+                        onClick={() => window.open(`tel:${alert.user_phone}`)}
+                      >
+                        <PhoneCall className="h-3 w-3" />
+                        Call
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* Attention Items Panel */}
           {(metrics?.awaitingDriver ?? 0) > 0 || (metrics?.shuttlesNearCapacity ?? 0) > 0 || (metrics?.rosterGaps ?? 0) > 0 ? (
             <Card className="shrink-0 border-amber-500/50 bg-amber-500/5 p-3">
               <div className="flex items-center gap-2 mb-2 text-amber-500">
@@ -916,6 +1020,117 @@ export default function ControlRoomPage() {
               <span>Now</span>
             </div>
           </Card>
+
+          {/* Shift Ending Soon */}
+          {shiftWarnings.length > 0 && (
+            <Card className="shrink-0 p-3 border-orange-500/50 bg-orange-500/5">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-sm font-semibold flex items-center gap-2 text-orange-400">
+                  <UserMinus className="h-4 w-4" />
+                  Shift Ending Soon
+                </h2>
+                <span className="text-xs text-muted-foreground">{shiftWarnings.length}</span>
+              </div>
+              <div className="space-y-1 max-h-[80px] overflow-y-auto">
+                {shiftWarnings.map((warning) => (
+                  <div
+                    key={warning.driver_id}
+                    className={`flex items-center justify-between p-2 rounded text-sm ${
+                      warning.has_active_ride ? "bg-red-500/20 border border-red-500/50" : "bg-muted/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="truncate max-w-[100px]">{warning.driver_name}</span>
+                      {warning.has_active_ride && (
+                        <Badge variant="outline" className="text-[9px] border-red-500 text-red-400">
+                          On Trip
+                        </Badge>
+                      )}
+                    </div>
+                    <span className={`font-mono text-xs ${
+                      warning.minutes_remaining <= 10 ? "text-red-400" : "text-orange-400"
+                    }`}>
+                      {warning.minutes_remaining}m
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* Scheduled Rides Queue */}
+          {scheduledRides.length > 0 && (
+            <Card className="shrink-0 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-sm font-semibold flex items-center gap-2 text-purple-400">
+                  <CalendarClock className="h-4 w-4" />
+                  Upcoming Scheduled
+                </h2>
+                <span className="text-xs text-muted-foreground">{scheduledRides.length}</span>
+              </div>
+              <div className="space-y-1 max-h-[80px] overflow-y-auto">
+                {scheduledRides.map((ride) => (
+                  <div
+                    key={ride.id}
+                    className={`flex items-center justify-between p-2 rounded text-sm ${
+                      ride.minutes_until <= 30 ? "bg-purple-500/20" : "bg-muted/50"
+                    }`}
+                  >
+                    <div className="truncate max-w-[140px]">
+                      <div className="text-xs font-medium">{ride.customer_name}</div>
+                      <div className="text-[10px] text-muted-foreground truncate">{ride.pickup_name}</div>
+                    </div>
+                    <span className={`font-mono text-xs whitespace-nowrap ${
+                      ride.minutes_until <= 30 ? "text-purple-400" : "text-muted-foreground"
+                    }`}>
+                      {ride.minutes_until}m
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* Live Ratings Ticker */}
+          {recentRatings.length > 0 && (
+            <Card className="shrink-0 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-sm font-semibold flex items-center gap-2 text-yellow-400">
+                  <Star className="h-4 w-4 fill-yellow-400" />
+                  Recent Ratings
+                </h2>
+              </div>
+              <div className="space-y-1 max-h-[60px] overflow-y-auto">
+                {recentRatings.slice(0, 3).map((rating) => (
+                  <div
+                    key={rating.id}
+                    className="flex items-center justify-between p-1.5 rounded bg-muted/30"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`h-2.5 w-2.5 ${
+                              i < rating.rating
+                                ? "fill-yellow-400 text-yellow-400"
+                                : "fill-muted text-muted"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground truncate">
+                        {rating.driver_name}
+                      </span>
+                    </div>
+                    <span className="text-[9px] text-muted-foreground whitespace-nowrap">
+                      {formatDistanceToNow(new Date(rating.created_at), { addSuffix: true })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
         </div>
       </div>
 

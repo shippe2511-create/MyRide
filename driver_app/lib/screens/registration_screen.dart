@@ -113,7 +113,20 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     } catch (e) {
       if (mounted) {
         HapticFeedback.heavyImpact();
-        AppSnackbar.error(context, 'Registration failed', subtitle: e.toString().replaceAll('Exception: ', ''));
+        final errorMsg = e.toString();
+        String title = 'Registration failed';
+        String subtitle = errorMsg.replaceAll('Exception: ', '');
+
+        // Handle specific error cases
+        if (errorMsg.contains('profiles_employee_id_key') || errorMsg.contains('duplicate key')) {
+          title = 'Staff ID already registered';
+          subtitle = 'This Staff ID is already in use. Please check your ID or contact admin.';
+        } else if (errorMsg.contains('profiles_phone_key')) {
+          title = 'Phone number already registered';
+          subtitle = 'This phone number is already registered. Try logging in instead.';
+        }
+
+        AppSnackbar.error(context, title, subtitle: subtitle);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

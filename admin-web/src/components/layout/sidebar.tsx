@@ -51,6 +51,7 @@ import {
   Layers,
   Building2,
   Bell,
+  MonitorPlay,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -101,6 +102,7 @@ const navigationSections: NavSection[] = [
     icon: Navigation,
     permission: "rides:view",
     items: [
+      { name: "Control Room", href: "/control-room", icon: MonitorPlay, permission: "rides:view" },
       { name: "Rides", href: "/dashboard/rides", icon: MapPin, permission: "rides:view" },
       { name: "Live Tracking", href: "/dashboard/tracking", icon: Radio, permission: "tracking:view" },
       { name: "Push to Talk", href: "/dashboard/push-to-talk", icon: Mic, permission: "settings:view" },

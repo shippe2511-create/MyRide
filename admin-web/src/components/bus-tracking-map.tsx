@@ -35,7 +35,9 @@ interface BusLocation {
 interface BusTrackingMapProps {
   buses: BusLocation[]
   selectedBusId?: string | null
+  followingBusId?: string | null
   onBusClick?: (bus: BusLocation) => void
+  onFollowToggle?: (busId: string | null) => void
 }
 
 const darkMapStyle = [
@@ -66,10 +68,14 @@ function BusMarker({
   bus,
   onClick,
   isSelected,
+  isFollowing,
+  onFollowClick,
 }: {
   bus: BusLocation
   onClick: () => void
   isSelected: boolean
+  isFollowing: boolean
+  onFollowClick: (e: React.MouseEvent) => void
 }) {
   const capacityRatio = bus.vehicle_capacity > 0 ? bus.passengers_on_board / bus.vehicle_capacity : 0
   const statusColor = bus.is_full
@@ -87,8 +93,12 @@ function BusMarker({
     <div
       onClick={onClick}
       className="cursor-pointer transform -translate-x-1/2 -translate-y-1/2 transition-transform hover:scale-110"
-      style={{ zIndex: isSelected ? 1000 : 1 }}
+      style={{ zIndex: isSelected || isFollowing ? 1000 : 1 }}
     >
+      {/* Following indicator ring */}
+      {isFollowing && (
+        <div className="absolute -inset-4 rounded-full border-4 border-blue-500 animate-pulse" />
+      )}
       {/* Bus icon */}
       <div className="relative">
         <svg
@@ -97,7 +107,7 @@ function BusMarker({
           viewBox="0 0 48 48"
           fill="none"
           style={{
-            filter: isSelected ? "drop-shadow(0 0 8px rgba(255,255,255,0.5))" : "drop-shadow(0 2px 4px rgba(0,0,0,0.3))",
+            filter: isSelected || isFollowing ? "drop-shadow(0 0 8px rgba(255,255,255,0.5))" : "drop-shadow(0 2px 4px rgba(0,0,0,0.3))",
           }}
         >
           <rect x="12" y="16" width="24" height="20" rx="4" fill={statusColor} />
@@ -115,6 +125,17 @@ function BusMarker({
         >
           {bus.passengers_on_board}
         </div>
+
+        {/* Follow button */}
+        <button
+          onClick={onFollowClick}
+          className={`absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center text-white border-2 border-white shadow-lg transition-all ${
+            isFollowing ? "bg-blue-500" : "bg-gray-700 hover:bg-blue-600"
+          }`}
+          title={isFollowing ? "Stop following" : "Follow this bus"}
+        >
+          <Navigation className="h-3 w-3" style={{ transform: isFollowing ? "none" : "rotate(-45deg)" }} />
+        </button>
       </div>
 
       <div className="mt-1 flex flex-col items-center">
@@ -127,12 +148,17 @@ function BusMarker({
         >
           {vehicleNumber}
         </div>
+        {isFollowing && (
+          <div className="text-[10px] px-2 py-0.5 rounded mt-0.5 font-semibold bg-blue-500 text-white animate-pulse">
+            FOLLOWING
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-export function BusTrackingMap({ buses, selectedBusId, onBusClick }: BusTrackingMapProps) {
+export function BusTrackingMap({ buses, selectedBusId, followingBusId, onBusClick, onFollowToggle }: BusTrackingMapProps) {
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showTraffic, setShowTraffic] = useState(false)
@@ -202,9 +228,9 @@ export function BusTrackingMap({ buses, selectedBusId, onBusClick }: BusTracking
     initialFitDoneRef.current = true
   }, [map, buses, selectedBusId])
 
-  // Center on selected bus
+  // Center on selected bus (one-time when selected)
   useEffect(() => {
-    if (map && selectedBusId) {
+    if (map && selectedBusId && !followingBusId) {
       const selectedBus = buses.find((b) => b.id === selectedBusId)
       if (selectedBus) {
         map.panTo({ lat: selectedBus.latitude, lng: selectedBus.longitude })
@@ -214,7 +240,21 @@ export function BusTrackingMap({ buses, selectedBusId, onBusClick }: BusTracking
         }
       }
     }
-  }, [map, selectedBusId, buses])
+  }, [map, selectedBusId])
+
+  // Continuously follow bus when followingBusId is set
+  useEffect(() => {
+    if (map && followingBusId) {
+      const followedBus = buses.find((b) => b.id === followingBusId)
+      if (followedBus) {
+        map.panTo({ lat: followedBus.latitude, lng: followedBus.longitude })
+        const currentZoom = map.getZoom()
+        if (currentZoom && currentZoom < 16) {
+          map.setZoom(16)
+        }
+      }
+    }
+  }, [map, followingBusId, buses])
 
   // Fullscreen handling
   useEffect(() => {
@@ -345,6 +385,11 @@ export function BusTrackingMap({ buses, selectedBusId, onBusClick }: BusTracking
               bus={bus}
               onClick={() => onBusClick?.(bus)}
               isSelected={selectedBusId === bus.id}
+              isFollowing={followingBusId === bus.id}
+              onFollowClick={(e) => {
+                e.stopPropagation()
+                onFollowToggle?.(followingBusId === bus.id ? null : bus.id)
+              }}
             />
           </OverlayView>
         ))}

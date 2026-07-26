@@ -26,6 +26,8 @@ interface ControlRoomMapProps {
   pickups?: { lat: number; lng: number; tripId: string }[]
   onMarkerClick?: (id: string, type: "taxi" | "shuttle") => void
   selectedId?: string | null
+  followingId?: string | null
+  onFollowToggle?: (id: string | null) => void
 }
 
 const darkMapStyle = [
@@ -66,6 +68,8 @@ export function ControlRoomMap({
   pickups = [],
   onMarkerClick,
   selectedId,
+  followingId,
+  onFollowToggle,
 }: ControlRoomMapProps) {
   const { isLoaded, loadError } = useGoogleMaps()
   const mapRef = useRef<google.maps.Map | null>(null)
@@ -115,9 +119,9 @@ export function ControlRoomMap({
     initialFitDoneRef.current = true
   }, [mapReady, trips.length])
 
-  // Center on selected marker
+  // Center on selected marker (one-time)
   useEffect(() => {
-    if (mapRef.current && selectedId) {
+    if (mapRef.current && selectedId && !followingId) {
       const selected = trips.find(t => t.id === selectedId)
       if (selected) {
         mapRef.current.panTo({ lat: selected.lat, lng: selected.lng })
@@ -127,7 +131,21 @@ export function ControlRoomMap({
         }
       }
     }
-  }, [selectedId, trips])
+  }, [selectedId])
+
+  // Continuously follow when followingId is set
+  useEffect(() => {
+    if (mapRef.current && followingId) {
+      const followed = trips.find(t => t.id === followingId)
+      if (followed) {
+        mapRef.current.panTo({ lat: followed.lat, lng: followed.lng })
+        const currentZoom = mapRef.current.getZoom()
+        if (currentZoom && currentZoom < 16) {
+          mapRef.current.setZoom(16)
+        }
+      }
+    }
+  }, [followingId, trips])
 
   // Fullscreen handling
   useEffect(() => {
@@ -256,8 +274,13 @@ export function ControlRoomMap({
             <TripMarkerComponent
               trip={trip}
               isSelected={selectedId === trip.id}
+              isFollowing={followingId === trip.id}
               isSearchMatch={searchMatchIds.has(trip.id)}
               onClick={() => onMarkerClick?.(trip.id, trip.type)}
+              onFollowClick={(e) => {
+                e.stopPropagation()
+                onFollowToggle?.(followingId === trip.id ? null : trip.id)
+              }}
             />
           </OverlayView>
         ))}
@@ -430,13 +453,17 @@ export function ControlRoomMap({
 function TripMarkerComponent({
   trip,
   isSelected,
+  isFollowing,
   isSearchMatch,
   onClick,
+  onFollowClick,
 }: {
   trip: TripMarker
   isSelected: boolean
+  isFollowing: boolean
   isSearchMatch?: boolean
   onClick: () => void
+  onFollowClick: (e: React.MouseEvent) => void
 }) {
   const color = STATUS_COLORS[trip.status] || "#6b7280"
   const isTaxi = trip.type === "taxi"
@@ -447,11 +474,26 @@ function TripMarkerComponent({
       className={`
         cursor-pointer transform -translate-x-1/2 -translate-y-1/2
         transition-all duration-200 hover:scale-110
-        ${isSelected ? "scale-125 z-50" : "z-10"}
+        ${isSelected || isFollowing ? "scale-125 z-50" : "z-10"}
         ${isSearchMatch ? "ring-2 ring-yellow-400 ring-offset-2 rounded-full" : ""}
       `}
     >
+      {/* Following indicator ring */}
+      {isFollowing && (
+        <div className="absolute -inset-3 rounded-full border-4 border-blue-500 animate-pulse" />
+      )}
       <div className="relative">
+        {/* Follow button */}
+        <button
+          onClick={onFollowClick}
+          className={`absolute -top-2 -left-2 w-5 h-5 rounded-full flex items-center justify-center text-white border-2 border-white shadow-lg transition-all z-10 ${
+            isFollowing ? "bg-blue-500" : "bg-gray-700 hover:bg-blue-600"
+          }`}
+          title={isFollowing ? "Stop following" : "Follow"}
+        >
+          <Navigation className="h-2.5 w-2.5" style={{ transform: isFollowing ? "none" : "rotate(-45deg)" }} />
+        </button>
+
         {/* Marker body */}
         <div
           className={`
@@ -462,7 +504,7 @@ function TripMarkerComponent({
           `}
           style={{
             backgroundColor: color,
-            borderColor: isSelected ? "#fff" : "rgba(255,255,255,0.3)",
+            borderColor: isSelected || isFollowing ? "#fff" : "rgba(255,255,255,0.3)",
           }}
         >
           {isTaxi ? (
@@ -473,8 +515,15 @@ function TripMarkerComponent({
           <span>{trip.label}</span>
         </div>
 
+        {/* Following badge */}
+        {isFollowing && (
+          <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-blue-500 text-white text-[8px] rounded font-bold animate-pulse whitespace-nowrap">
+            FOLLOWING
+          </div>
+        )}
+
         {/* Sublabel tooltip on hover/select */}
-        {trip.sublabel && isSelected && (
+        {trip.sublabel && isSelected && !isFollowing && (
           <div
             className="absolute top-full left-1/2 -translate-x-1/2 mt-1 px-2 py-1
                        bg-black/80 text-white text-[9px] rounded whitespace-nowrap"
@@ -484,7 +533,7 @@ function TripMarkerComponent({
         )}
 
         {/* Alert ring */}
-        {trip.isAlert && (
+        {trip.isAlert && !isFollowing && (
           <div
             className="absolute inset-0 rounded-full animate-ping"
             style={{

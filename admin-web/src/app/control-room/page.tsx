@@ -127,6 +127,7 @@ export default function ControlRoomPage() {
   const [tripsFilter, setTripsFilter] = useState<"all" | "pending" | "accepted" | "arrived" | "in_progress">("all")
   const [selectedTrip, setSelectedTrip] = useState<ActiveTrip | null>(null)
   const [tripDetailOpen, setTripDetailOpen] = useState(false)
+  const [followingId, setFollowingId] = useState<string | null>(null)
 
   // Clock update
   useEffect(() => {
@@ -862,12 +863,14 @@ export default function ControlRoomPage() {
           <Card className="flex-1 min-h-[200px] overflow-hidden">
             <ControlRoomMap
               trips={mapMarkers}
+              followingId={followingId}
               onMarkerClick={(id, type) => {
                 if (type === 'taxi') {
                   const trip = activeTrips.find(t => t.driver_id === id)
                   if (trip) viewTripDetails(trip)
                 }
               }}
+              onFollowToggle={(id) => setFollowingId(id)}
             />
           </Card>
 

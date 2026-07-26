@@ -99,6 +99,7 @@ export default function LiveTrackingPage() {
   const [alerts, setAlerts] = useState<BusFullAlert[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedBus, setSelectedBus] = useState<BusLocation | null>(null)
+  const [followingBusId, setFollowingBusId] = useState<string | null>(null)
   const [stopCounts, setStopCounts] = useState<StopPassengerCount[]>([])
   const [loadingStops, setLoadingStops] = useState(false)
   const [summary, setSummary] = useState<DailySummary>({
@@ -632,7 +633,15 @@ export default function LiveTrackingPage() {
             <BusTrackingMap
               buses={buses}
               selectedBusId={selectedBus?.id}
+              followingBusId={followingBusId}
               onBusClick={(bus) => setSelectedBus(bus)}
+              onFollowToggle={(busId) => {
+                setFollowingBusId(busId)
+                if (busId) {
+                  const bus = buses.find(b => b.id === busId)
+                  if (bus) setSelectedBus(bus)
+                }
+              }}
             />
           </CardContent>
         </Card>
@@ -645,14 +654,28 @@ export default function LiveTrackingPage() {
               <div className="flex flex-col h-full">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold">Bus Details</h3>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-6 w-6"
-                    onClick={() => setSelectedBus(null)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant={followingBusId === selectedBus.id ? "default" : "outline"}
+                      className={`h-7 text-xs ${followingBusId === selectedBus.id ? "bg-blue-500 hover:bg-blue-600" : ""}`}
+                      onClick={() => setFollowingBusId(followingBusId === selectedBus.id ? null : selectedBus.id)}
+                    >
+                      <Navigation className={`h-3 w-3 mr-1 ${followingBusId === selectedBus.id ? "" : "-rotate-45"}`} />
+                      {followingBusId === selectedBus.id ? "Following" : "Follow"}
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6"
+                      onClick={() => {
+                        setSelectedBus(null)
+                        setFollowingBusId(null)
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Bus Info */}

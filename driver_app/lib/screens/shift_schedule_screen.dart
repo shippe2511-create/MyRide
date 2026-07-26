@@ -18,6 +18,7 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
   int _selectedDay = DateTime.now().weekday - 1;
   bool _isLoading = true;
   StreamSubscription<Map<String, dynamic>>? _shiftsSubscription;
+  Timer? _countdownTimer;
 
   final List<String> _weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -31,10 +32,15 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
     super.initState();
     _loadShifts();
     _subscribeToShifts();
+    // Update countdown every minute
+    _countdownTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
+    _countdownTimer?.cancel();
     _shiftsSubscription?.cancel();
     final driverId = SupabaseService.visibleUserId;
     if (driverId != null) {
@@ -84,10 +90,30 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
 
         String status = shift['status'] ?? 'scheduled';
         if (status == 'scheduled') {
-          if (shiftDate.isBefore(DateTime(now.year, now.month, now.day))) {
+          final today = DateTime(now.year, now.month, now.day);
+          final shiftDay = DateTime(shiftDate.year, shiftDate.month, shiftDate.day);
+
+          if (shiftDay.isBefore(today)) {
             status = 'completed';
-          } else if (shiftDate.year == now.year && shiftDate.month == now.month && shiftDate.day == now.day) {
-            status = 'current';
+          } else if (shiftDay.isAtSameMomentAs(today)) {
+            // Check if current time is within shift hours
+            final startParts = (shift['start_time']?.toString() ?? '00:00:00').split(':');
+            final endParts = (shift['end_time']?.toString() ?? '23:59:59').split(':');
+            final startHour = int.tryParse(startParts[0]) ?? 0;
+            final startMin = int.tryParse(startParts.length > 1 ? startParts[1] : '0') ?? 0;
+            final endHour = int.tryParse(endParts[0]) ?? 23;
+            final endMin = int.tryParse(endParts.length > 1 ? endParts[1] : '59') ?? 59;
+
+            final shiftStart = DateTime(now.year, now.month, now.day, startHour, startMin);
+            final shiftEnd = DateTime(now.year, now.month, now.day, endHour, endMin);
+
+            if (now.isBefore(shiftStart)) {
+              status = 'upcoming';
+            } else if (now.isAfter(shiftEnd)) {
+              status = 'completed';
+            } else {
+              status = 'current';
+            }
           } else {
             status = 'upcoming';
           }
@@ -139,7 +165,7 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
                     title: Text('Shift Schedule', style: TextStyle(color: context.textColor)),
                     actions: [
                       IconButton(
-                        icon: Icon(Icons.calendar_month, color: context.textColor),
+                        icon: Icon(Icons.calendar_today_rounded, color: AppColors.yellow),
                         onPressed: () => _showMonthView(context),
                       ),
                     ],

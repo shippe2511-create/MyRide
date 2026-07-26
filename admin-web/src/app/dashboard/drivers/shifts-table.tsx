@@ -24,7 +24,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-  Plus, Loader2, Clock, Calendar, Trash2, Pencil, Users, Wand2, MoreHorizontal
+  Plus, Loader2, Clock, Calendar, Trash2, Pencil, Users, Wand2, MoreHorizontal, Search
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
@@ -223,12 +223,16 @@ export function ShiftsTable() {
         }
       }
 
-      const { error } = await supabase.from("shifts").insert(shiftsToInsert)
+      // Use upsert to update existing shifts or create new ones
+      const { error } = await supabase.from("shifts").upsert(shiftsToInsert, {
+        onConflict: "driver_id,shift_date",
+        ignoreDuplicates: false,
+      })
 
       if (error) {
-        toast.error("Failed to create shifts")
+        toast.error("Failed to create shifts: " + error.message)
       } else {
-        toast.success(`${shiftsToInsert.length} shift(s) created for ${formData.driver_ids.length} driver(s)`)
+        toast.success(`${shiftsToInsert.length} shift(s) created/updated for ${formData.driver_ids.length} driver(s)`)
         closeDialog()
         loadData()
       }
@@ -432,13 +436,17 @@ export function ShiftsTable() {
       return
     }
 
-    const { error } = await supabase.from("shifts").insert(shiftsToCreate)
+    // Use upsert to update existing shifts or create new ones
+    const { error } = await supabase.from("shifts").upsert(shiftsToCreate, {
+      onConflict: "driver_id,shift_date",
+      ignoreDuplicates: false,
+    })
 
     if (error) {
       toast.error("Failed to create shifts: " + error.message)
     } else {
       const periodText = autoSchedulePeriod === "month" ? "month" : "week"
-      toast.success(`Created ${shiftsToCreate.length} shifts for ${selectedDriversList.length} driver(s) for the next ${periodText}`)
+      toast.success(`Created/updated ${shiftsToCreate.length} shifts for ${selectedDriversList.length} driver(s) for the next ${periodText}`)
       loadData()
     }
 
@@ -533,22 +541,12 @@ export function ShiftsTable() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Select value={selectedDriver} onValueChange={setSelectedDriver}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="All Drivers" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Drivers</SelectItem>
-                {drivers.map(driver => {
-                  const profile = getDriverProfile(driver)
-                  return (
-                    <SelectItem key={driver.id} value={driver.id}>
-                      {profile?.full_name || "Unknown"}
-                    </SelectItem>
-                  )
-                })}
-              </SelectContent>
-            </Select>
+            <DriverFilterDropdown
+              drivers={drivers}
+              selectedDriver={selectedDriver}
+              onSelect={setSelectedDriver}
+              getDriverProfile={getDriverProfile}
+            />
             {selectedShifts.length > 0 && (
               <Button size="sm" variant="destructive" onClick={handleBulkDelete} disabled={bulkDeleting}>
                 {bulkDeleting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
@@ -677,7 +675,7 @@ export function ShiftsTable() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={(open) => !open && closeDialog()}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingShift ? "Edit Shift" : "Add Shift"}</DialogTitle>
           </DialogHeader>
@@ -1034,7 +1032,6 @@ function StaffPicker({
   getDriverProfile: (driver: Driver | undefined) => DriverProfile | null
 }) {
   const [search, setSearch] = useState("")
-  const [isOpen, setIsOpen] = useState(false)
 
   const filteredDrivers = drivers.filter(driver => {
     const profile = getDriverProfile(driver)
@@ -1047,7 +1044,6 @@ function StaffPicker({
   const toggleDriver = (driverId: string) => {
     if (singleSelect) {
       onSelectionChange([driverId])
-      setIsOpen(false)
     } else {
       if (selectedIds.includes(driverId)) {
         onSelectionChange(selectedIds.filter(id => id !== driverId))
@@ -1083,7 +1079,7 @@ function StaffPicker({
 
       {/* Selected Staff Chips */}
       {selectedDrivers.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 mb-2">
           {selectedDrivers.map(driver => {
             const profile = getDriverProfile(driver)
             return (
@@ -1114,7 +1110,7 @@ function StaffPicker({
       )}
 
       {/* Search Input */}
-      <div className="relative">
+      <div className="relative mb-2">
         <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="11" cy="11" r="8" />
           <path d="m21 21-4.35-4.35" />
@@ -1122,86 +1118,178 @@ function StaffPicker({
         <Input
           placeholder="Search by name..."
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value)
-            setIsOpen(true)
-          }}
-          onFocus={() => setIsOpen(true)}
+          onChange={(e) => setSearch(e.target.value)}
           className="pl-9"
         />
       </div>
 
-      {/* Driver List */}
-      {isOpen && (
-        <div className="border rounded-lg overflow-hidden">
-          {/* Quick Actions */}
-          {!singleSelect && (
-            <div className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b">
-              <span className="text-xs text-muted-foreground">
-                {selectedIds.length} of {drivers.length} selected
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 text-xs"
-                  onClick={() => onSelectionChange(drivers.map(d => d.id))}
-                >
-                  Select all
-                </Button>
-              </div>
-            </div>
-          )}
+      {/* Quick Actions */}
+      {!singleSelect && (
+        <div className="flex items-center justify-between px-3 py-2 bg-muted/50 border border-b-0 rounded-t-lg">
+          <span className="text-xs text-muted-foreground">
+            {selectedIds.length} of {drivers.length} selected
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 text-xs"
+            onClick={() => onSelectionChange(drivers.map(d => d.id))}
+          >
+            Select all
+          </Button>
+        </div>
+      )}
 
-          {/* Scrollable List */}
-          <div className="max-h-48 overflow-y-auto">
-            {filteredDrivers.length === 0 ? (
-              <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-                No drivers found
+      {/* Driver List - Always visible, scrollable */}
+      <div className={`border ${!singleSelect ? 'border-t-0 rounded-b-lg' : 'rounded-lg'} max-h-40 overflow-y-auto`}>
+        {filteredDrivers.length === 0 ? (
+          <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+            No drivers found
+          </div>
+        ) : (
+          filteredDrivers.map(driver => {
+            const profile = getDriverProfile(driver)
+            const isSelected = selectedIds.includes(driver.id)
+            return (
+              <div
+                key={driver.id}
+                onClick={() => toggleDriver(driver.id)}
+                className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors hover:bg-accent/50 ${
+                  isSelected ? "bg-primary/5" : ""
+                }`}
+              >
+                <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                  isSelected
+                    ? "bg-primary border-primary"
+                    : "border-muted-foreground/30"
+                }`}>
+                  {isSelected && (
+                    <svg className="h-3 w-3 text-primary-foreground" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 6l3 3 5-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </div>
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={profile?.avatar_url || undefined} />
+                  <AvatarFallback className="text-sm">{profile?.full_name?.[0] || "?"}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{profile?.full_name || "Unknown"}</p>
+                  {profile?.phone && (
+                    <p className="text-xs text-muted-foreground truncate">{profile.phone}</p>
+                  )}
+                </div>
+                {isSelected && (
+                  <div className="h-2 w-2 rounded-full bg-primary" />
+                )}
               </div>
-            ) : (
-              filteredDrivers.map(driver => {
+            )
+          })
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Driver Filter Dropdown with Search
+function DriverFilterDropdown({
+  drivers,
+  selectedDriver,
+  onSelect,
+  getDriverProfile,
+}: {
+  drivers: Driver[]
+  selectedDriver: string
+  onSelect: (id: string) => void
+  getDriverProfile: (driver: Driver | undefined) => DriverProfile | null
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState("")
+
+  const filteredDrivers = drivers.filter(driver => {
+    const profile = getDriverProfile(driver)
+    const name = profile?.full_name?.toLowerCase() || ""
+    return name.includes(search.toLowerCase())
+  })
+
+  const selectedProfile = selectedDriver === "all"
+    ? null
+    : getDriverProfile(drivers.find(d => d.id === selectedDriver))
+
+  return (
+    <div className="relative">
+      <Button
+        variant="outline"
+        className="w-48 justify-between"
+        onClick={() => setOpen(!open)}
+      >
+        <span className="truncate">
+          {selectedDriver === "all" ? "All Drivers" : selectedProfile?.full_name || "Unknown"}
+        </span>
+        <Search className="h-4 w-4 ml-2 opacity-50" />
+      </Button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 w-64 z-50 bg-popover border rounded-lg shadow-lg">
+            <div className="p-2 border-b">
+              <Input
+                placeholder="Search drivers..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-8"
+                autoFocus
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto p-1">
+              <div
+                className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-accent ${
+                  selectedDriver === "all" ? "bg-accent" : ""
+                }`}
+                onClick={() => {
+                  onSelect("all")
+                  setOpen(false)
+                  setSearch("")
+                }}
+              >
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">All Drivers</span>
+                {selectedDriver === "all" && <span className="ml-auto text-primary">✓</span>}
+              </div>
+              {filteredDrivers.map(driver => {
                 const profile = getDriverProfile(driver)
-                const isSelected = selectedIds.includes(driver.id)
+                const isSelected = selectedDriver === driver.id
                 return (
                   <div
                     key={driver.id}
-                    onClick={() => toggleDriver(driver.id)}
-                    className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors hover:bg-accent/50 ${
-                      isSelected ? "bg-primary/5" : ""
+                    className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-accent ${
+                      isSelected ? "bg-accent" : ""
                     }`}
+                    onClick={() => {
+                      onSelect(driver.id)
+                      setOpen(false)
+                      setSearch("")
+                    }}
                   >
-                    <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center transition-colors ${
-                      isSelected
-                        ? "bg-primary border-primary"
-                        : "border-muted-foreground/30"
-                    }`}>
-                      {isSelected && (
-                        <svg className="h-3 w-3 text-primary-foreground" viewBox="0 0 12 12" fill="none">
-                          <path d="M2 6l3 3 5-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      )}
-                    </div>
-                    <Avatar className="h-8 w-8">
+                    <Avatar className="h-6 w-6">
                       <AvatarImage src={profile?.avatar_url || undefined} />
-                      <AvatarFallback className="text-sm">{profile?.full_name?.[0] || "?"}</AvatarFallback>
+                      <AvatarFallback className="text-xs">{profile?.full_name?.[0] || "?"}</AvatarFallback>
                     </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{profile?.full_name || "Unknown"}</p>
-                      {profile?.phone && (
-                        <p className="text-xs text-muted-foreground truncate">{profile.phone}</p>
-                      )}
-                    </div>
-                    {isSelected && (
-                      <div className="h-2 w-2 rounded-full bg-primary" />
-                    )}
+                    <span className="text-sm truncate">{profile?.full_name || "Unknown"}</span>
+                    {isSelected && <span className="ml-auto text-primary">✓</span>}
                   </div>
                 )
-              })
-            )}
+              })}
+              {filteredDrivers.length === 0 && (
+                <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                  No drivers found
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   )

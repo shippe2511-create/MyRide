@@ -242,6 +242,16 @@ const columnLabels: Record<string, Record<string, string>> = {
     "Type": "shift_type",
     "Status": "status",
   },
+  driver_attendance: {
+    "Driver": "driver_name",
+    "Phone": "phone",
+    "Date": "shift_date",
+    "Shift": "shift_time",
+    "Type": "shift_type",
+    "Status": "attendance_status",
+    "Absence Reason": "absence_reason",
+    "Marked At": "marked_at",
+  },
   quota_usage: {
     "Customer": "customer_name",
     "Campaign": "campaign_name",
@@ -2924,7 +2934,7 @@ export default function ReportsPage() {
 
   const categories = [
     { name: "People", reports: ["customers", "drivers", "driver_performance", "customer_loyalty", "favorite_drivers"] },
-    { name: "Operations", reports: ["rides", "scheduled_rides", "recurring_rides", "cancellations", "shifts", "break_history"] },
+    { name: "Operations", reports: ["rides", "scheduled_rides", "recurring_rides", "cancellations", "shifts", "driver_attendance", "break_history"] },
     { name: "Feedback", reports: ["ratings", "support_tickets"] },
     { name: "Safety", reports: ["sos_alerts", "incidents"] },
     { name: "Vehicles", reports: ["vehicles", "vehicle_checks", "vehicle_logs"] },

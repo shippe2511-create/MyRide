@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { formatDistanceToNow, format } from "date-fns"
-import { PermissionGate } from "@/components/permission-gate"
+import { PermissionGate, TransportOnlyGate } from "@/components/permission-gate"
 
 const BusTrackingMap = dynamic(
   () => import("@/components/bus-tracking-map").then(mod => mod.BusTrackingMap),
@@ -473,6 +473,7 @@ export default function LiveTrackingPage() {
   const fullBuses = buses.filter(b => b.is_full).length
 
   return (
+    <TransportOnlyGate>
     <PermissionGate permission="tracking:view">
     <div className="flex flex-col h-[calc(100vh-100px)]">
       {/* Header */}
@@ -971,5 +972,6 @@ export default function LiveTrackingPage() {
       </Dialog>
     </div>
     </PermissionGate>
+    </TransportOnlyGate>
   )
 }

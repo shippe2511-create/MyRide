@@ -55,3 +55,27 @@ export function ManageGate({ resource, children }: { resource: string; children:
 
   return <>{children}</>
 }
+
+export function TransportOnlyGate({ children, fallback }: { children: React.ReactNode; fallback?: React.ReactNode }) {
+  const { isTransportDepartment, loading } = usePermissions()
+
+  if (loading) {
+    return <LoadingFallback />
+  }
+
+  if (!isTransportDepartment()) {
+    return fallback ?? (
+      <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
+          <ShieldX className="h-8 w-8 text-destructive" />
+        </div>
+        <h3 className="text-lg font-semibold mb-1">Transport Department Only</h3>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          This page is only accessible to Transport department staff.
+        </p>
+      </div>
+    )
+  }
+
+  return <>{children}</>
+}

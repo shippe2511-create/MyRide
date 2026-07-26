@@ -34,8 +34,11 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Protect dashboard routes
-  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
+  // Protect dashboard and control-room routes
+  const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard') ||
+                           request.nextUrl.pathname.startsWith('/control-room')
+
+  if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
@@ -61,7 +64,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Check if user has admin role
-  if (user && request.nextUrl.pathname.startsWith('/dashboard')) {
+  if (user && isProtectedRoute) {
     const profile = await findProfile()
     console.log('[Middleware] User:', user.id, user.email, 'Profile:', profile)
 

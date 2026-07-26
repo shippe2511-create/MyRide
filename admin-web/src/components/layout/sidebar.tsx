@@ -64,6 +64,7 @@ interface NavItem {
   href: string
   icon: typeof LayoutDashboard
   permission: Permission
+  transportOnly?: boolean
 }
 
 interface NavSection {
@@ -111,7 +112,7 @@ const navigationSections: NavSection[] = [
       { name: "Schedules", href: "/dashboard/scheduling", icon: Calendar, permission: "schedules:view" },
       { name: "Service Zones", href: "/dashboard/zones", icon: Map, permission: "zones:view" },
       { name: "Bus Roster", href: "/dashboard/bus-roster", icon: Users, permission: "settings:view" },
-      { name: "Bus Live Tracking", href: "/dashboard/live-tracking", icon: Navigation, permission: "tracking:view" },
+      { name: "Bus Live Tracking", href: "/dashboard/live-tracking", icon: Navigation, permission: "tracking:view", transportOnly: true },
     ]
   },
   {
@@ -161,7 +162,7 @@ export function Sidebar({ collapsed = false, onCollapse, onNavigate }: SidebarPr
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const { can, loading } = usePermissions()
+  const { can, loading, isTransportDepartment } = usePermissions()
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [hoveredSection, setHoveredSection] = useState<string | null>(null)
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
@@ -183,7 +184,13 @@ export function Sidebar({ collapsed = false, onCollapse, onNavigate }: SidebarPr
       if (!section.items) return section
       return {
         ...section,
-        items: section.items.filter(item => can(item.permission))
+        items: section.items.filter(item => {
+          // Check permission
+          if (!can(item.permission)) return false
+          // Check transport-only flag
+          if (item.transportOnly && !isTransportDepartment()) return false
+          return true
+        })
       }
     }).filter(section => !section.items || section.items.length > 0)
   }

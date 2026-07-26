@@ -67,6 +67,7 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { formatDistanceToNow, format } from "date-fns"
+import { PermissionGate } from "@/components/permission-gate"
 import {
   Tooltip,
   TooltipContent,
@@ -469,6 +470,7 @@ export default function ControlRoomPage() {
   }
 
   return (
+    <PermissionGate permission="rides:view">
     <TooltipProvider delayDuration={300}>
     <div className="h-full w-full flex flex-col p-4 gap-4">
       {/* Top Bar */}
@@ -1311,6 +1313,7 @@ export default function ControlRoomPage() {
       </Dialog>
     </div>
     </TooltipProvider>
+    </PermissionGate>
   )
 }
 

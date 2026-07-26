@@ -40,7 +40,7 @@ export default function ControlRoomLayout({
       .eq("id", user.id)
       .single()
 
-    const allowedRoles = ["super_admin", "manager", "supervisor", "operator"]
+    const allowedRoles = ["super_admin", "manager", "supervisor", "operator", "support", "viewer"]
     if (!profile || !allowedRoles.includes(profile.role)) {
       router.push("/dashboard")
       return

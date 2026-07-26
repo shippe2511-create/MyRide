@@ -80,6 +80,7 @@ class _BusTripScreenState extends State<BusTripScreen> {
         routeId: widget.assignment['route_id'] as String,
         latitude: position.latitude,
         longitude: position.longitude,
+        bearing: position.heading,
         currentStopName: currentStopName,
         currentStopIndex: _currentStopIndex,
         passengersOnBoard: _onBoardCount,

@@ -445,11 +445,13 @@ class SupabaseService {
   // Get driver by profile UUID (for phone-based login)
   static Future<Map<String, dynamic>?> getDriverByProfileId(String profileId) async {
     try {
+      // Simple query without joins for login check
       final response = await client
           .from('drivers')
-          .select('*, profile:profiles(*), vehicle:vehicle_types(*)')
+          .select('*')
           .eq('profile_id', profileId)
           .maybeSingle();
+      debugPrint('getDriverByProfileId: profileId=$profileId, found=${response != null}');
       return response;
     } catch (e) {
       debugPrint('Error getting driver by profile ID: $e');
@@ -2334,7 +2336,7 @@ class SupabaseService {
           .from('route_stops')
           .select()
           .eq('route_id', routeId)
-          .order('stop_order');
+          .order('stop_order', ascending: true);
 
       if (response.isNotEmpty) {
         return List<Map<String, dynamic>>.from(response);
@@ -2585,6 +2587,7 @@ class SupabaseService {
     required String routeId,
     required double latitude,
     required double longitude,
+    double bearing = 0,
     String? currentStopName,
     int currentStopIndex = 0,
     int passengersOnBoard = 0,
@@ -2608,6 +2611,7 @@ class SupabaseService {
         'route_id': routeId,
         'latitude': latitude,
         'longitude': longitude,
+        'bearing': bearing,
         'current_stop_name': currentStopName,
         'current_stop_index': currentStopIndex,
         'passengers_on_board': passengersOnBoard,

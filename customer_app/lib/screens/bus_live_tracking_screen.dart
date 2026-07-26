@@ -343,10 +343,13 @@ class _BusLiveTrackingScreenState extends State<BusLiveTrackingScreen> with Tick
         final isSelected = _selectedBus?['id'] == bus['id'];
         final vehicleInfo = bus['vehicle_types'];
         final plateNo = bus['vehicle_number'] ?? vehicleInfo?['plate_no'] ?? 'Bus';
+        final bearing = double.tryParse(bus['bearing']?.toString() ?? '0') ?? 0;
 
         markers.add(Marker(
           markerId: MarkerId('bus_${bus['id']}'),
           position: position,
+          rotation: bearing,
+          anchor: const Offset(0.5, 0.5),
           icon: BitmapDescriptor.defaultMarkerWithHue(
             isSelected ? BitmapDescriptor.hueViolet : BitmapDescriptor.hueCyan,
           ),

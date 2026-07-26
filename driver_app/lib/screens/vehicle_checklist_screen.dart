@@ -38,6 +38,11 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
   List<_ChecklistCategory> _categories = [];
   bool _loadingItems = true;
 
+  // Absent check
+  bool _isAbsent = false;
+  String? _absenceReason;
+  bool _checkingAttendance = true;
+
   // Running hours
   final TextEditingController _runningHoursController = TextEditingController();
   double? _previousRunningHours;
@@ -145,6 +150,33 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
     _loadChecklistItems();
     _subscribeToChecklistChanges();
     _loadPreviousRunningHours();
+    _checkAttendanceStatus();
+  }
+
+  Future<void> _checkAttendanceStatus() async {
+    try {
+      final driverState = context.read<DriverState>();
+      final driverId = driverState.driverId;
+      if (driverId.isEmpty) {
+        setState(() => _checkingAttendance = false);
+        return;
+      }
+
+      final shift = await SupabaseService.getTodayShift(driverId);
+      if (shift != null && mounted) {
+        final status = shift['attendance_status'] as String? ?? 'pending';
+        setState(() {
+          _isAbsent = status == 'absent';
+          _absenceReason = shift['absence_reason'] as String?;
+          _checkingAttendance = false;
+        });
+      } else {
+        setState(() => _checkingAttendance = false);
+      }
+    } catch (e) {
+      debugPrint('Error checking attendance: $e');
+      setState(() => _checkingAttendance = false);
+    }
   }
 
   Future<void> _loadPreviousRunningHours() async {
@@ -406,7 +438,85 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
       );
     }
 
-    if (_loadingItems) {
+    // Show "You're Absent" screen if driver marked absent for today
+    if (_isAbsent) {
+      return Scaffold(
+        backgroundColor: context.bgColor,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back, color: context.textColor),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: Text(
+            widget.isPostShift ? 'Post-Shift Check' : 'Pre-Trip Check',
+            style: TextStyle(color: context.textColor),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.block, size: 64, color: AppColors.error),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'You\'re Absent Today',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.error),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'You have marked yourself absent for today\'s shift. Cancel your absence from the home screen to access the checklist.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 15, color: context.mutedColor, height: 1.5),
+                ),
+                if (_absenceReason != null && _absenceReason!.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.info_outline, color: AppColors.error, size: 16),
+                        const SizedBox(width: 8),
+                        Flexible(child: Text(_absenceReason!, style: TextStyle(color: AppColors.error, fontSize: 13))),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 32),
+                ElevatedButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('Go Back'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.error,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_loadingItems || _checkingAttendance) {
       return Scaffold(
         backgroundColor: context.bgColor,
         body: Center(

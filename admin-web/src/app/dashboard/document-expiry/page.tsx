@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { AlertTriangle, Clock, FileWarning, RefreshCw, Bell, CheckCircle } from "lucide-react"
 import { format, differenceInDays } from "date-fns"
+import { PermissionGate } from "@/components/permission-gate"
 
 interface ExpiringDocument {
   id: string
@@ -139,6 +140,7 @@ export default function DocumentExpiryPage() {
   const expiringSoon = documents.filter((d) => d.days_until_expiry > 30)
 
   return (
+    <PermissionGate permission="drivers:view">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -337,5 +339,6 @@ export default function DocumentExpiryPage() {
         </Card>
       )}
     </div>
+    </PermissionGate>
   )
 }

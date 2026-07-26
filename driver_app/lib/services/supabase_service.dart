@@ -79,6 +79,21 @@ class SupabaseService {
     }
   }
 
+  // Get active departments for signup
+  static Future<List<Map<String, dynamic>>> getActiveDepartments() async {
+    try {
+      final response = await client
+          .from('departments')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name');
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error fetching departments: $e');
+      return [];
+    }
+  }
+
   // Sign up with phone (for new drivers)
   // Handles case where user already exists as customer
   static Future<Map<String, dynamic>> signUpWithPhone({
@@ -87,6 +102,7 @@ class SupabaseService {
     String? email,
     String? gender,
     String? staffId,
+    String? departmentId,
     List<Map<String, dynamic>>? emergencyContacts,
     bool isDriver = true,
   }) async {
@@ -127,6 +143,10 @@ class SupabaseService {
         updateData['email'] = email;
       }
 
+      if (departmentId != null && departmentId.isNotEmpty) {
+        updateData['department_id'] = departmentId;
+      }
+
       response = await client
           .from('profiles')
           .update(updateData)
@@ -147,6 +167,10 @@ class SupabaseService {
 
       if (email != null && email.isNotEmpty) {
         data['email'] = email;
+      }
+
+      if (departmentId != null && departmentId.isNotEmpty) {
+        data['department_id'] = departmentId;
       }
 
       response = await client.from('profiles').insert(data).select().single();

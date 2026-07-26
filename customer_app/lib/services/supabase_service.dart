@@ -87,12 +87,28 @@ class SupabaseService {
     }
   }
 
+  // Get active departments for signup
+  static Future<List<Map<String, dynamic>>> getActiveDepartments() async {
+    try {
+      final response = await client
+          .from('departments')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name');
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error fetching departments: $e');
+      return [];
+    }
+  }
+
   // Sign up with phone (for new users)
   static Future<Map<String, dynamic>> signUpWithPhone({
     required String phone,
     required String fullName,
     String? email,
     String? gender,
+    String? departmentId,
     String? staffId,
     List<Map<String, dynamic>>? emergencyContacts,
   }) async {
@@ -122,6 +138,10 @@ class SupabaseService {
 
     if (email != null && email.isNotEmpty) {
       data['email'] = email;
+    }
+
+    if (departmentId != null && departmentId.isNotEmpty) {
+      data['department_id'] = departmentId;
     }
 
     // Insert new profile

@@ -27,6 +27,34 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   bool _isLoading = false;
   String _phoneNumber = '';
 
+  // Department selection
+  List<Map<String, dynamic>> _departments = [];
+  String? _selectedDepartmentId;
+  bool _loadingDepartments = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDepartments();
+  }
+
+  Future<void> _loadDepartments() async {
+    try {
+      final departments = await SupabaseService.getActiveDepartments();
+      if (mounted) {
+        setState(() {
+          _departments = departments;
+          _loadingDepartments = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading departments: $e');
+      if (mounted) {
+        setState(() => _loadingDepartments = false);
+      }
+    }
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -50,6 +78,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   Future<void> _submitRegistration() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Validate department selection
+    if (_selectedDepartmentId == null) {
+      AppSnackbar.error(context, 'Please select your department');
+      return;
+    }
+
     setState(() => _isLoading = true);
     HapticFeedback.mediumImpact();
 
@@ -61,6 +95,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
         gender: _selectedGender,
         staffId: _staffIdController.text.trim().toUpperCase(),
+        departmentId: _selectedDepartmentId,
         emergencyContacts: _emergencyPhoneController.text.isNotEmpty
             ? [{'phone': '+960${_emergencyPhoneController.text.trim()}', 'relation': _emergencyRelationController.text.trim()}]
             : [],
@@ -274,6 +309,57 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   textCapitalization: TextCapitalization.characters,
                   validator: (v) => v?.isEmpty == true ? 'Staff ID is required' : null,
                 ),
+                const SizedBox(height: 20),
+
+                // Department
+                _buildLabel('Department *'),
+                _loadingDepartments
+                    ? Container(
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: context.mutedColor),
+                          ),
+                        ),
+                      )
+                    : Container(
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: _selectedDepartmentId != null
+                                ? AppColors.yellow
+                                : (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
+                            width: _selectedDepartmentId != null ? 2 : 1,
+                          ),
+                        ),
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedDepartmentId,
+                          decoration: InputDecoration(
+                            prefixIcon: Icon(Icons.business_outlined, color: context.mutedColor, size: 22),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          ),
+                          dropdownColor: context.cardColor,
+                          style: TextStyle(color: context.textColor, fontSize: 16),
+                          hint: Text('Select your department', style: TextStyle(color: context.faintColor)),
+                          items: _departments.map((dept) {
+                            return DropdownMenuItem<String>(
+                              value: dept['id'] as String,
+                              child: Text(dept['name'] as String),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() => _selectedDepartmentId = value);
+                          },
+                        ),
+                      ),
                 const SizedBox(height: 20),
 
                 // Emergency Contact

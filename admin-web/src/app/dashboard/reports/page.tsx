@@ -1982,16 +1982,18 @@ export default function ReportsPage() {
         }
 
         case "bus_full_alerts": {
+          // Get all vehicles for plate_no lookup
+          const { data: allVehicles } = await supabase
+            .from("vehicle_types")
+            .select("display_name, plate_no")
+          const vehicleLookup: Record<string, string> = {}
+          ;(allVehicles || []).forEach((v: { display_name: string; plate_no: string }) => {
+            if (v.plate_no) vehicleLookup[v.plate_no] = v.display_name || ""
+          })
+
           let query = supabase
             .from("bus_full_alerts")
-            .select(`
-              *,
-              bus_trip:bus_trips!bus_full_alerts_trip_id_fkey(
-                roster_assignment:roster_assignments!bus_trips_roster_assignment_id_fkey(
-                  vehicle:vehicle_types!roster_assignments_vehicle_id_fkey(display_name, plate_no)
-                )
-              )
-            `)
+            .select("*")
             .order("created_at", { ascending: false })
 
           if (dateFilter) {
@@ -2001,12 +2003,9 @@ export default function ReportsPage() {
           const { data: alerts } = await query
 
           rows = (alerts || []).map((a: Record<string, unknown>) => {
-            const tripData = a.bus_trip as Record<string, unknown> | null
-            const raData = tripData?.roster_assignment as Record<string, unknown> | null
-            const vehicleData = raData?.vehicle as Record<string, unknown> | null
-            const vehicleDisplay = vehicleData
-              ? `${vehicleData.display_name || ""} (${vehicleData.plate_no || ""})`
-              : String(a.vehicle_number || "-")
+            const plateNo = String(a.vehicle_number || "")
+            const displayName = vehicleLookup[plateNo] || ""
+            const vehicleDisplay = displayName ? `${displayName} (${plateNo})` : plateNo || "-"
             return {
               "Date": formatDateTime(String(a.created_at || "")),
               "Route": String(a.route_name || "-"),
@@ -2771,10 +2770,12 @@ export default function ReportsPage() {
           break
         }
         case "bus_full_alerts": {
-          let query = supabase.from("bus_full_alerts").select(`*, bus_trip:bus_trips!bus_full_alerts_trip_id_fkey(roster_assignment:roster_assignments!bus_trips_roster_assignment_id_fkey(vehicle:vehicle_types!roster_assignments_vehicle_id_fkey(display_name, plate_no)))`).order("created_at", { ascending: false })
+          const { data: allVeh } = await supabase.from("vehicle_types").select("display_name, plate_no")
+          const vehLookup: Record<string, string> = {}; (allVeh || []).forEach((v: { display_name: string; plate_no: string }) => { if (v.plate_no) vehLookup[v.plate_no] = v.display_name || "" })
+          let query = supabase.from("bus_full_alerts").select("*").order("created_at", { ascending: false })
           if (dateFilter) { query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59") }
           const { data: alerts } = await query
-          rows = (alerts || []).map((a: Record<string, unknown>) => { const tr = a.bus_trip as Record<string, unknown> | null; const ra = tr?.roster_assignment as Record<string, unknown> | null; const vh = ra?.vehicle as Record<string, unknown> | null; const vehDisplay = vh ? `${vh.display_name || ""} (${vh.plate_no || ""})` : String(a.vehicle_number || "-"); return { "Date": formatDateTime(String(a.created_at || "")), "Route": String(a.route_name || "-"), "Stop": String(a.stop_name || "-"), "Vehicle": vehDisplay, "Passengers": String(a.passengers_on_board || 0), "Capacity": String(a.vehicle_capacity || 0), "Acknowledged": a.is_acknowledged ? "Yes" : "No" } })
+          rows = (alerts || []).map((a: Record<string, unknown>) => { const plateNo = String(a.vehicle_number || ""); const dispName = vehLookup[plateNo] || ""; const vehDisplay = dispName ? `${dispName} (${plateNo})` : plateNo || "-"; return { "Date": formatDateTime(String(a.created_at || "")), "Route": String(a.route_name || "-"), "Stop": String(a.stop_name || "-"), "Vehicle": vehDisplay, "Passengers": String(a.passengers_on_board || 0), "Capacity": String(a.vehicle_capacity || 0), "Acknowledged": a.is_acknowledged ? "Yes" : "No" } })
           break
         }
         default: {

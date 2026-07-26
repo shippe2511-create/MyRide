@@ -38,10 +38,11 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
   List<_ChecklistCategory> _categories = [];
   bool _loadingItems = true;
 
-  // Absent check
-  bool _isAbsent = false;
+  // Attendance check
+  String _attendanceStatus = 'pending'; // pending, present, absent
   String? _absenceReason;
   bool _checkingAttendance = true;
+  bool _hasShiftToday = false;
 
   // Running hours
   final TextEditingController _runningHoursController = TextEditingController();
@@ -166,12 +167,16 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
       if (shift != null && mounted) {
         final status = shift['attendance_status'] as String? ?? 'pending';
         setState(() {
-          _isAbsent = status == 'absent';
+          _hasShiftToday = true;
+          _attendanceStatus = status;
           _absenceReason = shift['absence_reason'] as String?;
           _checkingAttendance = false;
         });
       } else {
-        setState(() => _checkingAttendance = false);
+        setState(() {
+          _hasShiftToday = false;
+          _checkingAttendance = false;
+        });
       }
     } catch (e) {
       debugPrint('Error checking attendance: $e');
@@ -439,7 +444,7 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
     }
 
     // Show "You're Absent" screen if driver marked absent for today
-    if (_isAbsent) {
+    if (_hasShiftToday && _attendanceStatus == 'absent') {
       return Scaffold(
         backgroundColor: context.bgColor,
         appBar: AppBar(
@@ -505,6 +510,66 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.error,
                     foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Show "Mark Attendance First" screen if driver has shift today but hasn't marked attendance
+    if (_hasShiftToday && _attendanceStatus == 'pending') {
+      return Scaffold(
+        backgroundColor: context.bgColor,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back, color: context.textColor),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: Text(
+            widget.isPostShift ? 'Post-Shift Check' : 'Pre-Trip Check',
+            style: TextStyle(color: context.textColor),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: AppColors.yellow.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.schedule, size: 64, color: AppColors.yellow),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Mark Attendance First',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.yellow),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'You have a shift scheduled today. Please mark yourself as Present or Absent from the home screen before starting the checklist.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 15, color: context.mutedColor, height: 1.5),
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('Go to Home'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.yellow,
+                    foregroundColor: AppColors.darkBg,
                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),

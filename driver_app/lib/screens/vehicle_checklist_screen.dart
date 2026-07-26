@@ -324,6 +324,83 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
 
   @override
   Widget build(BuildContext context) {
+    final driverState = context.watch<DriverState>();
+    final hasVehicle = driverState.vehicleNumber.isNotEmpty;
+
+    // Show "No Vehicle Assigned" screen if driver doesn't have a vehicle
+    if (!hasVehicle) {
+      return Scaffold(
+        backgroundColor: context.bgColor,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back, color: context.textColor),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: Text(
+            widget.isPostShift ? 'Post-Shift Check' : 'Pre-Trip Check',
+            style: TextStyle(color: context.textColor),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: AppColors.yellow.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.directions_car_outlined,
+                    size: 64,
+                    color: AppColors.yellow,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'No Vehicle Assigned',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: context.textColor,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'You need to have a vehicle assigned before you can complete the pre-trip checklist.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: context.mutedColor,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('Go Back'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.yellow,
+                    foregroundColor: AppColors.darkBg,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     if (_loadingItems) {
       return Scaffold(
         backgroundColor: context.bgColor,

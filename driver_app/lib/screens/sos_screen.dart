@@ -39,6 +39,30 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
       vsync: this,
     )..repeat();
     _loadEmergencyContacts();
+    _initAudioPlayer();
+  }
+
+  Future<void> _initAudioPlayer() async {
+    try {
+      // Set audio context for maximum volume
+      await _audioPlayer.setPlayerMode(PlayerMode.mediaPlayer);
+      await _audioPlayer.setAudioContext(AudioContext(
+        iOS: AudioContextIOS(
+          category: AVAudioSessionCategory.playback,
+          options: {AVAudioSessionOptions.mixWithOthers},
+        ),
+        android: AudioContextAndroid(
+          isSpeakerphoneOn: true,
+          stayAwake: true,
+          contentType: AndroidContentType.sonification,
+          usageType: AndroidUsageType.alarm,
+          audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+        ),
+      ));
+      debugPrint('Audio player initialized for SOS');
+    } catch (e) {
+      debugPrint('Error initializing audio player: $e');
+    }
   }
 
   Future<void> _loadEmergencyContacts() async {
@@ -78,10 +102,20 @@ class _SOSScreenState extends State<SOSScreen> with SingleTickerProviderStateMix
     try {
       await _audioPlayer.setReleaseMode(ReleaseMode.loop);
       await _audioPlayer.setVolume(1.0);
-      await _audioPlayer.play(AssetSource('sounds/alarm.mp3'));
-      debugPrint('SOS alarm sound started');
+
+      // Try playing the alarm sound
+      try {
+        await _audioPlayer.play(AssetSource('sounds/alarm.mp3'));
+        debugPrint('SOS alarm sound started');
+      } catch (assetError) {
+        debugPrint('Asset sound error: $assetError, trying alternative...');
+        // Fallback: Use system alarm tone via vibration
+        HapticFeedback.vibrate();
+      }
     } catch (e) {
       debugPrint('Error playing SOS sound: $e');
+      // At minimum, vibrate the device
+      HapticFeedback.heavyImpact();
     }
   }
 

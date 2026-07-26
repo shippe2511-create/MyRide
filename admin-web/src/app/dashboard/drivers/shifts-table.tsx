@@ -682,78 +682,13 @@ export function ShiftsTable() {
             <DialogTitle>{editingShift ? "Edit Shift" : "Add Shift"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">
-                  {editingShift ? "Driver" : "Drivers"}
-                  {!editingShift && formData.driver_ids.length > 0 && (
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      ({formData.driver_ids.length} selected)
-                    </span>
-                  )}
-                </label>
-                {!editingShift && (
-                  <div className="flex gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 text-xs"
-                      onClick={selectAllDrivers}
-                    >
-                      Select All
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 text-xs"
-                      onClick={clearDriverSelection}
-                    >
-                      Clear
-                    </Button>
-                  </div>
-                )}
-              </div>
-              {editingShift ? (
-                <Select value={formData.driver_ids[0] || ""} onValueChange={(v) => setFormData({ ...formData, driver_ids: [v] })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select driver" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {drivers.map(driver => {
-                      const profile = getDriverProfile(driver)
-                      return (
-                        <SelectItem key={driver.id} value={driver.id}>
-                          {profile?.full_name || "Unknown"}
-                        </SelectItem>
-                      )
-                    })}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div className="border rounded-lg p-2 max-h-32 overflow-y-auto space-y-1">
-                  {drivers.map(driver => {
-                    const profile = getDriverProfile(driver)
-                    const isSelected = formData.driver_ids.includes(driver.id)
-                    return (
-                      <div
-                        key={driver.id}
-                        className={`flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-accent ${isSelected ? 'bg-accent' : ''}`}
-                        onClick={() => toggleDriverSelection(driver.id)}
-                      >
-                        <Checkbox checked={isSelected} />
-                        <Avatar className="h-6 w-6">
-                          <AvatarImage src={profile?.avatar_url || undefined} />
-                          <AvatarFallback className="text-xs">{profile?.full_name?.[0] || "D"}</AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm">{profile?.full_name || "Unknown"}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+            <StaffPicker
+              drivers={drivers}
+              selectedIds={formData.driver_ids}
+              onSelectionChange={(ids) => setFormData({ ...formData, driver_ids: ids })}
+              singleSelect={!!editingShift}
+              getDriverProfile={getDriverProfile}
+            />
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Dates</label>
@@ -1080,6 +1015,194 @@ export function ShiftsTable() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  )
+}
+
+// Modern Staff Picker Component
+function StaffPicker({
+  drivers,
+  selectedIds,
+  onSelectionChange,
+  singleSelect = false,
+  getDriverProfile,
+}: {
+  drivers: Driver[]
+  selectedIds: string[]
+  onSelectionChange: (ids: string[]) => void
+  singleSelect?: boolean
+  getDriverProfile: (driver: Driver | undefined) => DriverProfile | null
+}) {
+  const [search, setSearch] = useState("")
+  const [isOpen, setIsOpen] = useState(false)
+
+  const filteredDrivers = drivers.filter(driver => {
+    const profile = getDriverProfile(driver)
+    const name = profile?.full_name?.toLowerCase() || ""
+    return name.includes(search.toLowerCase())
+  })
+
+  const selectedDrivers = drivers.filter(d => selectedIds.includes(d.id))
+
+  const toggleDriver = (driverId: string) => {
+    if (singleSelect) {
+      onSelectionChange([driverId])
+      setIsOpen(false)
+    } else {
+      if (selectedIds.includes(driverId)) {
+        onSelectionChange(selectedIds.filter(id => id !== driverId))
+      } else {
+        onSelectionChange([...selectedIds, driverId])
+      }
+    }
+  }
+
+  const removeDriver = (driverId: string) => {
+    onSelectionChange(selectedIds.filter(id => id !== driverId))
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium flex items-center gap-2">
+          <Users className="h-4 w-4 text-primary" />
+          {singleSelect ? "Select Driver" : "Select Staff"}
+        </label>
+        {!singleSelect && selectedIds.length > 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => onSelectionChange([])}
+          >
+            Clear all
+          </Button>
+        )}
+      </div>
+
+      {/* Selected Staff Chips */}
+      {selectedDrivers.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {selectedDrivers.map(driver => {
+            const profile = getDriverProfile(driver)
+            return (
+              <div
+                key={driver.id}
+                className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 rounded-full pl-1 pr-2 py-0.5 group"
+              >
+                <Avatar className="h-5 w-5">
+                  <AvatarImage src={profile?.avatar_url || undefined} />
+                  <AvatarFallback className="text-[10px] bg-primary/20">{profile?.full_name?.[0] || "?"}</AvatarFallback>
+                </Avatar>
+                <span className="text-xs font-medium">{profile?.full_name?.split(" ")[0] || "Unknown"}</span>
+                {!singleSelect && (
+                  <button
+                    type="button"
+                    onClick={() => removeDriver(driver.id)}
+                    className="ml-0.5 h-4 w-4 rounded-full flex items-center justify-center hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                  >
+                    <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
+                      <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Search Input */}
+      <div className="relative">
+        <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.35-4.35" />
+        </svg>
+        <Input
+          placeholder="Search by name..."
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value)
+            setIsOpen(true)
+          }}
+          onFocus={() => setIsOpen(true)}
+          className="pl-9"
+        />
+      </div>
+
+      {/* Driver List */}
+      {isOpen && (
+        <div className="border rounded-lg overflow-hidden">
+          {/* Quick Actions */}
+          {!singleSelect && (
+            <div className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b">
+              <span className="text-xs text-muted-foreground">
+                {selectedIds.length} of {drivers.length} selected
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs"
+                  onClick={() => onSelectionChange(drivers.map(d => d.id))}
+                >
+                  Select all
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Scrollable List */}
+          <div className="max-h-48 overflow-y-auto">
+            {filteredDrivers.length === 0 ? (
+              <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                No drivers found
+              </div>
+            ) : (
+              filteredDrivers.map(driver => {
+                const profile = getDriverProfile(driver)
+                const isSelected = selectedIds.includes(driver.id)
+                return (
+                  <div
+                    key={driver.id}
+                    onClick={() => toggleDriver(driver.id)}
+                    className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors hover:bg-accent/50 ${
+                      isSelected ? "bg-primary/5" : ""
+                    }`}
+                  >
+                    <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                      isSelected
+                        ? "bg-primary border-primary"
+                        : "border-muted-foreground/30"
+                    }`}>
+                      {isSelected && (
+                        <svg className="h-3 w-3 text-primary-foreground" viewBox="0 0 12 12" fill="none">
+                          <path d="M2 6l3 3 5-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </div>
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={profile?.avatar_url || undefined} />
+                      <AvatarFallback className="text-sm">{profile?.full_name?.[0] || "?"}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{profile?.full_name || "Unknown"}</p>
+                      {profile?.phone && (
+                        <p className="text-xs text-muted-foreground truncate">{profile.phone}</p>
+                      )}
+                    </div>
+                    {isSelected && (
+                      <div className="h-2 w-2 rounded-full bg-primary" />
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

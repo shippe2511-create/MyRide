@@ -100,7 +100,7 @@ function LoginContent() {
 
         console.log("Final profile:", profile)
 
-        if (!["super_admin", "admin", "manager", "operator"].includes(profile.role)) {
+        if (!["super_admin", "admin", "manager", "supervisor", "operator", "support", "viewer"].includes(profile.role)) {
           console.log("Role check failed. Role:", profile.role)
           toast.error("Access denied. Admin privileges required.")
           await supabase.auth.signOut()

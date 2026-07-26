@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { ComboboxInput } from "@/components/ui/combobox-input"
 import {
   Dialog,
   DialogContent,
@@ -1211,19 +1212,18 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                   <Car className="h-4 w-4" />
                   Assigned Vehicle
                 </label>
-                <Select value={formData.vehicle_id} onValueChange={(v) => setFormData({ ...formData, vehicle_id: v })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select vehicle" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No Vehicle</SelectItem>
-                    {vehicles.map((vehicle) => (
-                      <SelectItem key={vehicle.id} value={vehicle.id}>
-                        {vehicle.display_name} {vehicle.plate_no && `(${vehicle.plate_no})`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <ComboboxInput
+                  value={formData.vehicle_id}
+                  onChange={(v) => setFormData({ ...formData, vehicle_id: v })}
+                  options={[
+                    { value: "none", label: "No Vehicle" },
+                    ...vehicles.map((vehicle) => ({
+                      value: vehicle.id,
+                      label: `${vehicle.display_name} ${vehicle.plate_no ? `(${vehicle.plate_no})` : ""}`.trim()
+                    }))
+                  ]}
+                  placeholder="Search vehicle..."
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -1247,11 +1247,12 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Gender</label>
-                <Select value={formData.gender} onValueChange={(v) => setFormData({ ...formData, gender: v })}>
+                <Select value={formData.gender || "none"} onValueChange={(v) => setFormData({ ...formData, gender: v === "none" ? "" : v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">Not specified</SelectItem>
                     <SelectItem value="Male">Male</SelectItem>
                     <SelectItem value="Female">Female</SelectItem>
                   </SelectContent>

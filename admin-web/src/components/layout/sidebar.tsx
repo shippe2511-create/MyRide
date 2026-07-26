@@ -83,7 +83,7 @@ const navigationSections: NavSection[] = [
     items: [
       { name: "Customers", href: "/dashboard/customers", icon: Users, permission: "customers:view" },
       { name: "Drivers", href: "/dashboard/drivers", icon: Car, permission: "drivers:view" },
-      { name: "Pending Changes", href: "/dashboard/pending-changes", icon: Clock, permission: "customers:view" },
+      { name: "Pending Changes", href: "/dashboard/pending-changes", icon: Clock, permission: "customers:manage" },
       { name: "Eligibility", href: "/dashboard/eligibility", icon: Ticket, permission: "eligibility:view" },
       { name: "Service Pools", href: "/dashboard/pools", icon: Layers, permission: "pools:view" },
       { name: "Document Expiry", href: "/dashboard/document-expiry", icon: FileWarning, permission: "drivers:view" },

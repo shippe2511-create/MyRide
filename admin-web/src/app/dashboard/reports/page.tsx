@@ -1726,10 +1726,20 @@ export default function ReportsPage() {
             return acc
           }, {})
 
+          const formatTransportType = (type: string) => {
+            const typeMap: Record<string, string> = {
+              "mtcc_bus": "MTCC Bus",
+              "internal_bus": "Internal Bus",
+              "ferry": "Ferry",
+              "bus": "Bus",
+            }
+            return typeMap[type] || type.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
+          }
+
           rows = routes.map((r: Record<string, unknown>) => ({
             "Route Name": String(r.route_name || ""),
             "Code": String(r.route_code || "-"),
-            "Type": String(r.transport_type || "bus"),
+            "Type": formatTransportType(String(r.transport_type || "bus")),
             "Direction": formatStatus(String(r.direction || "")),
             "Stops": String(stopCounts[String(r.id)] || 0),
             "Schedules": String(scheduleCounts[String(r.id)] || 0),
@@ -1790,7 +1800,7 @@ export default function ReportsPage() {
               "Route": String(route?.route_name || "-"),
               "Departure": String(r.departure_time || "").slice(0, 5),
               "Driver": String(profile?.full_name || "-"),
-              "Vehicle": vehicle ? `${vehicle.name || ""} (${vehicle.plate_no || ""})` : "-",
+              "Vehicle": vehicle ? `${vehicle.display_name || ""} (${vehicle.plate_no || ""})` : "-",
               "Status": formatStatus(String(r.status || "scheduled")),
             }
           })
@@ -2717,7 +2727,8 @@ export default function ReportsPage() {
           const routes = routesRes.data || []
           const stopCounts = (stopsRes.data || []).reduce((acc: Record<string, number>, s: { route_id: string }) => { acc[s.route_id] = (acc[s.route_id] || 0) + 1; return acc }, {})
           const scheduleCounts = (schedulesRes.data || []).reduce((acc: Record<string, number>, s: { route_id: string }) => { acc[s.route_id] = (acc[s.route_id] || 0) + 1; return acc }, {})
-          rows = routes.map((r: Record<string, unknown>) => ({ "Route Name": String(r.route_name || ""), "Code": String(r.route_code || "-"), "Type": String(r.transport_type || "bus"), "Direction": formatStatus(String(r.direction || "")), "Stops": String(stopCounts[String(r.id)] || 0), "Schedules": String(scheduleCounts[String(r.id)] || 0), "Active": r.is_active ? "Yes" : "No" }))
+          const fmtType = (t: string) => ({ "mtcc_bus": "MTCC Bus", "internal_bus": "Internal Bus", "ferry": "Ferry", "bus": "Bus" }[t] || t.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()))
+          rows = routes.map((r: Record<string, unknown>) => ({ "Route Name": String(r.route_name || ""), "Code": String(r.route_code || "-"), "Type": fmtType(String(r.transport_type || "bus")), "Direction": formatStatus(String(r.direction || "")), "Stops": String(stopCounts[String(r.id)] || 0), "Schedules": String(scheduleCounts[String(r.id)] || 0), "Active": r.is_active ? "Yes" : "No" }))
           break
         }
         case "bus_stops": {
@@ -2729,7 +2740,7 @@ export default function ReportsPage() {
           let query = supabase.from("roster_assignments").select(`service_date, departure_time, status, route:transport_routes!roster_assignments_route_id_fkey(route_name), driver:drivers!roster_assignments_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name)), vehicle:vehicle_types!roster_assignments_vehicle_id_fkey(display_name, plate_no)`).order("service_date", { ascending: false }).order("departure_time")
           if (dateFilter) { query = query.gte("service_date", dateFilter.start).lte("service_date", dateFilter.end) }
           const { data: roster } = await query
-          rows = (roster || []).map((r: Record<string, unknown>) => { const route = r.route as Record<string, unknown> | null; const driver = r.driver as Record<string, unknown> | null; const profile = driver?.profile as Record<string, unknown> | null; const vehicle = r.vehicle as Record<string, unknown> | null; return { "Date": formatDate(String(r.service_date || "")), "Route": String(route?.route_name || "-"), "Departure": String(r.departure_time || "").slice(0, 5), "Driver": String(profile?.full_name || "-"), "Vehicle": vehicle ? `${vehicle.name || ""} (${vehicle.plate_no || ""})` : "-", "Status": formatStatus(String(r.status || "scheduled")) } })
+          rows = (roster || []).map((r: Record<string, unknown>) => { const route = r.route as Record<string, unknown> | null; const driver = r.driver as Record<string, unknown> | null; const profile = driver?.profile as Record<string, unknown> | null; const vehicle = r.vehicle as Record<string, unknown> | null; return { "Date": formatDate(String(r.service_date || "")), "Route": String(route?.route_name || "-"), "Departure": String(r.departure_time || "").slice(0, 5), "Driver": String(profile?.full_name || "-"), "Vehicle": vehicle ? `${vehicle.display_name || ""} (${vehicle.plate_no || ""})` : "-", "Status": formatStatus(String(r.status || "scheduled")) } })
           break
         }
         case "bus_statistics": {

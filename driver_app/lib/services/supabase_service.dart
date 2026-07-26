@@ -575,14 +575,21 @@ class SupabaseService {
     }
 
     // Also update driver_locations table for admin panel visibility
-    if (isOnline != null) {
-      await client
-          .from('driver_locations')
-          .upsert({
-            'driver_id': driverId,
-            'is_online': isOnline,
-            'last_updated': DateTime.now().toIso8601String(),
-          }, onConflict: 'driver_id');
+    // Only update if we have location data (lat/lng are required in the table)
+    if (isOnline != null && lat != null && lng != null) {
+      try {
+        await client
+            .from('driver_locations')
+            .upsert({
+              'driver_id': driverId,
+              'lat': lat,
+              'lng': lng,
+              'is_online': isOnline,
+              'last_updated': DateTime.now().toIso8601String(),
+            }, onConflict: 'driver_id');
+      } catch (e) {
+        debugPrint('updateDriverStatus: driver_locations update error - $e');
+      }
     }
   }
 
@@ -946,6 +953,44 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Error getting driver shifts: $e');
       return [];
+    }
+  }
+
+  // Mark attendance for a shift
+  static Future<bool> markShiftAttendance({
+    required String shiftId,
+    required String status, // 'present', 'absent', or 'pending'
+    String? reason,
+  }) async {
+    try {
+      debugPrint('markShiftAttendance: shiftId=$shiftId, status=$status, reason=$reason');
+      final response = await client.from('shifts').update({
+        'attendance_status': status,
+        'absence_reason': status == 'absent' ? reason : null,
+        'marked_at': DateTime.now().toIso8601String(),
+      }).eq('id', shiftId).select();
+      debugPrint('markShiftAttendance response: $response');
+      return response.isNotEmpty;
+    } catch (e) {
+      debugPrint('Error marking attendance: $e');
+      return false;
+    }
+  }
+
+  // Get today's shift for driver (for quick attendance marking)
+  static Future<Map<String, dynamic>?> getTodayShift(String driverId) async {
+    try {
+      final today = DateTime.now().toIso8601String().split('T')[0];
+      final response = await client
+          .from('shifts')
+          .select()
+          .eq('driver_id', driverId)
+          .eq('shift_date', today)
+          .maybeSingle();
+      return response;
+    } catch (e) {
+      debugPrint('Error getting today shift: $e');
+      return null;
     }
   }
 

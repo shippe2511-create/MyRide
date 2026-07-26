@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
@@ -49,6 +50,9 @@ interface Shift {
   end_time: string
   shift_type: string
   status: string
+  attendance_status?: string // 'pending' | 'present' | 'absent'
+  absence_reason?: string
+  marked_at?: string
   driver?: Driver
 }
 
@@ -112,52 +116,94 @@ export function ShiftsTable() {
   const weekStart = weekDates[0]
   const weekEnd = weekDates[6]
 
-  useEffect(() => {
-    loadData(true)
+  // Use ref to track current week for realtime updates
+  const weekOffsetRef = useRef(weekOffset)
+  const supabaseRef = useRef(supabase)
 
-    // Realtime subscription for shifts updates
-    const channel = supabase
-      .channel('shifts_realtime')
+  // Keep refs in sync
+  useEffect(() => {
+    weekOffsetRef.current = weekOffset
+  }, [weekOffset])
+
+  // Stable load function using refs
+  const loadData = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true)
+
+    // Calculate dates based on current weekOffset ref
+    const today = new Date()
+    const currentDay = today.getDay()
+    const monday = new Date(today)
+    monday.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1) + weekOffsetRef.current * 7)
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+
+    const startStr = formatDateInput(monday)
+    const endStr = formatDateInput(sunday)
+
+    // Only show drivers from Transport department
+    const TRANSPORT_DEPT_ID = "d5772aaa-02f7-4b56-bc3c-96cd7aaacd7d"
+
+    const [shiftsRes, driversRes] = await Promise.all([
+      supabaseRef.current
+        .from("shifts")
+        .select(`
+          *,
+          driver:drivers!inner(
+            id,
+            profile_id,
+            department_id,
+            profile:profiles(full_name, avatar_url, phone)
+          )
+        `)
+        .eq("driver.department_id", TRANSPORT_DEPT_ID)
+        .gte("shift_date", startStr)
+        .lte("shift_date", endStr)
+        .order("shift_date")
+        .order("start_time"),
+      supabaseRef.current
+        .from("drivers")
+        .select("id, profile_id, department_id, profile:profiles(full_name, avatar_url, phone)")
+        .eq("department_id", TRANSPORT_DEPT_ID)
+    ])
+
+    setShifts(shiftsRes.data || [])
+    setDrivers(driversRes.data || [])
+    if (showLoading) setLoading(false)
+  }, []) // Empty deps - uses refs for all changing values
+
+  // Load data when week changes - no loading spinner for week navigation
+  useEffect(() => {
+    loadData(false)
+  }, [weekOffset]) // Only depends on weekOffset, loadData is stable
+
+  // Initial load with spinner - runs once
+  const initialLoadDone = useRef(false)
+  useEffect(() => {
+    if (!initialLoadDone.current) {
+      initialLoadDone.current = true
+      loadData(true)
+    }
+  }, [loadData])
+
+  // Realtime subscription - set up once and never recreate
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  useEffect(() => {
+    if (channelRef.current) return // Already subscribed
+
+    channelRef.current = supabaseRef.current
+      .channel('shifts_realtime_stable')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shifts' }, () => {
         loadData(false)
       })
       .subscribe()
 
     return () => {
-      supabase.removeChannel(channel)
+      if (channelRef.current) {
+        supabaseRef.current.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
     }
-  }, [weekOffset])
-
-  const loadData = async (showLoading = true) => {
-    if (showLoading) setLoading(true)
-
-    const startStr = weekStart.toISOString().split("T")[0]
-    const endStr = weekEnd.toISOString().split("T")[0]
-
-    const [shiftsRes, driversRes] = await Promise.all([
-      supabase
-        .from("shifts")
-        .select(`
-          *,
-          driver:drivers(
-            id,
-            profile_id,
-            profile:profiles(full_name, avatar_url, phone)
-          )
-        `)
-        .gte("shift_date", startStr)
-        .lte("shift_date", endStr)
-        .order("shift_date")
-        .order("start_time"),
-      supabase
-        .from("drivers")
-        .select("id, profile_id, profile:profiles(full_name, avatar_url, phone)")
-    ])
-
-    setShifts(shiftsRes.data || [])
-    setDrivers(driversRes.data || [])
-    if (showLoading) setLoading(false)
-  }
+  }, [loadData])
 
   const generateDatesFromRange = () => {
     if (!rangeStart || !rangeEnd) return []
@@ -374,7 +420,10 @@ export function ShiftsTable() {
   }
 
   const formatDateInput = (date: Date) => {
-    return date.toISOString().split("T")[0]
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, "0")
+    const day = String(date.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
   }
 
   const getDriverProfile = (driver: Driver | undefined) => {
@@ -399,9 +448,9 @@ export function ShiftsTable() {
     setAutoScheduling(true)
 
     const shiftsToCreate: { driver_id: string; shift_date: string; start_time: string; end_time: string; shift_type: string; status: string }[] = []
-    const today = new Date()
-    const startDate = new Date(today)
-    startDate.setDate(startDate.getDate() + 1)
+
+    // Start from the current week's Monday (the displayed week)
+    const startDate = new Date(weekStart)
 
     // Calculate number of days based on period
     const daysToSchedule = autoSchedulePeriod === "month" ? 31 : 7
@@ -523,19 +572,24 @@ export function ShiftsTable() {
       </div>
 
       <Card className="p-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setWeekOffset(w => w - 1)}>
-              Previous
-            </Button>
-            <span className="text-sm font-medium px-2">
-              {formatDate(weekStart)} - {formatDate(weekEnd)}
-            </span>
-            <Button variant="outline" size="sm" onClick={() => setWeekOffset(w => w + 1)}>
-              Next
-            </Button>
+        {/* Header with navigation and actions */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center bg-muted/50 rounded-lg p-1">
+              <Button variant="ghost" size="sm" className="h-8 px-3" onClick={() => setWeekOffset(w => w - 1)}>
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              </Button>
+              <div className="px-4 min-w-[180px] text-center">
+                <span className="text-sm font-semibold">
+                  {formatDate(weekStart)} - {formatDate(weekEnd)}
+                </span>
+              </div>
+              <Button variant="ghost" size="sm" className="h-8 px-3" onClick={() => setWeekOffset(w => w + 1)}>
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </Button>
+            </div>
             {weekOffset !== 0 && (
-              <Button variant="ghost" size="sm" onClick={() => setWeekOffset(0)}>
+              <Button variant="outline" size="sm" className="h-8" onClick={() => setWeekOffset(0)}>
                 Today
               </Button>
             )}
@@ -568,274 +622,519 @@ export function ShiftsTable() {
           </div>
         </div>
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-10">
-                <Checkbox
-                  checked={filteredShifts.length > 0 && selectedShifts.length === filteredShifts.length}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setSelectedShifts(filteredShifts.map(s => s.id))
-                    } else {
-                      setSelectedShifts([])
+        {/* Modern Roster Grid - Drivers as rows, Days as columns */}
+        <div
+          className="overflow-x-auto cursor-grab active:cursor-grabbing select-none"
+          onMouseDown={(e) => {
+            if ((e.target as HTMLElement).closest('button, input, [role="button"]')) return
+            const startX = e.clientX
+            const startOffset = weekOffset
+            let moved = false
+            const handleMouseMove = (moveEvent: MouseEvent) => {
+              const diff = startX - moveEvent.clientX
+              if (Math.abs(diff) > 50) {
+                const weeksDiff = diff > 0 ? 1 : -1
+                if (!moved) {
+                  moved = true
+                  setWeekOffset(startOffset + weeksDiff)
+                }
+              }
+            }
+            const handleMouseUp = () => {
+              document.removeEventListener('mousemove', handleMouseMove)
+              document.removeEventListener('mouseup', handleMouseUp)
+            }
+            document.addEventListener('mousemove', handleMouseMove)
+            document.addEventListener('mouseup', handleMouseUp)
+          }}
+          onTouchStart={(e) => {
+            if ((e.target as HTMLElement).closest('button, input, [role="button"]')) return
+            const startX = e.touches[0].clientX
+            const startOffset = weekOffset
+            let moved = false
+            const handleTouchMove = (moveEvent: TouchEvent) => {
+              const diff = startX - moveEvent.touches[0].clientX
+              if (Math.abs(diff) > 50) {
+                const weeksDiff = diff > 0 ? 1 : -1
+                if (!moved) {
+                  moved = true
+                  setWeekOffset(startOffset + weeksDiff)
+                }
+              }
+            }
+            const handleTouchEnd = () => {
+              document.removeEventListener('touchmove', handleTouchMove)
+              document.removeEventListener('touchend', handleTouchEnd)
+            }
+            document.addEventListener('touchmove', handleTouchMove)
+            document.addEventListener('touchend', handleTouchEnd)
+          }}
+        >
+          <div className="min-w-[900px]">
+            {/* Header row with days */}
+            <div className="grid grid-cols-[200px_repeat(7,1fr)] gap-1 mb-2">
+              <div className="p-3 font-semibold text-sm text-muted-foreground">Driver</div>
+              {(() => {
+                const headers = []
+                const today = new Date()
+                today.setHours(0, 0, 0, 0)
+
+                for (let i = 0; i < 7; i++) {
+                  const date = new Date(weekStart)
+                  date.setDate(date.getDate() + i)
+                  const isToday = date.getTime() === today.getTime()
+                  const dayName = date.toLocaleDateString("en-US", { weekday: "short" })
+                  const dayNum = date.getDate()
+
+                  headers.push(
+                    <div
+                      key={i}
+                      className={`p-2 text-center rounded-lg ${
+                        isToday ? "bg-primary text-primary-foreground" : "bg-muted/50"
+                      }`}
+                    >
+                      <div className="text-xs font-medium opacity-70">{dayName}</div>
+                      <div className="text-lg font-bold">{dayNum}</div>
+                    </div>
+                  )
+                }
+                return headers
+              })()}
+            </div>
+
+            {/* Driver rows */}
+            {(selectedDriver === "all" ? drivers : drivers.filter(d => d.id === selectedDriver)).map(driver => {
+              const profile = getDriverProfile(driver)
+              return (
+                <div key={driver.id} className="grid grid-cols-[200px_repeat(7,1fr)] gap-1 mb-1">
+                  {/* Driver info */}
+                  <div className="p-3 flex items-center gap-3 bg-muted/30 rounded-lg">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={profile?.avatar_url || undefined} />
+                      <AvatarFallback className="text-xs">{profile?.full_name?.[0] || "?"}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">{profile?.full_name || "Unknown"}</div>
+                      <div className="text-xs text-muted-foreground truncate">{profile?.phone || ""}</div>
+                    </div>
+                  </div>
+
+                  {/* Day cells */}
+                  {(() => {
+                    const cells = []
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+
+                    for (let i = 0; i < 7; i++) {
+                      const date = new Date(weekStart)
+                      date.setDate(date.getDate() + i)
+                      const dateStr = formatDateInput(date)
+                      const isToday = date.getTime() === today.getTime()
+                      const shift = shifts.find(s => s.driver_id === driver.id && s.shift_date === dateStr)
+
+                      cells.push(
+                        <div
+                          key={i}
+                          className={`min-h-[60px] p-1 rounded-lg border-2 border-dashed transition-all cursor-pointer ${
+                            isToday ? "border-primary/30 bg-primary/5" : "border-transparent hover:border-muted-foreground/20 hover:bg-muted/30"
+                          }`}
+                          onClick={() => {
+                            if (shift) {
+                              openEditDialog(shift)
+                            } else {
+                              // Quick add shift for this driver on this date
+                              setFormData({
+                                driver_ids: [driver.id],
+                                shift_dates: [dateStr],
+                                start_time: "08:00",
+                                end_time: "16:00",
+                                shift_type: "full_day",
+                                status: "scheduled",
+                              })
+                              setDateRangeMode("select")
+                              setDialogOpen(true)
+                            }
+                          }}
+                        >
+                          {shift ? (
+                            <div
+                              className={`h-full p-2 rounded-md text-xs relative group ${
+                                shift.attendance_status === "present" ? "bg-emerald-500/30 border-2 border-emerald-500"
+                                : shift.attendance_status === "absent" ? "bg-red-500/30 border-2 border-red-500"
+                                : shift.shift_type === "morning" ? "bg-amber-500/20 border border-amber-500/30"
+                                : shift.shift_type === "evening" ? "bg-indigo-500/20 border border-indigo-500/30"
+                                : shift.shift_type === "night" ? "bg-slate-600/30 border border-slate-500/30"
+                                : "bg-emerald-500/20 border border-emerald-500/30"
+                              } ${selectedShifts.includes(shift.id) ? "ring-2 ring-primary" : ""}`}
+                            >
+                              {/* Edit button - shows on hover */}
+                              <button
+                                className="absolute top-0.5 left-0.5 w-5 h-5 bg-background/80 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openEditDialog(shift)
+                                }}
+                                title="Edit shift"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                              {/* Select checkbox - top right */}
+                              <button
+                                className="absolute top-0.5 right-5 w-5 h-5 bg-background/80 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (selectedShifts.includes(shift.id)) {
+                                    setSelectedShifts(prev => prev.filter(id => id !== shift.id))
+                                  } else {
+                                    setSelectedShifts(prev => [...prev, shift.id])
+                                  }
+                                }}
+                                title="Select shift"
+                              >
+                                <Checkbox checked={selectedShifts.includes(shift.id)} className="w-3 h-3" />
+                              </button>
+                              {/* Attendance indicator */}
+                              {shift.attendance_status === "present" && (
+                                <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
+                                  <span className="text-white text-[8px]">✓</span>
+                                </div>
+                              )}
+                              {shift.attendance_status === "absent" && (
+                                <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+                                  <span className="text-white text-[8px]">✕</span>
+                                </div>
+                              )}
+                              <div className="font-semibold text-[11px] mb-0.5">
+                                {SHIFT_TYPES.find(t => t.value === shift.shift_type)?.label || shift.shift_type}
+                              </div>
+                              <div className="font-mono text-[10px] opacity-80">
+                                {shift.start_time.substring(0, 5)}-{shift.end_time.substring(0, 5)}
+                              </div>
+                              {shift.attendance_status === "absent" && shift.absence_reason && (
+                                <div className="text-[9px] text-red-400 mt-1 truncate" title={shift.absence_reason}>
+                                  {shift.absence_reason}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="h-full flex items-center justify-center">
+                              <Plus className="h-4 w-4 text-muted-foreground/30" />
+                            </div>
+                          )}
+                        </div>
+                      )
                     }
-                  }}
-                />
-              </TableHead>
-              <TableHead>Driver</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Time</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-12"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredShifts.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                  No shifts scheduled for this week
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredShifts.map(shift => {
-                const profile = getDriverProfile(shift.driver)
-                const isSelected = selectedShifts.includes(shift.id)
-                return (
-                  <TableRow key={shift.id} className={isSelected ? "bg-accent/50" : ""}>
-                    <TableCell>
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedShifts(prev => [...prev, shift.id])
-                          } else {
-                            setSelectedShifts(prev => prev.filter(id => id !== shift.id))
-                          }
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={profile?.avatar_url || undefined} />
-                          <AvatarFallback>{profile?.full_name?.[0] || "D"}</AvatarFallback>
-                        </Avatar>
-                        <span className="font-medium">{profile?.full_name || "Unknown"}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(shift.shift_date + "T00:00:00").toLocaleDateString("en-US", {
-                        timeZone: "Indian/Maldives",
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </TableCell>
-                    <TableCell>
-                      {shift.start_time.substring(0, 5)} - {shift.end_time.substring(0, 5)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {SHIFT_TYPES.find(t => t.value === shift.shift_type)?.label || shift.shift_type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={shift.status === "completed" ? "success" : shift.status === "cancelled" ? "destructive" : "secondary"}>
-                        {shift.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditDialog(shift)}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => setDeleteId(shift.id)} className="text-destructive focus:text-destructive">
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                )
-              })
+                    return cells
+                  })()}
+                </div>
+              )
+            })}
+
+            {/* Empty state */}
+            {drivers.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground">
+                No drivers found. Add drivers first.
+              </div>
             )}
-          </TableBody>
-        </Table>
+          </div>
+        </div>
+
+        {/* Bottom Navigation - Draggable Scroll Bar */}
+        <div className="mt-4 pt-4 border-t">
+          {/* Week Label */}
+          <div className="text-center mb-3">
+            <span className="text-sm font-medium">
+              {weekOffset === 0 ? "This Week" : weekOffset === -1 ? "Last Week" : weekOffset === 1 ? "Next Week" : (
+                `${formatDate(weekStart).split(",")[1]?.trim()} - ${formatDate(weekEnd).split(",")[1]?.trim()}`
+              )}
+            </span>
+            {weekOffset !== 0 && (
+              <button
+                onClick={() => setWeekOffset(0)}
+                className="ml-3 text-xs text-primary hover:underline"
+              >
+                Go to Today
+              </button>
+            )}
+          </div>
+
+          {/* Scroll Track with Draggable Thumb */}
+          <div
+            className="relative h-8 bg-muted/30 rounded-full mx-auto max-w-md cursor-pointer"
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect()
+              const clickX = e.clientX - rect.left
+              const percent = clickX / rect.width
+              const newOffset = Math.round((percent - 0.5) * 20) // -10 to +10 range
+              setWeekOffset(Math.max(-10, Math.min(10, newOffset)))
+            }}
+          >
+            {/* Track marks */}
+            <div className="absolute inset-0 flex items-center justify-between px-4">
+              {[-10, -5, 0, 5, 10].map((mark) => (
+                <div
+                  key={mark}
+                  className={`w-0.5 h-3 rounded-full ${mark === 0 ? 'bg-primary/50 h-4' : 'bg-muted-foreground/20'}`}
+                />
+              ))}
+            </div>
+
+            {/* Draggable Thumb */}
+            <div
+              className="absolute top-1 h-6 w-16 bg-muted-foreground/60 hover:bg-muted-foreground/80 rounded-full cursor-grab active:cursor-grabbing transition-all shadow-md"
+              style={{
+                left: `calc(${((weekOffset + 10) / 20) * 100}% - 32px)`,
+              }}
+              onMouseDown={(e) => {
+                e.stopPropagation()
+                const startX = e.clientX
+                const startOffset = weekOffset
+                const track = e.currentTarget.parentElement!
+                const trackWidth = track.getBoundingClientRect().width
+
+                const handleMouseMove = (moveEvent: MouseEvent) => {
+                  const diff = moveEvent.clientX - startX
+                  const offsetChange = Math.round((diff / trackWidth) * 20)
+                  const newOffset = Math.max(-10, Math.min(10, startOffset + offsetChange))
+                  setWeekOffset(newOffset)
+                }
+                const handleMouseUp = () => {
+                  document.removeEventListener('mousemove', handleMouseMove)
+                  document.removeEventListener('mouseup', handleMouseUp)
+                }
+                document.addEventListener('mousemove', handleMouseMove)
+                document.addEventListener('mouseup', handleMouseUp)
+              }}
+              onTouchStart={(e) => {
+                e.stopPropagation()
+                const startX = e.touches[0].clientX
+                const startOffset = weekOffset
+                const track = e.currentTarget.parentElement!
+                const trackWidth = track.getBoundingClientRect().width
+
+                const handleTouchMove = (moveEvent: TouchEvent) => {
+                  const diff = moveEvent.touches[0].clientX - startX
+                  const offsetChange = Math.round((diff / trackWidth) * 20)
+                  const newOffset = Math.max(-10, Math.min(10, startOffset + offsetChange))
+                  setWeekOffset(newOffset)
+                }
+                const handleTouchEnd = () => {
+                  document.removeEventListener('touchmove', handleTouchMove)
+                  document.removeEventListener('touchend', handleTouchEnd)
+                }
+                document.addEventListener('touchmove', handleTouchMove)
+                document.addEventListener('touchend', handleTouchEnd)
+              }}
+            />
+          </div>
+
+          {/* Quick Navigation */}
+          <div className="flex items-center justify-center gap-4 mt-3">
+            <button
+              onClick={() => setWeekOffset(weekOffset - 1)}
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+            >
+              <ChevronLeft className="h-3 w-3" /> Prev
+            </button>
+            <button
+              onClick={() => setWeekOffset(weekOffset + 1)}
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+            >
+              Next <ChevronRight className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
+
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={(open) => !open && closeDialog()}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingShift ? "Edit Shift" : "Add Shift"}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-primary" />
+              {editingShift ? "Edit Shift" : "Quick Add Shift"}
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <StaffPicker
-              drivers={drivers}
-              selectedIds={formData.driver_ids}
-              onSelectionChange={(ids) => setFormData({ ...formData, driver_ids: ids })}
-              singleSelect={!!editingShift}
-              getDriverProfile={getDriverProfile}
-            />
+
+          <div className="space-y-5 py-2">
+            {/* Driver Selection - Compact */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Driver</label>
+              {editingShift ? (
+                <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback>{getDriverProfile(drivers.find(d => d.id === formData.driver_ids[0]))?.full_name?.[0] || "?"}</AvatarFallback>
+                  </Avatar>
+                  <span className="font-medium">{getDriverProfile(drivers.find(d => d.id === formData.driver_ids[0]))?.full_name || "Unknown"}</span>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {drivers.map(driver => {
+                    const profile = getDriverProfile(driver)
+                    const isSelected = formData.driver_ids.includes(driver.id)
+                    return (
+                      <button
+                        key={driver.id}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            setFormData({ ...formData, driver_ids: formData.driver_ids.filter(id => id !== driver.id) })
+                          } else {
+                            setFormData({ ...formData, driver_ids: [...formData.driver_ids, driver.id] })
+                          }
+                        }}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition-all ${
+                          isSelected
+                            ? "border-primary bg-primary/10"
+                            : "border-transparent bg-muted/50 hover:bg-muted"
+                        }`}
+                      >
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage src={profile?.avatar_url || undefined} />
+                          <AvatarFallback className="text-xs">{profile?.full_name?.[0] || "?"}</AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm font-medium">{profile?.full_name?.split(" ")[0] || "Unknown"}</span>
+                        {isSelected && <div className="h-2 w-2 rounded-full bg-primary" />}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Date Selection - Simplified */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Dates</label>
+                <label className="text-sm font-medium text-muted-foreground">Date</label>
                 {!editingShift && (
-                  <div className="flex gap-1">
-                    <Button
+                  <div className="flex rounded-lg bg-muted/50 p-0.5">
+                    <button
                       type="button"
-                      variant={dateRangeMode === "select" ? "default" : "outline"}
-                      size="sm"
-                      className="h-7 text-xs"
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                        dateRangeMode === "select" ? "bg-background shadow-sm" : "text-muted-foreground"
+                      }`}
                       onClick={() => setDateRangeMode("select")}
                     >
-                      Select
-                    </Button>
-                    <Button
+                      Pick Dates
+                    </button>
+                    <button
                       type="button"
-                      variant={dateRangeMode === "range" ? "default" : "outline"}
-                      size="sm"
-                      className="h-7 text-xs"
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                        dateRangeMode === "range" ? "bg-background shadow-sm" : "text-muted-foreground"
+                      }`}
                       onClick={() => setDateRangeMode("range")}
                     >
-                      Range
-                    </Button>
+                      Date Range
+                    </button>
                   </div>
                 )}
               </div>
 
               {dateRangeMode === "range" ? (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-muted-foreground">From</label>
-                    <Input
-                      type="date"
-                      value={rangeStart}
-                      onChange={(e) => setRangeStart(e.target.value)}
-                    />
+                    <label className="text-xs text-muted-foreground mb-1 block">From</label>
+                    <Input type="date" value={rangeStart} onChange={(e) => setRangeStart(e.target.value)} className="h-9" />
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground">To</label>
-                    <Input
-                      type="date"
-                      value={rangeEnd}
-                      onChange={(e) => setRangeEnd(e.target.value)}
-                    />
+                    <label className="text-xs text-muted-foreground mb-1 block">To</label>
+                    <Input type="date" value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)} className="h-9" />
                   </div>
                   {rangeStart && rangeEnd && (
-                    <p className="col-span-2 text-xs text-muted-foreground">
-                      {generateDatesFromRange().length} days selected
+                    <p className="col-span-2 text-xs text-primary font-medium">
+                      {generateDatesFromRange().length} days will be scheduled
                     </p>
                   )}
                 </div>
               ) : (
-                <div className="border rounded-lg p-2">
-                  <div className="grid grid-cols-7 gap-1 text-center text-xs mb-2 sticky top-0 bg-background pb-2">
+                <div className="border rounded-xl p-3 bg-muted/30">
+                  <div className="grid grid-cols-7 gap-1 text-center mb-2">
                     {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(d => (
-                      <span key={d} className="text-muted-foreground font-medium">{d}</span>
+                      <span key={d} className="text-[10px] font-semibold text-muted-foreground uppercase">{d}</span>
                     ))}
                   </div>
-                  <div className="max-h-40 overflow-y-auto">
-                  {(() => {
-                    const monthDates = getMonthDates()
-                    const firstDayOfWeek = monthDates[0].getDay()
-                    const paddedDates = Array(firstDayOfWeek).fill(null).concat(monthDates)
+                  <div className="grid grid-cols-7 gap-1">
+                    {(() => {
+                      const monthDates = getMonthDates()
+                      const firstDayOfWeek = monthDates[0].getDay()
+                      const paddedDates = Array(firstDayOfWeek).fill(null).concat(monthDates)
 
-                    return (
-                      <div className="grid grid-cols-7 gap-1">
-                        {paddedDates.map((date, i) => {
-                          if (!date) return <div key={`pad-${i}`} />
-                          const dateStr = date.toISOString().split("T")[0]
-                          const isSelected = formData.shift_dates.includes(dateStr)
-                          const isToday = dateStr === new Date().toISOString().split("T")[0]
+                      return paddedDates.slice(0, 42).map((date, i) => {
+                        if (!date) return <div key={`pad-${i}`} className="h-8" />
+                        const dateStr = formatDateInput(date)
+                        const isSelected = formData.shift_dates.includes(dateStr)
+                        const isToday = dateStr === formatDateInput(new Date())
 
-                          return (
-                            <button
-                              key={dateStr}
-                              type="button"
-                              onClick={() => toggleDate(dateStr)}
-                              className={`
-                                h-8 w-full rounded text-xs font-medium transition-colors
-                                ${isSelected ? "bg-primary text-primary-foreground" : "hover:bg-muted"}
-                                ${isToday && !isSelected ? "border border-primary" : ""}
-                              `}
-                            >
-                              {date.getDate()}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )
-                  })()}
+                        return (
+                          <button
+                            key={dateStr}
+                            type="button"
+                            onClick={() => toggleDate(dateStr)}
+                            className={`h-8 w-full rounded-lg text-xs font-medium transition-all ${
+                              isSelected
+                                ? "bg-primary text-primary-foreground shadow-sm"
+                                : isToday
+                                  ? "bg-primary/20 text-primary font-bold"
+                                  : "hover:bg-muted text-foreground"
+                            }`}
+                          >
+                            {date.getDate()}
+                          </button>
+                        )
+                      })
+                    })()}
                   </div>
                   {formData.shift_dates.length > 0 && (
-                    <p className="text-xs text-muted-foreground mt-2 pt-2 border-t">
-                      {formData.shift_dates.length} date(s) selected
-                    </p>
+                    <div className="mt-3 pt-3 border-t flex items-center justify-between">
+                      <span className="text-xs text-primary font-medium">{formData.shift_dates.length} date(s) selected</span>
+                      <button type="button" onClick={() => setFormData({ ...formData, shift_dates: [] })} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
+                    </div>
                   )}
                 </div>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Start Time</label>
+
+            {/* Time & Type - Horizontal compact layout */}
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Start</label>
                 <Input
                   type="time"
                   value={formData.start_time}
                   onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                  className="h-9"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">End Time</label>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">End</label>
                 <Input
                   type="time"
                   value={formData.end_time}
                   onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                  className="h-9"
                 />
               </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Shift Type</label>
-              <Select value={formData.shift_type} onValueChange={(v) => setFormData({ ...formData, shift_type: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SHIFT_TYPES.map(type => (
-                    <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Status</label>
-              <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="scheduled">Scheduled</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Type</label>
+                <Select value={formData.shift_type} onValueChange={(v) => setFormData({ ...formData, shift_type: v })}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SHIFT_TYPES.map(type => (
+                      <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={closeDialog}>Cancel</Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              {editingShift ? "Update" : "Create"}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={closeDialog}>Cancel</Button>
+            <Button onClick={handleSave} disabled={saving} className="min-w-[100px]">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+              {editingShift ? "Update" : "Add Shift"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -867,74 +1166,80 @@ export function ShiftsTable() {
           setAutoScheduleEndTime("16:00")
         }
       }}>
-        <AlertDialogContent className="max-w-md">
+        <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
-            <AlertDialogTitle>Auto-Schedule Shifts</AlertDialogTitle>
-            <AlertDialogDescription>
-              Generate 8:00 AM - 4:00 PM shifts for work days (Sun-Thu).
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Wand2 className="h-5 w-5 text-primary" />
+              Auto-Schedule Shifts
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm">
+              Automatically generate shifts for work days (Sun-Thu).
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="py-4 space-y-4">
+
+          <div className="py-2 space-y-5">
+            {/* Period Selection */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Period</label>
-              <div className="flex gap-2">
-                <Button
+              <label className="text-sm font-medium text-muted-foreground">Schedule Period</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
                   type="button"
-                  variant={autoSchedulePeriod === "week" ? "default" : "outline"}
-                  size="sm"
                   onClick={() => setAutoSchedulePeriod("week")}
+                  className={`p-3 rounded-xl border-2 transition-all text-left ${
+                    autoSchedulePeriod === "week"
+                      ? "border-primary bg-primary/10"
+                      : "border-muted hover:border-muted-foreground/30"
+                  }`}
                 >
-                  Next 7 Days
-                </Button>
-                <Button
+                  <div className="font-semibold text-sm">Next 7 Days</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">~5 work days</div>
+                </button>
+                <button
                   type="button"
-                  variant={autoSchedulePeriod === "month" ? "default" : "outline"}
-                  size="sm"
                   onClick={() => setAutoSchedulePeriod("month")}
+                  className={`p-3 rounded-xl border-2 transition-all text-left ${
+                    autoSchedulePeriod === "month"
+                      ? "border-primary bg-primary/10"
+                      : "border-muted hover:border-muted-foreground/30"
+                  }`}
                 >
-                  Full Month
-                </Button>
+                  <div className="font-semibold text-sm">Full Month</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">~22 work days</div>
+                </button>
               </div>
             </div>
+
+            {/* Driver Selection - Chips */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">
-                  Drivers
-                  {autoScheduleDrivers.length > 0 && (
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      ({autoScheduleDrivers.length} selected)
-                    </span>
-                  )}
-                </label>
-                <div className="flex gap-1">
-                  <Button
+                <label className="text-sm font-medium text-muted-foreground">Select Drivers</label>
+                <div className="flex gap-2">
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 text-xs"
+                    className="text-xs text-primary hover:underline"
                     onClick={() => setAutoScheduleDrivers(drivers.map(d => d.id))}
                   >
                     Select All
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 text-xs"
-                    onClick={() => setAutoScheduleDrivers([])}
-                  >
-                    Clear
-                  </Button>
+                  </button>
+                  {autoScheduleDrivers.length > 0 && (
+                    <button
+                      type="button"
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                      onClick={() => setAutoScheduleDrivers([])}
+                    >
+                      Clear
+                    </button>
+                  )}
                 </div>
               </div>
-              <div className="border rounded-lg p-2 max-h-32 overflow-y-auto space-y-1">
+              <div className="flex flex-wrap gap-2">
                 {drivers.map(driver => {
                   const profile = getDriverProfile(driver)
                   const isSelected = autoScheduleDrivers.includes(driver.id)
                   return (
-                    <div
+                    <button
                       key={driver.id}
-                      className={`flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-accent ${isSelected ? 'bg-accent' : ''}`}
+                      type="button"
                       onClick={() => {
                         if (isSelected) {
                           setAutoScheduleDrivers(prev => prev.filter(id => id !== driver.id))
@@ -942,47 +1247,66 @@ export function ShiftsTable() {
                           setAutoScheduleDrivers(prev => [...prev, driver.id])
                         }
                       }}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition-all ${
+                        isSelected
+                          ? "border-primary bg-primary/10"
+                          : "border-transparent bg-muted/50 hover:bg-muted"
+                      }`}
                     >
-                      <Checkbox checked={isSelected} />
                       <Avatar className="h-6 w-6">
                         <AvatarImage src={profile?.avatar_url || undefined} />
-                        <AvatarFallback className="text-xs">{profile?.full_name?.[0] || "D"}</AvatarFallback>
+                        <AvatarFallback className="text-xs">{profile?.full_name?.[0] || "?"}</AvatarFallback>
                       </Avatar>
-                      <span className="text-sm">{profile?.full_name || "Unknown"}</span>
-                    </div>
+                      <span className="text-sm font-medium">{profile?.full_name?.split(" ")[0] || "Unknown"}</span>
+                      {isSelected && <div className="h-2 w-2 rounded-full bg-primary" />}
+                    </button>
                   )
                 })}
               </div>
             </div>
+
+            {/* Time Selection */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Shift Time</label>
-              <div className="grid grid-cols-2 gap-4">
+              <label className="text-sm font-medium text-muted-foreground">Shift Hours</label>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-muted-foreground">Start</label>
+                  <label className="text-xs text-muted-foreground mb-1 block">Start Time</label>
                   <Input
                     type="time"
                     value={autoScheduleStartTime}
                     onChange={(e) => setAutoScheduleStartTime(e.target.value)}
+                    className="h-10"
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground">End</label>
+                  <label className="text-xs text-muted-foreground mb-1 block">End Time</label>
                   <Input
                     type="time"
                     value={autoScheduleEndTime}
                     onChange={(e) => setAutoScheduleEndTime(e.target.value)}
+                    className="h-10"
                   />
                 </div>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">
-              <strong>{autoScheduleDrivers.length || drivers.length}</strong> driver(s) will be scheduled across{" "}
-              <strong>{autoSchedulePeriod === "month" ? "~22" : "5"}</strong> work days.
-            </p>
+
+            {/* Summary */}
+            {autoScheduleDrivers.length > 0 && (
+              <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+                <p className="text-sm">
+                  <span className="font-bold text-primary">{autoScheduleDrivers.length}</span> driver(s) × <span className="font-bold text-primary">{autoSchedulePeriod === "month" ? "~22" : "~5"}</span> work days = <span className="font-bold">{autoScheduleDrivers.length * (autoSchedulePeriod === "month" ? 22 : 5)}</span> shifts
+                </p>
+              </div>
+            )}
           </div>
-          <AlertDialogFooter>
+
+          <AlertDialogFooter className="gap-2 sm:gap-0">
             <AlertDialogCancel disabled={autoScheduling}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleAutoSchedule} disabled={autoScheduling}>
+            <AlertDialogAction
+              onClick={handleAutoSchedule}
+              disabled={autoScheduling || autoScheduleDrivers.length === 0}
+              className="min-w-[140px]"
+            >
               {autoScheduling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Wand2 className="h-4 w-4 mr-2" />}
               Generate Shifts
             </AlertDialogAction>

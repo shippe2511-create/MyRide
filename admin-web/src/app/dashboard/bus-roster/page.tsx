@@ -31,6 +31,17 @@ interface Driver {
   profile?: { full_name: string }
 }
 
+interface DriverShift {
+  id: string
+  driver_id: string
+  shift_date: string
+  start_time: string
+  end_time: string
+  attendance_status: string
+  absence_reason?: string
+  driver?: Driver
+}
+
 interface Vehicle {
   id: string
   plate_no: string
@@ -96,6 +107,8 @@ export default function BusRosterPage() {
   const [deleting, setDeleting] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
+  const [driverShifts, setDriverShifts] = useState<DriverShift[]>([])
+  const [showDriverPanel, setShowDriverPanel] = useState(true)
 
   const [generateForm, setGenerateForm] = useState({
     startDate: format(new Date(), "yyyy-MM-dd"),
@@ -109,7 +122,40 @@ export default function BusRosterPage() {
   useEffect(() => {
     setSelectedIds(new Set()) // Clear selection when date/type changes
     loadRoster()
+    loadDriverShifts()
   }, [selectedDate, transportType])
+
+  // Realtime subscription for shifts attendance updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('shifts_attendance_updates')
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'shifts' },
+        () => {
+          loadDriverShifts()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [selectedDate])
+
+  const loadDriverShifts = async () => {
+    const dateStr = format(selectedDate, "yyyy-MM-dd")
+    const { data } = await supabase
+      .from("shifts")
+      .select(`
+        id, driver_id, shift_date, start_time, end_time, attendance_status, absence_reason,
+        driver:drivers(id, profile_id, profile:profiles(full_name))
+      `)
+      .eq("shift_date", dateStr)
+
+    if (data) {
+      setDriverShifts(data as unknown as DriverShift[])
+    }
+  }
 
   const loadMasterData = async () => {
     const [driversRes, vehiclesRes, schedulesRes] = await Promise.all([
@@ -562,6 +608,119 @@ export default function BusRosterPage() {
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
+
+        {/* Driver Availability Panel */}
+        <Card className="border-2 border-dashed">
+          <CardHeader className="py-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Driver Availability for {format(selectedDate, "MMM d")}
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDriverPanel(!showDriverPanel)}
+              >
+                {showDriverPanel ? "Hide" : "Show"}
+              </Button>
+            </div>
+          </CardHeader>
+          {showDriverPanel && (
+            <CardContent className="pt-0">
+              {driverShifts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No shifts scheduled for this date</p>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {/* Present Drivers */}
+                  {driverShifts.filter(s => s.attendance_status === "present").length > 0 && (
+                    <div className="col-span-full">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                        <span className="text-sm font-medium text-emerald-500">
+                          Present ({driverShifts.filter(s => s.attendance_status === "present").length})
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {driverShifts.filter(s => s.attendance_status === "present").map(shift => {
+                          const profile = shift.driver?.profile as { full_name?: string } | undefined
+                          return (
+                            <div
+                              key={shift.id}
+                              className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-full text-sm text-emerald-600 dark:text-emerald-400"
+                            >
+                              {profile?.full_name || "Unknown"}
+                              <span className="ml-2 text-xs opacity-70">
+                                {shift.start_time.substring(0, 5)}-{shift.end_time.substring(0, 5)}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Absent Drivers */}
+                  {driverShifts.filter(s => s.attendance_status === "absent").length > 0 && (
+                    <div className="col-span-full">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-3 h-3 rounded-full bg-red-500" />
+                        <span className="text-sm font-medium text-red-500">
+                          Absent ({driverShifts.filter(s => s.attendance_status === "absent").length})
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {driverShifts.filter(s => s.attendance_status === "absent").map(shift => {
+                          const profile = shift.driver?.profile as { full_name?: string } | undefined
+                          return (
+                            <div
+                              key={shift.id}
+                              className="px-3 py-1.5 bg-red-500/10 border border-red-500/30 rounded-full text-sm text-red-600 dark:text-red-400"
+                              title={shift.absence_reason || "No reason provided"}
+                            >
+                              {profile?.full_name || "Unknown"}
+                              {shift.absence_reason && (
+                                <span className="ml-2 text-xs opacity-70">({shift.absence_reason})</span>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pending Drivers */}
+                  {driverShifts.filter(s => s.attendance_status === "pending" || !s.attendance_status).length > 0 && (
+                    <div className="col-span-full">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                        <span className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                          Pending ({driverShifts.filter(s => s.attendance_status === "pending" || !s.attendance_status).length})
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {driverShifts.filter(s => s.attendance_status === "pending" || !s.attendance_status).map(shift => {
+                          const profile = shift.driver?.profile as { full_name?: string } | undefined
+                          return (
+                            <div
+                              key={shift.id}
+                              className="px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/30 rounded-full text-sm text-yellow-600 dark:text-yellow-400"
+                            >
+                              {profile?.full_name || "Unknown"}
+                              <span className="ml-2 text-xs opacity-70">
+                                {shift.start_time.substring(0, 5)}-{shift.end_time.substring(0, 5)}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          )}
+        </Card>
 
         {/* Route Filter Tabs */}
         {uniqueRoutes.length > 1 && (

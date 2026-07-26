@@ -275,11 +275,15 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  bool firebaseInitialized = false;
+  // Catch all Flutter errors and display them
+  FlutterError.onError = (details) {
+    debugPrint('FLUTTER ERROR: ${details.exception}');
+    debugPrint('STACK: ${details.stack}');
+  };
+
   try {
     // Initialize Firebase - wrapped carefully for devices without Google Play Services
     await Firebase.initializeApp();
-    firebaseInitialized = true;
     // Set up background message handler only if Firebase initialized
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   } catch (e) {
@@ -289,9 +293,14 @@ void main() async {
 
   try {
     await SupabaseService.initialize();
-    await AppSettingsService.load();
   } catch (e) {
     debugPrint('Supabase init failed: $e');
+  }
+
+  try {
+    await AppSettingsService.load();
+  } catch (e) {
+    debugPrint('AppSettings load failed: $e');
   }
 
   try {

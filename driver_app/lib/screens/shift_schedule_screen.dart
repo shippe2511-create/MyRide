@@ -16,6 +16,7 @@ class ShiftScheduleScreen extends StatefulWidget {
 
 class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
   int _selectedDay = DateTime.now().weekday - 1;
+  int _weekOffset = 0; // 0 = current week, 1 = next week, -1 = previous week
   bool _isLoading = true;
   StreamSubscription<Map<String, dynamic>>? _shiftsSubscription;
   Timer? _countdownTimer;
@@ -61,7 +62,11 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
   }
 
   Future<void> _loadShifts() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      // Clear the schedule immediately to prevent showing old data
+      _weekSchedule = List.generate(7, (_) => <String, dynamic>{'shifts': <Map<String, dynamic>>[]});
+    });
     try {
       final driverId = SupabaseService.visibleUserId;
       if (driverId == null) {
@@ -70,14 +75,19 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
       }
 
       final now = DateTime.now();
-      final weekStart = now.subtract(Duration(days: now.weekday - 1));
+      final baseWeekStart = now.subtract(Duration(days: now.weekday - 1));
+      final weekStart = baseWeekStart.add(Duration(days: _weekOffset * 7));
       final weekEnd = weekStart.add(const Duration(days: 7));
+
+      debugPrint('Loading shifts for week: ${weekStart.toIso8601String()} to ${weekEnd.toIso8601String()}');
 
       final shifts = await SupabaseService.getDriverShifts(
         driverId,
         weekStart,
         weekEnd,
       );
+
+      debugPrint('Got ${shifts.length} shifts from database');
 
       final newSchedule = List.generate(7, (_) => <String, dynamic>{'shifts': <Map<String, dynamic>>[]});
 
@@ -119,11 +129,16 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
           }
         }
 
+        debugPrint('Adding shift: date=${shift['shift_date']}, dayIndex=$dayIndex, type=${shift['shift_type']}');
         (newSchedule[dayIndex]['shifts'] as List).add({
+          'id': shift['id'],
           'start': shift['start_time']?.toString().substring(0, 5) ?? '00:00',
           'end': shift['end_time']?.toString().substring(0, 5) ?? '00:00',
           'type': _capitalizeFirst(shift['shift_type'] ?? 'shift'),
           'status': status,
+          'attendance_status': shift['attendance_status'] ?? 'pending',
+          'absence_reason': shift['absence_reason'],
+          'shift_date': shift['shift_date'],
         });
       }
 
@@ -252,90 +267,176 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
 
   Widget _buildDaySelector(BuildContext context) {
     final today = DateTime.now();
-    final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
+    final baseWeekStart = today.subtract(Duration(days: today.weekday - 1));
+    final startOfWeek = baseWeekStart.add(Duration(days: _weekOffset * 7));
+    final isCurrentWeek = _weekOffset == 0;
 
-    return Container(
-      height: 80,
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: 7,
-        itemBuilder: (context, index) {
-          final date = startOfWeek.add(Duration(days: index));
-          final isSelected = index == _selectedDay;
-          final isToday = index == today.weekday - 1;
-          final hasShift = (_weekSchedule[index]['shifts'] as List).isNotEmpty;
-
-          return GestureDetector(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              setState(() => _selectedDay = index);
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 52,
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.yellow
-                    : isToday
-                        ? AppColors.yellow.withValues(alpha: 0.15)
-                        : context.cardColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isSelected
-                      ? AppColors.yellow
-                      : isToday
-                          ? AppColors.yellow.withValues(alpha: 0.5)
-                          : context.borderColor,
+    return Column(
+      children: [
+        // Week navigation
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                onPressed: () {
+                  HapticFeedback.selectionClick();
+                  setState(() {
+                    _weekOffset--;
+                    _selectedDay = 0;
+                  });
+                  _loadShifts();
+                },
+                icon: Icon(Icons.chevron_left, color: context.textColor),
+                style: IconButton.styleFrom(
+                  backgroundColor: context.cardColor,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _weekDays[index],
+              GestureDetector(
+                onTap: isCurrentWeek ? null : () {
+                  HapticFeedback.selectionClick();
+                  setState(() {
+                    _weekOffset = 0;
+                    _selectedDay = today.weekday - 1;
+                  });
+                  _loadShifts();
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isCurrentWeek ? AppColors.yellow.withValues(alpha: 0.15) : context.cardColor,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isCurrentWeek ? AppColors.yellow.withValues(alpha: 0.5) : context.borderColor,
+                    ),
+                  ),
+                  child: Text(
+                    _getWeekRangeText(startOfWeek),
                     style: TextStyle(
-                      color: isSelected ? Colors.black : context.mutedColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                      color: isCurrentWeek ? AppColors.yellow : context.textColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${date.day}',
-                    style: TextStyle(
-                      color: isSelected ? Colors.black : context.textColor,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: hasShift
-                          ? isSelected
-                              ? Colors.black
-                              : AppColors.success
-                          : Colors.transparent,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-          );
-        },
-      ),
+              IconButton(
+                onPressed: () {
+                  HapticFeedback.selectionClick();
+                  setState(() {
+                    _weekOffset++;
+                    _selectedDay = 0;
+                  });
+                  _loadShifts();
+                },
+                icon: Icon(Icons.chevron_right, color: context.textColor),
+                style: IconButton.styleFrom(
+                  backgroundColor: context.cardColor,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Day selector
+        Container(
+          height: 80,
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: 7,
+            itemBuilder: (context, index) {
+              final date = startOfWeek.add(Duration(days: index));
+              final isSelected = index == _selectedDay;
+              final isTodayDate = isCurrentWeek && index == today.weekday - 1;
+              final hasShift = (_weekSchedule[index]['shifts'] as List).isNotEmpty;
+
+              return GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _selectedDay = index);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 52,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppColors.yellow
+                        : isTodayDate
+                            ? AppColors.yellow.withValues(alpha: 0.15)
+                            : context.cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppColors.yellow
+                          : isTodayDate
+                              ? AppColors.yellow.withValues(alpha: 0.5)
+                              : context.borderColor,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _weekDays[index],
+                        style: TextStyle(
+                          color: isSelected ? Colors.black : context.mutedColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${date.day}',
+                        style: TextStyle(
+                          color: isSelected ? Colors.black : context.textColor,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: hasShift
+                              ? isSelected
+                                  ? Colors.black
+                                  : AppColors.success
+                              : Colors.transparent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
+  }
+
+  String _getWeekRangeText(DateTime startOfWeek) {
+    final endOfWeek = startOfWeek.add(const Duration(days: 6));
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    if (startOfWeek.month == endOfWeek.month) {
+      return '${months[startOfWeek.month - 1]} ${startOfWeek.day} - ${endOfWeek.day}';
+    } else {
+      return '${months[startOfWeek.month - 1]} ${startOfWeek.day} - ${months[endOfWeek.month - 1]} ${endOfWeek.day}';
+    }
   }
 
   Widget _buildDaySchedule(BuildContext context) {
     final shifts = _weekSchedule[_selectedDay]['shifts'] as List;
     final today = DateTime.now();
-    final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
+    final baseWeekStart = today.subtract(Duration(days: today.weekday - 1));
+    final startOfWeek = baseWeekStart.add(Duration(days: _weekOffset * 7));
     final selectedDate = startOfWeek.add(Duration(days: _selectedDay));
 
     if (shifts.isEmpty) {
@@ -397,118 +498,435 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
     final status = shift['status'] as String;
     final isCurrent = status == 'current';
     final isCompleted = status == 'completed';
+    final attendanceStatus = shift['attendance_status'] as String? ?? 'pending';
+    final absenceReason = shift['absence_reason'] as String?;
+    final shiftDate = shift['shift_date'] as String?;
+    final shiftType = shift['type'] as String;
+    final startTime = shift['start'] as String;
+    final endTime = shift['end'] as String;
 
-    Color statusColor;
+    final today = DateTime.now();
+    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    final canMarkAttendance = shiftDate == todayStr && attendanceStatus == 'pending';
+
+    Color accentColor;
+    IconData statusIcon;
     String statusText;
 
-    if (isCurrent) {
-      statusColor = AppColors.success;
-      statusText = 'In Progress';
+    if (attendanceStatus == 'absent') {
+      accentColor = AppColors.error;
+      statusIcon = Icons.cancel_rounded;
+      statusText = 'Absent';
+    } else if (attendanceStatus == 'present') {
+      accentColor = AppColors.success;
+      statusIcon = Icons.check_circle_rounded;
+      statusText = 'Present';
+    } else if (isCurrent) {
+      accentColor = AppColors.success;
+      statusIcon = Icons.play_circle_rounded;
+      statusText = 'Active';
     } else if (isCompleted) {
-      statusColor = context.mutedColor;
-      statusText = 'Completed';
+      accentColor = context.mutedColor;
+      statusIcon = Icons.task_alt_rounded;
+      statusText = 'Done';
     } else {
-      statusColor = AppColors.yellow;
-      statusText = 'Upcoming';
+      accentColor = AppColors.yellow;
+      statusIcon = Icons.schedule_rounded;
+      statusText = 'Scheduled';
     }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: context.cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isCurrent ? AppColors.success : context.borderColor,
-          width: isCurrent ? 2 : 1,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            accentColor.withValues(alpha: 0.12),
+            accentColor.withValues(alpha: 0.04),
+          ],
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  statusText,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: context.bgColor,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  shift['type'] as String,
-                  style: TextStyle(
-                    color: context.textColor,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: accentColor.withValues(alpha: 0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _buildTimeBlock(context, shift['start'] as String, 'Start'),
-              Expanded(
-                child: Column(
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Column(
+          children: [
+            // Main content
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  // Top row with status and shift type
+                  Row(
+                    children: [
+                      // Status pill with icon
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: accentColor.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(statusIcon, color: accentColor, size: 14),
+                            const SizedBox(width: 6),
+                            Text(
+                              statusText,
+                              style: TextStyle(
+                                color: accentColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      // Shift type badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: context.cardColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: context.borderColor),
+                        ),
+                        child: Text(
+                          shiftType,
+                          style: TextStyle(
+                            color: context.textColor,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Time display - modern layout
+                  Row(
+                    children: [
+                      // Start time
+                      Expanded(
+                        child: _buildModernTimeBlock(context, startTime, 'Start', accentColor),
+                      ),
+                      // Duration indicator
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Column(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: context.cardColor,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: context.borderColor),
+                              ),
+                              child: Icon(
+                                Icons.arrow_forward_rounded,
+                                color: accentColor,
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _calculateDuration(startTime, endTime),
+                              style: TextStyle(
+                                color: context.mutedColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // End time
+                      Expanded(
+                        child: _buildModernTimeBlock(context, endTime, 'End', accentColor),
+                      ),
+                    ],
+                  ),
+
+                  // Time remaining for current shift
+                  if (isCurrent && attendanceStatus == 'pending') ...[
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.timer_outlined, color: AppColors.success, size: 18),
+                          const SizedBox(width: 10),
+                          Text(
+                            _calculateTimeRemaining(endTime),
+                            style: TextStyle(
+                              color: AppColors.success,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // Absence reason
+                  if (attendanceStatus == 'absent' && absenceReason != null && absenceReason.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline_rounded, color: AppColors.error, size: 18),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              absenceReason,
+                              style: TextStyle(
+                                color: AppColors.error,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            // Attendance action bar
+            if (canMarkAttendance)
+              Container(
+                decoration: BoxDecoration(
+                  color: context.cardColor.withValues(alpha: 0.5),
+                  border: Border(
+                    top: BorderSide(color: context.borderColor.withValues(alpha: 0.5)),
+                  ),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Row(
                   children: [
-                    Icon(Icons.arrow_forward, color: context.mutedColor, size: 20),
-                    const SizedBox(height: 4),
-                    Text(
-                      _calculateDuration(shift['start'] as String, shift['end'] as String),
-                      style: TextStyle(
-                        color: context.mutedColor,
-                        fontSize: 11,
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _markAttendance(shift['id'] as String, 'present'),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [AppColors.success, AppColors.success.withValues(alpha: 0.8)],
+                            ),
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.success.withValues(alpha: 0.4),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Present',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _showAbsentDialog(shift['id'] as String),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: Colors.transparent,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.error, width: 1.5),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.cancel_rounded, color: AppColors.error, size: 20),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Absent',
+                                style: TextStyle(
+                                  color: AppColors.error,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-              _buildTimeBlock(context, shift['end'] as String, 'End'),
-            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernTimeBlock(BuildContext context, String time, String label, Color accentColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      decoration: BoxDecoration(
+        color: context.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.borderColor),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: context.mutedColor,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.5,
+            ),
           ),
-          if (isCurrent) ...[
+          const SizedBox(height: 8),
+          Text(
+            time,
+            style: TextStyle(
+              color: context.textColor,
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _markAttendance(String shiftId, String status, {String? reason}) async {
+    HapticFeedback.mediumImpact();
+
+    final success = await SupabaseService.markShiftAttendance(
+      shiftId: shiftId,
+      status: status,
+      reason: reason,
+    );
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(status == 'present' ? 'Marked as Present' : 'Marked as Absent'),
+          backgroundColor: status == 'present' ? AppColors.success : AppColors.error,
+        ),
+      );
+      _loadShifts();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Failed to mark attendance'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  void _showAbsentDialog(String shiftId) {
+    final reasonController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Mark as Absent', style: TextStyle(color: context.textColor)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Please provide a reason for your absence:',
+              style: TextStyle(color: context.mutedColor, fontSize: 14),
+            ),
             const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.success.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+            TextField(
+              controller: reasonController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'e.g., Sick leave, Family emergency...',
+                hintStyle: TextStyle(color: context.mutedColor),
+                filled: true,
+                fillColor: context.bgColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
               ),
-              child: Row(
-                children: [
-                  Icon(Icons.access_time, color: AppColors.success, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _calculateTimeRemaining(shift['end'] as String),
-                      style: TextStyle(
-                        color: AppColors.success,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              style: TextStyle(color: context.textColor),
             ),
           ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: TextStyle(color: context.mutedColor)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _markAttendance(shiftId, 'absent', reason: reasonController.text.trim());
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Confirm Absent'),
+          ),
         ],
       ),
     );

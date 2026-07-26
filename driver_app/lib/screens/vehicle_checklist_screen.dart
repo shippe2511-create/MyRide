@@ -137,6 +137,11 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
+    // Force refresh vehicle info from database
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<DriverState>().refreshVehicleInfo();
+    });
+
     _loadChecklistItems();
     _subscribeToChecklistChanges();
     _loadPreviousRunningHours();
@@ -646,6 +651,61 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                 ],
               ),
             ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Vehicle Info Card
+          Consumer<DriverState>(
+            builder: (context, driverState, _) {
+              final vehiclePlate = driverState.vehicleNumber;
+              final vehicleModel = driverState.vehicleModel;
+              if (vehiclePlate.isEmpty) return const SizedBox.shrink();
+
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: context.cardColor,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: context.borderColor),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.yellow.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.directions_bus, color: AppColors.yellow, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          vehicleModel.isNotEmpty ? vehicleModel : 'Vehicle',
+                          style: TextStyle(
+                            color: context.textColor,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          vehiclePlate,
+                          style: TextStyle(
+                            color: AppColors.yellow,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),

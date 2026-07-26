@@ -59,7 +59,8 @@ class _HomeScreenState extends State<HomeScreen> {
   RealtimeChannel? _notificationsChannel;
   int _unreadNotificationCount = 0;
   Timer? _notificationPollTimer;
-
+  Map<String, dynamic>? _todayShift;
+  bool _loadingTodayShift = false;
 
   @override
   void initState() {
@@ -98,6 +99,9 @@ class _HomeScreenState extends State<HomeScreen> {
       // Refresh stats from database (Today, Total, Rating)
       await state.loadDriverStats();
 
+      // Load today's shift for attendance
+      _loadTodayShift();
+
       _checkForActiveRide();
 
       // If driver was online from previous session, re-initialize subscriptions
@@ -107,6 +111,146 @@ class _HomeScreenState extends State<HomeScreen> {
         _tryGoOnline(state);
       }
     });
+  }
+
+  Future<void> _loadTodayShift() async {
+    final driverId = SupabaseService.driverId;
+    if (driverId == null) return;
+
+    setState(() => _loadingTodayShift = true);
+
+    try {
+      final today = DateTime.now();
+      final todayStart = DateTime(today.year, today.month, today.day);
+      final todayEnd = todayStart.add(const Duration(days: 1));
+
+      final shifts = await SupabaseService.getDriverShifts(driverId, todayStart, todayEnd);
+
+      if (shifts.isNotEmpty && mounted) {
+        setState(() {
+          _todayShift = shifts.first;
+          _loadingTodayShift = false;
+        });
+      } else if (mounted) {
+        setState(() {
+          _todayShift = null;
+          _loadingTodayShift = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading today shift: $e');
+      if (mounted) setState(() => _loadingTodayShift = false);
+    }
+  }
+
+  Future<void> _markShiftAttendance(String status, {String? reason}) async {
+    if (_todayShift == null) return;
+
+    HapticFeedback.mediumImpact();
+    final shiftId = _todayShift!['id'] as String;
+
+    final success = await SupabaseService.markShiftAttendance(
+      shiftId: shiftId,
+      status: status,
+      reason: reason,
+    );
+
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(status == 'present' ? 'Marked as Present!' : 'Marked as Absent'),
+          backgroundColor: status == 'present' ? AppColors.success : AppColors.error,
+        ),
+      );
+      _loadTodayShift();
+    }
+  }
+
+  Future<void> _cancelAttendance() async {
+    if (_todayShift == null) return;
+
+    HapticFeedback.mediumImpact();
+    final shiftId = _todayShift!['id'] as String;
+
+    final success = await SupabaseService.markShiftAttendance(
+      shiftId: shiftId,
+      status: 'pending',
+      reason: null,
+    );
+
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Attendance cancelled'),
+          backgroundColor: AppColors.yellow,
+        ),
+      );
+      _loadTodayShift();
+    }
+  }
+
+  void _showAbsentReasonDialog() {
+    final reasonController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Mark as Absent', style: TextStyle(color: context.textColor)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Please provide a reason:',
+              style: TextStyle(color: context.mutedColor, fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: reasonController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'e.g., Sick leave, Family emergency...',
+                hintStyle: TextStyle(color: context.mutedColor),
+                filled: true,
+                fillColor: context.bgColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              style: TextStyle(color: context.textColor),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: TextStyle(color: context.mutedColor)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _markShiftAttendance('absent', reason: reasonController.text.trim());
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadBreakContent() async {
@@ -896,85 +1040,334 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
 
           // Go online prompt - centered in available space
-          SizedBox(
-            height: availableHeight,
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(30),
+          Builder(
+            builder: (context) {
+              // Check if driver is marked absent for today
+              final isAbsent = _todayShift != null &&
+                  (_todayShift!['attendance_status'] as String? ?? 'pending') == 'absent';
+              final absenceReason = _todayShift?['absence_reason'] as String?;
+
+              return Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(30),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: 40),
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: isAbsent ? AppColors.error.withValues(alpha: 0.15) : context.cardColor,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: isAbsent ? AppColors.error : context.borderColor,
+                            width: 2,
+                          ),
+                        ),
+                        child: Icon(
+                          isAbsent ? Icons.block : Icons.power_settings_new,
+                          size: 48,
+                          color: isAbsent ? AppColors.error : context.mutedColor,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        isAbsent ? 'You\'re Absent Today' : 'You\'re Offline',
+                        style: TextStyle(
+                          color: isAbsent ? AppColors.error : context.textColor,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        isAbsent
+                            ? 'You have marked yourself absent for today\'s shift'
+                            : state.checklistCompleted
+                                ? 'Tap below to start receiving ride requests'
+                                : 'Complete vehicle checklist to go online',
+                        style: TextStyle(
+                          color: context.mutedColor,
+                          fontSize: 15,
+                          height: 1.5,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      if (isAbsent && absenceReason != null && absenceReason.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.info_outline, color: AppColors.error, size: 16),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  absenceReason,
+                                  style: TextStyle(color: AppColors.error, fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 32),
+                      if (!isAbsent)
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            debugPrint('Go Online button tapped!');
+                            HapticFeedback.heavyImpact();
+                            _handleGoOnline(state);
+                          },
+                          icon: Icon(
+                            state.checklistCompleted
+                                ? Icons.wifi
+                                : Icons.checklist,
+                          ),
+                          label: Text(
+                            state.checklistCompleted
+                                ? 'Go Online'
+                                : 'Start Checklist',
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.success,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 32,
+                              vertical: 16,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        ),
+                      // Today's Shift Card
+                      if (_todayShift != null) ...[
+                        const SizedBox(height: 24),
+                        _buildTodayShiftCard(context),
+                      ],
+                      const SizedBox(height: 40),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          ],
+        );
+  }
+
+  Widget _buildTodayShiftCard(BuildContext context) {
+    if (_todayShift == null) return const SizedBox.shrink();
+
+    final attendanceStatus = _todayShift!['attendance_status'] as String? ?? 'pending';
+    final startTime = (_todayShift!['start_time']?.toString() ?? '00:00:00').substring(0, 5);
+    final endTime = (_todayShift!['end_time']?.toString() ?? '00:00:00').substring(0, 5);
+    final shiftType = _todayShift!['shift_type'] as String? ?? 'Shift';
+    final absenceReason = _todayShift!['absence_reason'] as String?;
+
+    Color statusColor;
+    IconData statusIcon;
+    String statusText;
+
+    switch (attendanceStatus) {
+      case 'present':
+        statusColor = AppColors.success;
+        statusIcon = Icons.check_circle;
+        statusText = 'Present';
+        break;
+      case 'absent':
+        statusColor = AppColors.error;
+        statusIcon = Icons.cancel;
+        statusText = 'Absent';
+        break;
+      default:
+        statusColor = AppColors.yellow;
+        statusIcon = Icons.schedule;
+        statusText = 'Pending';
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            statusColor.withValues(alpha: 0.15),
+            statusColor.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.calendar_today, color: statusColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color: context.cardColor,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: context.borderColor, width: 2),
-                      ),
-                      child: Icon(
-                        Icons.power_settings_new,
-                        size: 48,
-                        color: context.mutedColor,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
                     Text(
-                      'You\'re Offline',
+                      'Today\'s Shift',
                       style: TextStyle(
                         color: context.textColor,
-                        fontSize: 24,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 12),
                     Text(
-                      state.checklistCompleted
-                          ? 'Tap below to start receiving ride requests'
-                          : 'Complete vehicle checklist to go online',
+                      '$startTime - $endTime • ${shiftType[0].toUpperCase()}${shiftType.substring(1)}',
                       style: TextStyle(
                         color: context.mutedColor,
-                        fontSize: 15,
-                        height: 1.5,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 32),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        debugPrint('Go Online button tapped!');
-                        HapticFeedback.heavyImpact();
-                        _handleGoOnline(state);
-                      },
-                      icon: Icon(
-                        state.checklistCompleted
-                            ? Icons.wifi
-                            : Icons.checklist,
-                      ),
-                      label: Text(
-                        state.checklistCompleted
-                            ? 'Go Online'
-                            : 'Start Checklist',
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.success,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 32,
-                          vertical: 16,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
+                        fontSize: 13,
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(statusIcon, color: statusColor, size: 14),
+                    const SizedBox(width: 4),
+                    Text(
+                      statusText,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
+          if (attendanceStatus == 'pending') ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _markShiftAttendance('present'),
+                    icon: const Icon(Icons.check_circle, size: 18),
+                    label: const Text('Present'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.success,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _showAbsentReasonDialog,
+                    icon: Icon(Icons.cancel, size: 18, color: AppColors.error),
+                    label: Text('Absent', style: TextStyle(color: AppColors.error)),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: AppColors.error),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
-        );
+          if (attendanceStatus == 'absent') ...[
+            if (absenceReason != null && absenceReason.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: AppColors.error, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Reason: $absenceReason',
+                        style: TextStyle(color: AppColors.error, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _cancelAttendance(),
+                icon: const Icon(Icons.undo, size: 18),
+                label: const Text('Cancel Absence'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: BorderSide(color: AppColors.error.withValues(alpha: 0.5)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ],
+          if (attendanceStatus == 'present') ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _cancelAttendance(),
+                icon: const Icon(Icons.undo, size: 18),
+                label: const Text('Cancel Present'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: context.mutedColor,
+                  side: BorderSide(color: context.borderColor),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Widget _buildOnlineView(BuildContext context, DriverState state) {
@@ -1062,6 +1455,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
+
+        // Today's Shift Card (only if pending)
+        if (_todayShift != null && (_todayShift!['attendance_status'] ?? 'pending') == 'pending')
+          _buildTodayShiftCard(context),
 
       ],
     );

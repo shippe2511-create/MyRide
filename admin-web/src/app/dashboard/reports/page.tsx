@@ -92,6 +92,7 @@ const reportTypes = [
   { id: "drivers", name: "Drivers Report", description: "Driver list with ratings and trips", icon: Car },
   { id: "driver_performance", name: "Driver Performance", description: "KPIs: completion rate, cancellations, activity", icon: TrendingUp },
   { id: "shifts", name: "Shift Schedule", description: "Driver shift assignments and times", icon: Clock },
+  { id: "driver_attendance", name: "Driver Attendance", description: "Daily attendance status (present/absent/pending)", icon: ClipboardCheck },
   { id: "break_history", name: "Break History", description: "Driver break times and durations", icon: Coffee },
   { id: "support_tickets", name: "Support Tickets", description: "Customer support requests and status", icon: MessageSquare },
   { id: "ratings", name: "Ratings Report", description: "All ratings and feedback", icon: Star },
@@ -810,6 +811,40 @@ export default function ReportsPage() {
             }
           })
           filename = `shifts_${new Date().toISOString().split("T")[0]}.csv`
+          break
+        }
+
+        case "driver_attendance": {
+          let query = supabase
+            .from("shifts")
+            .select(`
+              shift_date, start_time, end_time, shift_type, attendance_status, absence_reason, marked_at,
+              driver:drivers!shifts_driver_id_fkey(
+                profile:profiles!drivers_profile_id_fkey(full_name, phone)
+              )
+            `)
+            .order("shift_date", { ascending: false })
+          if (dateFilter) {
+            query = query.gte("shift_date", dateFilter.start).lte("shift_date", dateFilter.end)
+          }
+          const { data: attendance } = await query
+
+          rows = (attendance || []).map((s: Record<string, unknown>) => {
+            const driver = s.driver as Record<string, unknown> | null
+            const profile = driver?.profile as Record<string, unknown> | null
+            const status = String(s.attendance_status || "pending")
+            return {
+              "Driver": String(profile?.full_name || "-"),
+              "Phone": formatPhone(String(profile?.phone || "")),
+              "Date": formatDate(String(s.shift_date || "")),
+              "Shift": `${String(s.start_time || "").substring(0, 5)} - ${String(s.end_time || "").substring(0, 5)}`,
+              "Type": formatStatus(String(s.shift_type || "")),
+              "Status": status === "present" ? "Present" : status === "absent" ? "Absent" : "Pending",
+              "Absence Reason": String(s.absence_reason || "-"),
+              "Marked At": s.marked_at ? new Date(String(s.marked_at)).toLocaleString("en-US", { timeZone: "Indian/Maldives" }) : "-",
+            }
+          })
+          filename = `driver_attendance_${new Date().toISOString().split("T")[0]}.csv`
           break
         }
 
@@ -2354,6 +2389,26 @@ export default function ReportsPage() {
               "End": String(s.end_time || "-"),
               "Type": formatStatus(String(s.shift_type || "")),
               "Status": formatStatus(String(s.status || "")),
+            }
+          })
+          break
+        }
+        case "driver_attendance": {
+          let query = supabase.from("shifts").select(`shift_date, start_time, end_time, shift_type, attendance_status, absence_reason, marked_at, driver:drivers!shifts_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name, phone))`).order("shift_date", { ascending: false })
+          if (dateFilter) query = query.gte("shift_date", dateFilter.start).lte("shift_date", dateFilter.end)
+          const { data: attendance } = await query
+          rows = (attendance || []).map((s: Record<string, unknown>) => {
+            const driver = s.driver as Record<string, unknown> | null
+            const profile = driver?.profile as Record<string, unknown> | null
+            const status = String(s.attendance_status || "pending")
+            return {
+              "Driver": String(profile?.full_name || "-"),
+              "Phone": formatPhone(String(profile?.phone || "")),
+              "Date": formatDate(String(s.shift_date || "")),
+              "Shift": `${String(s.start_time || "").substring(0, 5)} - ${String(s.end_time || "").substring(0, 5)}`,
+              "Type": formatStatus(String(s.shift_type || "")),
+              "Status": status === "present" ? "Present" : status === "absent" ? "Absent" : "Pending",
+              "Absence Reason": String(s.absence_reason || "-"),
             }
           })
           break

@@ -1,9 +1,14 @@
 "use client"
 
 import { useEffect, useState, useCallback, useRef } from "react"
-import { GoogleMap, OverlayView, Circle } from "@react-google-maps/api"
+import { GoogleMap, OverlayView, Circle, TrafficLayer } from "@react-google-maps/api"
 import { useGoogleMaps } from "@/components/providers/google-maps-provider"
-import { Car, Bus, MapPin } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Car, Bus, MapPin, Search, X, Maximize2, Minimize2, LocateFixed,
+  Volume2, VolumeX, Moon, Sun, Target, Navigation, Layers, Map as MapIcon, Satellite
+} from "lucide-react"
 
 interface TripMarker {
   id: string
@@ -46,6 +51,8 @@ const defaultCenter = {
   lng: 73.5093,
 }
 
+const serviceAreaRadius = 15000
+
 const STATUS_COLORS: Record<string, string> = {
   pending: "#f59e0b",
   accepted: "#3b82f6",
@@ -62,7 +69,18 @@ export function ControlRoomMap({
 }: ControlRoomMapProps) {
   const { isLoaded, loadError } = useGoogleMaps()
   const mapRef = useRef<google.maps.Map | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const initialFitDoneRef = useRef(false)
+
   const [mapReady, setMapReady] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [showTraffic, setShowTraffic] = useState(false)
+  const [showGeofence, setShowGeofence] = useState(true)
+  const [mapType, setMapType] = useState<"roadmap" | "satellite">("roadmap")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [showSearch, setShowSearch] = useState(false)
+  const [soundEnabled, setSoundEnabled] = useState(true)
+  const [isDark, setIsDark] = useState(true)
 
   const onLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map
@@ -74,18 +92,92 @@ export function ControlRoomMap({
     setMapReady(false)
   }, [])
 
-  // Fit bounds to show all markers
+  // Fit bounds only on initial load
   useEffect(() => {
     if (!mapReady || !mapRef.current || trips.length === 0) return
+    if (initialFitDoneRef.current) return
 
     const bounds = new google.maps.LatLngBounds()
     trips.forEach(t => bounds.extend({ lat: t.lat, lng: t.lng }))
     pickups.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }))
 
     if (!bounds.isEmpty()) {
-      mapRef.current.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 })
+      mapRef.current.fitBounds(bounds, { top: 50, right: 80, bottom: 50, left: 50 })
     }
+
+    setTimeout(() => {
+      const zoom = mapRef.current?.getZoom()
+      if (zoom && zoom > 15) {
+        mapRef.current?.setZoom(15)
+      }
+    }, 100)
+
+    initialFitDoneRef.current = true
   }, [mapReady, trips.length])
+
+  // Center on selected marker
+  useEffect(() => {
+    if (mapRef.current && selectedId) {
+      const selected = trips.find(t => t.id === selectedId)
+      if (selected) {
+        mapRef.current.panTo({ lat: selected.lat, lng: selected.lng })
+        const currentZoom = mapRef.current.getZoom()
+        if (currentZoom && currentZoom < 15) {
+          mapRef.current.setZoom(15)
+        }
+      }
+    }
+  }, [selectedId, trips])
+
+  // Fullscreen handling
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+    document.addEventListener("fullscreenchange", handleFullscreenChange)
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange)
+  }, [])
+
+  const toggleFullscreen = () => {
+    if (!containerRef.current) return
+    if (!document.fullscreenElement) {
+      containerRef.current.requestFullscreen()
+    } else {
+      document.exitFullscreen()
+    }
+  }
+
+  const recenterMap = () => {
+    if (!mapRef.current || trips.length === 0) return
+    const bounds = new google.maps.LatLngBounds()
+    trips.forEach(t => bounds.extend({ lat: t.lat, lng: t.lng }))
+    pickups.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }))
+    if (!bounds.isEmpty()) {
+      mapRef.current.fitBounds(bounds, { top: 50, right: 80, bottom: 50, left: 50 })
+    }
+  }
+
+  // Search functionality
+  const searchMatchIds = new Set(
+    searchQuery.trim()
+      ? trips
+          .filter(t =>
+            t.label?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            t.sublabel?.toLowerCase().includes(searchQuery.toLowerCase())
+          )
+          .map(t => t.id)
+      : []
+  )
+
+  const zoomToTrip = (tripId: string) => {
+    if (!mapRef.current) return
+    const trip = trips.find(t => t.id === tripId)
+    if (trip) {
+      mapRef.current.panTo({ lat: trip.lat, lng: trip.lng })
+      mapRef.current.setZoom(17)
+      onMarkerClick?.(trip.id, trip.type)
+    }
+  }
 
   if (loadError) {
     return (
@@ -104,76 +196,246 @@ export function ControlRoomMap({
   }
 
   return (
-    <GoogleMap
-      mapContainerStyle={mapContainerStyle}
-      center={defaultCenter}
-      zoom={12}
-      onLoad={onLoad}
-      onUnmount={onUnmount}
-      options={{
-        styles: darkMapStyle,
-        disableDefaultUI: true,
-        zoomControl: true,
-        zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_CENTER },
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: false,
-        clickableIcons: false,
-        minZoom: 8,
-        maxZoom: 18,
-      }}
-    >
-      {/* Service area circle */}
-      <Circle
+    <div ref={containerRef} className="relative h-full w-full">
+      <GoogleMap
+        mapContainerStyle={mapContainerStyle}
         center={defaultCenter}
-        radius={15000}
+        zoom={12}
+        onLoad={onLoad}
+        onUnmount={onUnmount}
+        mapTypeId={mapType}
         options={{
-          strokeColor: "#f59e0b",
-          strokeOpacity: 0.3,
-          strokeWeight: 1,
-          fillColor: "#f59e0b",
-          fillOpacity: 0.02,
+          styles: isDark && mapType === "roadmap" ? darkMapStyle : undefined,
+          disableDefaultUI: true,
+          zoomControl: false,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+          clickableIcons: false,
+          minZoom: 8,
+          maxZoom: 18,
         }}
-      />
+      >
+        {showTraffic && <TrafficLayer />}
 
-      {/* Pickup markers (small dots) */}
-      {pickups.map((pickup) => (
-        <OverlayView
-          key={`pickup-${pickup.tripId}`}
-          position={{ lat: pickup.lat, lng: pickup.lng }}
-          mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-        >
-          <div className="transform -translate-x-1/2 -translate-y-1/2">
-            <div className="w-3 h-3 rounded-full bg-green-500 border-2 border-white shadow-lg animate-pulse" />
-          </div>
-        </OverlayView>
-      ))}
-
-      {/* Trip/Driver markers */}
-      {trips.map((trip) => (
-        <OverlayView
-          key={trip.id}
-          position={{ lat: trip.lat, lng: trip.lng }}
-          mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-        >
-          <TripMarkerComponent
-            trip={trip}
-            isSelected={selectedId === trip.id}
-            onClick={() => onMarkerClick?.(trip.id, trip.type)}
+        {/* Service area circle */}
+        {showGeofence && (
+          <Circle
+            center={defaultCenter}
+            radius={serviceAreaRadius}
+            options={{
+              strokeColor: isDark ? "#3b82f6" : "#2563eb",
+              strokeOpacity: 0.5,
+              strokeWeight: 2,
+              fillColor: isDark ? "#3b82f6" : "#60a5fa",
+              fillOpacity: 0.08,
+            }}
           />
-        </OverlayView>
-      ))}
-    </GoogleMap>
+        )}
+
+        {/* Pickup markers (small dots) */}
+        {pickups.map((pickup) => (
+          <OverlayView
+            key={`pickup-${pickup.tripId}`}
+            position={{ lat: pickup.lat, lng: pickup.lng }}
+            mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+          >
+            <div className="transform -translate-x-1/2 -translate-y-1/2">
+              <div className="w-3 h-3 rounded-full bg-green-500 border-2 border-white shadow-lg animate-pulse" />
+            </div>
+          </OverlayView>
+        ))}
+
+        {/* Trip/Driver markers */}
+        {trips.map((trip) => (
+          <OverlayView
+            key={trip.id}
+            position={{ lat: trip.lat, lng: trip.lng }}
+            mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+          >
+            <TripMarkerComponent
+              trip={trip}
+              isSelected={selectedId === trip.id}
+              isSearchMatch={searchMatchIds.has(trip.id)}
+              onClick={() => onMarkerClick?.(trip.id, trip.type)}
+            />
+          </OverlayView>
+        ))}
+      </GoogleMap>
+
+      {/* Search Bar */}
+      {showSearch && (
+        <div className="absolute top-3 left-3 right-[60px] flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search driver or vehicle..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-9 bg-background/95 backdrop-blur shadow-lg"
+              autoFocus
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2"
+              >
+                <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+              </button>
+            )}
+          </div>
+          {searchMatchIds.size > 0 && (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="shadow-lg"
+              onClick={() => {
+                const firstMatch = trips.find(t => searchMatchIds.has(t.id))
+                if (firstMatch) zoomToTrip(firstMatch.id)
+              }}
+            >
+              <Target className="h-4 w-4 mr-1" />
+              Go ({searchMatchIds.size})
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Map Controls */}
+      <div className="absolute top-3 right-3 flex flex-col gap-2">
+        {/* Search Toggle */}
+        <Button
+          variant={showSearch ? "default" : "secondary"}
+          size="icon"
+          className="shadow-lg h-8 w-8"
+          onClick={() => setShowSearch(!showSearch)}
+          title="Search"
+        >
+          <Search className="h-4 w-4" />
+        </Button>
+
+        {/* Fullscreen Toggle */}
+        <Button
+          variant="secondary"
+          size="icon"
+          className="shadow-lg h-8 w-8"
+          onClick={toggleFullscreen}
+          title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+        >
+          {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </Button>
+
+        {/* Recenter */}
+        <Button
+          variant="secondary"
+          size="icon"
+          className="shadow-lg h-8 w-8"
+          onClick={recenterMap}
+          title="Show all"
+        >
+          <LocateFixed className="h-4 w-4" />
+        </Button>
+
+        {/* Sound Toggle */}
+        <Button
+          variant={soundEnabled ? "default" : "secondary"}
+          size="icon"
+          className="shadow-lg h-8 w-8"
+          onClick={() => setSoundEnabled(!soundEnabled)}
+          title={soundEnabled ? "Mute alerts" : "Enable sound"}
+        >
+          {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+        </Button>
+
+        {/* Divider */}
+        <div className="h-px bg-border my-1" />
+
+        {/* Traffic Toggle */}
+        <Button
+          variant={showTraffic ? "default" : "secondary"}
+          size="icon"
+          className="shadow-lg h-8 w-8"
+          onClick={() => setShowTraffic(!showTraffic)}
+          title="Traffic layer"
+        >
+          <Car className="h-4 w-4" />
+        </Button>
+
+        {/* Geofence Toggle */}
+        <Button
+          variant={showGeofence ? "default" : "secondary"}
+          size="icon"
+          className="shadow-lg h-8 w-8"
+          onClick={() => setShowGeofence(!showGeofence)}
+          title="Service area"
+        >
+          <Target className="h-4 w-4" />
+        </Button>
+
+        {/* Theme Toggle */}
+        <Button
+          variant={isDark ? "default" : "secondary"}
+          size="icon"
+          className="shadow-lg h-8 w-8"
+          onClick={() => setIsDark(!isDark)}
+          title={isDark ? "Light map" : "Dark map"}
+        >
+          {isDark ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+        </Button>
+
+        {/* Divider */}
+        <div className="h-px bg-border my-1" />
+
+        {/* Map Type Buttons */}
+        <div className="flex flex-col gap-1 bg-background/90 backdrop-blur rounded-lg p-1 shadow-lg">
+          <Button
+            variant={mapType === "roadmap" ? "default" : "ghost"}
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setMapType("roadmap")}
+            title="Map"
+          >
+            <MapIcon className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={mapType === "satellite" ? "default" : "ghost"}
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setMapType("satellite")}
+            title="Satellite"
+          >
+            <Satellite className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Layers Toggle (toggles all layers) */}
+        <Button
+          variant="secondary"
+          size="icon"
+          className="shadow-lg h-8 w-8"
+          onClick={() => {
+            const newShow = !showTraffic
+            setShowTraffic(newShow)
+            setShowGeofence(newShow)
+          }}
+          title="Toggle all layers"
+        >
+          <Layers className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
   )
 }
 
 function TripMarkerComponent({
   trip,
   isSelected,
+  isSearchMatch,
   onClick,
 }: {
   trip: TripMarker
   isSelected: boolean
+  isSearchMatch?: boolean
   onClick: () => void
 }) {
   const color = STATUS_COLORS[trip.status] || "#6b7280"
@@ -186,6 +448,7 @@ function TripMarkerComponent({
         cursor-pointer transform -translate-x-1/2 -translate-y-1/2
         transition-all duration-200 hover:scale-110
         ${isSelected ? "scale-125 z-50" : "z-10"}
+        ${isSearchMatch ? "ring-2 ring-yellow-400 ring-offset-2 rounded-full" : ""}
       `}
     >
       <div className="relative">

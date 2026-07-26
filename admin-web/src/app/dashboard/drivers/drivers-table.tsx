@@ -845,10 +845,13 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
         <div className="flex items-center gap-4 rounded-lg border bg-muted/50 p-3">
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={handleBulkApprove} disabled={bulkLoading}>
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Approve
-            </Button>
+            {/* Only show Approve if at least one selected driver is not approved */}
+            {drivers.some(d => selectedIds.has(d.id) && d.status !== 'approved') && (
+              <Button size="sm" variant="outline" onClick={handleBulkApprove} disabled={bulkLoading}>
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Approve
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={handleBulkSuspend} disabled={bulkLoading}>
               <Ban className="mr-2 h-4 w-4" />
               Suspend

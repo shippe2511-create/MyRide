@@ -1,8 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// 3-tier RBAC - all staff roles allowed to access admin panel
-const ADMIN_ROLES = ['super_admin', 'admin', 'manager', 'operator']
+// 6-tier RBAC - all staff roles allowed to access admin panel
+const ADMIN_ROLES = ['super_admin', 'admin', 'manager', 'supervisor', 'operator', 'support', 'viewer']
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({

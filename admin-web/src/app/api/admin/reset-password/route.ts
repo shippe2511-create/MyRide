@@ -20,20 +20,33 @@ export async function POST(request: NextRequest) {
       }
     )
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      console.error("Auth error:", authError)
+      return NextResponse.json({ error: "Unauthorized - not logged in" }, { status: 401 })
     }
 
-    // Check if user is super_admin
-    const { data: profile } = await supabase
+    // Check if user is super_admin or manager (managers can reset passwords for their dept)
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single()
 
-    if (!profile || profile.role !== "super_admin") {
-      return NextResponse.json({ error: "Forbidden - super_admin access required" }, { status: 403 })
+    if (profileError) {
+      console.error("Profile lookup error:", profileError)
+      // Try by email as fallback
+      const { data: profileByEmail } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("email", user.email)
+        .single()
+
+      if (!profileByEmail || !["super_admin", "manager"].includes(profileByEmail.role)) {
+        return NextResponse.json({ error: "Forbidden - admin access required" }, { status: 403 })
+      }
+    } else if (!profile || !["super_admin", "manager"].includes(profile.role)) {
+      return NextResponse.json({ error: "Forbidden - admin access required" }, { status: 403 })
     }
 
     const { userId, email, newPassword } = await request.json()

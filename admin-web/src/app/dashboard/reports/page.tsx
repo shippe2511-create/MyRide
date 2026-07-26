@@ -1984,7 +1984,14 @@ export default function ReportsPage() {
         case "bus_full_alerts": {
           let query = supabase
             .from("bus_full_alerts")
-            .select("*")
+            .select(`
+              *,
+              bus_trip:bus_trips!bus_full_alerts_trip_id_fkey(
+                roster_assignment:roster_assignments!bus_trips_roster_assignment_id_fkey(
+                  vehicle:vehicle_types!roster_assignments_vehicle_id_fkey(display_name, plate_no)
+                )
+              )
+            `)
             .order("created_at", { ascending: false })
 
           if (dateFilter) {
@@ -1993,15 +2000,23 @@ export default function ReportsPage() {
 
           const { data: alerts } = await query
 
-          rows = (alerts || []).map((a: Record<string, unknown>) => ({
-            "Date": formatDateTime(String(a.created_at || "")),
-            "Route": String(a.route_name || "-"),
-            "Stop": String(a.stop_name || "-"),
-            "Vehicle": String(a.vehicle_number || "-"),
-            "Passengers": String(a.passengers_on_board || 0),
-            "Capacity": String(a.vehicle_capacity || 0),
-            "Acknowledged": a.is_acknowledged ? "Yes" : "No",
-          }))
+          rows = (alerts || []).map((a: Record<string, unknown>) => {
+            const tripData = a.bus_trip as Record<string, unknown> | null
+            const raData = tripData?.roster_assignment as Record<string, unknown> | null
+            const vehicleData = raData?.vehicle as Record<string, unknown> | null
+            const vehicleDisplay = vehicleData
+              ? `${vehicleData.display_name || ""} (${vehicleData.plate_no || ""})`
+              : String(a.vehicle_number || "-")
+            return {
+              "Date": formatDateTime(String(a.created_at || "")),
+              "Route": String(a.route_name || "-"),
+              "Stop": String(a.stop_name || "-"),
+              "Vehicle": vehicleDisplay,
+              "Passengers": String(a.passengers_on_board || 0),
+              "Capacity": String(a.vehicle_capacity || 0),
+              "Acknowledged": a.is_acknowledged ? "Yes" : "No",
+            }
+          })
           filename = `bus_full_alerts_${new Date().toISOString().split("T")[0]}.csv`
           break
         }
@@ -2756,10 +2771,10 @@ export default function ReportsPage() {
           break
         }
         case "bus_full_alerts": {
-          let query = supabase.from("bus_full_alerts").select("*").order("created_at", { ascending: false })
+          let query = supabase.from("bus_full_alerts").select(`*, bus_trip:bus_trips!bus_full_alerts_trip_id_fkey(roster_assignment:roster_assignments!bus_trips_roster_assignment_id_fkey(vehicle:vehicle_types!roster_assignments_vehicle_id_fkey(display_name, plate_no)))`).order("created_at", { ascending: false })
           if (dateFilter) { query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59") }
           const { data: alerts } = await query
-          rows = (alerts || []).map((a: Record<string, unknown>) => ({ "Date": formatDateTime(String(a.created_at || "")), "Route": String(a.route_name || "-"), "Stop": String(a.stop_name || "-"), "Vehicle": String(a.vehicle_number || "-"), "Passengers": String(a.passengers_on_board || 0), "Capacity": String(a.vehicle_capacity || 0), "Acknowledged": a.is_acknowledged ? "Yes" : "No" }))
+          rows = (alerts || []).map((a: Record<string, unknown>) => { const tr = a.bus_trip as Record<string, unknown> | null; const ra = tr?.roster_assignment as Record<string, unknown> | null; const vh = ra?.vehicle as Record<string, unknown> | null; const vehDisplay = vh ? `${vh.display_name || ""} (${vh.plate_no || ""})` : String(a.vehicle_number || "-"); return { "Date": formatDateTime(String(a.created_at || "")), "Route": String(a.route_name || "-"), "Stop": String(a.stop_name || "-"), "Vehicle": vehDisplay, "Passengers": String(a.passengers_on_board || 0), "Capacity": String(a.vehicle_capacity || 0), "Acknowledged": a.is_acknowledged ? "Yes" : "No" } })
           break
         }
         default: {

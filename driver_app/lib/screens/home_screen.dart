@@ -120,20 +120,13 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _loadingTodayShift = true);
 
     try {
-      final today = DateTime.now();
-      final todayStart = DateTime(today.year, today.month, today.day);
-      final todayEnd = todayStart.add(const Duration(days: 1));
+      // Use getTodayShift which queries exact date match
+      final shift = await SupabaseService.getTodayShift(driverId);
+      debugPrint('_loadTodayShift: got shift=${shift?['id']}, date=${shift?['shift_date']}');
 
-      final shifts = await SupabaseService.getDriverShifts(driverId, todayStart, todayEnd);
-
-      if (shifts.isNotEmpty && mounted) {
+      if (mounted) {
         setState(() {
-          _todayShift = shifts.first;
-          _loadingTodayShift = false;
-        });
-      } else if (mounted) {
-        setState(() {
-          _todayShift = null;
+          _todayShift = shift;
           _loadingTodayShift = false;
         });
       }
@@ -483,13 +476,11 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // Check if checklist was completed for current shift
-    final currentShiftId = _todayShift?['id'] as String?;
-    final checklistDoneForShift = state.checklistCompleted &&
-        (currentShiftId == null || state.checklistCompletedShiftId == currentShiftId);
-    debugPrint('_handleGoOnline: checklistCompleted=${state.checklistCompleted}, currentShiftId=$currentShiftId, completedShiftId=${state.checklistCompletedShiftId}, doneForShift=$checklistDoneForShift');
+    // Check if checklist was completed today - that's all we need
+    // state.checklistCompleted already validates it's for today
+    debugPrint('_handleGoOnline: checklistCompleted=${state.checklistCompleted}');
 
-    if (!checklistDoneForShift) {
+    if (!state.checklistCompleted) {
       final result = await Navigator.push<dynamic>(
         context,
         MaterialPageRoute(
@@ -1051,10 +1042,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   (_todayShift!['attendance_status'] as String? ?? 'pending') == 'absent';
               final absenceReason = _todayShift?['absence_reason'] as String?;
 
-              // Check if checklist was completed for current shift
-              final currentShiftId = _todayShift?['id'] as String?;
-              final checklistDone = state.checklistCompleted &&
-                  (currentShiftId == null || state.checklistCompletedShiftId == currentShiftId);
+              // Checklist done for today - no shift ID check needed
+              // state.checklistCompleted already validates it's today
+              final checklistDone = state.checklistCompleted;
+              debugPrint('OfflineWidget: checklistCompleted=${state.checklistCompleted}, checklistDone=$checklistDone');
 
               return Expanded(
                 child: SingleChildScrollView(
@@ -1851,7 +1842,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         onPressed: () {
                           Navigator.pop(ctx);
                           state.goOffline();
-                          state.resetChecklist();
+                          // Don't reset checklist - it stays valid for today's shift
                           HapticFeedback.heavyImpact();
                         },
                         style: ElevatedButton.styleFrom(

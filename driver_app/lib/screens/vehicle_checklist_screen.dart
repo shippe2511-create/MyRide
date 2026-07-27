@@ -1471,9 +1471,9 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                         );
                         debugPrint('Checklist saved successfully');
 
-                        // Mark checklist completed for this shift
+                        // Mark checklist completed for this shift - MUST await to ensure save completes
                         debugPrint('Completing checklist with shiftId=$_todayShiftId');
-                        driverState.completeChecklist(
+                        await driverState.completeChecklist(
                           hasIssues: _hasIssues,
                           issues: _issueNotes,
                           shiftId: _todayShiftId,

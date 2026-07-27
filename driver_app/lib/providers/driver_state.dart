@@ -148,7 +148,7 @@ class DriverState extends ChangeNotifier {
 
   bool _isChecklistValidToday() {
     if (_checklistCompletedDate == null) return false;
-    final now = MaldivesTimezone.now();
+    final now = DateTime.now();
     final sameDay = _checklistCompletedDate!.year == now.year &&
         _checklistCompletedDate!.month == now.month &&
         _checklistCompletedDate!.day == now.day;
@@ -568,20 +568,20 @@ class DriverState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void completeChecklist({bool hasIssues = false, Map<String, String> issues = const {}, String? shiftId}) async {
+  Future<void> completeChecklist({bool hasIssues = false, Map<String, String> issues = const {}, String? shiftId}) async {
     _checklistCompleted = true;
     _checklistCompletedDate = DateTime.now();
     _checklistCompletedShiftId = shiftId;
     _checklistHasIssues = hasIssues;
     _checklistIssues = Map.from(issues);
 
-    // Save to SharedPreferences
+    // Save to SharedPreferences - MUST complete before returning
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('checklistCompletedDate', _checklistCompletedDate!.toIso8601String());
     if (shiftId != null) {
       await prefs.setString('checklistCompletedShiftId', shiftId);
     }
-    debugPrint('completeChecklist: saved for shiftId=$shiftId');
+    debugPrint('completeChecklist: saved date=${_checklistCompletedDate!.toIso8601String()}, shiftId=$shiftId');
 
     notifyListeners();
   }

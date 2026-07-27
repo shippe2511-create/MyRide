@@ -999,22 +999,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildOfflineView(BuildContext context, DriverState state) {
-    // Calculate available height for centering
-    final screenHeight = MediaQuery.of(context).size.height;
-    final topPadding = MediaQuery.of(context).padding.top;
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-    // Header ~80, stats card ~120, bottom nav ~80, checklist ~50 if shown
     final checklistValidForVehicle = state.vehicleId.isEmpty || state.checklistCompletedVehicleId == state.vehicleId;
-    final checklistShown = state.checklistCompleted && !state.vehicleChangedNeedsChecklist && checklistValidForVehicle;
-    final usedHeight = topPadding + 80 + 120 + bottomPadding + 80 + (checklistShown ? 60 : 0);
-    final availableHeight = (screenHeight - usedHeight).clamp(300.0, double.infinity);
+    final isAbsent = _todayShift != null && (_todayShift!['attendance_status'] as String? ?? 'pending') == 'absent';
+    // Don't show checklist banner if driver is absent
+    final checklistShown = state.checklistCompleted && !state.vehicleChangedNeedsChecklist && checklistValidForVehicle && !isAbsent;
 
-    return Column(
-      children: [
+    return SingleChildScrollView(
+      child: Column(
+        children: [
         // Stats card
         _buildStatsCard(context, state),
 
-          // Checklist status - only show if completed for current vehicle
+          // Checklist status - only show if completed for current vehicle and NOT absent
           if (checklistShown)
             Container(
               margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -1071,17 +1067,17 @@ class _HomeScreenState extends State<HomeScreen> {
               debugPrint('OfflineWidget: checklistCompleted=${state.checklistCompleted}, shiftMatch=$shiftMatch, vehicleMatch=$vehicleMatch, vehicleChanged=$vehicleChanged, checklistDone=$checklistDone');
 
               return Padding(
-                padding: const EdgeInsets.all(30),
+                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 16),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 16),
                       Container(
-                        width: 100,
-                        height: 100,
+                        width: 70,
+                        height: 70,
                         decoration: BoxDecoration(
                           color: isAbsent ? AppColors.error.withValues(alpha: 0.15) : context.cardColor,
-                          borderRadius: BorderRadius.circular(24),
+                          borderRadius: BorderRadius.circular(18),
                           border: Border.all(
                             color: isAbsent ? AppColors.error : context.borderColor,
                             width: 2,
@@ -1089,20 +1085,20 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         child: Icon(
                           isAbsent ? Icons.block : Icons.power_settings_new,
-                          size: 48,
+                          size: 32,
                           color: isAbsent ? AppColors.error : context.mutedColor,
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
                       Text(
                         isAbsent ? 'You\'re Absent Today' : 'You\'re Offline',
                         style: TextStyle(
                           color: isAbsent ? AppColors.error : context.textColor,
-                          fontSize: 24,
+                          fontSize: 20,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       Text(
                         isAbsent
                             ? 'You have marked yourself absent for today\'s shift'
@@ -1113,23 +1109,23 @@ class _HomeScreenState extends State<HomeScreen> {
                                     : 'Complete vehicle checklist to go online',
                         style: TextStyle(
                           color: context.mutedColor,
-                          fontSize: 15,
-                          height: 1.5,
+                          fontSize: 14,
+                          height: 1.4,
                         ),
                         textAlign: TextAlign.center,
                       ),
                       if (isAbsent && absenceReason != null && absenceReason.isNotEmpty) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
                             color: AppColors.error.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.info_outline, color: AppColors.error, size: 16),
+                              Icon(Icons.info_outline, color: AppColors.error, size: 14),
                               const SizedBox(width: 8),
                               Flexible(
                                 child: Text(
@@ -1176,14 +1172,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: 24),
                         _buildTodayShiftCard(context),
                       ],
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 100), // Extra padding for bottom nav
                     ],
                   ),
               );
             },
           ),
-          ],
-        );
+        ],
+      ),
+    );
   }
 
   Widget _buildTodayShiftCard(BuildContext context) {
@@ -1192,7 +1189,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final attendanceStatus = _todayShift!['attendance_status'] as String? ?? 'pending';
     final startTime = (_todayShift!['start_time']?.toString() ?? '00:00:00').substring(0, 5);
     final endTime = (_todayShift!['end_time']?.toString() ?? '00:00:00').substring(0, 5);
-    final shiftType = _todayShift!['shift_type'] as String? ?? 'Shift';
+    final shiftTypeRaw = _todayShift!['shift_type'] as String? ?? 'Shift';
+    // Format shift type: full_day -> Full Day, morning -> Morning
+    final shiftType = shiftTypeRaw.split('_').map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '').join(' ');
     final absenceReason = _todayShift!['absence_reason'] as String?;
 
     // When PRESENT: show compact chip only
@@ -1211,7 +1210,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                '${shiftType[0].toUpperCase()}${shiftType.substring(1)} ($startTime - $endTime)',
+                '$shiftType ($startTime - $endTime)',
                 style: TextStyle(
                   color: context.textColor,
                   fontSize: 14,
@@ -1307,7 +1306,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     Text(
-                      '$startTime - $endTime • ${shiftType[0].toUpperCase()}${shiftType.substring(1)}',
+                      '$startTime - $endTime • $shiftType',
                       style: TextStyle(
                         color: context.mutedColor,
                         fontSize: 13,
@@ -1405,12 +1404,12 @@ class _HomeScreenState extends State<HomeScreen> {
             Builder(builder: (context) {
               final markedAtStr = _todayShift?['marked_at'] as String?;
               final markedAtUtc = markedAtStr != null ? DateTime.tryParse(markedAtStr) : null;
-              // Convert to Maldives time (UTC+5)
-              final markedAt = markedAtUtc?.add(const Duration(hours: 5));
-              final now = MaldivesTimezone.now();
-              final minutesSinceMarked = markedAt != null ? now.difference(markedAt).inMinutes : 999;
-              final canCancel = markedAt != null && minutesSinceMarked >= 0 && minutesSinceMarked < 30;
+              // Compare in UTC to avoid timezone confusion
+              final nowUtc = DateTime.now().toUtc();
+              final minutesSinceMarked = markedAtUtc != null ? nowUtc.difference(markedAtUtc).inMinutes : 999;
+              final canCancel = markedAtUtc != null && minutesSinceMarked >= 0 && minutesSinceMarked < 30;
               final minutesLeft = canCancel ? (30 - minutesSinceMarked) : 0;
+              debugPrint('Cancel check: markedAt=$markedAtUtc, nowUtc=$nowUtc, minutesSince=$minutesSinceMarked, canCancel=$canCancel');
 
               if (canCancel) {
                 return Column(

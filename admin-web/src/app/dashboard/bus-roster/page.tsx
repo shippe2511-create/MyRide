@@ -127,10 +127,10 @@ export default function BusRosterPage() {
 
   // Realtime subscription for shifts attendance updates
   useEffect(() => {
-    const channel = supabase
+    const shiftsChannel = supabase
       .channel('shifts_attendance_updates')
       .on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'shifts' },
+        { event: '*', schema: 'public', table: 'shifts' },
         () => {
           loadDriverShifts()
         }
@@ -138,9 +138,26 @@ export default function BusRosterPage() {
       .subscribe()
 
     return () => {
-      supabase.removeChannel(channel)
+      supabase.removeChannel(shiftsChannel)
     }
   }, [selectedDate])
+
+  // Realtime subscription for roster assignments
+  useEffect(() => {
+    const rosterChannel = supabase
+      .channel('roster_assignments_updates')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'roster_assignments' },
+        () => {
+          loadRoster(false) // Don't show loading spinner for realtime updates
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(rosterChannel)
+    }
+  }, [selectedDate, transportType])
 
   const loadDriverShifts = async () => {
     const dateStr = format(selectedDate, "yyyy-MM-dd")

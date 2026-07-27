@@ -23,7 +23,7 @@ import { ComboboxInput } from "@/components/ui/combobox-input"
 import { toast } from "sonner"
 import { Loader2, Clock, Calendar, Users, Car, ChevronLeft, ChevronRight, Wand2, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import { PermissionGate } from "@/components/permission-gate"
-import { format, addDays, subDays } from "date-fns"
+import { format, addDays, subDays, parse } from "date-fns"
 
 interface Driver {
   id: string
@@ -954,21 +954,33 @@ export default function BusRosterPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Start Date</label>
-                  <Input
-                    type="date"
-                    value={generateForm.startDate}
-                    onChange={(e) => setGenerateForm({ ...generateForm, startDate: e.target.value })}
-                    className="[&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:opacity-50 [&::-webkit-calendar-picker-indicator]:hover:opacity-100"
-                  />
+                  <div className="relative flex items-center">
+                    <div className="flex-1 h-10 px-3 py-2 rounded-md border border-input bg-background text-sm">
+                      {generateForm.startDate ? format(parse(generateForm.startDate, "yyyy-MM-dd", new Date()), "dd/MM/yyyy") : "dd/mm/yyyy"}
+                    </div>
+                    <input
+                      type="date"
+                      value={generateForm.startDate}
+                      onChange={(e) => setGenerateForm({ ...generateForm, startDate: e.target.value })}
+                      className="absolute right-0 w-10 h-10 opacity-0 cursor-pointer [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                    />
+                    <Calendar className="absolute right-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">End Date</label>
-                  <Input
-                    type="date"
-                    value={generateForm.endDate}
-                    onChange={(e) => setGenerateForm({ ...generateForm, endDate: e.target.value })}
-                    className="[&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:opacity-50 [&::-webkit-calendar-picker-indicator]:hover:opacity-100"
-                  />
+                  <div className="relative flex items-center">
+                    <div className="flex-1 h-10 px-3 py-2 rounded-md border border-input bg-background text-sm">
+                      {generateForm.endDate ? format(parse(generateForm.endDate, "yyyy-MM-dd", new Date()), "dd/MM/yyyy") : "dd/mm/yyyy"}
+                    </div>
+                    <input
+                      type="date"
+                      value={generateForm.endDate}
+                      onChange={(e) => setGenerateForm({ ...generateForm, endDate: e.target.value })}
+                      className="absolute right-0 w-10 h-10 opacity-0 cursor-pointer [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                    />
+                    <Calendar className="absolute right-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  </div>
                 </div>
               </div>
               <div className="bg-muted p-3 rounded-lg text-sm">

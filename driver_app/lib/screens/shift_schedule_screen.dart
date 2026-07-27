@@ -995,10 +995,11 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
   }
 
   String _formatDate(DateTime date) {
-    final months = ['January', 'February', 'March', 'April', 'May', 'June',
-                   'July', 'August', 'September', 'October', 'November', 'December'];
-    final days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    return '${days[date.weekday - 1]}, ${months[date.month - 1]} ${date.day}';
+    final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final year = date.year;
+    return '${days[date.weekday - 1]}, $day/$month/$year';
   }
 
   String _calculateDuration(String startTime, String endTime) {

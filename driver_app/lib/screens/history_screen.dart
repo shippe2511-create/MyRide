@@ -264,7 +264,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Widget _buildActiveFilters() {
-    final dateFormat = DateFormat('MMM d');
+    final dateFormat = DateFormat('dd/MM');
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
       child: Wrap(
@@ -373,7 +373,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Widget _buildTripCard(BuildContext context, CompletedTrip trip) {
-    final dateFormat = DateFormat('MMM d, yyyy');
+    final dateFormat = DateFormat('dd/MM/yyyy');
     final timeFormat = DateFormat('h:mm a');
 
     IconData statusIcon;
@@ -849,7 +849,7 @@ class _FilterSheetState extends State<_FilterSheet> {
 
   Widget _buildDateOption(BuildContext context, String preset, String label, IconData icon) {
     final isSelected = _selectedPreset == preset;
-    final dateFormat = DateFormat('MMM d, yyyy');
+    final dateFormat = DateFormat('dd/MM/yyyy');
 
     return GestureDetector(
       onTap: () async {

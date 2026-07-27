@@ -394,7 +394,7 @@ class _DriverStatsScreenState extends State<DriverStatsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                createdAt != null ? DateFormat('MMM d · h:mm a').format(createdAt) : '',
+                createdAt != null ? DateFormat('dd/MM · h:mm a').format(createdAt) : '',
                 style: TextStyle(color: mutedColor, fontSize: 12),
               ),
               Row(

@@ -363,7 +363,7 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
 
       if (dateOnly == today) return 'Today';
       if (dateOnly == tomorrow) return 'Tomorrow';
-      return DateFormat('EEE, MMM d').format(d);
+      return DateFormat('EEE, dd/MM').format(d);
     } catch (e) {
       return date;
     }

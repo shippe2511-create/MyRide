@@ -522,7 +522,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> with WidgetsBindingOb
 
           isExpired = expiry.isBefore(now);
           isExpiringSoon = !isExpired && expiry.isBefore(thirtyDaysLater);
-          expiryDisplay = DateFormat('MMM d, yyyy').format(expiry);
+          expiryDisplay = DateFormat('dd/MM/yyyy').format(expiry);
         }
       } catch (e) {
         expiryDisplay = doc['expiry'];

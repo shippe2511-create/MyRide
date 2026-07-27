@@ -567,7 +567,7 @@ class _VehicleLogsScreenState extends State<VehicleLogsScreen> with SingleTicker
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
-                                  date != null ? DateFormat('MMM d').format(date) : '',
+                                  date != null ? DateFormat('dd/MM').format(date) : '',
                                   style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
                                 ),
                               ),
@@ -1041,7 +1041,7 @@ class _AddLogSheetState extends State<AddLogSheet> {
                       style: TextStyle(color: context.textColor, fontSize: 20, fontWeight: FontWeight.w800),
                     ),
                     Text(
-                      DateFormat('EEEE, MMM d').format(_selectedDate),
+                      DateFormat('EEE, dd/MM').format(_selectedDate),
                       style: TextStyle(color: context.mutedColor, fontSize: 14),
                     ),
                   ],

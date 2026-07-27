@@ -25,7 +25,10 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-  Plus, Loader2, Clock, Calendar, Trash2, Pencil, Users, Wand2, MoreHorizontal, Search
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+  Plus, Loader2, Clock, Calendar, Trash2, Pencil, Users, Wand2, MoreHorizontal, Search, CalendarDays
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
@@ -82,6 +85,9 @@ export function ShiftsTable() {
   const [autoScheduleShiftType, setAutoScheduleShiftType] = useState("morning")
 
   const [weekOffset, setWeekOffset] = useState(0)
+  const [customStartDate, setCustomStartDate] = useState<string>("")
+  const [customEndDate, setCustomEndDate] = useState<string>("")
+  const [datePickerOpen, setDatePickerOpen] = useState(false)
   const [selectedDriver, setSelectedDriver] = useState<string>("all")
   const [selectedShifts, setSelectedShifts] = useState<string[]>([])
   const [bulkDeleting, setBulkDeleting] = useState(false)
@@ -101,6 +107,20 @@ export function ShiftsTable() {
   const [rangeEnd, setRangeEnd] = useState("")
 
   const getWeekDates = () => {
+    // If custom date range is set, use that
+    if (customStartDate && customEndDate) {
+      const start = new Date(customStartDate)
+      const end = new Date(customEndDate)
+      const days: Date[] = []
+      const current = new Date(start)
+      while (current <= end) {
+        days.push(new Date(current))
+        current.setDate(current.getDate() + 1)
+      }
+      return days.length > 0 ? days : [new Date()]
+    }
+
+    // Default week view
     const today = new Date()
     const currentDay = today.getDay()
     const monday = new Date(today)
@@ -115,10 +135,13 @@ export function ShiftsTable() {
 
   const weekDates = getWeekDates()
   const weekStart = weekDates[0]
-  const weekEnd = weekDates[6]
+  const weekEnd = weekDates[weekDates.length - 1]
+  const isCustomRange = !!(customStartDate && customEndDate)
 
   // Use ref to track current week for realtime updates
   const weekOffsetRef = useRef(weekOffset)
+  const customStartDateRef = useRef(customStartDate)
+  const customEndDateRef = useRef(customEndDate)
   const supabaseRef = useRef(supabase)
 
   // Keep refs in sync
@@ -126,20 +149,34 @@ export function ShiftsTable() {
     weekOffsetRef.current = weekOffset
   }, [weekOffset])
 
+  useEffect(() => {
+    customStartDateRef.current = customStartDate
+    customEndDateRef.current = customEndDate
+  }, [customStartDate, customEndDate])
+
   // Stable load function using refs
   const loadData = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true)
 
-    // Calculate dates based on current weekOffset ref
-    const today = new Date()
-    const currentDay = today.getDay()
-    const monday = new Date(today)
-    monday.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1) + weekOffsetRef.current * 7)
-    const sunday = new Date(monday)
-    sunday.setDate(monday.getDate() + 6)
+    let startStr: string
+    let endStr: string
 
-    const startStr = formatDateInput(monday)
-    const endStr = formatDateInput(sunday)
+    // Use custom date range if set
+    if (customStartDateRef.current && customEndDateRef.current) {
+      startStr = customStartDateRef.current
+      endStr = customEndDateRef.current
+    } else {
+      // Calculate dates based on current weekOffset ref
+      const today = new Date()
+      const currentDay = today.getDay()
+      const monday = new Date(today)
+      monday.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1) + weekOffsetRef.current * 7)
+      const sunday = new Date(monday)
+      sunday.setDate(monday.getDate() + 6)
+
+      startStr = formatDateInput(monday)
+      endStr = formatDateInput(sunday)
+    }
 
     // Only show drivers from Transport department
     const TRANSPORT_DEPT_ID = "d5772aaa-02f7-4b56-bc3c-96cd7aaacd7d"
@@ -172,10 +209,10 @@ export function ShiftsTable() {
     if (showLoading) setLoading(false)
   }, []) // Empty deps - uses refs for all changing values
 
-  // Load data when week changes - no loading spinner for week navigation
+  // Load data when week changes or custom date range changes - no loading spinner for navigation
   useEffect(() => {
     loadData(false)
-  }, [weekOffset]) // Only depends on weekOffset, loadData is stable
+  }, [weekOffset, customStartDate, customEndDate]) // Reload when date range changes
 
   // Initial load with spinner - runs once
   const initialLoadDone = useRef(false)
@@ -577,20 +614,97 @@ export function ShiftsTable() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="flex items-center bg-muted/50 rounded-lg p-1">
-              <Button variant="ghost" size="sm" className="h-8 px-3" onClick={() => setWeekOffset(w => w - 1)}>
+              <Button variant="ghost" size="sm" className="h-8 px-3" onClick={() => {
+                if (isCustomRange) {
+                  // Clear custom range and go back to week view
+                  setCustomStartDate("")
+                  setCustomEndDate("")
+                } else {
+                  setWeekOffset(w => w - 1)
+                }
+              }}>
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               </Button>
-              <div className="px-4 min-w-[180px] text-center">
-                <span className="text-sm font-semibold">
-                  {formatDate(weekStart)} - {formatDate(weekEnd)}
-                </span>
-              </div>
-              <Button variant="ghost" size="sm" className="h-8 px-3" onClick={() => setWeekOffset(w => w + 1)}>
+              <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                <PopoverTrigger asChild>
+                  <button className="px-4 min-w-[180px] text-center hover:bg-muted/50 rounded py-1 transition-colors">
+                    <span className="text-sm font-semibold flex items-center justify-center gap-2">
+                      <CalendarDays className="h-4 w-4" />
+                      {formatDate(weekStart)} - {formatDate(weekEnd)}
+                    </span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-4" align="start">
+                  <div className="space-y-4">
+                    <div className="text-sm font-medium">Select Date Range</div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs text-muted-foreground">Start Date</label>
+                        <Input
+                          type="date"
+                          value={customStartDate || weekStart.toISOString().split("T")[0]}
+                          onChange={(e) => setCustomStartDate(e.target.value)}
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs text-muted-foreground">End Date</label>
+                        <Input
+                          type="date"
+                          value={customEndDate || weekEnd.toISOString().split("T")[0]}
+                          onChange={(e) => setCustomEndDate(e.target.value)}
+                          className="h-9"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => {
+                          setCustomStartDate("")
+                          setCustomEndDate("")
+                          setWeekOffset(0)
+                          setDatePickerOpen(false)
+                        }}
+                      >
+                        This Week
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => {
+                          if (customStartDate && customEndDate) {
+                            setDatePickerOpen(false)
+                          }
+                        }}
+                        disabled={!customStartDate || !customEndDate}
+                      >
+                        Apply
+                      </Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <Button variant="ghost" size="sm" className="h-8 px-3" onClick={() => {
+                if (isCustomRange) {
+                  // Clear custom range and go back to week view
+                  setCustomStartDate("")
+                  setCustomEndDate("")
+                } else {
+                  setWeekOffset(w => w + 1)
+                }
+              }}>
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
               </Button>
             </div>
-            {weekOffset !== 0 && (
-              <Button variant="outline" size="sm" className="h-8" onClick={() => setWeekOffset(0)}>
+            {(weekOffset !== 0 || isCustomRange) && (
+              <Button variant="outline" size="sm" className="h-8" onClick={() => {
+                setCustomStartDate("")
+                setCustomEndDate("")
+                setWeekOffset(0)
+              }}>
                 Today
               </Button>
             )}

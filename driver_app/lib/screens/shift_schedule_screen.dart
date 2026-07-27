@@ -90,8 +90,16 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
       debugPrint('Got ${shifts.length} shifts from database');
 
       final newSchedule = List.generate(7, (_) => <String, dynamic>{'shifts': <Map<String, dynamic>>[]});
+      final seenIds = <String>{};  // Track seen shift IDs to prevent duplicates
 
       for (final shift in shifts) {
+        // Skip if we've already processed this shift ID
+        final shiftId = shift['id']?.toString() ?? '';
+        if (shiftId.isEmpty || seenIds.contains(shiftId)) {
+          debugPrint('Skipping duplicate shift: $shiftId');
+          continue;
+        }
+        seenIds.add(shiftId);
         final shiftDate = MaldivesTimezone.parse(shift['shift_date'] ?? '');
         if (shiftDate == null) continue;
 

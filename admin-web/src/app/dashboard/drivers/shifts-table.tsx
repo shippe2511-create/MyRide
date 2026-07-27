@@ -88,6 +88,7 @@ export function ShiftsTable() {
   const [customStartDate, setCustomStartDate] = useState<string>("")
   const [customEndDate, setCustomEndDate] = useState<string>("")
   const [datePickerOpen, setDatePickerOpen] = useState(false)
+  const [pickerYear, setPickerYear] = useState(new Date().getFullYear())
   const [selectedDriver, setSelectedDriver] = useState<string>("all")
   const [selectedShifts, setSelectedShifts] = useState<string[]>([])
   const [bulkDeleting, setBulkDeleting] = useState(false)
@@ -283,7 +284,7 @@ export function ShiftsTable() {
       } else {
         toast.success("Shift updated")
         closeDialog()
-        loadData()
+        loadData(false)
       }
     } else {
       if (formData.driver_ids.length === 0 || datesToCreate.length === 0) {
@@ -318,7 +319,7 @@ export function ShiftsTable() {
       } else {
         toast.success(`${shiftsToInsert.length} shift(s) created/updated for ${formData.driver_ids.length} driver(s)`)
         closeDialog()
-        loadData()
+        loadData(false)
       }
     }
     setSaving(false)
@@ -541,7 +542,7 @@ export function ShiftsTable() {
     } else {
       const periodText = autoSchedulePeriod === "month" ? "month" : "week"
       toast.success(`Created/updated ${shiftsToCreate.length} shifts for ${selectedDriversList.length} driver(s) for the next ${periodText}`)
-      loadData()
+      loadData(false)
     }
 
     setAutoScheduling(false)
@@ -641,9 +642,87 @@ export function ShiftsTable() {
                     </span>
                   </button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[340px] p-4" align="start">
+                <PopoverContent className="w-[380px] p-4" align="start">
                   <div className="space-y-4">
-                    <div className="text-sm font-medium">Select Date Range</div>
+                    {/* Year Navigation */}
+                    <div className="flex items-center justify-between">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => setPickerYear(y => y - 1)}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="text-lg font-semibold">{pickerYear}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => setPickerYear(y => y + 1)}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Month Grid */}
+                    <div className="grid grid-cols-4 gap-2">
+                      {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((month, idx) => {
+                        const currentYear = new Date().getFullYear()
+                        const currentMonth = new Date().getMonth()
+                        const isCurrentMonth = pickerYear === currentYear && idx === currentMonth
+                        const isSelected = customStartDate && new Date(customStartDate).getMonth() === idx && new Date(customStartDate).getFullYear() === pickerYear
+                        return (
+                          <Button
+                            key={month}
+                            size="sm"
+                            variant={isSelected ? "default" : isCurrentMonth ? "secondary" : "outline"}
+                            className={`text-sm h-9 ${isCurrentMonth && !isSelected ? "border-primary" : ""}`}
+                            onClick={() => {
+                              const firstDay = new Date(pickerYear, idx, 1)
+                              const lastDay = new Date(pickerYear, idx + 1, 0)
+                              setCustomStartDate(formatDateInput(firstDay))
+                              setCustomEndDate(formatDateInput(lastDay))
+                            }}
+                          >
+                            {month}
+                          </Button>
+                        )
+                      })}
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="flex gap-2 pt-2 border-t">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs"
+                        onClick={() => {
+                          const now = new Date()
+                          setPickerYear(now.getFullYear())
+                          const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+                          const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+                          setCustomStartDate(formatDateInput(firstDay))
+                          setCustomEndDate(formatDateInput(lastDay))
+                        }}
+                      >
+                        This Month
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs"
+                        onClick={() => {
+                          const today = new Date()
+                          const next3Months = new Date(today.getFullYear(), today.getMonth() + 3, 0)
+                          setCustomStartDate(formatDateInput(today))
+                          setCustomEndDate(formatDateInput(next3Months))
+                        }}
+                      >
+                        Next 3 Months
+                      </Button>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <label className="text-xs text-muted-foreground">Start Date</label>

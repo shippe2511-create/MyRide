@@ -1007,6 +1007,7 @@ export function ShiftsTable() {
                                 end_time: "16:00",
                                 shift_type: "full_day",
                                 status: "scheduled",
+                                attendance_status: "pending",
                               })
                               setDateRangeMode("select")
                               setDialogOpen(true)

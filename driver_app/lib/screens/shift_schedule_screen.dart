@@ -166,20 +166,51 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   SliverAppBar(
+                    expandedHeight: 100,
+                    floating: false,
+                    pinned: true,
                     backgroundColor: context.bgColor,
-                    floating: true,
-                    snap: true,
+                    elevation: 0,
                     leading: IconButton(
-                      icon: Icon(Icons.arrow_back, color: context.textColor),
+                      icon: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: context.cardColor,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(Icons.arrow_back, color: context.textColor, size: 20),
+                      ),
                       onPressed: () => Navigator.pop(context),
                     ),
-                    title: Text('Shift Schedule', style: TextStyle(color: context.textColor)),
                     actions: [
                       IconButton(
-                        icon: Icon(Icons.calendar_today_rounded, color: AppColors.yellow),
+                        icon: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: context.cardColor,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(Icons.calendar_today_rounded, color: AppColors.yellow, size: 20),
+                        ),
                         onPressed: () => _showMonthView(context),
                       ),
+                      const SizedBox(width: 8),
                     ],
+                    flexibleSpace: FlexibleSpaceBar(
+                      background: SafeArea(
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(60, 50, 20, 0),
+                          child: Text(
+                            'Shift Schedule',
+                            style: TextStyle(
+                              color: context.textColor,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                   SliverList(
                     delegate: SliverChildListDelegate([

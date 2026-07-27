@@ -1,5 +1,8 @@
 /// Maldives Timezone Utilities
 /// All times in MyRide should display in Maldives Time (MVT, UTC+5)
+///
+/// IMPORTANT: We assume the device is physically located in Maldives
+/// and the device timezone is set correctly. This avoids double-conversion issues.
 
 class MaldivesTimezone {
   static const Duration offset = Duration(hours: 5);
@@ -9,8 +12,8 @@ class MaldivesTimezone {
     if (utc.isUtc) {
       return utc.add(offset);
     }
-    // If already local, convert to UTC first then add offset
-    return utc.toUtc().add(offset);
+    // If already local (device in Maldives), return as-is
+    return utc;
   }
 
   /// Parse a UTC string and return Maldives time
@@ -18,20 +21,30 @@ class MaldivesTimezone {
     if (dateStr == null || dateStr.isEmpty) return null;
     final parsed = DateTime.tryParse(dateStr);
     if (parsed == null) return null;
-    return toMaldives(parsed);
+    // Database stores UTC, convert to Maldives
+    if (parsed.isUtc) {
+      return parsed.add(offset);
+    }
+    return parsed;
   }
 
   /// Get current time in Maldives
+  /// Since device is in Maldives, DateTime.now() is already Maldives time
   static DateTime now() {
-    return DateTime.now().toUtc().add(offset);
+    return DateTime.now();
+  }
+
+  /// Get today's date as string (YYYY-MM-DD) in Maldives timezone
+  static String todayDateString() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
   }
 
   /// Get start of today in Maldives timezone, returned as UTC for database queries
-  /// Example: If it's 2AM in Maldives (July 19), this returns midnight July 19 Maldives = 19:00 UTC July 18
   static DateTime todayStartUtc() {
-    final maldivesNow = now();
-    final maldivesMidnight = DateTime(maldivesNow.year, maldivesNow.month, maldivesNow.day);
-    // Convert Maldives midnight back to UTC by subtracting offset
-    return maldivesMidnight.subtract(offset);
+    final localNow = DateTime.now();
+    final localMidnight = DateTime(localNow.year, localNow.month, localNow.day);
+    // Convert local midnight to UTC
+    return localMidnight.toUtc();
   }
 }

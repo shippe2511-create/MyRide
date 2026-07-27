@@ -999,7 +999,7 @@ class SupabaseService {
   // Get today's shift for driver (for quick attendance marking)
   static Future<Map<String, dynamic>?> getTodayShift(String driverId) async {
     try {
-      final today = MaldivesTimezone.now().toIso8601String().split('T')[0];
+      final today = MaldivesTimezone.todayDateString();
       debugPrint('getTodayShift: driverId=$driverId, today=$today');
       final response = await client
           .from('shifts')

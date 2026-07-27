@@ -154,7 +154,10 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
 
   String _capitalizeFirst(String s) {
     if (s.isEmpty) return s;
-    return s[0].toUpperCase() + s.substring(1);
+    // Handle snake_case like "full_day" -> "Full Day"
+    return s.split('_').map((word) =>
+      word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1)
+    ).join(' ');
   }
 
   @override

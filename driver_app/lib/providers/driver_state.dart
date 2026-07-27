@@ -684,6 +684,34 @@ class DriverState extends ChangeNotifier {
       }
     }
 
+    // Update Supabase FIRST - the database trigger validates shift + checklist
+    if (_driverId.isNotEmpty) {
+      try {
+        await SupabaseService.updateDriverStatus(
+          driverId: _driverId,
+          isOnline: true,
+          isOnBreak: false,
+        );
+      } catch (e) {
+        debugPrint('Error updating driver status: $e');
+        // Check for specific error messages from database trigger
+        final errorMsg = e.toString().toLowerCase();
+        if (errorMsg.contains('no shift scheduled')) {
+          _vehicleInactiveReason = 'You have no shift scheduled for today. Please contact admin.';
+        } else if (errorMsg.contains('checklist')) {
+          _vehicleInactiveReason = 'Please complete the pre-trip checklist first.';
+        } else {
+          _vehicleInactiveReason = 'Unable to go online. Please try again.';
+        }
+        _isOnline = false;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('isOnline', false);
+        notifyListeners();
+        return false;
+      }
+    }
+
+    // Only set online state AFTER database update succeeds
     _isOnline = true;
     _isOnBreak = false;
     _breakType = '';
@@ -708,17 +736,8 @@ class DriverState extends ChangeNotifier {
     debugPrint('goOnline: Unified pool system active');
     notifyListeners();
 
-    // Update Supabase
+    // Continue with subscriptions
     if (_driverId.isNotEmpty) {
-      try {
-        await SupabaseService.updateDriverStatus(
-          driverId: _driverId,
-          isOnline: true,
-          isOnBreak: false,
-        );
-      } catch (e) {
-        debugPrint('Error updating driver status: $e');
-      }
 
       // Start background location tracking
       debugPrint('Starting background location service...');

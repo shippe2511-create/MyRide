@@ -573,6 +573,7 @@ class SupabaseService {
       debugPrint('updateDriverStatus: success');
     } catch (e) {
       debugPrint('updateDriverStatus: error - $e');
+      rethrow; // Rethrow so caller can handle database trigger errors
     }
 
     // Also update driver_locations table for admin panel visibility

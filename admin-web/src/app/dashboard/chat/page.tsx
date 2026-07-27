@@ -227,7 +227,7 @@ export default function ChatPage() {
     if (diffMins < 60) return `${diffMins}m`
     const diffHours = Math.floor(diffMins / 60)
     if (diffHours < 24) return `${diffHours}h`
-    return d.toLocaleDateString("en-US", { timeZone: "Indian/Maldives", month: "short", day: "numeric" })
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
   }
 
   const formatMessageTime = (date: string) => {

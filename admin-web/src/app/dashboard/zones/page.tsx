@@ -410,7 +410,7 @@ export default function ZonesPage() {
       z.zone_type === "pickup" ? "Pickup Only" : z.zone_type === "dropoff" ? "Dropoff Only" : "Both",
       z.priority,
       z.is_active ? "Active" : "Inactive",
-      new Date(z.created_at).toLocaleDateString('en-US', { timeZone: 'Indian/Maldives' })
+      (() => { const d = new Date(z.created_at); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}` })()
     ])
 
     const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n")

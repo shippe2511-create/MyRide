@@ -169,12 +169,8 @@ export default function DocumentsPage() {
 
   const formatExpiryDate = (date: string | null) => {
     if (!date) return "-"
-    return new Date(date).toLocaleDateString("en-US", {
-      timeZone: "Indian/Maldives",
-      month: "short",
-      day: "numeric",
-      year: "numeric"
-    })
+    const d = new Date(date)
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
   }
 
   const getDocTypeLabel = (type: string) => {

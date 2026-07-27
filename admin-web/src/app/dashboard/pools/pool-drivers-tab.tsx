@@ -376,7 +376,7 @@ export function PoolDriversTab({
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {new Date(group.earliest_date).toLocaleDateString("en-US", { timeZone: "Indian/Maldives", month: "short", day: "numeric", year: "numeric" })}
+                    {(() => { const d = new Date(group.earliest_date); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}` })()}
                   </TableCell>
                   {canManage && (
                     <TableCell>

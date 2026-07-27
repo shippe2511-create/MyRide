@@ -522,12 +522,7 @@ export default function ReportsPage() {
   const formatDate = (dateStr: string) => {
     if (!dateStr) return ""
     const d = new Date(dateStr)
-    return d.toLocaleDateString("en-US", {
-      timeZone: "Indian/Maldives",
-      year: "numeric",
-      month: "short",
-      day: "numeric"
-    })
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
   }
 
   const formatTime = (dateStr: string) => {

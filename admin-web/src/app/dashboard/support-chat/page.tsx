@@ -289,7 +289,10 @@ export default function SupportChatPage() {
     if (days === 0) return formatTime(date)
     if (days === 1) return 'Yesterday'
     if (days < 7) return `${days}d ago`
-    return d.toLocaleDateString('en-US', { timeZone: 'Indian/Maldives' })
+    const day = String(d.getDate()).padStart(2, '0')
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const year = d.getFullYear()
+    return `${day}/${month}/${year}`
   }
 
   const getStatusBadge = (status: string) => {

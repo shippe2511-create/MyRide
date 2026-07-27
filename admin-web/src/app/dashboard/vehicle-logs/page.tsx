@@ -344,12 +344,8 @@ export default function VehicleLogsPage() {
   }
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("en-US", {
-      timeZone: "Indian/Maldives",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    })
+    const d = new Date(date)
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
   }
 
   const formatAmount = (amount: number | null) => {

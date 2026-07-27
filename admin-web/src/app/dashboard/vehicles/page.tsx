@@ -354,7 +354,7 @@ export default function VehiclesPage() {
       v.plate_no || "",
       v.capacity,
       v.is_active ? "Active" : "Inactive",
-      new Date(v.created_at).toLocaleDateString("en-US", { timeZone: "Indian/Maldives", month: "short", day: "numeric", year: "numeric" })
+      (() => { const d = new Date(v.created_at); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}` })()
     ])
 
     const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n")

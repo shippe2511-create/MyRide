@@ -458,11 +458,7 @@ function ReactionsTab() {
                   </TableCell>
                   <TableCell className="text-xl">{REACTION_EMOJIS[r.reaction]}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {new Date(r.created_at).toLocaleDateString("en-US", {
-                      timeZone: "Indian/Maldives",
-                      month: "short",
-                      day: "numeric",
-                    })}
+                    {(() => { const d = new Date(r.created_at); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}` })()}
                   </TableCell>
                 </TableRow>
               ))}

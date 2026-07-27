@@ -64,7 +64,6 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
   Future<void> _loadShifts() async {
     setState(() {
       _isLoading = true;
-      // Clear the schedule immediately to prevent showing old data
       _weekSchedule = List.generate(7, (_) => <String, dynamic>{'shifts': <Map<String, dynamic>>[]});
     });
     try {
@@ -79,52 +78,39 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
       final weekStart = baseWeekStart.add(Duration(days: _weekOffset * 7));
       final weekEnd = weekStart.add(const Duration(days: 7));
 
-      debugPrint('Loading shifts for week: ${weekStart.toIso8601String()} to ${weekEnd.toIso8601String()}');
-
-      final shifts = await SupabaseService.getDriverShifts(
-        driverId,
-        weekStart,
-        weekEnd,
-      );
-
-      debugPrint('Got ${shifts.length} shifts from database');
-
+      final shifts = await SupabaseService.getDriverShifts(driverId, weekStart, weekEnd);
       final newSchedule = List.generate(7, (_) => <String, dynamic>{'shifts': <Map<String, dynamic>>[]});
-      final seenIds = <String>{};  // Track seen shift IDs to prevent duplicates
+      final seenIds = <String>{};
 
       for (final shift in shifts) {
-        // Skip if we've already processed this shift ID
         final shiftId = shift['id']?.toString() ?? '';
-        if (shiftId.isEmpty || seenIds.contains(shiftId)) {
-          debugPrint('Skipping duplicate shift: $shiftId');
-          continue;
-        }
+        if (shiftId.isEmpty || seenIds.contains(shiftId)) continue;
         seenIds.add(shiftId);
+
         final shiftDate = MaldivesTimezone.parse(shift['shift_date'] ?? '');
         if (shiftDate == null) continue;
 
-        final dayIndex = shiftDate.weekday - 1;
+        // Calculate dayIndex relative to the week being viewed, not absolute weekday
+        final shiftDay = DateTime(shiftDate.year, shiftDate.month, shiftDate.day);
+        final weekStartDay = DateTime(weekStart.year, weekStart.month, weekStart.day);
+        final dayIndex = shiftDay.difference(weekStartDay).inDays;
         if (dayIndex < 0 || dayIndex > 6) continue;
 
         String status = shift['status'] ?? 'scheduled';
-        if (status == 'scheduled') {
-          final today = DateTime(now.year, now.month, now.day);
-          final shiftDay = DateTime(shiftDate.year, shiftDate.month, shiftDate.day);
+        final today = DateTime(now.year, now.month, now.day);
 
+        if (status == 'scheduled') {
           if (shiftDay.isBefore(today)) {
             status = 'completed';
           } else if (shiftDay.isAtSameMomentAs(today)) {
-            // Check if current time is within shift hours
             final startParts = (shift['start_time']?.toString() ?? '00:00:00').split(':');
             final endParts = (shift['end_time']?.toString() ?? '23:59:59').split(':');
             final startHour = int.tryParse(startParts[0]) ?? 0;
             final startMin = int.tryParse(startParts.length > 1 ? startParts[1] : '0') ?? 0;
             final endHour = int.tryParse(endParts[0]) ?? 23;
             final endMin = int.tryParse(endParts.length > 1 ? endParts[1] : '59') ?? 59;
-
             final shiftStart = DateTime(now.year, now.month, now.day, startHour, startMin);
             final shiftEnd = DateTime(now.year, now.month, now.day, endHour, endMin);
-
             if (now.isBefore(shiftStart)) {
               status = 'upcoming';
             } else if (now.isAfter(shiftEnd)) {
@@ -137,7 +123,6 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
           }
         }
 
-        debugPrint('Adding shift: date=${shift['shift_date']}, dayIndex=$dayIndex, type=${shift['shift_type']}');
         (newSchedule[dayIndex]['shifts'] as List).add({
           'id': shift['id'],
           'start': shift['start_time']?.toString().substring(0, 5) ?? '00:00',

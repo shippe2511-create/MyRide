@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/image_utils.dart';
+import '../utils/timezone_utils.dart';
 
 class SupabaseService {
   static const String _supabaseUrl = 'https://lwkndyyfmmrzazdvrsnk.supabase.co';
@@ -980,13 +981,15 @@ class SupabaseService {
   // Get today's shift for driver (for quick attendance marking)
   static Future<Map<String, dynamic>?> getTodayShift(String driverId) async {
     try {
-      final today = DateTime.now().toIso8601String().split('T')[0];
+      final today = MaldivesTimezone.now().toIso8601String().split('T')[0];
+      debugPrint('getTodayShift: driverId=$driverId, today=$today');
       final response = await client
           .from('shifts')
           .select()
           .eq('driver_id', driverId)
           .eq('shift_date', today)
           .maybeSingle();
+      debugPrint('getTodayShift response: $response');
       return response;
     } catch (e) {
       debugPrint('Error getting today shift: $e');

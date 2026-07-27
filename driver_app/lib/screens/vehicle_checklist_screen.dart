@@ -41,6 +41,7 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
   // Attendance check
   String _attendanceStatus = 'pending'; // pending, present, absent
   String? _absenceReason;
+  String? _todayShiftId;
   bool _checkingAttendance = true;
   bool _hasShiftToday = false;
 
@@ -168,6 +169,7 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
         final status = shift['attendance_status'] as String? ?? 'pending';
         setState(() {
           _hasShiftToday = true;
+          _todayShiftId = shift['id'] as String?;
           _attendanceStatus = status;
           _absenceReason = shift['absence_reason'] as String?;
           _checkingAttendance = false;
@@ -175,6 +177,7 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
       } else {
         setState(() {
           _hasShiftToday = false;
+          _todayShiftId = null;
           _checkingAttendance = false;
         });
       }
@@ -1467,6 +1470,14 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                           runningHours: runningHours,
                         );
                         debugPrint('Checklist saved successfully');
+
+                        // Mark checklist completed for this shift
+                        debugPrint('Completing checklist with shiftId=$_todayShiftId');
+                        driverState.completeChecklist(
+                          hasIssues: _hasIssues,
+                          issues: _issueNotes,
+                          shiftId: _todayShiftId,
+                        );
                       } catch (e) {
                         debugPrint('Failed to save checklist: $e');
                         if (context.mounted) {

@@ -22,6 +22,7 @@ class DriverState extends ChangeNotifier {
   bool _isLoggedIn = false;
   bool _checklistCompleted = false;
   DateTime? _checklistCompletedDate;
+  String? _checklistCompletedShiftId;
   bool _checklistHasIssues = false;
   Map<String, String> _checklistIssues = {};
   bool _isOnHomeScreen = false;
@@ -126,6 +127,7 @@ class DriverState extends ChangeNotifier {
   bool get hasActiveRide => _currentRide != null;
   bool get checklistCompleted => _checklistCompleted && _isChecklistValidToday();
   bool get checklistHasIssues => _checklistHasIssues;
+  String? get checklistCompletedShiftId => _checklistCompletedShiftId;
   Map<String, String> get checklistIssues => _checklistIssues;
   bool get isOnHomeScreen => _isOnHomeScreen;
   bool get isBusMode => _isBusMode;
@@ -147,9 +149,16 @@ class DriverState extends ChangeNotifier {
   bool _isChecklistValidToday() {
     if (_checklistCompletedDate == null) return false;
     final now = MaldivesTimezone.now();
-    return _checklistCompletedDate!.year == now.year &&
+    final sameDay = _checklistCompletedDate!.year == now.year &&
         _checklistCompletedDate!.month == now.month &&
         _checklistCompletedDate!.day == now.day;
+    return sameDay;
+  }
+
+  // Check if checklist was completed for current shift
+  bool isChecklistCompletedForShift(String? shiftId) {
+    if (shiftId == null || _checklistCompletedShiftId == null) return false;
+    return _checklistCompletedShiftId == shiftId && _isChecklistValidToday();
   }
 
   // Check if current time is within duty roster hours (defaults to 8am-4pm)
@@ -559,73 +568,59 @@ class DriverState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void completeChecklist({bool hasIssues = false, Map<String, String> issues = const {}}) async {
+  void completeChecklist({bool hasIssues = false, Map<String, String> issues = const {}, String? shiftId}) async {
     _checklistCompleted = true;
     _checklistCompletedDate = DateTime.now();
+    _checklistCompletedShiftId = shiftId;
     _checklistHasIssues = hasIssues;
     _checklistIssues = Map.from(issues);
 
-    // Clear the needsNewChecklist flag since we just completed one
+    // Save to SharedPreferences
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('needsNewChecklist', false);
+    await prefs.setString('checklistCompletedDate', _checklistCompletedDate!.toIso8601String());
+    if (shiftId != null) {
+      await prefs.setString('checklistCompletedShiftId', shiftId);
+    }
+    debugPrint('completeChecklist: saved for shiftId=$shiftId');
 
     notifyListeners();
   }
 
-  /// Load today's checklist from database for this driver
+  /// Load checklist status from SharedPreferences
   Future<void> loadTodayChecklist() async {
-    if (_driverId.isEmpty) return;
-
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // Check if we need a new checklist (after ending shift)
-      final needsNew = prefs.getBool('needsNewChecklist') ?? false;
-      if (needsNew) {
-        _checklistCompleted = false;
-        _checklistCompletedDate = null;
-        _checklistHasIssues = false;
-        _checklistIssues = {};
-        debugPrint('New checklist required for new shift');
-        notifyListeners();
-        return;
-      }
+      final savedDateStr = prefs.getString('checklistCompletedDate');
+      final savedShiftId = prefs.getString('checklistCompletedShiftId');
+      debugPrint('loadTodayChecklist: savedDateStr=$savedDateStr, savedShiftId=$savedShiftId');
 
-      // Use Maldives timezone for "today" check
-      final todayStartUtc = MaldivesTimezone.todayStartUtc();
-      final tomorrowStartUtc = todayStartUtc.add(const Duration(days: 1));
-
-      final response = await SupabaseService.client
-          .from('vehicle_checklists')
-          .select()
-          .eq('driver_id', _driverId)
-          .gte('checked_at', todayStartUtc.toIso8601String())
-          .lt('checked_at', tomorrowStartUtc.toIso8601String())
-          .order('checked_at', ascending: false)
-          .limit(1)
-          .maybeSingle();
-
-      if (response != null) {
-        _checklistCompleted = true;
-        _checklistCompletedDate = DateTime.tryParse(response['checked_at'] ?? '') ?? MaldivesTimezone.now();
-        _checklistHasIssues = response['has_issues'] ?? false;
-        final issues = response['issues'];
-        if (issues is Map) {
-          _checklistIssues = Map<String, String>.from(
-            issues.map((k, v) => MapEntry(k.toString(), v.toString()))
-          );
+      if (savedDateStr != null) {
+        final savedDate = DateTime.tryParse(savedDateStr);
+        if (savedDate != null) {
+          final now = DateTime.now();
+          final sameDay = savedDate.year == now.year &&
+              savedDate.month == now.month &&
+              savedDate.day == now.day;
+          if (sameDay) {
+            _checklistCompleted = true;
+            _checklistCompletedDate = savedDate;
+            _checklistCompletedShiftId = savedShiftId;
+            debugPrint('Checklist completed for shift $savedShiftId');
+            notifyListeners();
+            return;
+          }
         }
-        debugPrint('Loaded today\'s checklist for driver $_driverId');
-      } else {
-        _checklistCompleted = false;
-        _checklistCompletedDate = null;
-        _checklistHasIssues = false;
-        _checklistIssues = {};
-        debugPrint('No checklist found for today');
       }
+
+      // Not completed today or different day
+      _checklistCompleted = false;
+      _checklistCompletedDate = null;
+      _checklistCompletedShiftId = null;
+      debugPrint('No valid checklist found');
       notifyListeners();
     } catch (e) {
-      debugPrint('Error loading today\'s checklist: $e');
+      debugPrint('Error loading checklist status: $e');
     }
   }
 
@@ -866,21 +861,17 @@ class DriverState extends ChangeNotifier {
     _stopRidePolling();
     _unsubscribeFromRides();
 
-    // Reset checklist for next shift
-    _checklistCompleted = false;
-    _checklistCompletedDate = null;
-    _checklistHasIssues = false;
-    _checklistIssues = {};
+    // Checklist stays valid for today - don't reset
 
     // Haptic and voice feedback
     HapticFeedback.lightImpact();
     VoiceService().announceGoingOffline();
 
-    // Clear online, break state and mark checklist as needed for next shift
+    // Clear online, break state - checklist remains valid for today
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isOnline', false);
     await prefs.setBool('isOnBreak', false);
-    await prefs.setBool('needsNewChecklist', true);  // Require checklist for next shift
+    // Don't reset checklist - it's valid for the whole day once completed
     await prefs.remove('breakType');
     await prefs.remove('breakStartTime');
     await prefs.remove('shiftStartTime');  // Clear shift time when going offline

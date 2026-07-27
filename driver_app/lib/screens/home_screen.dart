@@ -100,7 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await state.loadDriverStats();
 
       // Load today's shift for attendance
-      _loadTodayShift();
+      await _loadTodayShift();
 
       _checkForActiveRide();
 
@@ -483,7 +483,13 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    if (!state.checklistCompleted) {
+    // Check if checklist was completed for current shift
+    final currentShiftId = _todayShift?['id'] as String?;
+    final checklistDoneForShift = state.checklistCompleted &&
+        (currentShiftId == null || state.checklistCompletedShiftId == currentShiftId);
+    debugPrint('_handleGoOnline: checklistCompleted=${state.checklistCompleted}, currentShiftId=$currentShiftId, completedShiftId=${state.checklistCompletedShiftId}, doneForShift=$checklistDoneForShift');
+
+    if (!checklistDoneForShift) {
       final result = await Navigator.push<dynamic>(
         context,
         MaterialPageRoute(
@@ -493,9 +499,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       if (result != null && result is Map && result['completed'] == true && mounted) {
-        final hasIssues = result['hasIssues'] ?? false;
-        final issues = result['issues'] as Map<String, String>? ?? {};
-        state.completeChecklist(hasIssues: hasIssues, issues: issues);
+        // Checklist screen already calls completeChecklist with shift ID
         await _tryGoOnline(state);
       }
     } else {
@@ -1047,6 +1051,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   (_todayShift!['attendance_status'] as String? ?? 'pending') == 'absent';
               final absenceReason = _todayShift?['absence_reason'] as String?;
 
+              // Check if checklist was completed for current shift
+              final currentShiftId = _todayShift?['id'] as String?;
+              final checklistDone = state.checklistCompleted &&
+                  (currentShiftId == null || state.checklistCompletedShiftId == currentShiftId);
+
               return Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(30),
@@ -1084,7 +1093,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text(
                         isAbsent
                             ? 'You have marked yourself absent for today\'s shift'
-                            : state.checklistCompleted
+                            : checklistDone
                                 ? 'Tap below to start receiving ride requests'
                                 : 'Complete vehicle checklist to go online',
                         style: TextStyle(
@@ -1126,12 +1135,12 @@ class _HomeScreenState extends State<HomeScreen> {
                             _handleGoOnline(state);
                           },
                           icon: Icon(
-                            state.checklistCompleted
+                            checklistDone
                                 ? Icons.wifi
                                 : Icons.checklist,
                           ),
                           label: Text(
-                            state.checklistCompleted
+                            checklistDone
                                 ? 'Go Online'
                                 : 'Start Checklist',
                           ),

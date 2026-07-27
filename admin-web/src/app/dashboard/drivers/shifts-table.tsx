@@ -1004,6 +1004,7 @@ export function ShiftsTable() {
                                 shift.attendance_status === "present" ? "bg-emerald-500/30 border-2 border-emerald-500"
                                 : shift.attendance_status === "absent" ? "bg-red-500/30 border-2 border-red-500"
                                 : shift.shift_type === "morning" ? "bg-amber-500/20 border border-amber-500/30"
+                                : shift.shift_type === "afternoon" ? "bg-orange-500/20 border border-orange-500/30"
                                 : shift.shift_type === "evening" ? "bg-indigo-500/20 border border-indigo-500/30"
                                 : shift.shift_type === "night" ? "bg-slate-600/30 border border-slate-500/30"
                                 : "bg-emerald-500/20 border border-emerald-500/30"
@@ -1191,11 +1192,15 @@ export function ShiftsTable() {
             <span className="text-muted-foreground font-medium">Shift Types:</span>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded bg-emerald-500/30 border border-emerald-500/50" />
-              <span>Full Day / Afternoon</span>
+              <span>Full Day</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded bg-amber-500/30 border border-amber-500/50" />
               <span>Morning</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-orange-500/30 border border-orange-500/50" />
+              <span>Afternoon</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded bg-indigo-500/30 border border-indigo-500/50" />

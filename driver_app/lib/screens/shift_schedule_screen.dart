@@ -445,6 +445,10 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
 
   Widget _buildDaySchedule(BuildContext context) {
     final shifts = _weekSchedule[_selectedDay]['shifts'] as List;
+    debugPrint('_buildDaySchedule: _selectedDay=$_selectedDay, shifts.length=${shifts.length}');
+    for (var i = 0; i < shifts.length; i++) {
+      debugPrint('  Shift $i: id=${shifts[i]['id']}, status=${shifts[i]['status']}, attendance=${shifts[i]['attendance_status']}');
+    }
     final today = DateTime.now();
     final baseWeekStart = today.subtract(Duration(days: today.weekday - 1));
     final startOfWeek = baseWeekStart.add(Duration(days: _weekOffset * 7));

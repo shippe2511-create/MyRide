@@ -159,29 +159,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _cancelAttendance() async {
-    if (_todayShift == null) return;
-
-    HapticFeedback.mediumImpact();
-    final shiftId = _todayShift!['id'] as String;
-
-    final success = await SupabaseService.markShiftAttendance(
-      shiftId: shiftId,
-      status: 'pending',
-      reason: null,
-    );
-
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Attendance cancelled'),
-          backgroundColor: AppColors.yellow,
-        ),
-      );
-      _loadTodayShift();
-    }
-  }
-
   void _showAbsentReasonDialog() {
     final reasonController = TextEditingController();
 
@@ -476,11 +453,14 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // Check if checklist was completed today - that's all we need
-    // state.checklistCompleted already validates it's for today
-    debugPrint('_handleGoOnline: checklistCompleted=${state.checklistCompleted}');
+    // Check if checklist was completed for THIS shift
+    // Each shift needs its own checklist, but within same shift can go offline/online
+    final currentShiftId = _todayShift?['id'] as String?;
+    final checklistDoneForShift = state.checklistCompleted &&
+        (currentShiftId == null || state.checklistCompletedShiftId == currentShiftId);
+    debugPrint('_handleGoOnline: checklistCompleted=${state.checklistCompleted}, currentShiftId=$currentShiftId, completedShiftId=${state.checklistCompletedShiftId}');
 
-    if (!state.checklistCompleted) {
+    if (!checklistDoneForShift) {
       final result = await Navigator.push<dynamic>(
         context,
         MaterialPageRoute(
@@ -1042,10 +1022,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   (_todayShift!['attendance_status'] as String? ?? 'pending') == 'absent';
               final absenceReason = _todayShift?['absence_reason'] as String?;
 
-              // Checklist done for today - no shift ID check needed
-              // state.checklistCompleted already validates it's today
-              final checklistDone = state.checklistCompleted;
-              debugPrint('OfflineWidget: checklistCompleted=${state.checklistCompleted}, checklistDone=$checklistDone');
+              // Checklist done for THIS shift - each shift needs its own checklist
+              final currentShiftId = _todayShift?['id'] as String?;
+              final checklistDone = state.checklistCompleted &&
+                  (currentShiftId == null || state.checklistCompletedShiftId == currentShiftId);
+              debugPrint('OfflineWidget: checklistCompleted=${state.checklistCompleted}, currentShiftId=$currentShiftId, completedShiftId=${state.checklistCompletedShiftId}, checklistDone=$checklistDone');
 
               return Expanded(
                 child: SingleChildScrollView(
@@ -1172,16 +1153,62 @@ class _HomeScreenState extends State<HomeScreen> {
     final shiftType = _todayShift!['shift_type'] as String? ?? 'Shift';
     final absenceReason = _todayShift!['absence_reason'] as String?;
 
+    // When PRESENT: show compact chip only
+    if (attendanceStatus == 'present') {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.success.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.schedule, color: AppColors.success, size: 18),
+            const SizedBox(width: 10),
+            Text(
+              '${shiftType[0].toUpperCase()}${shiftType.substring(1)} Shift ($startTime - $endTime)',
+              style: TextStyle(
+                color: context.textColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.success.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle, color: AppColors.success, size: 14),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Present',
+                    style: TextStyle(
+                      color: AppColors.success,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // For PENDING and ABSENT: show full card
     Color statusColor;
     IconData statusIcon;
     String statusText;
 
     switch (attendanceStatus) {
-      case 'present':
-        statusColor = AppColors.success;
-        statusIcon = Icons.check_circle;
-        statusText = 'Present';
-        break;
       case 'absent':
         statusColor = AppColors.error;
         statusIcon = Icons.cancel;
@@ -1329,40 +1356,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
             const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => _cancelAttendance(),
-                icon: const Icon(Icons.undo, size: 18),
-                label: const Text('Cancel Absence'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.error,
-                  side: BorderSide(color: AppColors.error.withValues(alpha: 0.5)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
+            Text(
+              'Contact admin to change attendance status',
+              style: TextStyle(
+                color: context.mutedColor,
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
               ),
-            ),
-          ],
-          if (attendanceStatus == 'present') ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => _cancelAttendance(),
-                icon: const Icon(Icons.undo, size: 18),
-                label: const Text('Cancel Present'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: context.mutedColor,
-                  side: BorderSide(color: context.borderColor),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ],

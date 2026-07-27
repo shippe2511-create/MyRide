@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { usePermissions } from "@/hooks/usePermissions"
 import { formatPhone } from "@/lib/format-phone"
 import { toast } from "sonner"
 import {
@@ -123,6 +124,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
+  const { departmentId: userDepartmentId } = usePermissions()
 
   const [drivers, setDrivers] = useState<Driver[]>(initialDrivers)
   const [totalCount, setTotalCount] = useState(initialTotalCount)
@@ -174,8 +176,15 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
   const [departments, setDepartments] = useState<Department[]>([])
-  const [departmentFilter, setDepartmentFilter] = useState("all")
+  const [departmentFilter, setDepartmentFilter] = useState(userDepartmentId || "all")
   const [poolFilter, setPoolFilter] = useState("all")
+
+  // Update department filter when user's department loads
+  useEffect(() => {
+    if (userDepartmentId && departmentFilter === "all") {
+      setDepartmentFilter(userDepartmentId)
+    }
+  }, [userDepartmentId])
 
   useEffect(() => {
     loadVehicles()

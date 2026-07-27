@@ -457,6 +457,13 @@ export function ShiftsTable() {
     })
   }
 
+  const formatDateNumeric = (date: Date) => {
+    const day = String(date.getDate()).padStart(2, "0")
+    const month = String(date.getMonth() + 1).padStart(2, "0")
+    const year = date.getFullYear()
+    return `${day}/${month}/${year}`
+  }
+
   const formatDateInput = (date: Date) => {
     const year = date.getFullYear()
     const month = String(date.getMonth() + 1).padStart(2, "0")
@@ -630,30 +637,52 @@ export function ShiftsTable() {
                   <button className="px-4 min-w-[180px] text-center hover:bg-muted/50 rounded py-1 transition-colors">
                     <span className="text-sm font-semibold flex items-center justify-center gap-2">
                       <CalendarDays className="h-4 w-4" />
-                      {formatDate(weekStart)} - {formatDate(weekEnd)}
+                      {formatDateNumeric(weekStart)} - {formatDateNumeric(weekEnd)}
                     </span>
                   </button>
                 </PopoverTrigger>
-                <PopoverContent className="w-80 p-4" align="start">
+                <PopoverContent className="w-[340px] p-4" align="start">
                   <div className="space-y-4">
                     <div className="text-sm font-medium">Select Date Range</div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <label className="text-xs text-muted-foreground">Start Date</label>
-                        <Input
+                        <div
+                          className="h-9 px-3 flex items-center justify-between bg-background border rounded-md text-sm cursor-pointer hover:bg-muted/50"
+                          onClick={() => {
+                            const input = document.getElementById('start-date-input') as HTMLInputElement
+                            input?.showPicker()
+                          }}
+                        >
+                          {formatDateNumeric(customStartDate ? new Date(customStartDate) : weekStart)}
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <input
+                          id="start-date-input"
                           type="date"
-                          value={customStartDate || weekStart.toISOString().split("T")[0]}
+                          value={customStartDate || formatDateInput(weekStart)}
                           onChange={(e) => setCustomStartDate(e.target.value)}
-                          className="h-9"
+                          className="sr-only"
                         />
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-xs text-muted-foreground">End Date</label>
-                        <Input
+                        <div
+                          className="h-9 px-3 flex items-center justify-between bg-background border rounded-md text-sm cursor-pointer hover:bg-muted/50"
+                          onClick={() => {
+                            const input = document.getElementById('end-date-input') as HTMLInputElement
+                            input?.showPicker()
+                          }}
+                        >
+                          {formatDateNumeric(customEndDate ? new Date(customEndDate) : weekEnd)}
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <input
+                          id="end-date-input"
                           type="date"
-                          value={customEndDate || weekEnd.toISOString().split("T")[0]}
+                          value={customEndDate || formatDateInput(weekEnd)}
                           onChange={(e) => setCustomEndDate(e.target.value)}
-                          className="h-9"
+                          className="sr-only"
                         />
                       </div>
                     </div>
@@ -675,11 +704,15 @@ export function ShiftsTable() {
                         size="sm"
                         className="flex-1"
                         onClick={() => {
-                          if (customStartDate && customEndDate) {
-                            setDatePickerOpen(false)
+                          // If no custom dates selected yet, use the current week dates
+                          if (!customStartDate) {
+                            setCustomStartDate(formatDateInput(weekStart))
                           }
+                          if (!customEndDate) {
+                            setCustomEndDate(formatDateInput(weekEnd))
+                          }
+                          setDatePickerOpen(false)
                         }}
-                        disabled={!customStartDate || !customEndDate}
                       >
                         Apply
                       </Button>
@@ -960,7 +993,7 @@ export function ShiftsTable() {
           <div className="text-center mb-3">
             <span className="text-sm font-medium">
               {weekOffset === 0 ? "This Week" : weekOffset === -1 ? "Last Week" : weekOffset === 1 ? "Next Week" : (
-                `${formatDate(weekStart).split(",")[1]?.trim()} - ${formatDate(weekEnd).split(",")[1]?.trim()}`
+                `${formatDateNumeric(weekStart)} - ${formatDateNumeric(weekEnd)}`
               )}
             </span>
             {weekOffset !== 0 && (

@@ -106,6 +106,8 @@ export function ShiftsTable() {
   const [dateRangeMode, setDateRangeMode] = useState<"single" | "range" | "select">("select")
   const [rangeStart, setRangeStart] = useState("")
   const [rangeEnd, setRangeEnd] = useState("")
+  const [dialogCalendarMonth, setDialogCalendarMonth] = useState(new Date().getMonth())
+  const [dialogCalendarYear, setDialogCalendarYear] = useState(new Date().getFullYear())
 
   const getWeekDates = () => {
     // If custom date range is set, use that
@@ -434,11 +436,8 @@ export function ShiftsTable() {
   }
 
   const getMonthDates = () => {
-    const today = new Date()
-    const year = today.getFullYear()
-    const month = today.getMonth()
-    const firstDay = new Date(year, month, 1)
-    const lastDay = new Date(year, month + 2, 0)
+    const firstDay = new Date(dialogCalendarYear, dialogCalendarMonth, 1)
+    const lastDay = new Date(dialogCalendarYear, dialogCalendarMonth + 1, 0)
 
     const dates: Date[] = []
     const current = new Date(firstDay)
@@ -448,6 +447,22 @@ export function ShiftsTable() {
     }
     return dates
   }
+
+  const navigateDialogCalendar = (direction: number) => {
+    let newMonth = dialogCalendarMonth + direction
+    let newYear = dialogCalendarYear
+    if (newMonth < 0) {
+      newMonth = 11
+      newYear--
+    } else if (newMonth > 11) {
+      newMonth = 0
+      newYear++
+    }
+    setDialogCalendarMonth(newMonth)
+    setDialogCalendarYear(newYear)
+  }
+
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString("en-US", {
@@ -1306,6 +1321,30 @@ export function ShiftsTable() {
                 </div>
               ) : (
                 <div className="border rounded-xl p-3 bg-muted/30">
+                  {/* Month Navigation Header */}
+                  <div className="flex items-center justify-between mb-3">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      onClick={() => navigateDialogCalendar(-1)}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm font-semibold">
+                      {monthNames[dialogCalendarMonth]} {dialogCalendarYear}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      onClick={() => navigateDialogCalendar(1)}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
                   <div className="grid grid-cols-7 gap-1 text-center mb-2">
                     {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(d => (
                       <span key={d} className="text-[10px] font-semibold text-muted-foreground uppercase">{d}</span>

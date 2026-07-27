@@ -979,6 +979,23 @@ class SupabaseService {
     }
   }
 
+  // Cancel absence (reset to pending) - only allowed within 30 minutes
+  static Future<bool> cancelAbsence({required String shiftId}) async {
+    try {
+      debugPrint('cancelAbsence: shiftId=$shiftId');
+      final response = await client.from('shifts').update({
+        'attendance_status': 'pending',
+        'absence_reason': null,
+        'marked_at': null,
+      }).eq('id', shiftId).select();
+      debugPrint('cancelAbsence response: $response');
+      return response.isNotEmpty;
+    } catch (e) {
+      debugPrint('Error cancelling absence: $e');
+      return false;
+    }
+  }
+
   // Get today's shift for driver (for quick attendance marking)
   static Future<Map<String, dynamic>?> getTodayShift(String driverId) async {
     try {

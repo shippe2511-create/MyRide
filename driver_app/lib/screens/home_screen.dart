@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/ride_request.dart';
 import '../providers/driver_state.dart';
 import '../theme/app_theme.dart';
+import '../utils/timezone_utils.dart';
 import '../widgets/status_toggle.dart';
 import '../widgets/ride_request_popup.dart';
 import '../widgets/break_timer.dart';
@@ -149,13 +150,45 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(status == 'present' ? 'Marked as Present!' : 'Marked as Absent'),
-          backgroundColor: status == 'present' ? AppColors.success : AppColors.error,
-        ),
-      );
       _loadTodayShift();
+    }
+  }
+
+  Future<void> _cancelAbsence() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Cancel Absence', style: TextStyle(color: context.textColor)),
+        content: Text(
+          'Are you sure you want to cancel your absence and mark yourself as available?',
+          style: TextStyle(color: context.mutedColor),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('No', style: TextStyle(color: context.mutedColor)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.warning,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Yes, Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && _todayShift != null) {
+      final shiftId = _todayShift!['id'] as String;
+      final success = await SupabaseService.cancelAbsence(shiftId: shiftId);
+      if (success && mounted) {
+        _loadTodayShift();
+      }
     }
   }
 
@@ -1368,15 +1401,53 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
             const SizedBox(height: 12),
-            Text(
-              'Contact admin to change attendance status',
-              style: TextStyle(
-                color: context.mutedColor,
-                fontSize: 12,
-                fontStyle: FontStyle.italic,
-              ),
-              textAlign: TextAlign.center,
-            ),
+            // Check if within 30 minutes of marking absent
+            Builder(builder: (context) {
+              final markedAtStr = _todayShift?['marked_at'] as String?;
+              final markedAtUtc = markedAtStr != null ? DateTime.tryParse(markedAtStr) : null;
+              // Convert to Maldives time (UTC+5)
+              final markedAt = markedAtUtc?.add(const Duration(hours: 5));
+              final now = MaldivesTimezone.now();
+              final minutesSinceMarked = markedAt != null ? now.difference(markedAt).inMinutes : 999;
+              final canCancel = markedAt != null && minutesSinceMarked >= 0 && minutesSinceMarked < 30;
+              final minutesLeft = canCancel ? (30 - minutesSinceMarked) : 0;
+
+              if (canCancel) {
+                return Column(
+                  children: [
+                    FilledButton.icon(
+                      onPressed: () => _cancelAbsence(),
+                      icon: const Icon(Icons.undo, size: 18),
+                      label: const Text('Cancel Absence'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.warning,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '$minutesLeft min left to cancel',
+                      style: TextStyle(
+                        color: context.mutedColor,
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                );
+              } else {
+                return Text(
+                  'Contact admin to change attendance status',
+                  style: TextStyle(
+                    color: context.mutedColor,
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
+                );
+              }
+            }),
           ],
         ],
       ),

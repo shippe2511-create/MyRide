@@ -102,6 +102,7 @@ export function ShiftsTable() {
     end_time: "16:00",
     shift_type: "full_day",
     status: "scheduled",
+    attendance_status: "pending" as string,
   })
   const [dateRangeMode, setDateRangeMode] = useState<"single" | "range" | "select">("select")
   const [rangeStart, setRangeStart] = useState("")
@@ -269,16 +270,28 @@ export function ShiftsTable() {
       }
 
       setSaving(true)
+      const updateData: Record<string, unknown> = {
+        driver_id: formData.driver_ids[0],
+        shift_date: datesToCreate[0],
+        start_time: formData.start_time,
+        end_time: formData.end_time,
+        shift_type: formData.shift_type,
+        status: formData.status,
+        attendance_status: formData.attendance_status,
+      }
+      // Clear absence_reason if changing from absent to something else
+      if (editingShift.attendance_status === "absent" && formData.attendance_status !== "absent") {
+        updateData.absence_reason = null
+        updateData.marked_at = null
+      }
+      // Set marked_at when changing attendance
+      if (formData.attendance_status !== editingShift.attendance_status) {
+        updateData.marked_at = new Date().toISOString()
+      }
+
       const { error } = await supabase
         .from("shifts")
-        .update({
-          driver_id: formData.driver_ids[0],
-          shift_date: datesToCreate[0],
-          start_time: formData.start_time,
-          end_time: formData.end_time,
-          shift_type: formData.shift_type,
-          status: formData.status,
-        })
+        .update(updateData)
         .eq("id", editingShift.id)
 
       if (error) {
@@ -383,6 +396,7 @@ export function ShiftsTable() {
       end_time: shift.end_time.substring(0, 5),
       shift_type: shift.shift_type || "morning",
       status: shift.status || "scheduled",
+      attendance_status: shift.attendance_status || "pending",
     })
     setDialogOpen(true)
   }
@@ -400,6 +414,7 @@ export function ShiftsTable() {
       end_time: "16:00",
       shift_type: "full_day",
       status: "scheduled",
+      attendance_status: "pending",
     })
   }
 
@@ -1462,6 +1477,53 @@ export function ShiftsTable() {
                 </Select>
               </div>
             </div>
+
+            {/* Attendance Status - Only show when editing */}
+            {editingShift && (
+              <div className="space-y-2 pt-2 border-t">
+                <label className="text-sm font-medium text-muted-foreground">Attendance Status</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, attendance_status: "pending" })}
+                    className={`flex-1 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                      formData.attendance_status === "pending"
+                        ? "border-gray-500 bg-gray-500/20 text-gray-200"
+                        : "border-transparent bg-muted/50 text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    Pending
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, attendance_status: "present" })}
+                    className={`flex-1 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                      formData.attendance_status === "present"
+                        ? "border-emerald-500 bg-emerald-500/20 text-emerald-400"
+                        : "border-transparent bg-muted/50 text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    Present
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, attendance_status: "absent" })}
+                    className={`flex-1 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                      formData.attendance_status === "absent"
+                        ? "border-red-500 bg-red-500/20 text-red-400"
+                        : "border-transparent bg-muted/50 text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    Absent
+                  </button>
+                </div>
+                {editingShift.absence_reason && formData.attendance_status === "absent" && (
+                  <div className="text-xs text-red-400 bg-red-500/10 p-2 rounded-md">
+                    Reason: {editingShift.absence_reason}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">

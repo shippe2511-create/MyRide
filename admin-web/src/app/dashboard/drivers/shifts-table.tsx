@@ -79,6 +79,7 @@ export function ShiftsTable() {
   const [autoSchedulePeriod, setAutoSchedulePeriod] = useState<"week" | "month">("week")
   const [autoScheduleStartTime, setAutoScheduleStartTime] = useState("08:00")
   const [autoScheduleEndTime, setAutoScheduleEndTime] = useState("16:00")
+  const [autoScheduleShiftType, setAutoScheduleShiftType] = useState("morning")
 
   const [weekOffset, setWeekOffset] = useState(0)
   const [selectedDriver, setSelectedDriver] = useState<string>("all")
@@ -472,7 +473,7 @@ export function ShiftsTable() {
           shift_date: dateStr,
           start_time: autoScheduleStartTime + ":00",
           end_time: autoScheduleEndTime + ":00",
-          shift_type: "full_day",
+          shift_type: autoScheduleShiftType,
           status: "scheduled",
         })
       }
@@ -943,6 +944,37 @@ export function ShiftsTable() {
               Next <ChevronRight className="h-3 w-3" />
             </button>
           </div>
+
+          {/* Color Legend */}
+          <div className="flex items-center justify-center gap-4 mt-4 pt-3 border-t text-xs flex-wrap">
+            <span className="text-muted-foreground font-medium">Shift Types:</span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-emerald-500/30 border border-emerald-500/50" />
+              <span>Full Day / Afternoon</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-amber-500/30 border border-amber-500/50" />
+              <span>Morning</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-indigo-500/30 border border-indigo-500/50" />
+              <span>Evening</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-slate-600/40 border border-slate-500/50" />
+              <span>Night</span>
+            </div>
+            <span className="text-muted-foreground mx-2">|</span>
+            <span className="text-muted-foreground font-medium">Attendance:</span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-emerald-500/40 border-2 border-emerald-500" />
+              <span>Present</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-red-500/40 border-2 border-red-500" />
+              <span>Absent</span>
+            </div>
+          </div>
         </div>
 
       </Card>
@@ -993,7 +1025,7 @@ export function ShiftsTable() {
                           <AvatarImage src={profile?.avatar_url || undefined} />
                           <AvatarFallback className="text-xs">{profile?.full_name?.[0] || "?"}</AvatarFallback>
                         </Avatar>
-                        <span className="text-sm font-medium">{profile?.full_name?.split(" ")[0] || "Unknown"}</span>
+                        <span className="text-sm font-medium">{profile?.full_name || "Unknown"}</span>
                         {isSelected && <div className="h-2 w-2 rounded-full bg-primary" />}
                       </button>
                     )
@@ -1257,12 +1289,29 @@ export function ShiftsTable() {
                         <AvatarImage src={profile?.avatar_url || undefined} />
                         <AvatarFallback className="text-xs">{profile?.full_name?.[0] || "?"}</AvatarFallback>
                       </Avatar>
-                      <span className="text-sm font-medium">{profile?.full_name?.split(" ")[0] || "Unknown"}</span>
+                      <span className="text-sm font-medium">{profile?.full_name || "Unknown"}</span>
                       {isSelected && <div className="h-2 w-2 rounded-full bg-primary" />}
                     </button>
                   )
                 })}
               </div>
+            </div>
+
+            {/* Shift Type */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Shift Type</label>
+              <Select value={autoScheduleShiftType} onValueChange={setAutoScheduleShiftType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="morning">Morning Shift</SelectItem>
+                  <SelectItem value="afternoon">Afternoon Shift</SelectItem>
+                  <SelectItem value="evening">Evening Shift</SelectItem>
+                  <SelectItem value="night">Night Shift</SelectItem>
+                  <SelectItem value="full_day">Full Day</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Time Selection */}

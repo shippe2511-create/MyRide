@@ -173,6 +173,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
     pools: { public: true, private: false }
   })
   const [driverPools, setDriverPools] = useState<Record<string, string[]>>({})
+  const [todayShifts, setTodayShifts] = useState<Set<string>>(new Set())
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
   const [departments, setDepartments] = useState<Department[]>([])
@@ -190,7 +191,20 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
     loadVehicles()
     loadAllDriverPools()
     loadDepartments()
+    loadTodayShifts()
   }, [])
+
+  const loadTodayShifts = async () => {
+    const today = new Date().toISOString().split("T")[0]
+    const { data } = await supabase
+      .from("shifts")
+      .select("driver_id")
+      .eq("shift_date", today)
+      .neq("attendance_status", "absent")
+    if (data) {
+      setTodayShifts(new Set(data.map(s => s.driver_id)))
+    }
+  }
 
   const loadAllDriverPools = async () => {
     const { data } = await supabase.from("driver_pools").select("driver_id, pool:pools(name)")
@@ -953,6 +967,11 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse" />
                         Online
                       </Badge>
+                    ) : !driver.driver_record?.id || !todayShifts.has(driver.driver_record.id) ? (
+                      <Badge variant="outline" className="bg-orange-500/10 text-orange-500 border-orange-500/30">
+                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500 mr-1.5" />
+                        Not Scheduled
+                      </Badge>
                     ) : (
                       <Badge variant="outline" className="bg-slate-500/10 text-slate-400 border-slate-500/30">
                         <span className="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5" />
@@ -1244,6 +1263,12 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                   ]}
                   placeholder="Search vehicle..."
                 />
+                {selectedDriver?.driver_record?.id && !todayShifts.has(selectedDriver.driver_record.id) && formData.vehicle_id && formData.vehicle_id !== "none" && (
+                  <p className="text-xs text-orange-500 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                    Driver not scheduled today - cannot go online
+                  </p>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">

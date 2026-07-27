@@ -66,6 +66,7 @@ interface VehicleChecklist {
 interface VehicleHealth {
   vehicle_number: string
   display_name: string
+  department_id: string | null
   total_checks: number
   total_issues: number
   pending_issues: number
@@ -104,8 +105,19 @@ interface ChecklistItem {
 }
 
 const ITEM_LABELS: Record<string, string> = {
+  // Basic items
   fuel: "Fuel Level", tires: "Tires", lights: "Lights", body: "Body Condition",
   ac: "A/C", safety: "Safety Kit", documents: "Documents", seatbelts: "Seatbelts", cleanliness: "Cleanliness",
+  // Extended items
+  brake: "Brakes", horns: "Horns", beacon: "Beacon Light", diesel: "Diesel Level",
+  Lights: "Lights", meters: "Dashboard Meters", base_set: "Base Set", belt_slip: "Belt Slip",
+  brake_oil: "Brake Oil", insurance: "Insurance Valid", engine_oil: "Engine Oil",
+  body_damage: "Body Damage", engine_noise: "Engine Noise", side_mirrors: "Side Mirrors",
+  tyre_wornout: "Tyre Condition", air_condition: "Air Conditioning", running_hours: "Running Hours",
+  tyre_pressure: "Tyre Pressure", annual_sticker: "Annual Sticker", steering_wheel: "Steering Wheel",
+  road_worthiness: "Road Worthiness", airport_worthiness: "Airport Worthiness",
+  power_steering_oil: "Power Steering Oil", interior_cleanliness: "Interior Cleanliness",
+  radiator_water_level: "Radiator Water", windshield_washer_water: "Windshield Washer",
 }
 
 const PAGE_SIZE = 15
@@ -331,6 +343,11 @@ export default function ChecklistsPage() {
 
   const [stats, setStats] = useState({ total: 0, withIssues: 0, passed: 0 })
 
+  // Fleet Health filters
+  const [fleetDepartmentFilter, setFleetDepartmentFilter] = useState("")
+  const [fleetSearch, setFleetSearch] = useState("")
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
+
   // Running hours edit state
   const [editingRunningHours, setEditingRunningHours] = useState<VehicleHealth | null>(null)
   const [runningHoursForm, setRunningHoursForm] = useState({ current_running_hours: "", next_service_hours: "", service_interval_hours: "" })
@@ -399,6 +416,15 @@ export default function ChecklistsPage() {
 
   useEffect(() => {
     loadData(true)
+    // Load departments for fleet filter
+    const loadDepartments = async () => {
+      const { data } = await supabase.from("departments").select("id, name").eq("is_active", true).order("name")
+      setDepartments(data || [])
+      // Set Transport as default
+      const transport = data?.find(d => d.name.toLowerCase() === "transport")
+      if (transport) setFleetDepartmentFilter(transport.id)
+    }
+    loadDepartments()
 
     const channel = supabase
       .channel('checklists_realtime')
@@ -685,7 +711,7 @@ export default function ChecklistsPage() {
 
   const loadFleetHealth = async () => {
     const [vehiclesRes, checklistsRes] = await Promise.all([
-      supabase.from("vehicle_types").select("plate_no, display_name, is_active, created_at, current_running_hours, last_running_hours_update, next_service_hours, service_interval_hours").eq("is_active", true),
+      supabase.from("vehicle_types").select("plate_no, display_name, is_active, created_at, current_running_hours, last_running_hours_update, next_service_hours, service_interval_hours, department_id").eq("is_active", true),
       supabase.from("vehicle_checklists").select("*").order("checked_at", { ascending: false }),
     ])
 
@@ -698,6 +724,7 @@ export default function ChecklistsPage() {
       vehicleMap.set(v.plate_no, {
         vehicle_number: v.plate_no,
         display_name: v.display_name || '',
+        department_id: v.department_id || null,
         total_checks: 0, total_issues: 0, pending_issues: 0, fixed_issues: 0, deferred_issues: 0,
         last_check: null, first_check: v.created_at, most_common_issue: null, issue_breakdown: {}, health_score: 100,
         days_in_service: v.created_at ? Math.ceil((Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60 * 24)) : 0,
@@ -1323,8 +1350,41 @@ export default function ChecklistsPage() {
       )}
 
       {/* FLEET HEALTH TAB */}
-      {activeTab === "fleet" && (
+      {activeTab === "fleet" && (() => {
+        // Filter vehicle health data
+        const filteredFleetData = vehicleHealthData.filter(v => {
+          if (fleetDepartmentFilter && fleetDepartmentFilter !== "all" && v.department_id !== fleetDepartmentFilter) return false
+          if (fleetSearch) {
+            const searchLower = fleetSearch.toLowerCase()
+            return v.vehicle_number.toLowerCase().includes(searchLower) || v.display_name.toLowerCase().includes(searchLower)
+          }
+          return true
+        })
+        return (
         <Card className="p-4">
+          <div className="flex items-center gap-3 mb-4">
+            <Select value={fleetDepartmentFilter} onValueChange={setFleetDepartmentFilter}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="All Departments" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.map(d => (
+                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search vehicles..."
+                value={fleetSearch}
+                onChange={(e) => setFleetSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <span className="text-sm text-muted-foreground ml-auto">{filteredFleetData.length} vehicles</span>
+          </div>
           <div className="rounded-lg border overflow-hidden">
             <Table>
               <TableHeader>
@@ -1339,10 +1399,10 @@ export default function ChecklistsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {vehicleHealthData.length === 0 ? (
+                {filteredFleetData.length === 0 ? (
                   <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No vehicles found</TableCell></TableRow>
                 ) : (
-                  vehicleHealthData.map(v => {
+                  filteredFleetData.map(v => {
                     const hoursToService = v.next_service_hours ? v.next_service_hours - v.current_running_hours : v.service_interval_hours - (v.current_running_hours % v.service_interval_hours)
                     const serviceOverdue = hoursToService <= 0
                     const serviceSoon = hoursToService > 0 && hoursToService <= 50
@@ -1390,7 +1450,8 @@ export default function ChecklistsPage() {
             </Table>
           </div>
         </Card>
-      )}
+        )
+      })()}
 
       {/* REPORTS TAB */}
       {activeTab === "reports" && (() => {

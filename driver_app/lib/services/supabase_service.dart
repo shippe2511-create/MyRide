@@ -969,7 +969,7 @@ class SupabaseService {
       final response = await client.from('shifts').update({
         'attendance_status': status,
         'absence_reason': status == 'absent' ? reason : null,
-        'marked_at': DateTime.now().toIso8601String(),
+        'marked_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('id', shiftId).select();
       debugPrint('markShiftAttendance response: $response');
       return response.isNotEmpty;

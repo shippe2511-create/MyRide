@@ -1001,8 +1001,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildOfflineView(BuildContext context, DriverState state) {
     final checklistValidForVehicle = state.vehicleId.isEmpty || state.checklistCompletedVehicleId == state.vehicleId;
     final isAbsent = _todayShift != null && (_todayShift!['attendance_status'] as String? ?? 'pending') == 'absent';
-    // Don't show checklist banner if driver is absent
-    final checklistShown = state.checklistCompleted && !state.vehicleChangedNeedsChecklist && checklistValidForVehicle && !isAbsent;
+    final hasShiftToday = _todayShift != null;
+    // Don't show checklist banner if driver is absent OR no shift assigned
+    final checklistShown = state.checklistCompleted && !state.vehicleChangedNeedsChecklist && checklistValidForVehicle && !isAbsent && hasShiftToday;
 
     return SingleChildScrollView(
       child: Column(
@@ -1167,10 +1168,13 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         ),
-                      // Today's Shift Card
+                      // Today's Shift Card or No Shift Card
                       if (_todayShift != null) ...[
                         const SizedBox(height: 24),
                         _buildTodayShiftCard(context),
+                      ] else ...[
+                        const SizedBox(height: 24),
+                        _buildNoShiftCard(context),
                       ],
                       const SizedBox(height: 100), // Extra padding for bottom nav
                     ],
@@ -1436,18 +1440,113 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 );
               } else {
-                return Text(
-                  'Contact admin to change attendance status',
-                  style: TextStyle(
-                    color: context.mutedColor,
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                  ),
-                  textAlign: TextAlign.center,
+                return Column(
+                  children: [
+                    Text(
+                      'Contact admin to change attendance',
+                      style: TextStyle(
+                        color: context.mutedColor,
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ShiftScheduleScreen()),
+                        );
+                      },
+                      icon: Icon(Icons.calendar_month, size: 16, color: context.mutedColor),
+                      label: Text('View My Schedule', style: TextStyle(color: context.textColor, fontSize: 13)),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: context.borderColor),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               }
             }),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoShiftCard(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.event_busy, color: AppColors.error, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'No Shift Today',
+                      style: TextStyle(
+                        color: AppColors.error,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Contact admin if this is incorrect',
+                      style: TextStyle(
+                        color: context.mutedColor,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ShiftScheduleScreen()),
+                );
+              },
+              icon: Icon(Icons.calendar_month, size: 18, color: AppColors.error),
+              label: Text('View My Schedule', style: TextStyle(color: AppColors.error)),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: AppColors.error.withValues(alpha: 0.5)),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

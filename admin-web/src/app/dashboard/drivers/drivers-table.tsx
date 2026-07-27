@@ -1247,12 +1247,11 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Gender</label>
-                <Select value={formData.gender || "none"} onValueChange={(v) => setFormData({ ...formData, gender: v === "none" ? "" : v })}>
+                <Select value={formData.gender || ""} onValueChange={(v) => setFormData({ ...formData, gender: v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Not specified</SelectItem>
                     <SelectItem value="Male">Male</SelectItem>
                     <SelectItem value="Female">Female</SelectItem>
                   </SelectContent>

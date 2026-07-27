@@ -1210,7 +1210,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
             <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Gender</label>
-                <Select value={formData.gender} onValueChange={(v) => setFormData({ ...formData, gender: v })}>
+                <Select value={formData.gender || ""} onValueChange={(v) => setFormData({ ...formData, gender: v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>

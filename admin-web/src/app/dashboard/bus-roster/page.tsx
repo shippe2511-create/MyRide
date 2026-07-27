@@ -849,10 +849,17 @@ export default function BusRosterPage() {
                           <ComboboxInput
                             value={assignment.driver_id || ""}
                             onChange={(v) => updateAssignment(assignment.id, "driver_id", v || null)}
-                            options={drivers.map(d => ({
-                              value: d.id,
-                              label: (d.profile as { full_name: string })?.full_name || "Unknown"
-                            }))}
+                            options={drivers.map(d => {
+                              const shift = driverShifts.find(s => s.driver_id === d.id)
+                              const status = shift?.attendance_status === "present" ? "available"
+                                : shift?.attendance_status === "absent" ? "assigned"
+                                : undefined
+                              return {
+                                value: d.id,
+                                label: (d.profile as { full_name: string })?.full_name || "Unknown",
+                                status: status as "available" | "assigned" | undefined
+                              }
+                            })}
                             placeholder="Search driver..."
                           />
                         </div>
@@ -862,10 +869,17 @@ export default function BusRosterPage() {
                           <ComboboxInput
                             value={assignment.vehicle_id || ""}
                             onChange={(v) => updateAssignment(assignment.id, "vehicle_id", v || null)}
-                            options={vehicles.map(v => ({
-                              value: v.id,
-                              label: `${v.display_name} (${v.plate_no})`
-                            }))}
+                            options={vehicles.map(v => {
+                              // Check if vehicle is assigned to another roster entry (not this one)
+                              const isOccupied = roster.some(r =>
+                                r.vehicle_id === v.id && r.id !== assignment.id
+                              )
+                              return {
+                                value: v.id,
+                                label: `${v.display_name} (${v.plate_no})`,
+                                status: isOccupied ? "assigned" as const : "available" as const
+                              }
+                            })}
                             placeholder="Search vehicle..."
                           />
                         </div>

@@ -1307,11 +1307,43 @@ export function ShiftsTable() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">From</label>
-                    <Input type="date" value={rangeStart} onChange={(e) => setRangeStart(e.target.value)} className="h-9" />
+                    <div
+                      className="h-9 px-3 flex items-center justify-between bg-background border rounded-md text-sm cursor-pointer hover:bg-muted/50"
+                      onClick={() => {
+                        const input = document.getElementById('range-start-input') as HTMLInputElement
+                        input?.showPicker()
+                      }}
+                    >
+                      {rangeStart ? formatDateNumeric(new Date(rangeStart)) : "dd/mm/yyyy"}
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <input
+                      id="range-start-input"
+                      type="date"
+                      value={rangeStart}
+                      onChange={(e) => setRangeStart(e.target.value)}
+                      className="sr-only"
+                    />
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">To</label>
-                    <Input type="date" value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)} className="h-9" />
+                    <div
+                      className="h-9 px-3 flex items-center justify-between bg-background border rounded-md text-sm cursor-pointer hover:bg-muted/50"
+                      onClick={() => {
+                        const input = document.getElementById('range-end-input') as HTMLInputElement
+                        input?.showPicker()
+                      }}
+                    >
+                      {rangeEnd ? formatDateNumeric(new Date(rangeEnd)) : "dd/mm/yyyy"}
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <input
+                      id="range-end-input"
+                      type="date"
+                      value={rangeEnd}
+                      onChange={(e) => setRangeEnd(e.target.value)}
+                      className="sr-only"
+                    />
                   </div>
                   {rangeStart && rangeEnd && (
                     <p className="col-span-2 text-xs text-primary font-medium">

@@ -1471,12 +1471,13 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                         );
                         debugPrint('Checklist saved successfully');
 
-                        // Mark checklist completed for this shift - MUST await to ensure save completes
-                        debugPrint('Completing checklist with shiftId=$_todayShiftId');
+                        // Mark checklist completed for this shift AND vehicle - MUST await to ensure save completes
+                        debugPrint('Completing checklist with shiftId=$_todayShiftId, vehicleId=${driverState.vehicleId}');
                         await driverState.completeChecklist(
                           hasIssues: _hasIssues,
                           issues: _issueNotes,
                           shiftId: _todayShiftId,
+                          vehicleId: driverState.vehicleId,
                         );
                       } catch (e) {
                         debugPrint('Failed to save checklist: $e');

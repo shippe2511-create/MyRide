@@ -216,6 +216,13 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
     setVehicles(data || [])
   }
 
+  // Get set of vehicle IDs that are assigned to drivers
+  const assignedVehicleIds = new Set(
+    drivers
+      .filter(d => d.driver_record?.vehicle_id)
+      .map(d => d.driver_record!.vehicle_id!)
+  )
+
   const loadDepartments = async () => {
     const { data, error } = await supabase
       .from("departments")
@@ -1226,10 +1233,14 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                   onChange={(v) => setFormData({ ...formData, vehicle_id: v })}
                   options={[
                     { value: "none", label: "No Vehicle" },
-                    ...vehicles.map((vehicle) => ({
-                      value: vehicle.id,
-                      label: `${vehicle.display_name} ${vehicle.plate_no ? `(${vehicle.plate_no})` : ""}`.trim()
-                    }))
+                    ...vehicles.map((vehicle) => {
+                      const isAssigned = assignedVehicleIds.has(vehicle.id) && vehicle.id !== formData.vehicle_id
+                      return {
+                        value: vehicle.id,
+                        label: `${vehicle.display_name} ${vehicle.plate_no ? `(${vehicle.plate_no})` : ""}`.trim(),
+                        status: isAssigned ? "assigned" as const : "available" as const
+                      }
+                    })
                   ]}
                   placeholder="Search vehicle..."
                 />
@@ -1256,11 +1267,12 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Gender</label>
-                <Select value={formData.gender || ""} onValueChange={(v) => setFormData({ ...formData, gender: v })}>
+                <Select value={formData.gender || "unspecified"} onValueChange={(v) => setFormData({ ...formData, gender: v === "unspecified" ? "" : v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="unspecified">Not specified</SelectItem>
                     <SelectItem value="Male">Male</SelectItem>
                     <SelectItem value="Female">Female</SelectItem>
                   </SelectContent>

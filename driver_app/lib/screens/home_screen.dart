@@ -455,10 +455,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Check if checklist was completed for THIS shift
     // Each shift needs its own checklist, but within same shift can go offline/online
+    // Check if checklist was completed for THIS shift AND THIS vehicle
+    // New vehicle = new checklist required
     final currentShiftId = _todayShift?['id'] as String?;
-    final checklistDoneForShift = state.checklistCompleted &&
-        (currentShiftId == null || state.checklistCompletedShiftId == currentShiftId);
-    debugPrint('_handleGoOnline: checklistCompleted=${state.checklistCompleted}, currentShiftId=$currentShiftId, completedShiftId=${state.checklistCompletedShiftId}');
+    final currentVehicleId = state.vehicleId;
+    final shiftMatch = currentShiftId == null || state.checklistCompletedShiftId == currentShiftId;
+    final vehicleMatch = currentVehicleId.isEmpty || state.checklistCompletedVehicleId == currentVehicleId;
+    final checklistDoneForShift = state.checklistCompleted && shiftMatch && vehicleMatch;
+    debugPrint('_handleGoOnline: checklistCompleted=${state.checklistCompleted}, shiftMatch=$shiftMatch, vehicleMatch=$vehicleMatch, currentVehicle=$currentVehicleId, completedVehicle=${state.checklistCompletedVehicleId}');
 
     if (!checklistDoneForShift) {
       final result = await Navigator.push<dynamic>(
@@ -1022,11 +1026,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   (_todayShift!['attendance_status'] as String? ?? 'pending') == 'absent';
               final absenceReason = _todayShift?['absence_reason'] as String?;
 
-              // Checklist done for THIS shift - each shift needs its own checklist
+              // Checklist done for THIS shift AND THIS vehicle
               final currentShiftId = _todayShift?['id'] as String?;
-              final checklistDone = state.checklistCompleted &&
-                  (currentShiftId == null || state.checklistCompletedShiftId == currentShiftId);
-              debugPrint('OfflineWidget: checklistCompleted=${state.checklistCompleted}, currentShiftId=$currentShiftId, completedShiftId=${state.checklistCompletedShiftId}, checklistDone=$checklistDone');
+              final currentVehicleId = state.vehicleId;
+              final shiftMatch = currentShiftId == null || state.checklistCompletedShiftId == currentShiftId;
+              final vehicleMatch = currentVehicleId.isEmpty || state.checklistCompletedVehicleId == currentVehicleId;
+              final checklistDone = state.checklistCompleted && shiftMatch && vehicleMatch && !state.vehicleChangedNeedsChecklist;
+              final vehicleChanged = state.vehicleChangedNeedsChecklist || (!vehicleMatch && state.checklistCompleted);
+              debugPrint('OfflineWidget: checklistCompleted=${state.checklistCompleted}, shiftMatch=$shiftMatch, vehicleMatch=$vehicleMatch, vehicleChanged=$vehicleChanged, checklistDone=$checklistDone');
 
               return Expanded(
                 child: SingleChildScrollView(
@@ -1067,7 +1074,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             ? 'You have marked yourself absent for today\'s shift'
                             : checklistDone
                                 ? 'Tap below to start receiving ride requests'
-                                : 'Complete vehicle checklist to go online',
+                                : vehicleChanged
+                                    ? 'New vehicle assigned - complete checklist'
+                                    : 'Complete vehicle checklist to go online',
                         style: TextStyle(
                           color: context.mutedColor,
                           fontSize: 15,

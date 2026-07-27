@@ -23,7 +23,9 @@ class DriverState extends ChangeNotifier {
   bool _checklistCompleted = false;
   DateTime? _checklistCompletedDate;
   String? _checklistCompletedShiftId;
+  String? _checklistCompletedVehicleId;
   bool _checklistHasIssues = false;
+  bool _vehicleChangedNeedsChecklist = false;
   Map<String, String> _checklistIssues = {};
   bool _isOnHomeScreen = false;
 
@@ -37,6 +39,7 @@ class DriverState extends ChangeNotifier {
   String _employeeId = '';
   String _vehicleNumber = '';
   String _vehicleModel = '';
+  String _vehicleId = '';
   String _phoneNumber = '';
   String _profileImagePath = '';
   String _avatarUrl = '';
@@ -104,6 +107,7 @@ class DriverState extends ChangeNotifier {
   String get employeeId => _employeeId;
   String get vehicleNumber => _vehicleNumber;
   String get vehicleModel => _vehicleModel;
+  String get vehicleId => _vehicleId;
   String get phoneNumber => _phoneNumber;
   String get profileImagePath => _profileImagePath;
   String get avatarUrl => _avatarUrl;
@@ -128,6 +132,8 @@ class DriverState extends ChangeNotifier {
   bool get checklistCompleted => _checklistCompleted && _isChecklistValidToday();
   bool get checklistHasIssues => _checklistHasIssues;
   String? get checklistCompletedShiftId => _checklistCompletedShiftId;
+  String? get checklistCompletedVehicleId => _checklistCompletedVehicleId;
+  bool get vehicleChangedNeedsChecklist => _vehicleChangedNeedsChecklist;
   Map<String, String> get checklistIssues => _checklistIssues;
   bool get isOnHomeScreen => _isOnHomeScreen;
   bool get isBusMode => _isBusMode;
@@ -247,6 +253,7 @@ class DriverState extends ChangeNotifier {
       _driverId = prefs.getString('driverId') ?? '';
       _profileId = prefs.getString('profileId') ?? '';
       _employeeId = prefs.getString('employeeId') ?? '';
+      _vehicleId = prefs.getString('vehicleId') ?? '';
       _vehicleNumber = prefs.getString('vehicleNumber') ?? '';
 
       // Sync driverId to SupabaseService
@@ -568,20 +575,26 @@ class DriverState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> completeChecklist({bool hasIssues = false, Map<String, String> issues = const {}, String? shiftId}) async {
+  Future<void> completeChecklist({bool hasIssues = false, Map<String, String> issues = const {}, String? shiftId, String? vehicleId}) async {
     _checklistCompleted = true;
     _checklistCompletedDate = DateTime.now();
     _checklistCompletedShiftId = shiftId;
+    _checklistCompletedVehicleId = vehicleId;
     _checklistHasIssues = hasIssues;
     _checklistIssues = Map.from(issues);
+    _vehicleChangedNeedsChecklist = false; // Clear the flag
 
     // Save to SharedPreferences - MUST complete before returning
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('checklistCompletedDate', _checklistCompletedDate!.toIso8601String());
+    await prefs.setBool('vehicleChangedNeedsChecklist', false);
     if (shiftId != null) {
       await prefs.setString('checklistCompletedShiftId', shiftId);
     }
-    debugPrint('completeChecklist: saved date=${_checklistCompletedDate!.toIso8601String()}, shiftId=$shiftId');
+    if (vehicleId != null) {
+      await prefs.setString('checklistCompletedVehicleId', vehicleId);
+    }
+    debugPrint('completeChecklist: saved date=${_checklistCompletedDate!.toIso8601String()}, shiftId=$shiftId, vehicleId=$vehicleId');
 
     notifyListeners();
   }
@@ -593,7 +606,8 @@ class DriverState extends ChangeNotifier {
 
       final savedDateStr = prefs.getString('checklistCompletedDate');
       final savedShiftId = prefs.getString('checklistCompletedShiftId');
-      debugPrint('loadTodayChecklist: savedDateStr=$savedDateStr, savedShiftId=$savedShiftId');
+      final savedVehicleId = prefs.getString('checklistCompletedVehicleId');
+      debugPrint('loadTodayChecklist: savedDateStr=$savedDateStr, savedShiftId=$savedShiftId, savedVehicleId=$savedVehicleId');
 
       if (savedDateStr != null) {
         final savedDate = DateTime.tryParse(savedDateStr);
@@ -606,7 +620,8 @@ class DriverState extends ChangeNotifier {
             _checklistCompleted = true;
             _checklistCompletedDate = savedDate;
             _checklistCompletedShiftId = savedShiftId;
-            debugPrint('Checklist completed for shift $savedShiftId');
+            _checklistCompletedVehicleId = savedVehicleId;
+            debugPrint('Checklist completed for shift $savedShiftId, vehicle $savedVehicleId');
             notifyListeners();
             return;
           }
@@ -617,6 +632,7 @@ class DriverState extends ChangeNotifier {
       _checklistCompleted = false;
       _checklistCompletedDate = null;
       _checklistCompletedShiftId = null;
+      _checklistCompletedVehicleId = null;
       debugPrint('No valid checklist found');
       notifyListeners();
     } catch (e) {
@@ -1133,10 +1149,32 @@ class DriverState extends ChangeNotifier {
               // Also refresh today's count since total changed
               refreshStats();
             }
-            // Check if vehicle_id changed and refresh vehicle info
+            // Check if vehicle_id changed - requires new checklist
             final newVehicleId = newRecord['vehicle_id'] as String?;
-            debugPrint('Checking vehicle_id change: $newVehicleId');
+            final oldVehicleId = _vehicleId;
+            debugPrint('Checking vehicle_id change: old=$oldVehicleId, new=$newVehicleId');
+
+            // Refresh vehicle info first
             await refreshVehicleInfo();
+
+            // If vehicle changed and driver is online, go offline and notify
+            if (oldVehicleId.isNotEmpty && newVehicleId != null && oldVehicleId != newVehicleId) {
+              debugPrint('Vehicle changed! Requiring new checklist');
+              // Force driver offline - need new checklist for new vehicle
+              if (_isOnline) {
+                _isOnline = false;
+                _vehicleChangedNeedsChecklist = true;
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setBool('isOnline', false);
+                await prefs.setBool('vehicleChangedNeedsChecklist', true);
+                // Update Supabase
+                await SupabaseService.updateDriverStatus(
+                  driverId: _driverId,
+                  isOnline: false,
+                  isOnBreak: false,
+                );
+              }
+            }
             notifyListeners();
           },
         )
@@ -1571,13 +1609,16 @@ class DriverState extends ChangeNotifier {
     try {
       final vehicle = await SupabaseService.getDriverVehicle(_driverId);
       if (vehicle != null) {
+        _vehicleId = vehicle['id'] ?? '';
         _vehicleNumber = vehicle['plate_no'] ?? '';
         _vehicleModel = vehicle['display_name'] ?? '';
       } else {
+        _vehicleId = '';
         _vehicleNumber = '';
         _vehicleModel = '';
       }
       final prefs = await SharedPreferences.getInstance();
+      prefs.setString('vehicleId', _vehicleId);
       prefs.setString('vehicleNumber', _vehicleNumber);
       prefs.setString('vehicleModel', _vehicleModel);
       notifyListeners();

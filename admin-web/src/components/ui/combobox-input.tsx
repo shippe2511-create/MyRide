@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 interface ComboboxInputProps {
   value: string
   onChange: (value: string) => void
-  options: { value: string; label: string }[]
+  options: { value: string; label: string; status?: "available" | "assigned" }[]
   placeholder?: string
   allowCustom?: boolean
 }
@@ -111,6 +111,14 @@ export function ComboboxInput({
                       value === option.value ? "opacity-100 text-primary" : "opacity-0"
                     )}
                   />
+                  {option.status && (
+                    <span
+                      className={cn(
+                        "h-2 w-2 rounded-full shrink-0",
+                        option.status === "available" ? "bg-green-500" : "bg-red-500"
+                      )}
+                    />
+                  )}
                   <span className="truncate">{option.label}</span>
                 </div>
               ))

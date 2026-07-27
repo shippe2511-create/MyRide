@@ -38,7 +38,7 @@ function useDriversData(search?: string, status?: string, page: number = 1) {
           total_trips,
           rating,
           updated_at,
-          profiles!inner(id, full_name, email, phone, avatar_url, status, employee_id, role),
+          profiles!inner(id, full_name, email, phone, avatar_url, status, employee_id, role, gender),
           vehicle:vehicle_types(id, display_name, plate_no),
           department:departments(id, name)
         `, { count: "exact" })

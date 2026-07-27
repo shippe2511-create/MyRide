@@ -971,7 +971,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final topPadding = MediaQuery.of(context).padding.top;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     // Header ~80, stats card ~120, bottom nav ~80, checklist ~50 if shown
-    final usedHeight = topPadding + 80 + 120 + bottomPadding + 80 + (state.checklistCompleted ? 60 : 0);
+    final checklistValidForVehicle = state.vehicleId.isEmpty || state.checklistCompletedVehicleId == state.vehicleId;
+    final checklistShown = state.checklistCompleted && !state.vehicleChangedNeedsChecklist && checklistValidForVehicle;
+    final usedHeight = topPadding + 80 + 120 + bottomPadding + 80 + (checklistShown ? 60 : 0);
     final availableHeight = (screenHeight - usedHeight).clamp(300.0, double.infinity);
 
     return Column(
@@ -979,8 +981,8 @@ class _HomeScreenState extends State<HomeScreen> {
         // Stats card
         _buildStatsCard(context, state),
 
-          // Checklist status
-          if (state.checklistCompleted)
+          // Checklist status - only show if completed for current vehicle
+          if (checklistShown)
             Container(
               margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1035,12 +1037,11 @@ class _HomeScreenState extends State<HomeScreen> {
               final vehicleChanged = state.vehicleChangedNeedsChecklist || (!vehicleMatch && state.checklistCompleted);
               debugPrint('OfflineWidget: checklistCompleted=${state.checklistCompleted}, shiftMatch=$shiftMatch, vehicleMatch=$vehicleMatch, vehicleChanged=$vehicleChanged, checklistDone=$checklistDone');
 
-              return Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(30),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+              return Padding(
+                padding: const EdgeInsets.all(30),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                       const SizedBox(height: 40),
                       Container(
                         width: 100,
@@ -1145,7 +1146,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 40),
                     ],
                   ),
-                ),
               );
             },
           ),
@@ -1176,15 +1176,18 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Icon(Icons.schedule, color: AppColors.success, size: 18),
             const SizedBox(width: 10),
-            Text(
-              '${shiftType[0].toUpperCase()}${shiftType.substring(1)} Shift ($startTime - $endTime)',
-              style: TextStyle(
-                color: context.textColor,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
+            Expanded(
+              child: Text(
+                '${shiftType[0].toUpperCase()}${shiftType.substring(1)} ($startTime - $endTime)',
+                style: TextStyle(
+                  color: context.textColor,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(

@@ -35,7 +35,7 @@ interface VehicleLog {
   driver_id: string
   log_type: string
   amount: number | null
-  fuel_amount: number | null
+  liters: number | null
   odometer: number | null
   notes: string | null
   log_date: string
@@ -87,7 +87,7 @@ export default function VehicleLogsPage() {
     const total = typeLogs.reduce((sum, l) => sum + (l.amount || 0), 0)
     // For fuel, also calculate total liters
     const totalLiters = type.value === "fuel"
-      ? typeLogs.reduce((sum, l) => sum + (l.fuel_amount || 0), 0)
+      ? typeLogs.reduce((sum, l) => sum + (l.liters || 0), 0)
       : 0
     return {
       ...type,
@@ -486,9 +486,11 @@ export default function VehicleLogsPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xl font-bold tracking-tight">
-                    {isFuel ? `${stat.totalLiters.toLocaleString()} L` : `MVR ${stat.total.toLocaleString()}`}
+                    {isFuel ? `MVR ${stat.total.toLocaleString()}` : `MVR ${stat.total.toLocaleString()}`}
                   </p>
-                  <p className="text-xs text-muted-foreground truncate">{stat.label}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {isFuel && stat.totalLiters > 0 ? `${stat.totalLiters.toLocaleString()} L · ` : ""}{stat.label}
+                  </p>
                 </div>
                 <span className="text-xs font-medium text-muted-foreground ml-auto shrink-0">{stat.count}</span>
               </div>

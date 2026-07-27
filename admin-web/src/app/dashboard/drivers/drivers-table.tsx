@@ -193,12 +193,14 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
   }, [])
 
   const loadAllDriverPools = async () => {
-    const { data } = await supabase.from("driver_pools").select("driver_id, pool")
+    const { data } = await supabase.from("driver_pools").select("driver_id, pool:pools(name)")
     if (data) {
       const poolMap: Record<string, string[]> = {}
-      data.forEach(row => {
+      data.forEach((row) => {
         if (!poolMap[row.driver_id]) poolMap[row.driver_id] = []
-        poolMap[row.driver_id].push(row.pool)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const pool = row.pool as any
+        if (pool?.name) poolMap[row.driver_id].push(pool.name)
       })
       setDriverPools(poolMap)
     }
@@ -979,14 +981,12 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-1">
-                      {driver.driver_record?.id && driverPools[driver.driver_record.id]?.includes("public") && (
-                        <Badge variant="outline" className="text-xs">Public</Badge>
-                      )}
-                      {driver.driver_record?.id && driverPools[driver.driver_record.id]?.includes("private") && (
-                        <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">Private</Badge>
-                      )}
-                      {(!driver.driver_record?.id || !driverPools[driver.driver_record.id]?.length) && (
+                    <div className="flex flex-wrap gap-1">
+                      {driver.driver_record?.id && driverPools[driver.driver_record.id]?.length > 0 ? (
+                        driverPools[driver.driver_record.id].map((poolName, idx) => (
+                          <Badge key={idx} variant="outline" className="text-xs">{poolName}</Badge>
+                        ))
+                      ) : (
                         <span className="text-muted-foreground text-sm">-</span>
                       )}
                     </div>

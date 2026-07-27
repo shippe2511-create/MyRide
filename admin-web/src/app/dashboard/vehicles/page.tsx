@@ -109,6 +109,8 @@ export default function VehiclesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [search, setSearch] = useState("")
+  const [departmentFilter, setDepartmentFilter] = useState("")
+  const [categoryFilter, setCategoryFilter] = useState("")
   const [departments, setDepartments] = useState<Department[]>([])
   const [formData, setFormData] = useState({
     name: "",
@@ -140,7 +142,7 @@ export default function VehiclesPage() {
     staleTime: 30 * 1000,
   })
 
-  // Load departments
+  // Load departments and set Transport as default
   useEffect(() => {
     const loadDepartments = async () => {
       const { data } = await supabase
@@ -149,6 +151,9 @@ export default function VehiclesPage() {
         .eq("is_active", true)
         .order("name")
       setDepartments(data || [])
+      // Set Transport as default filter
+      const transport = data?.find(d => d.name.toLowerCase() === "transport")
+      if (transport) setDepartmentFilter(transport.id)
     }
     loadDepartments()
   }, [])
@@ -322,8 +327,13 @@ export default function VehiclesPage() {
 
   const activeCount = vehicles.filter(v => v.is_active).length
 
-  // Filter vehicles by search
+  // Filter vehicles by search, department, and category
   const filteredVehicles = vehicles.filter(v => {
+    // Department filter
+    if (departmentFilter && departmentFilter !== "all" && v.department_id !== departmentFilter) return false
+    // Category filter
+    if (categoryFilter && categoryFilter !== "all" && v.icon !== categoryFilter) return false
+    // Search filter
     if (!search.trim()) return true
     const searchLower = search.toLowerCase()
     return (
@@ -331,7 +341,8 @@ export default function VehiclesPage() {
       v.display_name?.toLowerCase().includes(searchLower) ||
       v.plate_no?.toLowerCase().includes(searchLower) ||
       v.make_model?.toLowerCase().includes(searchLower) ||
-      v.color?.toLowerCase().includes(searchLower)
+      v.color?.toLowerCase().includes(searchLower) ||
+      v.department?.name?.toLowerCase().includes(searchLower)
     )
   })
 
@@ -466,14 +477,38 @@ export default function VehiclesPage() {
                 Configure vehicle types and features for your transport service
               </CardDescription>
             </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search vehicles..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-64 pl-9"
-              />
+            <div className="flex items-center gap-3">
+              <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="All Departments" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {departments.map(d => (
+                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-36">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {VEHICLE_CATEGORIES.map(c => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search vehicles..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-64 pl-9"
+                />
+              </div>
             </div>
           </div>
         </CardHeader>

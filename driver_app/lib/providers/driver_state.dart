@@ -1157,16 +1157,17 @@ class DriverState extends ChangeNotifier {
             // Refresh vehicle info first
             await refreshVehicleInfo();
 
-            // If vehicle changed and driver is online, go offline and notify
+            // If vehicle changed, require new checklist
             if (oldVehicleId.isNotEmpty && newVehicleId != null && oldVehicleId != newVehicleId) {
               debugPrint('Vehicle changed! Requiring new checklist');
-              // Force driver offline - need new checklist for new vehicle
+              _vehicleChangedNeedsChecklist = true;
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('vehicleChangedNeedsChecklist', true);
+
+              // Force driver offline if online
               if (_isOnline) {
                 _isOnline = false;
-                _vehicleChangedNeedsChecklist = true;
-                final prefs = await SharedPreferences.getInstance();
                 await prefs.setBool('isOnline', false);
-                await prefs.setBool('vehicleChangedNeedsChecklist', true);
                 // Update Supabase
                 await SupabaseService.updateDriverStatus(
                   driverId: _driverId,

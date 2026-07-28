@@ -181,6 +181,7 @@ export default function ControlRoomPage() {
   const [driverAvailCollapsed, setDriverAvailCollapsed] = useState(false)
   const [tripsByZoneCollapsed, setTripsByZoneCollapsed] = useState(false)
   const [alertsCollapsed, setAlertsCollapsed] = useState(false)
+  const [ratingsCollapsed, setRatingsCollapsed] = useState(false)
 
   // Resizable panels state (percentage widths)
   const [leftPanelWidth, setLeftPanelWidth] = useState(42) // 42% default
@@ -2166,16 +2167,21 @@ export default function ControlRoomPage() {
             </Card>
           )}
 
-          {/* Live Ratings Ticker */}
+          {/* Live Ratings Ticker - Collapsible */}
           {recentRatings.length > 0 && (
-            <Card className="shrink-0 p-3">
-              <div className="flex items-center justify-between mb-2">
+            <Card className="shrink-0 overflow-hidden">
+              <button
+                onClick={() => setRatingsCollapsed(!ratingsCollapsed)}
+                className="w-full flex items-center justify-between p-2 hover:bg-muted/30 transition-colors"
+              >
                 <h2 className="text-sm font-semibold flex items-center gap-2 text-yellow-400">
                   <Star className="h-4 w-4 fill-yellow-400" />
                   Recent Ratings
                 </h2>
-              </div>
-              <div className="space-y-1 max-h-[60px] overflow-y-auto">
+                {ratingsCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
+              {!ratingsCollapsed && (
+              <div className="space-y-1 max-h-[60px] overflow-y-auto px-2 pb-2">
                 {recentRatings.slice(0, 3).map((rating) => (
                   <div
                     key={rating.id}
@@ -2204,6 +2210,7 @@ export default function ControlRoomPage() {
                   </div>
                 ))}
               </div>
+              )}
             </Card>
           )}
         </div>

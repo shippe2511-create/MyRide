@@ -1603,26 +1603,97 @@ export default function ControlRoomPage() {
 
           {/* Response Time Trend */}
           <Card className="shrink-0 p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-semibold flex items-center gap-2">
-                <Timer className="h-4 w-4 text-cyan-400" />
-                Response Time
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold">
+                Response Time Trend <span className="text-muted-foreground font-normal">(Minutes)</span>
               </h2>
-              <Badge variant="outline" className="text-[10px] text-cyan-400 border-cyan-400">
-                {formatDuration(metrics?.avgAcceptSeconds ?? 0)} avg
+              <Badge variant="outline" className="text-[10px]">
+                Today
               </Badge>
             </div>
-            <div className="h-12">
-              <Sparkline
-                data={hourlyTrends.map(h => h.completed > 0 ? h.requests / h.completed * 60 : 0)}
-                color="#22d3ee"
-                height={48}
-              />
-            </div>
-            <div className="flex justify-between text-[9px] text-muted-foreground mt-1">
-              <span>12 AM</span>
-              <span>Now</span>
-            </div>
+            {(() => {
+              // Calculate response time data per hour (in minutes)
+              const responseData = hourlyTrends.map(h => {
+                if (h.completed > 0) {
+                  return Math.round((h.requests / h.completed) * 10) / 10 // Response time in minutes
+                }
+                return 0
+              })
+
+              const maxVal = Math.max(...responseData, 1)
+              const roundedMax = Math.ceil(maxVal / 5) * 5 || 15
+              const height = 100
+              const width = 280
+              const padding = { left: 25, right: 10, top: 10, bottom: 20 }
+              const chartWidth = width - padding.left - padding.right
+              const chartHeight = height - padding.top - padding.bottom
+
+              // Generate points
+              const points = responseData.map((val, i) => {
+                const x = padding.left + (i / (responseData.length - 1)) * chartWidth
+                const y = padding.top + chartHeight - (val / roundedMax) * chartHeight
+                return { x, y, val, hour: i }
+              })
+
+              const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ")
+              const areaD = `${pathD} L ${points[points.length - 1].x} ${padding.top + chartHeight} L ${padding.left} ${padding.top + chartHeight} Z`
+
+              const currentHour = new Date().getHours()
+              const currentVal = responseData[currentHour] || responseData[responseData.length - 1] || 0
+
+              return (
+                <div className="relative">
+                  <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ height: 120 }}>
+                    {/* Grid lines */}
+                    {[0, 5, 10, 15].filter(v => v <= roundedMax).map(val => {
+                      const y = padding.top + chartHeight - (val / roundedMax) * chartHeight
+                      return (
+                        <g key={val}>
+                          <line x1={padding.left} y1={y} x2={width - padding.right} y2={y} stroke="currentColor" strokeOpacity={0.1} strokeDasharray="2,2" />
+                          <text x={padding.left - 5} y={y + 3} fontSize={8} fill="currentColor" opacity={0.5} textAnchor="end">{val}</text>
+                        </g>
+                      )
+                    })}
+                    {/* Area fill */}
+                    <path d={areaD} fill="url(#responseGradient)" />
+                    {/* Line */}
+                    <path d={pathD} fill="none" stroke="#22d3ee" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    {/* Data points */}
+                    {points.filter((_, i) => i % 2 === 0).map((p, i) => (
+                      <circle key={i} cx={p.x} cy={p.y} r={3} fill="#22d3ee" stroke="#0f172a" strokeWidth={1.5} />
+                    ))}
+                    {/* Current value indicator */}
+                    <g>
+                      <line x1={points[currentHour]?.x || points[points.length - 1].x} y1={padding.top} x2={points[currentHour]?.x || points[points.length - 1].x} y2={padding.top + chartHeight} stroke="#22d3ee" strokeOpacity={0.5} strokeDasharray="3,3" />
+                      <circle cx={points[currentHour]?.x || points[points.length - 1].x} cy={points[currentHour]?.y || points[points.length - 1].y} r={4} fill="#22d3ee" />
+                    </g>
+                    {/* Gradient definition */}
+                    <defs>
+                      <linearGradient id="responseGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="#22d3ee" stopOpacity={0.05} />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  {/* Current value tooltip */}
+                  <div
+                    className="absolute bg-slate-800 text-white text-xs px-2 py-1 rounded shadow-lg"
+                    style={{
+                      right: 10,
+                      top: 30,
+                    }}
+                  >
+                    {currentVal.toFixed(1)} min
+                  </div>
+                  {/* X-axis labels */}
+                  <div className="flex justify-between text-[9px] text-muted-foreground mt-1 px-6">
+                    {["12 AM", "2 AM", "4 AM", "6 AM", "8 AM", "10 AM", "12 PM"].map((label, i) => (
+                      <span key={i}>{label}</span>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
           </Card>
 
           {/* Driver Availability Donut */}

@@ -1009,10 +1009,10 @@ export default function ControlRoomPage() {
         />
       </div>
 
-      {/* Main Content - Responsive 3 columns */}
-      <div className={`flex-1 grid grid-cols-1 ${rightPanelCollapsed ? "lg:grid-cols-10" : "lg:grid-cols-12"} gap-3 min-h-0 overflow-y-auto lg:overflow-hidden`}>
+      {/* Main Content - Responsive 3 columns (5-4-3 layout) */}
+      <div className={`flex-1 grid grid-cols-1 ${rightPanelCollapsed ? "lg:grid-cols-9" : "lg:grid-cols-12"} gap-3 min-h-0 overflow-y-auto lg:overflow-hidden`}>
         {/* Left Column - Live Trips Table with Timeline */}
-        <div className={`col-span-1 ${rightPanelCollapsed ? "lg:col-span-6" : "lg:col-span-6"} flex flex-col min-h-[300px] lg:min-h-0`}>
+        <div className={`col-span-1 ${rightPanelCollapsed ? "lg:col-span-5" : "lg:col-span-5"} flex flex-col min-h-[300px] lg:min-h-0`}>
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-semibold flex items-center gap-2">
               <Car className="h-4 w-4 text-blue-400" />
@@ -1305,7 +1305,7 @@ export default function ControlRoomPage() {
         </div>
 
         {/* Center Column - Map + Alerts */}
-        <div className={`col-span-1 ${rightPanelCollapsed ? "lg:col-span-4" : "lg:col-span-4"} flex flex-col gap-2 min-h-[400px] lg:min-h-0`}>
+        <div className={`col-span-1 ${rightPanelCollapsed ? "lg:col-span-4" : "lg:col-span-4"} flex flex-col gap-2 min-h-[400px] lg:min-h-0 overflow-hidden`}>
           {/* SOS Alerts Panel - TOP PRIORITY */}
           {sosAlerts.length > 0 && (
             <Card className="shrink-0 border-red-500 bg-red-500/10 p-3 animate-pulse">
@@ -1563,7 +1563,7 @@ export default function ControlRoomPage() {
 
         {/* Right Column - Shuttles + Trends - Collapsible */}
         {!rightPanelCollapsed ? (
-        <div className="col-span-1 lg:col-span-2 flex flex-col gap-2 min-h-0 relative">
+        <div className="col-span-1 lg:col-span-3 flex flex-col gap-2 min-h-0 relative overflow-hidden">
           {/* Collapse Right Panel Button */}
           <Button
             variant="ghost"

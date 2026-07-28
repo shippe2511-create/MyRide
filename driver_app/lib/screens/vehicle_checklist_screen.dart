@@ -339,6 +339,16 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
       return false;
     }
 
+    if (hours < 0) {
+      setState(() => _runningHoursError = 'Hours cannot be negative');
+      return false;
+    }
+
+    if (hours > 9999999) {
+      setState(() => _runningHoursError = 'Value too large (max 9,999,999)');
+      return false;
+    }
+
     if (_previousRunningHours != null && hours < _previousRunningHours!) {
       setState(() => _runningHoursError = 'Cannot be less than previous (${_previousRunningHours!.toStringAsFixed(1)})');
       return false;
@@ -1482,7 +1492,15 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
                       } catch (e) {
                         debugPrint('Failed to save checklist: $e');
                         if (context.mounted) {
-                          AppSnackbar.error(context, 'Failed to save', subtitle: '$e');
+                          String errorMsg = 'Please try again';
+                          if (e.toString().contains('numeric field overflow') ||
+                              e.toString().contains('precision')) {
+                            errorMsg = 'Running hours value is too large';
+                          } else if (e.toString().contains('network') ||
+                                     e.toString().contains('connection')) {
+                            errorMsg = 'Check your internet connection';
+                          }
+                          AppSnackbar.error(context, 'Failed to save checklist', subtitle: errorMsg);
                         }
                         return;
                       }

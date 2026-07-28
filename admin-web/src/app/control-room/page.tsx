@@ -449,16 +449,25 @@ export default function ControlRoomPage() {
   // Attention level
   const attentionLevel = metrics ? getAttentionLevel(metrics) : "calm"
 
-  // Sort and filter trips
+  // Sort and filter trips - include completed trips for 5 seconds before removing
   const sortedFilteredTrips = activeTrips
-    .filter(trip => tripsFilter === "all" || trip.status === tripsFilter)
+    .filter(trip => {
+      // Filter out completed trips older than 5 seconds
+      if (trip.status === "completed") {
+        if (!trip.completed_at) return false
+        const completedTime = new Date(trip.completed_at).getTime()
+        const now = Date.now()
+        return (now - completedTime) < 5000 // Keep for 5 seconds
+      }
+      return tripsFilter === "all" || trip.status === tripsFilter
+    })
     .sort((a, b) => {
       let cmp = 0
       if (tripsSortBy === "wait") {
         cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       } else if (tripsSortBy === "status") {
-        const order = { pending: 0, accepted: 1, arrived: 2, in_progress: 3 }
-        cmp = (order[a.status as keyof typeof order] ?? 4) - (order[b.status as keyof typeof order] ?? 4)
+        const order = { pending: 0, accepted: 1, arrived: 2, in_progress: 3, completed: 4 }
+        cmp = (order[a.status as keyof typeof order] ?? 5) - (order[b.status as keyof typeof order] ?? 5)
       } else if (tripsSortBy === "customer") {
         cmp = (a.customer?.full_name || "").localeCompare(b.customer?.full_name || "")
       }
@@ -1145,13 +1154,15 @@ export default function ControlRoomPage() {
                               trip.status === "accepted" ? "bg-purple-500" :
                               trip.status === "arrived" ? "bg-blue-500" :
                               trip.status === "in_progress" ? "bg-green-500" :
+                              trip.status === "completed" ? "bg-emerald-500" :
                               "bg-gray-500"
                             } text-white text-[9px] px-2`}>
                               {trip.status === "pending" ? "PENDING" :
                                trip.status === "accepted" ? "EN ROUTE" :
                                trip.status === "arrived" ? "ARRIVED" :
                                trip.status === "in_progress" ? "IN PROGRESS" :
-                               "COMPLETED"}
+                               trip.status === "completed" ? "COMPLETED" :
+                               "UNKNOWN"}
                             </Badge>
                           </td>
                           {/* Journey Progress - 4 stages with connecting lines */}

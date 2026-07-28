@@ -244,7 +244,7 @@ export async function getActiveTrips(
         vehicle:vehicles(vehicle_number, vehicle_model)
       )
     `)
-    .in('status', ['pending', 'accepted', 'arrived', 'in_progress'])
+    .in('status', ['pending', 'accepted', 'arrived', 'in_progress', 'completed'])
     .order('created_at', { ascending: true })
 
   const { data, error } = await query

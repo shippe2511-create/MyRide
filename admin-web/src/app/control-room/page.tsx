@@ -1099,7 +1099,7 @@ export default function ControlRoomPage() {
                                 {trip.driver?.vehicle?.vehicle_number || "—"}
                               </span>
                               <span className="text-[10px] text-muted-foreground">
-                                {trip.driver?.vehicle_id ? trip.driver.vehicle_id.slice(0, 8).toUpperCase() : "—"}
+                                {(trip.driver?.vehicle as any)?.vehicle_model || "—"}
                               </span>
                             </div>
                           </td>

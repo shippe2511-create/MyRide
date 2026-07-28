@@ -241,7 +241,7 @@ export async function getActiveTrips(
       driver:drivers!rides_driver_id_fkey(
         profile:profiles(full_name),
         vehicle_id,
-        vehicle:vehicles(vehicle_number)
+        vehicle:vehicles(vehicle_number, vehicle_model)
       )
     `)
     .in('status', ['pending', 'accepted', 'arrived', 'in_progress'])

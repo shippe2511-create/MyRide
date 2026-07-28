@@ -54,7 +54,8 @@ import {
   ChevronUp, ChevronDown, Filter, Eye, PhoneCall, XCircle,
   ArrowUpDown, Volume2, VolumeX, Keyboard, Siren, Star, CalendarClock,
   UserMinus, Zap, Target, Award, Megaphone, Pause, Play, Shield,
-  Trophy, Cloud, Sun, CloudRain, Search, Command, History, MapPinned, Send
+  Trophy, Cloud, Sun, CloudRain, Search, Command, History, MapPinned, Send,
+  PanelRightClose, PanelRightOpen, ChevronRight
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -167,6 +168,13 @@ export default function ControlRoomPage() {
 
   // Heatmap overlay state
   const [showHeatmap, setShowHeatmap] = useState(false)
+
+  // Collapsible panels state
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false)
+  const [mapCollapsed, setMapCollapsed] = useState(false)
+  const [shuttlesCollapsed, setShuttlesCollapsed] = useState(false)
+  const [fleetCollapsed, setFleetCollapsed] = useState(false)
+  const [recentCollapsed, setRecentCollapsed] = useState(false)
 
   // Geofence alerts state
   const [geofenceAlerts, setGeofenceAlerts] = useState<Array<{
@@ -1002,9 +1010,9 @@ export default function ControlRoomPage() {
       </div>
 
       {/* Main Content - Responsive 3 columns */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 min-h-0 overflow-y-auto lg:overflow-hidden">
+      <div className={`flex-1 grid grid-cols-1 ${rightPanelCollapsed ? "lg:grid-cols-10" : "lg:grid-cols-12"} gap-3 min-h-0 overflow-y-auto lg:overflow-hidden`}>
         {/* Left Column - Live Trips Table with Timeline */}
-        <div className="col-span-1 lg:col-span-6 flex flex-col min-h-[300px] lg:min-h-0">
+        <div className={`col-span-1 ${rightPanelCollapsed ? "lg:col-span-6" : "lg:col-span-6"} flex flex-col min-h-[300px] lg:min-h-0`}>
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-semibold flex items-center gap-2">
               <Car className="h-4 w-4 text-blue-400" />
@@ -1297,7 +1305,7 @@ export default function ControlRoomPage() {
         </div>
 
         {/* Center Column - Map + Alerts */}
-        <div className="col-span-1 lg:col-span-4 flex flex-col gap-2 min-h-[400px] lg:min-h-0">
+        <div className={`col-span-1 ${rightPanelCollapsed ? "lg:col-span-4" : "lg:col-span-4"} flex flex-col gap-2 min-h-[400px] lg:min-h-0`}>
           {/* SOS Alerts Panel - TOP PRIORITY */}
           {sosAlerts.length > 0 && (
             <Card className="shrink-0 border-red-500 bg-red-500/10 p-3 animate-pulse">
@@ -1372,9 +1380,19 @@ export default function ControlRoomPage() {
             </Card>
           ) : null}
 
-          {/* Live Map */}
-          <Card className="flex-[2] min-h-[250px] overflow-hidden">
-            <ControlRoomMap
+          {/* Live Map - Collapsible */}
+          <Card className={`${mapCollapsed ? "shrink-0" : "flex-[2] min-h-[250px]"} overflow-hidden`}>
+            <button
+              onClick={() => setMapCollapsed(!mapCollapsed)}
+              className="w-full flex items-center justify-between p-2 hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center gap-2 text-xs font-semibold">
+                <MapPin className="h-4 w-4 text-blue-400" />
+                Live Map
+              </div>
+              {mapCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            {!mapCollapsed && <ControlRoomMap
               trips={mapMarkers}
               followingId={followingId}
               showHeatmap={showHeatmap}
@@ -1391,7 +1409,7 @@ export default function ControlRoomPage() {
                   toast.warning(`${alert.driver} left ${alert.zone}`)
                 }
               }}
-            />
+            />}
           </Card>
 
           {/* Requests by Hour Chart */}
@@ -1434,15 +1452,21 @@ export default function ControlRoomPage() {
             )}
           </Card>
 
-          {/* Fleet Status with Progress Bars */}
-          <Card className="shrink-0 p-2">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-xs font-semibold">Fleet status</h2>
-              <Badge variant="outline" className="text-[10px]">
-                {totalDrivers} vehicles
-              </Badge>
-            </div>
-            <div className="space-y-2">
+          {/* Fleet Status with Progress Bars - Collapsible */}
+          <Card className="shrink-0 overflow-hidden">
+            <button
+              onClick={() => setFleetCollapsed(!fleetCollapsed)}
+              className="w-full flex items-center justify-between p-2 hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <h2 className="text-xs font-semibold">Fleet status</h2>
+                <Badge variant="outline" className="text-[10px]">
+                  {totalDrivers} vehicles
+                </Badge>
+              </div>
+              {fleetCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            {!fleetCollapsed && <div className="space-y-2 px-2 pb-2">
               {/* On Trip */}
               <div className="flex items-center gap-2">
                 <span className="text-xs w-16">On trip</span>
@@ -1482,15 +1506,22 @@ export default function ControlRoomPage() {
                   {Math.max(0, onlineDrivers - activeTrips.length)}
                 </span>
               </div>
-            </div>
+            </div>}
           </Card>
 
-          {/* Recently Completed */}
-          <Card className="shrink-0 p-2 max-h-[140px] overflow-hidden">
-            <div className="flex items-center justify-between mb-1">
-              <h2 className="text-xs font-semibold">Recently completed</h2>
-            </div>
-            <div className="space-y-1 overflow-y-auto max-h-[100px]">
+          {/* Recently Completed - Collapsible */}
+          <Card className="shrink-0 overflow-hidden">
+            <button
+              onClick={() => setRecentCollapsed(!recentCollapsed)}
+              className="w-full flex items-center justify-between p-2 hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <h2 className="text-xs font-semibold">Recently completed</h2>
+                <Badge variant="outline" className="text-[10px]">{recentlyCompleted.length}</Badge>
+              </div>
+              {recentCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            {!recentCollapsed && <div className="space-y-1 overflow-y-auto max-h-[100px] px-2 pb-2">
               {recentlyCompleted.length === 0 ? (
                 <div className="text-xs text-muted-foreground text-center py-4">No completed trips yet</div>
               ) : (
@@ -1526,23 +1557,38 @@ export default function ControlRoomPage() {
                   )
                 })
               )}
-            </div>
+            </div>}
           </Card>
         </div>
 
-        {/* Right Column - Shuttles + Trends */}
-        <div className="col-span-1 lg:col-span-2 flex flex-col gap-2 min-h-0">
-          {/* Active Shuttles */}
+        {/* Right Column - Shuttles + Trends - Collapsible */}
+        {!rightPanelCollapsed ? (
+        <div className="col-span-1 lg:col-span-2 flex flex-col gap-2 min-h-0 relative">
+          {/* Collapse Right Panel Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute -left-3 top-0 h-6 w-6 rounded-full bg-background border shadow-sm z-10 hidden lg:flex"
+            onClick={() => setRightPanelCollapsed(true)}
+            title="Collapse panel"
+          >
+            <PanelRightClose className="h-3 w-3" />
+          </Button>
+
+          {/* Active Shuttles - Collapsible */}
           <div className="flex-1 flex flex-col min-h-0">
-            <div className="flex items-center justify-between mb-2">
+            <button
+              onClick={() => setShuttlesCollapsed(!shuttlesCollapsed)}
+              className="flex items-center justify-between mb-2 hover:opacity-80 transition-opacity w-full"
+            >
               <h2 className="text-sm font-semibold flex items-center gap-2">
                 <Bus className="h-4 w-4 text-green-400" />
                 Active Shuttles
+                <Badge variant="outline" className="text-[10px]">{activeShuttles.length}</Badge>
               </h2>
-              <span className="text-xs text-muted-foreground">
-                {activeShuttles.length} running
-              </span>
-            </div>
+              {shuttlesCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            {!shuttlesCollapsed ? (
             <Card className="flex-1 overflow-hidden">
               <div className="h-full overflow-y-auto p-2 space-y-2">
                 {activeShuttles.length === 0 ? (
@@ -1644,6 +1690,7 @@ export default function ControlRoomPage() {
                 )}
               </div>
             </Card>
+            ) : null}
           </div>
 
           {/* Response Time Trend */}
@@ -2054,6 +2101,61 @@ export default function ControlRoomPage() {
             </Card>
           )}
         </div>
+        ) : (
+        /* Collapsed Right Panel - Just a thin expand button */
+        <div className="hidden lg:flex flex-col items-center justify-start pt-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full bg-muted/50 hover:bg-muted"
+                onClick={() => setRightPanelCollapsed(false)}
+              >
+                <PanelRightOpen className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>Expand panel</p>
+            </TooltipContent>
+          </Tooltip>
+          {/* Mini indicators when collapsed */}
+          <div className="mt-4 space-y-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-500/20">
+                  <Bus className="h-4 w-4 text-green-400" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                <p>{activeShuttles.length} shuttles running</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500/20">
+                  <Users className="h-4 w-4 text-blue-400" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                <p>{onlineDrivers} drivers online</p>
+              </TooltipContent>
+            </Tooltip>
+            {sosAlerts.length > 0 && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-red-500/20 animate-pulse">
+                    <Siren className="h-4 w-4 text-red-400" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  <p>{sosAlerts.length} SOS alerts!</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+        </div>
+        )}
       </div>
 
       {/* Footer - Responsive */}

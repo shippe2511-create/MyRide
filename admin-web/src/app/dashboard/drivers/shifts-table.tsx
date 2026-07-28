@@ -28,7 +28,7 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover"
 import {
-  Plus, Loader2, Clock, Calendar, Trash2, Pencil, Users, Wand2, MoreHorizontal, Search, CalendarDays
+  Plus, Loader2, Clock, Calendar, Trash2, Pencil, Users, Wand2, MoreHorizontal, Search, CalendarDays, Download, Upload, FileSpreadsheet
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
@@ -94,6 +94,19 @@ export function ShiftsTable() {
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [clearAllOpen, setClearAllOpen] = useState(false)
   const [clearingAll, setClearingAll] = useState(false)
+
+  // Import/Export states
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [importLoading, setImportLoading] = useState(false)
+  const [importPreview, setImportPreview] = useState<Array<{
+    driver_name: string
+    driver_id: string | null
+    shift_date: string
+    start_time: string
+    end_time: string
+    shift_type: string
+  }>>([])
+  const [importError, setImportError] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     driver_ids: [] as string[],
@@ -580,6 +593,161 @@ export function ShiftsTable() {
     setAutoScheduleDrivers([])
   }
 
+  // Export shifts to CSV
+  const exportCSV = () => {
+    const headers = ["Driver Name", "Phone", "Date", "Start Time", "End Time", "Shift Type", "Status", "Attendance"]
+    const rows = shifts.map(shift => {
+      const profile = getDriverProfile(shift.driver)
+      return [
+        profile?.full_name || "Unknown",
+        profile?.phone || "",
+        shift.shift_date,
+        shift.start_time?.substring(0, 5) || "",
+        shift.end_time?.substring(0, 5) || "",
+        shift.shift_type || "",
+        shift.status || "",
+        shift.attendance_status || "pending"
+      ]
+    })
+
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `shifts_${formatDateInput(weekStart)}_to_${formatDateInput(weekEnd)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success(`Exported ${shifts.length} shifts`)
+  }
+
+  // Download import template
+  const downloadTemplate = () => {
+    const headers = ["driver_name", "shift_date", "start_time", "end_time", "shift_type"]
+    const exampleRows = [
+      ["Hussain Moosa", "2026-07-28", "08:00", "16:00", "full_day"],
+      ["Mujuthaba Nizar", "2026-07-28", "08:00", "12:00", "morning"],
+      ["Mohamed Fazeem", "2026-07-29", "12:00", "18:00", "afternoon"],
+    ]
+
+    const csv = [headers, ...exampleRows].map(row => row.join(",")).join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "shifts_import_template.csv"
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Handle file upload
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setImportError(null)
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string
+        const lines = text.split("\n").filter(line => line.trim())
+        if (lines.length < 2) {
+          setImportError("CSV must have a header row and at least one data row")
+          return
+        }
+
+        const headers = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/["']/g, ""))
+        const driverNameIdx = headers.findIndex(h => h.includes("driver") && h.includes("name"))
+        const dateIdx = headers.findIndex(h => h.includes("date"))
+        const startIdx = headers.findIndex(h => h.includes("start"))
+        const endIdx = headers.findIndex(h => h.includes("end"))
+        const typeIdx = headers.findIndex(h => h.includes("type"))
+
+        if (driverNameIdx === -1 || dateIdx === -1) {
+          setImportError("CSV must have 'driver_name' and 'shift_date' columns")
+          return
+        }
+
+        const parsed: typeof importPreview = []
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(",").map(v => v.trim().replace(/["']/g, ""))
+          const driverName = values[driverNameIdx] || ""
+          const shiftDate = values[dateIdx] || ""
+
+          if (!driverName || !shiftDate) continue
+
+          // Try to match driver by name
+          const matchedDriver = drivers.find(d => {
+            const profile = getDriverProfile(d)
+            return profile?.full_name?.toLowerCase().includes(driverName.toLowerCase()) ||
+              driverName.toLowerCase().includes(profile?.full_name?.toLowerCase() || "xxx")
+          })
+
+          parsed.push({
+            driver_name: driverName,
+            driver_id: matchedDriver?.id || null,
+            shift_date: shiftDate,
+            start_time: startIdx !== -1 ? (values[startIdx] || "08:00") : "08:00",
+            end_time: endIdx !== -1 ? (values[endIdx] || "16:00") : "16:00",
+            shift_type: typeIdx !== -1 ? (values[typeIdx] || "full_day") : "full_day",
+          })
+        }
+
+        if (parsed.length === 0) {
+          setImportError("No valid rows found in CSV")
+          return
+        }
+
+        const unmatchedCount = parsed.filter(p => !p.driver_id).length
+        if (unmatchedCount > 0) {
+          setImportError(`${unmatchedCount} row(s) have unmatched driver names - they will be skipped`)
+        }
+
+        setImportPreview(parsed)
+      } catch {
+        setImportError("Failed to parse CSV file")
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ""
+  }
+
+  // Handle import
+  const handleImport = async () => {
+    const validRows = importPreview.filter(row => row.driver_id)
+    if (validRows.length === 0) {
+      toast.error("No valid rows to import")
+      return
+    }
+
+    setImportLoading(true)
+    const shiftsToInsert = validRows.map(row => ({
+      driver_id: row.driver_id!,
+      shift_date: row.shift_date,
+      start_time: row.start_time.length === 5 ? row.start_time + ":00" : row.start_time,
+      end_time: row.end_time.length === 5 ? row.end_time + ":00" : row.end_time,
+      shift_type: row.shift_type,
+      status: "scheduled",
+    }))
+
+    // Use upsert to update existing or create new
+    const { error } = await supabase.from("shifts").upsert(shiftsToInsert, {
+      onConflict: "driver_id,shift_date",
+      ignoreDuplicates: false,
+    })
+
+    if (error) {
+      toast.error("Import failed: " + error.message)
+    } else {
+      toast.success(`Imported ${validRows.length} shifts`)
+      setImportDialogOpen(false)
+      setImportPreview([])
+      setImportError(null)
+      loadData(false)
+    }
+    setImportLoading(false)
+  }
+
   const stats = {
     total: shifts.length,
     scheduled: shifts.filter(s => s.status === "scheduled").length,
@@ -867,6 +1035,14 @@ export function ShiftsTable() {
             <Button size="sm" variant="outline" className="text-red-500 border-red-500/50 hover:bg-red-500/10" onClick={() => setClearAllOpen(true)}>
               <Trash2 className="h-4 w-4 mr-2" />
               Clear All
+            </Button>
+            <Button size="sm" variant="outline" onClick={exportCSV}>
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setImportDialogOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Import
             </Button>
             <Button size="sm" variant="outline" onClick={() => setAutoScheduleOpen(true)}>
               <Wand2 className="h-4 w-4 mr-2" />
@@ -1751,6 +1927,119 @@ export function ShiftsTable() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Import CSV Dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={(open) => {
+        setImportDialogOpen(open)
+        if (!open) {
+          setImportPreview([])
+          setImportError(null)
+        }
+      }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5" />
+              Import Shifts from CSV
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Upload a CSV file with shift data. Required columns: <code className="bg-muted px-1 rounded">driver_name</code>, <code className="bg-muted px-1 rounded">shift_date</code>.
+              Optional: <code className="bg-muted px-1 rounded">start_time</code>, <code className="bg-muted px-1 rounded">end_time</code>, <code className="bg-muted px-1 rounded">shift_type</code>.
+            </p>
+
+            <div className="flex items-center gap-4">
+              <Input
+                type="file"
+                accept=".csv"
+                onChange={handleFileUpload}
+                className="flex-1"
+              />
+              <Button variant="outline" size="sm" onClick={downloadTemplate}>
+                <Download className="mr-2 h-4 w-4" />
+                Template
+              </Button>
+            </div>
+
+            {importError && (
+              <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm text-amber-500">
+                {importError}
+              </div>
+            )}
+
+            {importPreview.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">
+                  {importPreview.filter(r => r.driver_id).length} of {importPreview.length} shifts ready to import:
+                </p>
+                <div className="max-h-64 overflow-auto rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Driver</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Time</TableHead>
+                        <TableHead>Type</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {importPreview.slice(0, 15).map((row, i) => (
+                        <TableRow key={i} className={!row.driver_id ? "opacity-50" : ""}>
+                          <TableCell>
+                            {row.driver_id ? (
+                              <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/30">
+                                Matched
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/30">
+                                No Match
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="font-medium">{row.driver_name}</TableCell>
+                          <TableCell className="text-muted-foreground">{row.shift_date}</TableCell>
+                          <TableCell className="text-muted-foreground">{row.start_time} - {row.end_time}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{row.shift_type}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {importPreview.length > 15 && (
+                    <p className="p-2 text-center text-sm text-muted-foreground">
+                      ... and {importPreview.length - 15} more
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={handleImport}
+              disabled={importLoading || importPreview.filter(r => r.driver_id).length === 0}
+            >
+              {importLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import {importPreview.filter(r => r.driver_id).length} Shifts
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

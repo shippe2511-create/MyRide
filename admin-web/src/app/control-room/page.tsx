@@ -1094,9 +1094,16 @@ export default function ControlRoomPage() {
                           </td>
                           {/* Vehicle No. */}
                           <td className="p-2">
-                            <span className="font-mono text-sm">
-                              {trip.driver?.vehicle?.vehicle_number || "—"}
-                            </span>
+                            <div className="flex flex-col">
+                              <span className="font-mono text-sm font-medium">
+                                {trip.driver?.vehicle?.vehicle_number || "—"}
+                              </span>
+                              {trip.driver?.vehicle_id && (
+                                <span className="text-[9px] text-muted-foreground font-mono truncate max-w-[80px]">
+                                  {trip.driver.vehicle_id.slice(0, 8)}...
+                                </span>
+                              )}
+                            </div>
                           </td>
                           {/* Driver Name */}
                           <td className="p-2">

@@ -1094,9 +1094,14 @@ export default function ControlRoomPage() {
                           </td>
                           {/* Vehicle No. */}
                           <td className="p-2">
-                            <span className="font-mono text-sm">
-                              {trip.driver?.vehicle?.vehicle_number || "—"}
-                            </span>
+                            <div className="flex flex-col">
+                              <span className="font-mono text-sm font-semibold">
+                                {trip.driver?.vehicle?.vehicle_number || "—"}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {trip.driver?.vehicle_id ? trip.driver.vehicle_id.slice(0, 8).toUpperCase() : "—"}
+                              </span>
+                            </div>
                           </td>
                           {/* Driver Name */}
                           <td className="p-2">

@@ -55,7 +55,7 @@ import {
   ArrowUpDown, Volume2, VolumeX, Keyboard, Siren, Star, CalendarClock,
   UserMinus, Zap, Target, Award, Megaphone, Pause, Play, Shield,
   Trophy, Cloud, Sun, CloudRain, Search, Command, History, MapPinned, Send,
-  PanelRightClose, PanelRightOpen, ChevronRight
+  PanelRightClose, PanelRightOpen, ChevronRight, GripVertical
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -175,6 +175,48 @@ export default function ControlRoomPage() {
   const [shuttlesCollapsed, setShuttlesCollapsed] = useState(false)
   const [fleetCollapsed, setFleetCollapsed] = useState(false)
   const [recentCollapsed, setRecentCollapsed] = useState(false)
+
+  // Resizable panels state (percentage widths)
+  const [leftPanelWidth, setLeftPanelWidth] = useState(42) // 42% default
+  const [rightPanelWidth, setRightPanelWidth] = useState(25) // 25% default
+  const [isResizingLeft, setIsResizingLeft] = useState(false)
+  const [isResizingRight, setIsResizingRight] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Handle resize drag
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!containerRef.current) return
+    const containerRect = containerRef.current.getBoundingClientRect()
+    const containerWidth = containerRect.width
+
+    if (isResizingLeft) {
+      const newWidth = ((e.clientX - containerRect.left) / containerWidth) * 100
+      setLeftPanelWidth(Math.max(25, Math.min(60, newWidth))) // min 25%, max 60%
+    } else if (isResizingRight) {
+      const newWidth = ((containerRect.right - e.clientX) / containerWidth) * 100
+      setRightPanelWidth(Math.max(15, Math.min(40, newWidth))) // min 15%, max 40%
+    }
+  }, [isResizingLeft, isResizingRight])
+
+  const handleMouseUp = useCallback(() => {
+    setIsResizingLeft(false)
+    setIsResizingRight(false)
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+  }, [])
+
+  useEffect(() => {
+    if (isResizingLeft || isResizingRight) {
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+      window.addEventListener('mousemove', handleMouseMove)
+      window.addEventListener('mouseup', handleMouseUp)
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove)
+        window.removeEventListener('mouseup', handleMouseUp)
+      }
+    }
+  }, [isResizingLeft, isResizingRight, handleMouseMove, handleMouseUp])
 
   // Geofence alerts state
   const [geofenceAlerts, setGeofenceAlerts] = useState<Array<{
@@ -1009,10 +1051,13 @@ export default function ControlRoomPage() {
         />
       </div>
 
-      {/* Main Content - Responsive 3 columns (5-4-3 layout) */}
-      <div className={`flex-1 grid grid-cols-1 ${rightPanelCollapsed ? "lg:grid-cols-9" : "lg:grid-cols-12"} gap-3 min-h-0 overflow-y-auto lg:overflow-hidden`}>
+      {/* Main Content - Resizable 3 columns */}
+      <div ref={containerRef} className="flex-1 flex flex-col lg:flex-row gap-0 min-h-0 overflow-y-auto lg:overflow-hidden">
         {/* Left Column - Live Trips Table with Timeline */}
-        <div className={`col-span-1 ${rightPanelCollapsed ? "lg:col-span-5" : "lg:col-span-5"} flex flex-col min-h-[300px] lg:min-h-0`}>
+        <div
+          className="flex flex-col min-h-[300px] lg:min-h-0 shrink-0"
+          style={{ width: typeof window !== 'undefined' && window.innerWidth >= 1024 ? `${leftPanelWidth}%` : '100%' }}
+        >
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-semibold flex items-center gap-2">
               <Car className="h-4 w-4 text-blue-400" />
@@ -1304,8 +1349,16 @@ export default function ControlRoomPage() {
           </Card>
         </div>
 
+        {/* Left Resize Handle */}
+        <div
+          className="hidden lg:flex items-center justify-center w-2 cursor-col-resize hover:bg-primary/20 transition-colors group"
+          onMouseDown={() => setIsResizingLeft(true)}
+        >
+          <div className="w-0.5 h-16 bg-border group-hover:bg-primary rounded-full transition-colors" />
+        </div>
+
         {/* Center Column - Map + Alerts */}
-        <div className={`col-span-1 ${rightPanelCollapsed ? "lg:col-span-4" : "lg:col-span-4"} flex flex-col gap-2 min-h-[400px] lg:min-h-0 overflow-hidden`}>
+        <div className="flex-1 flex flex-col gap-2 min-h-[400px] lg:min-h-0 overflow-hidden px-1">
           {/* SOS Alerts Panel - TOP PRIORITY */}
           {sosAlerts.length > 0 && (
             <Card className="shrink-0 border-red-500 bg-red-500/10 p-3 animate-pulse">
@@ -1561,14 +1614,25 @@ export default function ControlRoomPage() {
           </Card>
         </div>
 
+        {/* Right Resize Handle */}
+        <div
+          className="hidden lg:flex items-center justify-center w-2 cursor-col-resize hover:bg-primary/20 transition-colors group"
+          onMouseDown={() => setIsResizingRight(true)}
+        >
+          <div className="w-0.5 h-16 bg-border group-hover:bg-primary rounded-full transition-colors" />
+        </div>
+
         {/* Right Column - Shuttles + Trends - Collapsible */}
         {!rightPanelCollapsed ? (
-        <div className="col-span-1 lg:col-span-3 flex flex-col gap-2 min-h-0 relative overflow-hidden">
+        <div
+          className="flex flex-col gap-2 min-h-0 relative overflow-hidden shrink-0"
+          style={{ width: typeof window !== 'undefined' && window.innerWidth >= 1024 ? `${rightPanelWidth}%` : '100%' }}
+        >
           {/* Collapse Right Panel Button */}
           <Button
             variant="ghost"
             size="icon"
-            className="absolute -left-3 top-0 h-6 w-6 rounded-full bg-background border shadow-sm z-10 hidden lg:flex"
+            className="absolute -left-1 top-0 h-6 w-6 rounded-full bg-background border shadow-sm z-10 hidden lg:flex"
             onClick={() => setRightPanelCollapsed(true)}
             title="Collapse panel"
           >

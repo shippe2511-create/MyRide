@@ -364,10 +364,21 @@ export default function ControlRoomPage() {
   useEffect(() => {
     loadData()
 
+    // Debounced reload to prevent too many updates
+    let debounceTimer: NodeJS.Timeout | null = null
+    const debouncedLoadData = () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => {
+        console.log('[ControlRoom] Realtime update - reloading data')
+        loadData()
+      }, 500) // 500ms debounce
+    }
+
     // Set up realtime subscriptions
-    subscriptionsRef.current = subscribeToControlRoomUpdates(supabase, loadData)
+    subscriptionsRef.current = subscribeToControlRoomUpdates(supabase, debouncedLoadData)
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
       if (subscriptionsRef.current) {
         unsubscribeFromControlRoom(supabase, subscriptionsRef.current)
       }

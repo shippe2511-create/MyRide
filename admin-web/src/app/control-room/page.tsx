@@ -1678,6 +1678,100 @@ export default function ControlRoomPage() {
             </div>
           </Card>
 
+          {/* Trips by Zone */}
+          <Card className="shrink-0 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold">Trips by Zone</h2>
+              <span className="text-[10px] text-muted-foreground">Today</span>
+            </div>
+            {(() => {
+              // Calculate zone distribution from active + completed trips
+              const allTrips = [...activeTrips, ...recentlyCompleted]
+              const zones: Record<string, number> = {}
+
+              allTrips.forEach(trip => {
+                // Extract zone from pickup name (first part before comma)
+                const zoneName = trip.pickup_name?.split(",")[0]?.trim() || "Other"
+                // Group similar zones
+                const zone = zoneName.includes("Terminal") ? zoneName :
+                            zoneName.includes("Airport") ? "Airport" :
+                            zoneName.includes("Hulhumale") ? "Hulhumalé" :
+                            zoneName.includes("Male") || zoneName.includes("Malé") ? "Malé" :
+                            "Other Zones"
+                zones[zone] = (zones[zone] || 0) + 1
+              })
+
+              const totalTrips = allTrips.length
+              const sortedZones = Object.entries(zones)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+
+              const zoneColors = ["#3b82f6", "#8b5cf6", "#22c55e", "#f59e0b", "#6b7280"]
+
+              if (totalTrips === 0) {
+                return (
+                  <div className="text-center py-4 text-muted-foreground text-xs">
+                    No trips today yet
+                  </div>
+                )
+              }
+
+              // Calculate cumulative offsets for donut chart
+              let cumulativeOffset = 0
+              const segments = sortedZones.map(([_, count], i) => {
+                const pct = (count / totalTrips) * 100
+                const dashArray = (pct / 100) * 97.4
+                const offset = cumulativeOffset
+                cumulativeOffset += dashArray
+                return { dashArray, offset }
+              })
+
+              return (
+                <div className="flex items-center gap-4">
+                  {/* Donut Chart */}
+                  <div className="relative w-20 h-20 shrink-0">
+                    <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+                      <circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" strokeWidth="3" className="text-muted/30" />
+                      {sortedZones.map(([_, count], i) => (
+                        <circle
+                          key={i}
+                          cx="18" cy="18" r="15.5" fill="none"
+                          stroke={zoneColors[i]}
+                          strokeWidth="3"
+                          strokeDasharray={`${segments[i].dashArray} 97.4`}
+                          strokeDashoffset={`${-segments[i].offset}`}
+                          strokeLinecap="round"
+                        />
+                      ))}
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-lg font-bold">{totalTrips}</span>
+                      <span className="text-[8px] text-muted-foreground">Trips</span>
+                    </div>
+                  </div>
+                  {/* Legend */}
+                  <div className="flex-1 space-y-1 text-xs">
+                    {sortedZones.map(([zone, count], i) => (
+                      <div key={zone} className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: zoneColors[i] }} />
+                          <span className="truncate max-w-[80px]">{zone}</span>
+                        </div>
+                        <span className="font-medium">{count} ({Math.round((count / totalTrips) * 100)}%)</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+            <button
+              onClick={() => window.location.href = "/dashboard/reports"}
+              className="mt-2 text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1"
+            >
+              View Zone Report <ArrowRight className="h-3 w-3" />
+            </button>
+          </Card>
+
           {/* Recent Alerts / Delays */}
           <Card className="shrink-0 p-3">
             <div className="flex items-center justify-between mb-2">

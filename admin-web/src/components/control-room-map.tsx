@@ -358,6 +358,7 @@ export function ControlRoomMap({
           clickableIcons: false,
           minZoom: 8,
           maxZoom: 18,
+          keyboardShortcuts: false,
         }}
       >
         {showTraffic && <TrafficLayer />}

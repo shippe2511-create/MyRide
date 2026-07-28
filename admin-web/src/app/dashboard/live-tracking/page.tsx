@@ -720,28 +720,6 @@ export default function LiveTrackingPage() {
                     </div>
                   )}
 
-                  {/* Occupancy Bar */}
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-sm flex items-center gap-1">
-                        <Users className="h-4 w-4" />
-                        Occupancy
-                      </span>
-                      <span className="font-bold">
-                        {selectedBus.passengers_on_board}/{selectedBus.vehicle_capacity}
-                      </span>
-                    </div>
-                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${getOccupancyColor((selectedBus.passengers_on_board / selectedBus.vehicle_capacity) * 100)}`}
-                        style={{ width: `${Math.min(100, (selectedBus.passengers_on_board / selectedBus.vehicle_capacity) * 100)}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1 text-right">
-                      {Math.round((selectedBus.passengers_on_board / selectedBus.vehicle_capacity) * 100)}% full
-                    </p>
-                  </div>
-
                   {selectedBus.current_stop_name && (
                     <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 text-sm">
                       <MapPin className="h-4 w-4 text-muted-foreground" />
@@ -851,6 +829,17 @@ export default function LiveTrackingPage() {
                               </div>
                             </div>
                           </div>
+                          {/* Occupancy Bar */}
+                          {bus.vehicle_capacity > 0 && (
+                            <div className="mt-2">
+                              <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all ${getOccupancyColor((bus.passengers_on_board / bus.vehicle_capacity) * 100)}`}
+                                  style={{ width: `${Math.min(100, (bus.passengers_on_board / bus.vehicle_capacity) * 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
                           {/* Trip Progress Bar (by stops) */}
                           {bus.total_stops && bus.total_stops > 0 && (
                             <div className="mt-2">

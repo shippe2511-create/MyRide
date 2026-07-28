@@ -1482,7 +1482,10 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogType(null)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={loading}>
+            <Button
+              onClick={handleSave}
+              disabled={loading || !formData.full_name.trim() || !formData.phone?.trim() || !formData.employee_id?.trim()}
+            >
               {loading ? "Saving..." : dialogType === "add" ? "Add Driver" : "Save Changes"}
             </Button>
           </DialogFooter>

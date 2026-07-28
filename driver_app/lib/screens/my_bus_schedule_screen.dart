@@ -118,7 +118,7 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
     final today = DateTime(now.year, now.month, now.day);
     final tomorrow = today.add(const Duration(days: 1));
 
-    return _assignments.where((a) {
+    final filtered = _assignments.where((a) {
       final dateStr = a['service_date'] as String?;
       if (dateStr == null) return false;
       final date = DateTime.tryParse(dateStr);
@@ -136,6 +136,15 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
           return true;
       }
     }).toList();
+
+    // Sort by departure time ascending (earliest first)
+    filtered.sort((a, b) {
+      final timeA = a['departure_time'] as String? ?? '23:59:59';
+      final timeB = b['departure_time'] as String? ?? '23:59:59';
+      return timeA.compareTo(timeB);
+    });
+
+    return filtered;
   }
 
   Future<void> _startTrip(Map<String, dynamic> assignment) async {
@@ -416,13 +425,13 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
       backgroundColor: context.bgColor,
       body: Stack(
         children: [
-          CustomScrollView(
-            slivers: [
-              // Modern App Bar
+          NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) => [
               SliverAppBar(
                 expandedHeight: 140,
                 floating: false,
                 pinned: true,
+                forceElevated: innerBoxIsScrolled,
                 backgroundColor: context.bgColor,
                 elevation: 0,
                 leading: IconButton(
@@ -525,21 +534,17 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
                   ),
                 ),
               ),
-
-              // Content
-              SliverFillRemaining(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator(color: AppColors.yellow))
-                    : TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildTripList(_filterAssignments('today')),
-                          _buildTripList(_filterAssignments('tomorrow')),
-                          _buildTripList(_filterAssignments('upcoming')),
-                        ],
-                      ),
-              ),
             ],
+            body: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: AppColors.yellow))
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildTripList(_filterAssignments('today')),
+                      _buildTripList(_filterAssignments('tomorrow')),
+                      _buildTripList(_filterAssignments('upcoming')),
+                    ],
+                  ),
           ),
 
           // Loading overlay

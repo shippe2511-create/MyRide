@@ -16,6 +16,7 @@ import {
   getScheduledRides,
   getRecentRatings,
   getRecentlyCompletedTrips,
+  getDispatchSuggestions,
   computeMetrics,
   subscribeToControlRoomUpdates,
   unsubscribeFromControlRoom,
@@ -34,6 +35,7 @@ import {
   type ShiftWarning,
   type ScheduledRide,
   type RecentRating,
+  type DriverSuggestion,
 } from "@/lib/control-room-data"
 import dynamic from "next/dynamic"
 
@@ -51,7 +53,7 @@ import {
   Navigation, Route, Loader2, Circle, Activity, Timer, Percent,
   ChevronUp, ChevronDown, Filter, Eye, PhoneCall, XCircle,
   ArrowUpDown, Volume2, VolumeX, Keyboard, Siren, Star, CalendarClock,
-  UserMinus
+  UserMinus, Zap, Target, Award
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -130,6 +132,12 @@ export default function ControlRoomPage() {
   const [selectedTrip, setSelectedTrip] = useState<ActiveTrip | null>(null)
   const [tripDetailOpen, setTripDetailOpen] = useState(false)
   const [followingId, setFollowingId] = useState<string | null>(null)
+
+  // Smart dispatch state
+  const [dispatchTripId, setDispatchTripId] = useState<string | null>(null)
+  const [suggestions, setSuggestions] = useState<DriverSuggestion[]>([])
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+  const [assigningDriver, setAssigningDriver] = useState<string | null>(null)
 
   // Clock update
   useEffect(() => {
@@ -463,6 +471,61 @@ export default function ControlRoomPage() {
     }
   }
 
+  // Load dispatch suggestions for a pending trip
+  const loadSuggestions = async (trip: ActiveTrip) => {
+    setDispatchTripId(trip.id)
+    setLoadingSuggestions(true)
+    setSuggestions([])
+
+    // Get pickup coordinates from the trip (we need to fetch them)
+    const { data: rideData } = await supabase
+      .from("rides")
+      .select("pickup_lat, pickup_lng")
+      .eq("id", trip.id)
+      .single()
+
+    if (rideData?.pickup_lat && rideData?.pickup_lng) {
+      const results = await getDispatchSuggestions(
+        supabase,
+        trip.id,
+        parseFloat(rideData.pickup_lat),
+        parseFloat(rideData.pickup_lng)
+      )
+      setSuggestions(results)
+    }
+    setLoadingSuggestions(false)
+  }
+
+  // Assign driver to trip
+  const assignDriver = async (tripId: string, driverId: string) => {
+    setAssigningDriver(driverId)
+
+    const { error } = await supabase
+      .from("rides")
+      .update({
+        driver_id: driverId,
+        status: "accepted",
+        accepted_at: new Date().toISOString()
+      })
+      .eq("id", tripId)
+
+    if (error) {
+      toast.error("Failed to assign driver")
+    } else {
+      toast.success("Driver assigned successfully")
+      setDispatchTripId(null)
+      setSuggestions([])
+      loadData()
+    }
+    setAssigningDriver(null)
+  }
+
+  // Close suggestions panel
+  const closeSuggestions = () => {
+    setDispatchTripId(null)
+    setSuggestions([])
+  }
+
   if (loading) {
     return (
       <div className="h-full w-full flex items-center justify-center">
@@ -779,33 +842,60 @@ export default function ControlRoomPage() {
                           </td>
                           {/* Actions */}
                           <td className="p-2" onClick={e => e.stopPropagation()}>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-6 w-6">
-                                  <ArrowUpDown className="h-3 w-3" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => viewTripDetails(trip)}>
-                                  <Eye className="h-3 w-3 mr-2" />
-                                  View Details
-                                </DropdownMenuItem>
-                                {trip.customer?.phone && (
-                                  <DropdownMenuItem onClick={() => window.open(`tel:${trip.customer?.phone}`)}>
-                                    <PhoneCall className="h-3 w-3 mr-2" />
-                                    Call Customer
+                            <div className="flex items-center gap-1">
+                              {/* Smart Dispatch button for pending trips */}
+                              {trip.status === "pending" && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-amber-400 hover:text-amber-300 hover:bg-amber-500/20"
+                                      onClick={() => loadSuggestions(trip)}
+                                    >
+                                      <Zap className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Smart Dispatch</TooltipContent>
+                                </Tooltip>
+                              )}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                                    <ArrowUpDown className="h-3 w-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {trip.status === "pending" && (
+                                    <>
+                                      <DropdownMenuItem onClick={() => loadSuggestions(trip)} className="text-amber-400">
+                                        <Zap className="h-3 w-3 mr-2" />
+                                        Smart Dispatch
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                    </>
+                                  )}
+                                  <DropdownMenuItem onClick={() => viewTripDetails(trip)}>
+                                    <Eye className="h-3 w-3 mr-2" />
+                                    View Details
                                   </DropdownMenuItem>
-                                )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="text-red-500"
-                                  onClick={() => cancelTrip(trip.id)}
-                                >
-                                  <XCircle className="h-3 w-3 mr-2" />
-                                  Cancel Trip
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                                  {trip.customer?.phone && (
+                                    <DropdownMenuItem onClick={() => window.open(`tel:${trip.customer?.phone}`)}>
+                                      <PhoneCall className="h-3 w-3 mr-2" />
+                                      Call Customer
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-red-500"
+                                    onClick={() => cancelTrip(trip.id)}
+                                  >
+                                    <XCircle className="h-3 w-3 mr-2" />
+                                    Cancel Trip
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           </td>
                         </tr>
                       )
@@ -1537,6 +1627,152 @@ export default function ControlRoomPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Smart Dispatch Dialog */}
+      <Dialog open={!!dispatchTripId} onOpenChange={(open) => !open && closeSuggestions()}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-amber-400" />
+              Smart Dispatch
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* Trip info */}
+          {dispatchTripId && (
+            <div className="mb-4 p-3 rounded-lg bg-muted/50">
+              {(() => {
+                const trip = activeTrips.find(t => t.id === dispatchTripId)
+                if (!trip) return null
+                return (
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="font-medium">{trip.customer?.full_name || "Customer"}</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {trip.pickup_name?.split(",")[0]} → {trip.dropoff_name?.split(",")[0]}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm text-amber-400 font-medium">
+                        Waiting {formatDuration((Date.now() - new Date(trip.created_at).getTime()) / 1000)}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+          )}
+
+          {/* Loading state */}
+          {loadingSuggestions && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-2 text-muted-foreground">Finding best drivers...</span>
+            </div>
+          )}
+
+          {/* Suggestions list */}
+          {!loadingSuggestions && suggestions.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs text-muted-foreground mb-3">
+                Recommended drivers based on proximity, rating, and availability
+              </div>
+              {suggestions.map((driver, index) => (
+                <div
+                  key={driver.driver_id}
+                  className={`p-3 rounded-lg border transition-all ${
+                    index === 0
+                      ? "border-amber-500/50 bg-amber-500/5"
+                      : "border-border bg-muted/30 hover:bg-muted/50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {/* Rank badge */}
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                        index === 0 ? "bg-amber-500 text-black" : "bg-muted text-muted-foreground"
+                      }`}>
+                        {index + 1}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{driver.driver_name}</span>
+                          <span className="text-xs text-muted-foreground">{driver.vehicle_number}</span>
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Target className="h-3 w-3" />
+                            {driver.distance_km} km
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            ~{driver.eta_minutes} min
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                            {driver.rating}
+                          </span>
+                          {driver.trips_today > 0 && (
+                            <span className="flex items-center gap-1">
+                              <Award className="h-3 w-3" />
+                              {driver.trips_today} trips
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      className={index === 0 ? "bg-amber-500 hover:bg-amber-600 text-black" : ""}
+                      onClick={() => dispatchTripId && assignDriver(dispatchTripId, driver.driver_id)}
+                      disabled={assigningDriver === driver.driver_id}
+                    >
+                      {assigningDriver === driver.driver_id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>Assign</>
+                      )}
+                    </Button>
+                  </div>
+                  {/* Best choice indicator */}
+                  {index === 0 && (
+                    <div className="mt-2 pt-2 border-t border-amber-500/30">
+                      <span className="text-[10px] text-amber-400 flex items-center gap-1">
+                        <Zap className="h-3 w-3" />
+                        BEST MATCH — Closest driver with high rating
+                      </span>
+                    </div>
+                  )}
+                  {/* Shift warning */}
+                  {driver.shift_minutes_remaining !== null && driver.shift_minutes_remaining < 30 && (
+                    <div className="mt-1 text-[10px] text-orange-400">
+                      ⚠ Shift ends in {driver.shift_minutes_remaining} minutes
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* No suggestions */}
+          {!loadingSuggestions && suggestions.length === 0 && (
+            <div className="text-center py-8">
+              <Users className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+              <p className="text-muted-foreground">No available drivers found</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                All drivers are either busy, offline, or on break
+              </p>
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="flex justify-end pt-2">
+            <Button variant="outline" onClick={closeSuggestions}>
+              Cancel
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

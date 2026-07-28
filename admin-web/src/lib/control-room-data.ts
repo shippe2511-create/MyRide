@@ -105,6 +105,18 @@ export interface RosterGap {
   route_id: string
 }
 
+export interface DriverSuggestion {
+  driver_id: string
+  driver_name: string
+  vehicle_number: string
+  distance_km: number
+  eta_minutes: number
+  rating: number
+  trips_today: number
+  shift_minutes_remaining: number | null
+  score: number // computed score (higher = better)
+}
+
 export interface DriverLocation {
   driver_id: string
   lat: number
@@ -472,6 +484,156 @@ export async function getFleetStatus(
   }
 
   return fleet
+}
+
+/**
+ * Get smart dispatch suggestions for a pending trip
+ * Returns ranked list of available drivers based on proximity, rating, and shift time
+ */
+export async function getDispatchSuggestions(
+  supabase: SupabaseClient,
+  tripId: string,
+  pickupLat: number,
+  pickupLng: number
+): Promise<DriverSuggestion[]> {
+  const today = new Date().toISOString().split('T')[0]
+
+  // Get available drivers (online, not on break, no active ride)
+  const { data: availableDrivers } = await supabase
+    .from('drivers')
+    .select(`
+      id, profile_id, is_online, is_on_break,
+      profile:profiles(full_name, rating),
+      vehicle:vehicles(vehicle_number)
+    `)
+    .eq('is_online', true)
+    .eq('is_on_break', false)
+
+  if (!availableDrivers || availableDrivers.length === 0) return []
+
+  // Get drivers with active rides (to exclude them)
+  const { data: activeRides } = await supabase
+    .from('rides')
+    .select('driver_id')
+    .in('status', ['accepted', 'arrived', 'in_progress'])
+
+  const busyDriverIds = new Set((activeRides || []).map((r: any) => r.driver_id))
+
+  // Get driver locations
+  const driverIds = availableDrivers.map((d: any) => d.id)
+  const { data: locations } = await supabase
+    .from('driver_locations')
+    .select('driver_id, lat, lng')
+    .in('driver_id', driverIds)
+    .eq('is_online', true)
+
+  const locationMap: Record<string, { lat: number; lng: number }> = {}
+  ;(locations || []).forEach((loc: any) => {
+    locationMap[loc.driver_id] = { lat: parseFloat(loc.lat), lng: parseFloat(loc.lng) }
+  })
+
+  // Get today's shifts for shift time remaining
+  const { data: shifts } = await supabase
+    .from('shifts')
+    .select('driver_id, end_time')
+    .eq('shift_date', today)
+    .in('driver_id', driverIds)
+
+  const shiftMap: Record<string, string> = {}
+  ;(shifts || []).forEach((s: any) => {
+    shiftMap[s.driver_id] = s.end_time
+  })
+
+  // Get today's trip counts
+  const { data: tripCounts } = await supabase
+    .from('rides')
+    .select('driver_id')
+    .eq('status', 'completed')
+    .gte('completed_at', `${today}T00:00:00`)
+    .in('driver_id', driverIds)
+
+  const tripCountMap: Record<string, number> = {}
+  ;(tripCounts || []).forEach((t: any) => {
+    tripCountMap[t.driver_id] = (tripCountMap[t.driver_id] || 0) + 1
+  })
+
+  // Calculate suggestions
+  const suggestions: DriverSuggestion[] = []
+
+  for (const driver of availableDrivers as any[]) {
+    // Skip busy drivers
+    if (busyDriverIds.has(driver.id)) continue
+
+    const location = locationMap[driver.id]
+    if (!location) continue // No location data
+
+    const profile = Array.isArray(driver.profile) ? driver.profile[0] : driver.profile
+    const vehicle = Array.isArray(driver.vehicle) ? driver.vehicle[0] : driver.vehicle
+
+    if (!vehicle) continue // No vehicle assigned
+
+    // Calculate distance (Haversine formula)
+    const R = 6371 // Earth's radius in km
+    const dLat = (location.lat - pickupLat) * Math.PI / 180
+    const dLng = (location.lng - pickupLng) * Math.PI / 180
+    const a = Math.sin(dLat / 2) ** 2 +
+              Math.cos(pickupLat * Math.PI / 180) * Math.cos(location.lat * Math.PI / 180) *
+              Math.sin(dLng / 2) ** 2
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    const distance_km = R * c
+
+    // Estimate ETA (assume 30 km/h average speed in traffic)
+    const eta_minutes = Math.round((distance_km / 30) * 60)
+
+    // Get shift time remaining
+    let shift_minutes_remaining: number | null = null
+    if (shiftMap[driver.id]) {
+      const [hours, minutes] = shiftMap[driver.id].split(':').map(Number)
+      const now = new Date()
+      const shiftEnd = new Date()
+      shiftEnd.setHours(hours, minutes, 0, 0)
+      shift_minutes_remaining = Math.max(0, Math.round((shiftEnd.getTime() - now.getTime()) / 60000))
+    }
+
+    const rating = profile?.rating || 5.0
+    const trips_today = tripCountMap[driver.id] || 0
+
+    // Calculate score (higher = better)
+    // Factors: proximity (most important), rating, shift time remaining
+    let score = 100
+
+    // Distance penalty: -10 points per km
+    score -= distance_km * 10
+
+    // Rating bonus: +5 points per star above 3
+    score += (rating - 3) * 5
+
+    // Shift time penalty: -20 if less than 30 minutes remaining
+    if (shift_minutes_remaining !== null && shift_minutes_remaining < 30) {
+      score -= 20
+    }
+
+    // Experience bonus: +1 point per completed trip today (up to 5)
+    score += Math.min(trips_today, 5)
+
+    suggestions.push({
+      driver_id: driver.id,
+      driver_name: profile?.full_name || 'Unknown',
+      vehicle_number: vehicle?.vehicle_number || 'N/A',
+      distance_km: Math.round(distance_km * 10) / 10,
+      eta_minutes,
+      rating: Math.round(rating * 10) / 10,
+      trips_today,
+      shift_minutes_remaining,
+      score: Math.round(score),
+    })
+  }
+
+  // Sort by score (highest first)
+  suggestions.sort((a, b) => b.score - a.score)
+
+  // Return top 5
+  return suggestions.slice(0, 5)
 }
 
 /**

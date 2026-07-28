@@ -988,10 +988,13 @@ export default function ControlRoomPage() {
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-semibold flex items-center gap-2">
               <Car className="h-4 w-4 text-blue-400" />
-              Live Trips
-              <Badge variant="outline" className="ml-2 text-[10px]">{sortedFilteredTrips.length} active</Badge>
+              Live Trip Monitoring
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <Badge className="bg-blue-500 text-white text-[9px] px-2 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                LIVE
+              </Badge>
               {/* Filter dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -1019,13 +1022,10 @@ export default function ControlRoomPage() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <span className="text-xs text-muted-foreground">
-                {sortedFilteredTrips.length} shown
-              </span>
             </div>
           </div>
-          <Card className="flex-1 overflow-hidden">
-            <div className="h-full overflow-y-auto">
+          <Card className="flex-1 overflow-hidden flex flex-col">
+            <div className="flex-1 overflow-y-auto">
               {sortedFilteredTrips.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-muted-foreground">
                   <div className="text-center">
@@ -1037,13 +1037,19 @@ export default function ControlRoomPage() {
                 <table className="w-full text-xs">
                   <thead className="bg-muted/50 sticky top-0 z-10">
                     <tr>
-                      <th className="text-left p-2 font-medium w-[70px]">VEHICLE</th>
-                      <th className="text-left p-2 font-medium w-[140px]">DRIVER · ROUTE</th>
-                      <th className="text-center p-2 font-medium w-[70px]">REQUESTED</th>
-                      <th className="text-center p-2 font-medium w-[70px]">ACCEPTED</th>
-                      <th className="text-center p-2 font-medium w-[70px]">ARRIVED</th>
-                      <th className="text-center p-2 font-medium w-[70px]">DESTINATION</th>
-                      <th className="text-center p-2 font-medium w-[90px]">STATUS</th>
+                      <th className="text-left p-2 font-medium w-[80px]">Request ID</th>
+                      <th className="text-left p-2 font-medium w-[130px]">User / Dept</th>
+                      <th className="text-left p-2 font-medium w-[90px]">Vehicle No.</th>
+                      <th className="text-left p-2 font-medium w-[100px]">Driver Name</th>
+                      <th className="text-center p-2 font-medium w-[90px]">Status</th>
+                      <th className="text-center p-2 font-medium" colSpan={4}>
+                        <div className="flex flex-col items-center">
+                          <span>Journey Progress</span>
+                          <span className="text-[9px] font-normal text-muted-foreground">
+                            Requested → Accepted → Arrived → Destination
+                          </span>
+                        </div>
+                      </th>
                       <th className="w-8"></th>
                     </tr>
                   </thead>
@@ -1071,93 +1077,102 @@ export default function ControlRoomPage() {
                           className={`border-b border-border/50 hover:bg-muted/30 cursor-pointer ${isLongWait ? "bg-red-500/10" : ""}`}
                           onClick={() => viewTripDetails(trip)}
                         >
-                          {/* Vehicle */}
+                          {/* Request ID */}
                           <td className="p-2">
-                            <div className="font-bold text-sm">
+                            <span className="text-blue-400 font-medium">
+                              REQ-{trip.id.substring(0, 5).toUpperCase()}
+                            </span>
+                          </td>
+                          {/* User / Dept */}
+                          <td className="p-2">
+                            <div className="font-medium truncate max-w-[120px]">
+                              {trip.customer?.full_name || "Unknown"}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                              {trip.customer?.department?.name || "—"}
+                            </div>
+                          </td>
+                          {/* Vehicle No. */}
+                          <td className="p-2">
+                            <span className="font-mono text-sm">
                               {trip.driver?.vehicle?.vehicle_number || "—"}
-                            </div>
-                            <div className="text-[10px] text-muted-foreground">
-                              {trip.customer?.department?.name?.substring(0, 8) || ""}
-                            </div>
+                            </span>
                           </td>
-                          {/* Driver · Route */}
+                          {/* Driver Name */}
                           <td className="p-2">
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-medium shrink-0">
-                                {((trip.driver?.profile as any)?.full_name || trip.customer?.full_name || "?").split(" ").map((n: string) => n[0]).join("").toUpperCase().substring(0, 2)}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="truncate font-medium">
-                                  {(trip.driver?.profile as any)?.full_name || trip.customer?.full_name || "Unassigned"}
-                                </div>
-                                <div className="text-[10px] text-muted-foreground truncate">
-                                  {trip.pickup_name?.split(",")[0]} → {trip.dropoff_name?.split(",")[0]}
-                                </div>
-                              </div>
-                            </div>
+                            <span className="truncate max-w-[90px] block">
+                              {(trip.driver?.profile as any)?.full_name || "Unassigned"}
+                            </span>
                           </td>
-                          {/* Timeline: Requested */}
+                          {/* Status Badge */}
                           <td className="p-2 text-center">
-                            <div className="flex flex-col items-center">
-                              {acceptDelay !== null && (
-                                <div className="text-[9px] text-muted-foreground mb-0.5">{acceptDelay}s</div>
-                              )}
-                              <div className="flex items-center gap-1">
-                                <div className={`w-2.5 h-2.5 rounded-full ${statusIndex >= 0 ? "bg-blue-500" : "bg-muted-foreground/30"}`} />
-                                <div className={`w-8 h-0.5 ${statusIndex >= 1 ? "bg-blue-500" : "bg-muted-foreground/30"}`} />
-                              </div>
-                              <div className="text-[10px] mt-0.5 tabular-nums">{format(requestedTime, "HH:mm")}</div>
-                            </div>
-                          </td>
-                          {/* Timeline: Accepted */}
-                          <td className="p-2 text-center">
-                            <div className="flex flex-col items-center">
-                              {arrivalDelay !== null && (
-                                <div className="text-[9px] text-muted-foreground mb-0.5">{arrivalDelay < 60 ? `${arrivalDelay}s` : `${(arrivalDelay / 60).toFixed(1)}m`}</div>
-                              )}
-                              <div className="flex items-center gap-1">
-                                <div className={`w-2.5 h-2.5 rounded-full ${statusIndex >= 1 ? "bg-blue-500" : "bg-muted-foreground/30"}`} />
-                                <div className={`w-8 h-0.5 ${statusIndex >= 2 ? "bg-blue-500" : "bg-muted-foreground/30"}`} />
-                              </div>
-                              <div className="text-[10px] mt-0.5 tabular-nums">
-                                {acceptedTime ? format(acceptedTime, "HH:mm") : "· · ·"}
-                              </div>
-                            </div>
-                          </td>
-                          {/* Timeline: Arrived */}
-                          <td className="p-2 text-center">
-                            <div className="flex flex-col items-center">
-                              {tripDuration !== null && (
-                                <div className="text-[9px] text-muted-foreground mb-0.5">{tripDuration < 60 ? `${tripDuration}s` : `${(tripDuration / 60).toFixed(1)}m`}</div>
-                              )}
-                              <div className="flex items-center gap-1">
-                                <div className={`w-2.5 h-2.5 rounded-full ${statusIndex >= 2 ? "bg-blue-500" : "bg-muted-foreground/30"}`} />
-                                <div className={`w-8 h-0.5 ${statusIndex >= 3 ? "bg-green-500" : "bg-muted-foreground/30"}`} />
-                              </div>
-                              <div className="text-[10px] mt-0.5 tabular-nums">
-                                {arrivedTime ? format(arrivedTime, "HH:mm") : "· · ·"}
-                              </div>
-                            </div>
-                          </td>
-                          {/* Timeline: Destination */}
-                          <td className="p-2 text-center">
-                            <div className="flex flex-col items-center">
-                              <div className="h-3" /> {/* spacer */}
-                              <div className="flex items-center">
-                                <div className={`w-2.5 h-2.5 rounded-full ${statusIndex >= 4 ? "bg-green-500" : "bg-muted-foreground/30"}`} />
-                              </div>
-                              <div className="text-[10px] mt-0.5 tabular-nums">
-                                {completedTime ? format(completedTime, "HH:mm") : "· · ·"}
-                              </div>
-                            </div>
-                          </td>
-                          {/* Status */}
-                          <td className="p-2 text-center">
-                            <Badge className={`${STATUS_COLORS[trip.status]} text-white text-[9px] px-2`}>
-                              {trip.status === "pending" ? "AWAITING" : trip.status === "accepted" ? "TO PICKUP" : trip.status === "arrived" ? "AT PICKUP" : trip.status === "in_progress" ? "ON TRIP" : "COMPLETED"}
+                            <Badge className={`${
+                              trip.status === "pending" ? "bg-amber-500" :
+                              trip.status === "accepted" ? "bg-purple-500" :
+                              trip.status === "arrived" ? "bg-blue-500" :
+                              trip.status === "in_progress" ? "bg-green-500" :
+                              "bg-gray-500"
+                            } text-white text-[9px] px-2`}>
+                              {trip.status === "pending" ? "PENDING" :
+                               trip.status === "accepted" ? "EN ROUTE" :
+                               trip.status === "arrived" ? "ARRIVED" :
+                               trip.status === "in_progress" ? "IN PROGRESS" :
+                               "COMPLETED"}
                             </Badge>
-                            <div className="text-[9px] text-muted-foreground mt-0.5">
-                              {trip.status === "completed" ? `total ${formatDuration(waitSeconds)}` : `elapsed ${formatDuration(waitSeconds)}`}
+                          </td>
+                          {/* Journey Progress - 4 stages with connecting lines */}
+                          <td className="p-2" colSpan={4}>
+                            <div className="flex items-center justify-center gap-0">
+                              {/* Stage 1: Requested */}
+                              <div className="flex flex-col items-center min-w-[60px]">
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                                  statusIndex >= 1 ? "bg-green-500" : statusIndex === 0 ? "bg-amber-500 ring-2 ring-amber-500/30" : "border-2 border-muted-foreground/30"
+                                }`}>
+                                  {statusIndex >= 1 ? <CheckCircle2 className="h-3 w-3 text-white" /> : null}
+                                </div>
+                                <span className="text-[9px] mt-1 text-muted-foreground tabular-nums">
+                                  {format(requestedTime, "h:mm a")}
+                                </span>
+                              </div>
+                              {/* Line 1 */}
+                              <div className={`h-0.5 w-8 ${statusIndex >= 1 ? "bg-green-500" : "bg-muted-foreground/30"}`} />
+                              {/* Stage 2: Accepted */}
+                              <div className="flex flex-col items-center min-w-[60px]">
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                                  statusIndex >= 2 ? "bg-green-500" : statusIndex === 1 ? "bg-blue-500 ring-2 ring-blue-500/30" : "border-2 border-muted-foreground/30"
+                                }`}>
+                                  {statusIndex >= 2 ? <CheckCircle2 className="h-3 w-3 text-white" /> : null}
+                                </div>
+                                <span className="text-[9px] mt-1 text-muted-foreground tabular-nums">
+                                  {acceptedTime ? format(acceptedTime, "h:mm a") : "—"}
+                                </span>
+                              </div>
+                              {/* Line 2 */}
+                              <div className={`h-0.5 w-8 ${statusIndex >= 2 ? "bg-green-500" : "bg-muted-foreground/30"}`} />
+                              {/* Stage 3: Arrived */}
+                              <div className="flex flex-col items-center min-w-[60px]">
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                                  statusIndex >= 3 ? "bg-green-500" : statusIndex === 2 ? "bg-blue-500 ring-2 ring-blue-500/30" : "border-2 border-muted-foreground/30"
+                                }`}>
+                                  {statusIndex >= 3 ? <CheckCircle2 className="h-3 w-3 text-white" /> : null}
+                                </div>
+                                <span className="text-[9px] mt-1 text-muted-foreground tabular-nums">
+                                  {arrivedTime ? format(arrivedTime, "h:mm a") : "—"}
+                                </span>
+                              </div>
+                              {/* Line 3 */}
+                              <div className={`h-0.5 w-8 ${statusIndex >= 4 ? "bg-green-500" : "bg-muted-foreground/30"}`} />
+                              {/* Stage 4: Destination */}
+                              <div className="flex flex-col items-center min-w-[60px]">
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                                  statusIndex >= 4 ? "bg-green-500" : statusIndex === 3 ? "bg-blue-500 ring-2 ring-blue-500/30" : "border-2 border-muted-foreground/30"
+                                }`}>
+                                  {statusIndex >= 4 ? <CheckCircle2 className="h-3 w-3 text-white" /> : null}
+                                </div>
+                                <span className="text-[9px] mt-1 text-muted-foreground tabular-nums">
+                                  {completedTime ? format(completedTime, "h:mm a") : "—"}
+                                </span>
+                              </div>
                             </div>
                           </td>
                           {/* Actions */}
@@ -1223,6 +1238,15 @@ export default function ControlRoomPage() {
                   </tbody>
                 </table>
               )}
+            </div>
+            {/* View All Requests Link */}
+            <div className="p-2 border-t border-border/50 shrink-0">
+              <button
+                onClick={() => window.location.href = "/dashboard/rides"}
+                className="w-full text-center text-xs text-blue-400 hover:text-blue-300 flex items-center justify-center gap-1"
+              >
+                View All Requests <ArrowRight className="h-3 w-3" />
+              </button>
             </div>
           </Card>
         </div>

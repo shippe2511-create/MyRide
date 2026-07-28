@@ -176,10 +176,21 @@ class _ScheduleScreenState extends State<ScheduleScreen> with TickerProviderStat
   }
 
   List<Map<String, dynamic>> _getSchedulesForRoute(String routeId) {
-    final now = TimeOfDay.now();
+    final today = MaldivesTimezone.now();
+    final now = TimeOfDay(hour: today.hour, minute: today.minute);
+    // Dart: Monday=1, Tuesday=2, ... Sunday=7
+    // dayNames index: 0=Sun, 1=Mon, 2=Tue, ... 6=Sat
+    final dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    final todayDayName = dayNames[today.weekday % 7];
 
     return _schedules.where((s) {
       if (s['route_id'] != routeId) return false;
+
+      // Check if schedule runs today
+      final daysOfWeek = (s['days_of_week'] as List?)?.cast<String>() ?? [];
+      if (daysOfWeek.isNotEmpty && !daysOfWeek.contains(todayDayName)) {
+        return false;
+      }
 
       // Filter out past times
       final timeStr = s['departure_time']?.toString() ?? '';

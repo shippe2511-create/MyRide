@@ -1289,7 +1289,7 @@ class SupabaseService {
 
   static Future<List<Map<String, dynamic>>> getSchedules({String? routeId}) async {
     try {
-      var query = client.from('route_schedules').select();
+      var query = client.from('route_schedules').select().eq('is_active', true);
       if (routeId != null) {
         query = query.eq('route_id', routeId);
       }

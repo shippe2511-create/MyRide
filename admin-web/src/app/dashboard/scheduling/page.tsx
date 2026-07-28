@@ -49,6 +49,7 @@ interface TransportRoute {
   direction: string
   stops: string[]
   is_active: boolean
+  color?: string
   schedules?: { departure_time: string; days_of_week: string[] }[]
 }
 
@@ -104,7 +105,15 @@ function SortableRow({
           <GripVertical className="h-4 w-4 text-muted-foreground" />
         </div>
       </TableCell>
-      <TableCell className="font-medium">{route.route_name}</TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <div
+            className="w-3 h-3 rounded-full flex-shrink-0"
+            style={{ backgroundColor: route.color || '#3B82F6' }}
+          />
+          <span className="font-medium">{route.route_name}</span>
+        </div>
+      </TableCell>
       <TableCell>{route.route_code || "-"}</TableCell>
       <TableCell>
         <Badge variant="outline">{route.direction}</Badge>
@@ -350,6 +359,7 @@ export default function SchedulingPage() {
       direction: routeToUpdate.direction,
       stops: routeToUpdate.stops || [],
       is_active: routeToUpdate.is_active,
+      color: routeToUpdate.color || "#3B82F6",
     }).eq("id", routeToUpdate.id)
 
     if (error) {
@@ -1330,7 +1340,35 @@ export default function SchedulingPage() {
                   </SelectContent>
                 </Select>
               </div>
-                            <div className="flex items-center gap-2">
+                            <div>
+                <label className="text-sm font-medium">Route Color</label>
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="color"
+                    value={editingRoute.color || "#3B82F6"}
+                    onChange={(e) => setEditingRoute({ ...editingRoute, color: e.target.value })}
+                    className="w-10 h-10 rounded cursor-pointer border-0 p-0"
+                  />
+                  <Input
+                    value={editingRoute.color || "#3B82F6"}
+                    onChange={(e) => setEditingRoute({ ...editingRoute, color: e.target.value })}
+                    placeholder="#3B82F6"
+                    className="w-28 font-mono text-sm"
+                  />
+                  <div className="flex gap-1">
+                    {["#EF4444", "#F97316", "#EAB308", "#22C55E", "#3B82F6", "#8B5CF6", "#EC4899"].map(c => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setEditingRoute({ ...editingRoute, color: c })}
+                        className="w-6 h-6 rounded-full border-2 border-transparent hover:border-white/50 transition-colors"
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
                 <Checkbox
                   id="edit-active"
                   checked={editingRoute.is_active}

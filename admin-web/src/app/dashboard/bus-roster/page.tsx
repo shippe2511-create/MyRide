@@ -55,6 +55,7 @@ interface TransportRoute {
   route_code: string | null
   transport_type: string
   direction: string
+  color?: string
 }
 
 interface RouteSchedule {
@@ -180,7 +181,7 @@ export default function BusRosterPage() {
       supabase.from("vehicle_types").select("id, plate_no, display_name, capacity").eq("is_active", true),
       supabase.from("route_schedules").select(`
         *,
-        route:transport_routes(id, route_name, route_code, transport_type, direction)
+        route:transport_routes(id, route_name, route_code, transport_type, direction, color)
       `).eq("is_active", true),
     ])
 
@@ -237,7 +238,7 @@ export default function BusRosterPage() {
     // Get related data separately
     const { data: routeData } = await supabase
       .from("transport_routes")
-      .select("id, route_name, route_code, transport_type, direction")
+      .select("id, route_name, route_code, transport_type, direction, color")
       .in("id", routeIds)
 
     const driverIds = assignments.map(a => a.driver_id).filter(Boolean)
@@ -821,7 +822,11 @@ export default function BusRosterPage() {
                 </TableHeader>
                 <TableBody>
                   {sortedRoster.map((assignment) => (
-                    <TableRow key={assignment.id} className={selectedIds.has(assignment.id) ? "bg-primary/5" : ""}>
+                    <TableRow
+                        key={assignment.id}
+                        className={selectedIds.has(assignment.id) ? "bg-primary/5" : ""}
+                        style={{ borderLeft: `4px solid ${assignment.route?.color || '#3B82F6'}` }}
+                      >
                       <TableCell>
                         <input
                           type="checkbox"
@@ -837,11 +842,17 @@ export default function BusRosterPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div>
-                          <p className="font-medium">{assignment.route?.route_name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {assignment.route?.route_code} • {assignment.route?.direction}
-                          </p>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: assignment.route?.color || '#3B82F6' }}
+                          />
+                          <div>
+                            <p className="font-medium">{assignment.route?.route_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {assignment.route?.route_code} • {assignment.route?.direction}
+                            </p>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>

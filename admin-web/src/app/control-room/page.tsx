@@ -15,6 +15,7 @@ import {
   getShiftWarnings,
   getScheduledRides,
   getRecentRatings,
+  getRecentlyCompletedTrips,
   computeMetrics,
   subscribeToControlRoomUpdates,
   unsubscribeFromControlRoom,
@@ -108,6 +109,7 @@ export default function ControlRoomPage() {
   const [shiftWarnings, setShiftWarnings] = useState<ShiftWarning[]>([])
   const [scheduledRides, setScheduledRides] = useState<ScheduledRide[]>([])
   const [recentRatings, setRecentRatings] = useState<RecentRating[]>([])
+  const [recentlyCompleted, setRecentlyCompleted] = useState<ActiveTrip[]>([])
   const [departmentId, setDepartmentId] = useState<string | null>(null)
 
   // UI state
@@ -276,7 +278,7 @@ export default function ControlRoomPage() {
   // Load all data
   const loadData = useCallback(async () => {
     setIsUpdating(true)
-    const [trips, shuttles, fleetData, locations, todayStats, yesterdayStats, gaps, trends, sos, shifts, scheduled, ratings] = await Promise.all([
+    const [trips, shuttles, fleetData, locations, todayStats, yesterdayStats, gaps, trends, sos, shifts, scheduled, ratings, completed] = await Promise.all([
       getActiveTrips(supabase, departmentId),
       getActiveShuttles(supabase),
       getFleetStatus(supabase, departmentId),
@@ -289,6 +291,7 @@ export default function ControlRoomPage() {
       getShiftWarnings(supabase, departmentId),
       getScheduledRides(supabase, departmentId),
       getRecentRatings(supabase),
+      getRecentlyCompletedTrips(supabase, departmentId),
     ])
 
     setActiveTrips(trips)
@@ -301,6 +304,7 @@ export default function ControlRoomPage() {
     setShiftWarnings(shifts)
     setScheduledRides(scheduled)
     setRecentRatings(ratings)
+    setRecentlyCompleted(completed)
 
     const computedMetrics = computeMetrics(trips, shuttles, fleetData, todayStats, yesterdayStats, gaps)
     setMetrics(computedMetrics)
@@ -596,12 +600,13 @@ export default function ControlRoomPage() {
 
       {/* Main Content - 3 columns */}
       <div className="flex-1 grid grid-cols-12 gap-4 min-h-0">
-        {/* Left Column - Active Trips Table */}
-        <div className="col-span-5 flex flex-col min-h-0">
+        {/* Left Column - Live Trips Table with Timeline */}
+        <div className="col-span-7 flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-semibold flex items-center gap-2">
               <Car className="h-4 w-4 text-blue-400" />
-              Active Taxi Rides
+              Live Trips
+              <Badge variant="outline" className="ml-2 text-[10px]">{sortedFilteredTrips.length} active</Badge>
             </h2>
             <div className="flex items-center gap-2">
               {/* Filter dropdown */}
@@ -646,44 +651,16 @@ export default function ControlRoomPage() {
                   </div>
                 </div>
               ) : (
-                <table className="w-full text-sm">
+                <table className="w-full text-xs">
                   <thead className="bg-muted/50 sticky top-0 z-10">
                     <tr>
-                      <th
-                        className="text-left p-2 font-medium cursor-pointer hover:bg-muted/70 select-none"
-                        onClick={() => handleSort("status")}
-                      >
-                        <div className="flex items-center gap-1">
-                          Status
-                          {tripsSortBy === "status" && (
-                            tripsSortDir === "desc" ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />
-                          )}
-                        </div>
-                      </th>
-                      <th
-                        className="text-left p-2 font-medium cursor-pointer hover:bg-muted/70 select-none"
-                        onClick={() => handleSort("customer")}
-                      >
-                        <div className="flex items-center gap-1">
-                          Customer
-                          {tripsSortBy === "customer" && (
-                            tripsSortDir === "desc" ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />
-                          )}
-                        </div>
-                      </th>
-                      <th className="text-left p-2 font-medium">Route</th>
-                      <th className="text-left p-2 font-medium">Driver</th>
-                      <th
-                        className="text-right p-2 font-medium cursor-pointer hover:bg-muted/70 select-none"
-                        onClick={() => handleSort("wait")}
-                      >
-                        <div className="flex items-center justify-end gap-1">
-                          Wait
-                          {tripsSortBy === "wait" && (
-                            tripsSortDir === "desc" ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />
-                          )}
-                        </div>
-                      </th>
+                      <th className="text-left p-2 font-medium w-[70px]">VEHICLE</th>
+                      <th className="text-left p-2 font-medium w-[140px]">DRIVER · ROUTE</th>
+                      <th className="text-center p-2 font-medium w-[70px]">REQUESTED</th>
+                      <th className="text-center p-2 font-medium w-[70px]">ACCEPTED</th>
+                      <th className="text-center p-2 font-medium w-[70px]">ARRIVED</th>
+                      <th className="text-center p-2 font-medium w-[70px]">DESTINATION</th>
+                      <th className="text-center p-2 font-medium w-[90px]">STATUS</th>
                       <th className="w-8"></th>
                     </tr>
                   </thead>
@@ -692,58 +669,115 @@ export default function ControlRoomPage() {
                       const waitSeconds = (Date.now() - new Date(trip.created_at).getTime()) / 1000
                       const isLongWait = trip.status === "pending" && waitSeconds > 300
 
+                      // Calculate time differences for timeline
+                      const requestedTime = new Date(trip.created_at)
+                      const acceptedTime = trip.accepted_at ? new Date(trip.accepted_at) : null
+                      const arrivedTime = trip.arrived_at ? new Date(trip.arrived_at) : null
+                      const completedTime = trip.completed_at ? new Date(trip.completed_at) : null
+
+                      const acceptDelay = acceptedTime ? Math.round((acceptedTime.getTime() - requestedTime.getTime()) / 1000) : null
+                      const arrivalDelay = arrivedTime && acceptedTime ? Math.round((arrivedTime.getTime() - acceptedTime.getTime()) / 1000) : null
+                      const tripDuration = completedTime && arrivedTime ? Math.round((completedTime.getTime() - arrivedTime.getTime()) / 1000) : null
+
+                      // Status progression: 0=requested, 1=accepted, 2=arrived, 3=in_progress, 4=completed
+                      const statusIndex = trip.status === "pending" ? 0 : trip.status === "accepted" ? 1 : trip.status === "arrived" ? 2 : trip.status === "in_progress" ? 3 : 4
+
                       return (
                         <tr
                           key={trip.id}
                           className={`border-b border-border/50 hover:bg-muted/30 cursor-pointer ${isLongWait ? "bg-red-500/10" : ""}`}
                           onClick={() => viewTripDetails(trip)}
                         >
+                          {/* Vehicle */}
                           <td className="p-2">
-                            <Badge className={`${STATUS_COLORS[trip.status]} text-white text-[10px]`}>
-                              {STATUS_LABELS[trip.status as keyof typeof STATUS_LABELS] || trip.status}
-                            </Badge>
-                          </td>
-                          <td className="p-2">
-                            <div className="truncate max-w-[120px]">
-                              {trip.customer?.full_name || "Unknown"}
+                            <div className="font-bold text-sm">
+                              {trip.driver?.vehicle?.vehicle_number || "—"}
                             </div>
-                            {trip.customer?.department?.name && (
-                              <div className="text-[10px] text-muted-foreground truncate">
-                                {trip.customer.department.name}
+                            <div className="text-[10px] text-muted-foreground">
+                              {trip.customer?.department?.name?.substring(0, 8) || ""}
+                            </div>
+                          </td>
+                          {/* Driver · Route */}
+                          <td className="p-2">
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-medium shrink-0">
+                                {((trip.driver?.profile as any)?.full_name || trip.customer?.full_name || "?").split(" ").map((n: string) => n[0]).join("").toUpperCase().substring(0, 2)}
                               </div>
-                            )}
-                          </td>
-                          <td className="p-2">
-                            <div className="flex items-center gap-1 text-xs">
-                              <MapPin className="h-3 w-3 text-green-500 shrink-0" />
-                              <span className="truncate max-w-[80px]">{trip.pickup_name?.split(",")[0]}</span>
-                            </div>
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <ArrowRight className="h-3 w-3 shrink-0" />
-                              <span className="truncate max-w-[80px]">{trip.dropoff_name?.split(",")[0]}</span>
-                            </div>
-                          </td>
-                          <td className="p-2">
-                            {trip.driver ? (
-                              <div>
-                                <div className="truncate max-w-[100px]">
-                                  {(trip.driver.profile as any)?.full_name || "Assigned"}
+                              <div className="min-w-0">
+                                <div className="truncate font-medium">
+                                  {(trip.driver?.profile as any)?.full_name || trip.customer?.full_name || "Unassigned"}
                                 </div>
-                                {trip.driver.vehicle && (
-                                  <div className="text-[10px] text-muted-foreground">
-                                    {trip.driver.vehicle.vehicle_number}
-                                  </div>
-                                )}
+                                <div className="text-[10px] text-muted-foreground truncate">
+                                  {trip.pickup_name?.split(",")[0]} → {trip.dropoff_name?.split(",")[0]}
+                                </div>
                               </div>
-                            ) : (
-                              <span className="text-amber-500 text-xs">Unassigned</span>
-                            )}
+                            </div>
                           </td>
-                          <td className="p-2 text-right tabular-nums">
-                            <span className={isLongWait ? "text-red-400 font-medium" : ""}>
-                              {formatDuration(waitSeconds)}
-                            </span>
+                          {/* Timeline: Requested */}
+                          <td className="p-2 text-center">
+                            <div className="flex flex-col items-center">
+                              {acceptDelay !== null && (
+                                <div className="text-[9px] text-muted-foreground mb-0.5">{acceptDelay}s</div>
+                              )}
+                              <div className="flex items-center gap-1">
+                                <div className={`w-2.5 h-2.5 rounded-full ${statusIndex >= 0 ? "bg-blue-500" : "bg-muted-foreground/30"}`} />
+                                <div className={`w-8 h-0.5 ${statusIndex >= 1 ? "bg-blue-500" : "bg-muted-foreground/30"}`} />
+                              </div>
+                              <div className="text-[10px] mt-0.5 tabular-nums">{format(requestedTime, "HH:mm")}</div>
+                            </div>
                           </td>
+                          {/* Timeline: Accepted */}
+                          <td className="p-2 text-center">
+                            <div className="flex flex-col items-center">
+                              {arrivalDelay !== null && (
+                                <div className="text-[9px] text-muted-foreground mb-0.5">{arrivalDelay < 60 ? `${arrivalDelay}s` : `${(arrivalDelay / 60).toFixed(1)}m`}</div>
+                              )}
+                              <div className="flex items-center gap-1">
+                                <div className={`w-2.5 h-2.5 rounded-full ${statusIndex >= 1 ? "bg-blue-500" : "bg-muted-foreground/30"}`} />
+                                <div className={`w-8 h-0.5 ${statusIndex >= 2 ? "bg-blue-500" : "bg-muted-foreground/30"}`} />
+                              </div>
+                              <div className="text-[10px] mt-0.5 tabular-nums">
+                                {acceptedTime ? format(acceptedTime, "HH:mm") : "· · ·"}
+                              </div>
+                            </div>
+                          </td>
+                          {/* Timeline: Arrived */}
+                          <td className="p-2 text-center">
+                            <div className="flex flex-col items-center">
+                              {tripDuration !== null && (
+                                <div className="text-[9px] text-muted-foreground mb-0.5">{tripDuration < 60 ? `${tripDuration}s` : `${(tripDuration / 60).toFixed(1)}m`}</div>
+                              )}
+                              <div className="flex items-center gap-1">
+                                <div className={`w-2.5 h-2.5 rounded-full ${statusIndex >= 2 ? "bg-blue-500" : "bg-muted-foreground/30"}`} />
+                                <div className={`w-8 h-0.5 ${statusIndex >= 3 ? "bg-green-500" : "bg-muted-foreground/30"}`} />
+                              </div>
+                              <div className="text-[10px] mt-0.5 tabular-nums">
+                                {arrivedTime ? format(arrivedTime, "HH:mm") : "· · ·"}
+                              </div>
+                            </div>
+                          </td>
+                          {/* Timeline: Destination */}
+                          <td className="p-2 text-center">
+                            <div className="flex flex-col items-center">
+                              <div className="h-3" /> {/* spacer */}
+                              <div className="flex items-center">
+                                <div className={`w-2.5 h-2.5 rounded-full ${statusIndex >= 4 ? "bg-green-500" : "bg-muted-foreground/30"}`} />
+                              </div>
+                              <div className="text-[10px] mt-0.5 tabular-nums">
+                                {completedTime ? format(completedTime, "HH:mm") : "· · ·"}
+                              </div>
+                            </div>
+                          </td>
+                          {/* Status */}
+                          <td className="p-2 text-center">
+                            <Badge className={`${STATUS_COLORS[trip.status]} text-white text-[9px] px-2`}>
+                              {trip.status === "pending" ? "AWAITING" : trip.status === "accepted" ? "TO PICKUP" : trip.status === "arrived" ? "AT PICKUP" : trip.status === "in_progress" ? "ON TRIP" : "COMPLETED"}
+                            </Badge>
+                            <div className="text-[9px] text-muted-foreground mt-0.5">
+                              {trip.status === "completed" ? `total ${formatDuration(waitSeconds)}` : `elapsed ${formatDuration(waitSeconds)}`}
+                            </div>
+                          </td>
+                          {/* Actions */}
                           <td className="p-2" onClick={e => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -784,7 +818,7 @@ export default function ControlRoomPage() {
         </div>
 
         {/* Center Column - Map + Alerts */}
-        <div className="col-span-4 flex flex-col gap-4 min-h-0">
+        <div className="col-span-3 flex flex-col gap-3 min-h-0">
           {/* SOS Alerts Panel - TOP PRIORITY */}
           {sosAlerts.length > 0 && (
             <Card className="shrink-0 border-red-500 bg-red-500/10 p-3 animate-pulse">
@@ -874,34 +908,133 @@ export default function ControlRoomPage() {
             />
           </Card>
 
-          {/* Fleet Summary */}
+          {/* Requests by Hour Chart */}
           <Card className="shrink-0 p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-semibold flex items-center gap-2">
-                <Users className="h-4 w-4 text-primary" />
-                Fleet Status
-              </h2>
-              <span className="text-xs text-muted-foreground">{totalDrivers} drivers</span>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold">Requests by hour</h2>
+              <Badge variant="outline" className="text-[10px] text-blue-400 border-blue-400">
+                {hourlyTrends.reduce((sum, h) => sum + h.requests, 0)} today
+              </Badge>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="p-2 rounded bg-green-500/10 text-center">
-                <div className="text-lg font-bold text-green-400">{onlineDrivers}</div>
-                <div className="text-[10px] text-muted-foreground">Active</div>
+            <div className="h-16 flex items-end gap-0.5">
+              {hourlyTrends.slice(0, 12).map((h, i) => {
+                const maxRequests = Math.max(...hourlyTrends.map(t => t.requests), 1)
+                const heightPct = (h.requests / maxRequests) * 100
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center">
+                    <div
+                      className="w-full bg-blue-500 rounded-t transition-all"
+                      style={{ height: `${Math.max(heightPct, 2)}%` }}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+            <div className="flex justify-between mt-1 text-[9px] text-muted-foreground">
+              <span>01</span>
+              <span>04</span>
+              <span>07</span>
+              <span>10</span>
+              <span>12</span>
+            </div>
+            {/* Show peak */}
+            {hourlyTrends.length > 0 && (
+              <div className="text-right mt-1">
+                <span className="text-[10px] text-muted-foreground">Peak: </span>
+                <span className="text-xs font-bold text-blue-400">
+                  {Math.max(...hourlyTrends.map(t => t.requests))}
+                </span>
               </div>
-              <div className="p-2 rounded bg-amber-500/10 text-center">
-                <div className="text-lg font-bold text-amber-400">{onBreakDrivers}</div>
-                <div className="text-[10px] text-muted-foreground">On Break</div>
+            )}
+          </Card>
+
+          {/* Fleet Status with Progress Bars */}
+          <Card className="shrink-0 p-3">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold">Fleet status</h2>
+              <Badge variant="outline" className="text-[10px]">
+                {totalDrivers} vehicles
+              </Badge>
+            </div>
+            <div className="space-y-2">
+              {/* On Trip */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs w-16">On trip</span>
+                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-green-500 rounded-full"
+                    style={{ width: `${totalDrivers > 0 ? (activeTrips.filter(t => t.status === "in_progress").length / totalDrivers) * 100 : 0}%` }}
+                  />
+                </div>
+                <span className="text-xs font-bold w-6 text-right text-green-400">
+                  {activeTrips.filter(t => t.status === "in_progress").length}
+                </span>
               </div>
-              <div className="p-2 rounded bg-gray-500/10 text-center">
-                <div className="text-lg font-bold text-gray-400">{offlineDrivers}</div>
-                <div className="text-[10px] text-muted-foreground">Offline</div>
+              {/* To Pickup */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs w-16">To pickup</span>
+                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 rounded-full"
+                    style={{ width: `${totalDrivers > 0 ? (activeTrips.filter(t => t.status === "accepted" || t.status === "arrived").length / totalDrivers) * 100 : 0}%` }}
+                  />
+                </div>
+                <span className="text-xs font-bold w-6 text-right text-blue-400">
+                  {activeTrips.filter(t => t.status === "accepted" || t.status === "arrived").length}
+                </span>
               </div>
+              {/* Available */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs w-16">Available</span>
+                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 rounded-full"
+                    style={{ width: `${totalDrivers > 0 ? (onlineDrivers - activeTrips.length) / totalDrivers * 100 : 0}%` }}
+                  />
+                </div>
+                <span className="text-xs font-bold w-6 text-right text-emerald-400">
+                  {Math.max(0, onlineDrivers - activeTrips.length)}
+                </span>
+              </div>
+            </div>
+          </Card>
+
+          {/* Recently Completed */}
+          <Card className="shrink-0 p-3 max-h-[180px] overflow-hidden">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold">Recently completed</h2>
+            </div>
+            <div className="space-y-1.5 overflow-y-auto max-h-[130px]">
+              {recentlyCompleted.length === 0 ? (
+                <div className="text-xs text-muted-foreground text-center py-4">No completed trips yet</div>
+              ) : (
+                recentlyCompleted.slice(0, 5).map((trip) => {
+                  const duration = trip.completed_at && trip.created_at
+                    ? Math.round((new Date(trip.completed_at).getTime() - new Date(trip.created_at).getTime()) / 1000)
+                    : 0
+                  return (
+                    <div key={trip.id} className="flex items-center justify-between p-1.5 rounded bg-muted/30 text-xs">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium truncate">
+                          {trip.driver?.vehicle?.vehicle_number || "—"} · {trip.pickup_name?.split(",")[0]} → {trip.dropoff_name?.split(",")[0]}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {(trip.driver?.profile as any)?.full_name || "Driver"} · finished {trip.completed_at ? format(new Date(trip.completed_at), "HH:mm") : ""}
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[9px] ml-2 shrink-0">
+                        {formatDuration(duration)}
+                      </Badge>
+                    </div>
+                  )
+                })
+              )}
             </div>
           </Card>
         </div>
 
         {/* Right Column - Shuttles + Trends */}
-        <div className="col-span-3 flex flex-col gap-4 min-h-0">
+        <div className="col-span-2 flex flex-col gap-3 min-h-0">
           {/* Active Shuttles */}
           <div className="flex-1 flex flex-col min-h-0">
             <div className="flex items-center justify-between mb-2">
@@ -1016,66 +1149,158 @@ export default function ControlRoomPage() {
             </Card>
           </div>
 
-          {/* Hourly Trend Chart */}
+          {/* Response Time Trend */}
           <Card className="shrink-0 p-3">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-sm font-semibold flex items-center gap-2">
-                <Activity className="h-4 w-4 text-blue-400" />
-                Today's Activity
+                <Timer className="h-4 w-4 text-cyan-400" />
+                Response Time
               </h2>
-              <span className="text-xs text-muted-foreground">
-                {hourlyTrends.reduce((sum, h) => sum + h.requests, 0)} requests
-              </span>
+              <Badge variant="outline" className="text-[10px] text-cyan-400 border-cyan-400">
+                {formatDuration(metrics?.avgAcceptSeconds ?? 0)} avg
+              </Badge>
             </div>
-            <div className="h-10">
+            <div className="h-12">
               <Sparkline
-                data={hourlyTrends.map(h => h.requests)}
-                color="#3b82f6"
-                height={40}
+                data={hourlyTrends.map(h => h.completed > 0 ? h.requests / h.completed * 60 : 0)}
+                color="#22d3ee"
+                height={48}
               />
             </div>
             <div className="flex justify-between text-[9px] text-muted-foreground mt-1">
-              <span>00:00</span>
+              <span>12 AM</span>
               <span>Now</span>
             </div>
           </Card>
 
-          {/* Shift Ending Soon */}
-          {shiftWarnings.length > 0 && (
-            <Card className="shrink-0 p-3 border-orange-500/50 bg-orange-500/5">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-sm font-semibold flex items-center gap-2 text-orange-400">
-                  <UserMinus className="h-4 w-4" />
-                  Shift Ending Soon
-                </h2>
-                <span className="text-xs text-muted-foreground">{shiftWarnings.length}</span>
+          {/* Driver Availability Donut */}
+          <Card className="shrink-0 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold">Driver Availability</h2>
+            </div>
+            <div className="flex items-center gap-4">
+              {/* Donut Chart */}
+              <div className="relative w-20 h-20">
+                <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+                  {/* Background circle */}
+                  <circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" strokeWidth="3" className="text-muted/30" />
+                  {/* Available segment (green) */}
+                  <circle
+                    cx="18" cy="18" r="15.5" fill="none"
+                    stroke="#22c55e"
+                    strokeWidth="3"
+                    strokeDasharray={`${totalDrivers > 0 ? (Math.max(0, onlineDrivers - activeTrips.length) / totalDrivers) * 97.4 : 0} 97.4`}
+                    strokeLinecap="round"
+                  />
+                  {/* On Trip segment (blue) */}
+                  <circle
+                    cx="18" cy="18" r="15.5" fill="none"
+                    stroke="#3b82f6"
+                    strokeWidth="3"
+                    strokeDasharray={`${totalDrivers > 0 ? (activeTrips.filter(t => t.status === "in_progress").length / totalDrivers) * 97.4 : 0} 97.4`}
+                    strokeDashoffset={`${-(totalDrivers > 0 ? (Math.max(0, onlineDrivers - activeTrips.length) / totalDrivers) * 97.4 : 0)}`}
+                    strokeLinecap="round"
+                  />
+                  {/* On Break segment (amber) */}
+                  <circle
+                    cx="18" cy="18" r="15.5" fill="none"
+                    stroke="#f59e0b"
+                    strokeWidth="3"
+                    strokeDasharray={`${totalDrivers > 0 ? (onBreakDrivers / totalDrivers) * 97.4 : 0} 97.4`}
+                    strokeDashoffset={`${-(totalDrivers > 0 ? ((Math.max(0, onlineDrivers - activeTrips.length) + activeTrips.filter(t => t.status === "in_progress").length) / totalDrivers) * 97.4 : 0)}`}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-lg font-bold">{totalDrivers}</span>
+                  <span className="text-[8px] text-muted-foreground">Drivers</span>
+                </div>
               </div>
-              <div className="space-y-1 max-h-[80px] overflow-y-auto">
-                {shiftWarnings.map((warning) => (
-                  <div
-                    key={warning.driver_id}
-                    className={`flex items-center justify-between p-2 rounded text-sm ${
-                      warning.has_active_ride ? "bg-red-500/20 border border-red-500/50" : "bg-muted/50"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="truncate max-w-[100px]">{warning.driver_name}</span>
-                      {warning.has_active_ride && (
-                        <Badge variant="outline" className="text-[9px] border-red-500 text-red-400">
-                          On Trip
-                        </Badge>
-                      )}
-                    </div>
-                    <span className={`font-mono text-xs ${
-                      warning.minutes_remaining <= 10 ? "text-red-400" : "text-orange-400"
-                    }`}>
-                      {warning.minutes_remaining}m
-                    </span>
+              {/* Legend */}
+              <div className="flex-1 space-y-1 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                    <span>Available</span>
                   </div>
-                ))}
+                  <span className="font-medium">{Math.max(0, onlineDrivers - activeTrips.length)} ({totalDrivers > 0 ? Math.round((Math.max(0, onlineDrivers - activeTrips.length) / totalDrivers) * 100) : 0}%)</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-blue-500" />
+                    <span>On Trip</span>
+                  </div>
+                  <span className="font-medium">{activeTrips.filter(t => t.status === "in_progress").length} ({totalDrivers > 0 ? Math.round((activeTrips.filter(t => t.status === "in_progress").length / totalDrivers) * 100) : 0}%)</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-amber-500" />
+                    <span>On Break</span>
+                  </div>
+                  <span className="font-medium">{onBreakDrivers} ({totalDrivers > 0 ? Math.round((onBreakDrivers / totalDrivers) * 100) : 0}%)</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-gray-500" />
+                    <span>Offline</span>
+                  </div>
+                  <span className="font-medium">{offlineDrivers} ({totalDrivers > 0 ? Math.round((offlineDrivers / totalDrivers) * 100) : 0}%)</span>
+                </div>
               </div>
-            </Card>
-          )}
+            </div>
+          </Card>
+
+          {/* Recent Alerts / Delays */}
+          <Card className="shrink-0 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-400" />
+                Recent Alerts
+              </h2>
+            </div>
+            <div className="space-y-1.5 max-h-[120px] overflow-y-auto">
+              {/* Long wait alerts */}
+              {activeTrips.filter(t => t.status === "pending" && (Date.now() - new Date(t.created_at).getTime()) / 1000 > 180).map((trip) => (
+                <div key={`wait-${trip.id}`} className="flex items-start gap-2 p-1.5 rounded bg-red-500/10 border border-red-500/30">
+                  <AlertTriangle className="h-3 w-3 text-red-400 mt-0.5 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[10px] font-medium text-red-400">Long wait - {formatDuration((Date.now() - new Date(trip.created_at).getTime()) / 1000)}</div>
+                    <div className="text-[9px] text-muted-foreground truncate">{trip.customer?.full_name} waiting at {trip.pickup_name?.split(",")[0]}</div>
+                  </div>
+                  <span className="text-[9px] text-muted-foreground">{format(new Date(trip.created_at), "HH:mm")}</span>
+                </div>
+              ))}
+              {/* Shift ending warnings */}
+              {shiftWarnings.filter(w => w.has_active_ride).map((warning) => (
+                <div key={`shift-${warning.driver_id}`} className="flex items-start gap-2 p-1.5 rounded bg-orange-500/10 border border-orange-500/30">
+                  <Clock className="h-3 w-3 text-orange-400 mt-0.5 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[10px] font-medium text-orange-400">Shift ending - {warning.minutes_remaining}m left</div>
+                    <div className="text-[9px] text-muted-foreground truncate">{warning.driver_name} on active trip</div>
+                  </div>
+                </div>
+              ))}
+              {/* Roster gaps */}
+              {rosterGaps.slice(0, 2).map((gap, i) => (
+                <div key={`gap-${i}`} className="flex items-start gap-2 p-1.5 rounded bg-amber-500/10 border border-amber-500/30">
+                  <Users className="h-3 w-3 text-amber-400 mt-0.5 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[10px] font-medium text-amber-400">No driver assigned</div>
+                    <div className="text-[9px] text-muted-foreground truncate">{gap.route_name} at {gap.departure_time}</div>
+                  </div>
+                </div>
+              ))}
+              {/* No alerts message */}
+              {activeTrips.filter(t => t.status === "pending" && (Date.now() - new Date(t.created_at).getTime()) / 1000 > 180).length === 0 &&
+               shiftWarnings.filter(w => w.has_active_ride).length === 0 &&
+               rosterGaps.length === 0 && (
+                <div className="text-[10px] text-muted-foreground text-center py-2">
+                  <CheckCircle2 className="h-4 w-4 mx-auto mb-1 text-green-400" />
+                  All clear - no alerts
+                </div>
+              )}
+            </div>
+          </Card>
 
           {/* Scheduled Rides Queue */}
           {scheduledRides.length > 0 && (

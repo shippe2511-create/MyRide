@@ -272,6 +272,69 @@ export async function getActiveTrips(
 }
 
 /**
+ * Get recently completed trips (last 10, completed today)
+ */
+export async function getRecentlyCompletedTrips(
+  supabase: SupabaseClient,
+  departmentId?: string | null
+): Promise<ActiveTrip[]> {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  let query = supabase
+    .from('rides')
+    .select(`
+      id, customer_id, driver_id, pickup_name, dropoff_name, status,
+      created_at, accepted_at, arrived_at, started_at, completed_at, cancelled_at, cancel_reason,
+      customer:profiles!rides_customer_id_fkey(
+        full_name, phone, department_id,
+        department:departments(name)
+      ),
+      driver:drivers!rides_driver_id_fkey(
+        profile:profiles(full_name),
+        vehicle_id,
+        vehicle:vehicles(vehicle_number)
+      )
+    `)
+    .eq('status', 'completed')
+    .gte('completed_at', today.toISOString())
+    .order('completed_at', { ascending: false })
+    .limit(10)
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error fetching recently completed trips:', error)
+    return []
+  }
+
+  let trips = (data || []).map((row: any) => ({
+    ...row,
+    customer: Array.isArray(row.customer) ? row.customer[0] : row.customer,
+    driver: Array.isArray(row.driver) ? row.driver[0] : row.driver,
+  })) as ActiveTrip[]
+
+  trips = trips.map(t => ({
+    ...t,
+    customer: t.customer ? {
+      ...t.customer,
+      department: Array.isArray(t.customer.department) ? t.customer.department[0] : t.customer.department
+    } : undefined,
+    driver: t.driver ? {
+      ...t.driver,
+      profile: Array.isArray((t.driver as any).profile) ? (t.driver as any).profile[0] : (t.driver as any).profile,
+      vehicle: Array.isArray((t.driver as any).vehicle) ? (t.driver as any).vehicle[0] : (t.driver as any).vehicle,
+    } : undefined,
+  }))
+
+  if (departmentId) {
+    trips = trips.filter(t => t.customer?.department_id === departmentId)
+  }
+
+  return trips
+}
+
+/**
  * Get active shuttle/bus trips
  */
 export async function getActiveShuttles(

@@ -175,6 +175,8 @@ export default function ControlRoomPage() {
   const [shuttlesCollapsed, setShuttlesCollapsed] = useState(false)
   const [fleetCollapsed, setFleetCollapsed] = useState(false)
   const [recentCollapsed, setRecentCollapsed] = useState(false)
+  const [hourlyCollapsed, setHourlyCollapsed] = useState(false)
+  const [attentionCollapsed, setAttentionCollapsed] = useState(false)
 
   // Resizable panels state (percentage widths)
   const [leftPanelWidth, setLeftPanelWidth] = useState(42) // 42% default
@@ -1401,14 +1403,21 @@ export default function ControlRoomPage() {
             </Card>
           )}
 
-          {/* Attention Items Panel */}
+          {/* Attention Items Panel - Collapsible */}
           {(metrics?.awaitingDriver ?? 0) > 0 || (metrics?.shuttlesNearCapacity ?? 0) > 0 || (metrics?.rosterGaps ?? 0) > 0 ? (
-            <Card className="shrink-0 border-amber-500/50 bg-amber-500/5 p-3">
-              <div className="flex items-center gap-2 mb-2 text-amber-500">
-                <AlertTriangle className="h-4 w-4" />
-                <span className="text-sm font-semibold">Attention Items</span>
-              </div>
-              <div className="space-y-2 text-sm">
+            <Card className="shrink-0 border-amber-500/50 bg-amber-500/5 overflow-hidden">
+              <button
+                onClick={() => setAttentionCollapsed(!attentionCollapsed)}
+                className="w-full flex items-center justify-between p-2 hover:bg-amber-500/10 transition-colors"
+              >
+                <div className="flex items-center gap-2 text-amber-500">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="text-sm font-semibold">Attention Items</span>
+                </div>
+                {attentionCollapsed ? <ChevronRight className="h-4 w-4 text-amber-500" /> : <ChevronDown className="h-4 w-4 text-amber-500" />}
+              </button>
+              {!attentionCollapsed && (
+              <div className="space-y-2 text-sm px-2 pb-2">
                 {metrics && metrics.oldestUnassignedSeconds > 0 && (
                   <div className="flex items-center justify-between p-2 rounded bg-muted/50">
                     <span>Oldest unassigned request</span>
@@ -1430,6 +1439,7 @@ export default function ControlRoomPage() {
                   </div>
                 )}
               </div>
+              )}
             </Card>
           ) : null}
 
@@ -1465,43 +1475,53 @@ export default function ControlRoomPage() {
             />}
           </Card>
 
-          {/* Requests by Hour Chart */}
-          <Card className="shrink-0 p-2">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-xs font-semibold">Requests by hour</h2>
-              <Badge variant="outline" className="text-[10px] text-blue-400 border-blue-400">
-                {hourlyTrends.reduce((sum, h) => sum + h.requests, 0)} today
-              </Badge>
-            </div>
-            <div className="h-12 flex items-end gap-0.5">
-              {hourlyTrends.slice(0, 12).map((h, i) => {
-                const maxRequests = Math.max(...hourlyTrends.map(t => t.requests), 1)
-                const heightPct = (h.requests / maxRequests) * 100
-                return (
-                  <div key={i} className="flex-1 flex flex-col items-center">
-                    <div
-                      className="w-full bg-blue-500 rounded-t transition-all"
-                      style={{ height: `${Math.max(heightPct, 2)}%` }}
-                    />
-                  </div>
-                )
-              })}
-            </div>
-            <div className="flex justify-between mt-1 text-[9px] text-muted-foreground">
-              <span>01</span>
-              <span>04</span>
-              <span>07</span>
-              <span>10</span>
-              <span>12</span>
-            </div>
-            {/* Show peak */}
-            {hourlyTrends.length > 0 && (
-              <div className="text-right mt-1">
-                <span className="text-[10px] text-muted-foreground">Peak: </span>
-                <span className="text-xs font-bold text-blue-400">
-                  {Math.max(...hourlyTrends.map(t => t.requests))}
-                </span>
+          {/* Requests by Hour Chart - Collapsible */}
+          <Card className="shrink-0 overflow-hidden">
+            <button
+              onClick={() => setHourlyCollapsed(!hourlyCollapsed)}
+              className="w-full flex items-center justify-between p-2 hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <h2 className="text-xs font-semibold">Requests by hour</h2>
+                <Badge variant="outline" className="text-[10px] text-blue-400 border-blue-400">
+                  {hourlyTrends.reduce((sum, h) => sum + h.requests, 0)} today
+                </Badge>
               </div>
+              {hourlyCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            {!hourlyCollapsed && (
+            <div className="px-2 pb-2">
+              <div className="h-12 flex items-end gap-0.5">
+                {hourlyTrends.slice(0, 12).map((h, i) => {
+                  const maxRequests = Math.max(...hourlyTrends.map(t => t.requests), 1)
+                  const heightPct = (h.requests / maxRequests) * 100
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center">
+                      <div
+                        className="w-full bg-blue-500 rounded-t transition-all"
+                        style={{ height: `${Math.max(heightPct, 2)}%` }}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="flex justify-between mt-1 text-[9px] text-muted-foreground">
+                <span>01</span>
+                <span>04</span>
+                <span>07</span>
+                <span>10</span>
+                <span>12</span>
+              </div>
+              {/* Show peak */}
+              {hourlyTrends.length > 0 && (
+                <div className="text-right mt-1">
+                  <span className="text-[10px] text-muted-foreground">Peak: </span>
+                  <span className="text-xs font-bold text-blue-400">
+                    {Math.max(...hourlyTrends.map(t => t.requests))}
+                  </span>
+                </div>
+              )}
+            </div>
             )}
           </Card>
 

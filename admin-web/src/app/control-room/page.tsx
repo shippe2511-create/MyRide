@@ -993,9 +993,9 @@ export default function ControlRoomPage() {
       </div>
 
       {/* Main Content - 3 columns */}
-      <div className="flex-1 grid grid-cols-12 gap-4 min-h-0">
+      <div className="flex-1 grid grid-cols-12 gap-3 min-h-0">
         {/* Left Column - Live Trips Table with Timeline */}
-        <div className="col-span-7 flex flex-col min-h-0">
+        <div className="col-span-6 flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-semibold flex items-center gap-2">
               <Car className="h-4 w-4 text-blue-400" />
@@ -1268,7 +1268,7 @@ export default function ControlRoomPage() {
         </div>
 
         {/* Center Column - Map + Alerts */}
-        <div className="col-span-3 flex flex-col gap-3 min-h-0">
+        <div className="col-span-4 flex flex-col gap-2 min-h-0">
           {/* SOS Alerts Panel - TOP PRIORITY */}
           {sosAlerts.length > 0 && (
             <Card className="shrink-0 border-red-500 bg-red-500/10 p-3 animate-pulse">
@@ -1344,7 +1344,7 @@ export default function ControlRoomPage() {
           ) : null}
 
           {/* Live Map */}
-          <Card className="flex-1 min-h-[200px] overflow-hidden">
+          <Card className="flex-[2] min-h-[250px] overflow-hidden">
             <ControlRoomMap
               trips={mapMarkers}
               followingId={followingId}
@@ -1366,14 +1366,14 @@ export default function ControlRoomPage() {
           </Card>
 
           {/* Requests by Hour Chart */}
-          <Card className="shrink-0 p-3">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold">Requests by hour</h2>
+          <Card className="shrink-0 p-2">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xs font-semibold">Requests by hour</h2>
               <Badge variant="outline" className="text-[10px] text-blue-400 border-blue-400">
                 {hourlyTrends.reduce((sum, h) => sum + h.requests, 0)} today
               </Badge>
             </div>
-            <div className="h-16 flex items-end gap-0.5">
+            <div className="h-12 flex items-end gap-0.5">
               {hourlyTrends.slice(0, 12).map((h, i) => {
                 const maxRequests = Math.max(...hourlyTrends.map(t => t.requests), 1)
                 const heightPct = (h.requests / maxRequests) * 100
@@ -1406,9 +1406,9 @@ export default function ControlRoomPage() {
           </Card>
 
           {/* Fleet Status with Progress Bars */}
-          <Card className="shrink-0 p-3">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold">Fleet status</h2>
+          <Card className="shrink-0 p-2">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xs font-semibold">Fleet status</h2>
               <Badge variant="outline" className="text-[10px]">
                 {totalDrivers} vehicles
               </Badge>
@@ -1457,11 +1457,11 @@ export default function ControlRoomPage() {
           </Card>
 
           {/* Recently Completed */}
-          <Card className="shrink-0 p-3 max-h-[180px] overflow-hidden">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-semibold">Recently completed</h2>
+          <Card className="shrink-0 p-2 max-h-[140px] overflow-hidden">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-xs font-semibold">Recently completed</h2>
             </div>
-            <div className="space-y-1.5 overflow-y-auto max-h-[130px]">
+            <div className="space-y-1 overflow-y-auto max-h-[100px]">
               {recentlyCompleted.length === 0 ? (
                 <div className="text-xs text-muted-foreground text-center py-4">No completed trips yet</div>
               ) : (
@@ -1502,7 +1502,7 @@ export default function ControlRoomPage() {
         </div>
 
         {/* Right Column - Shuttles + Trends */}
-        <div className="col-span-2 flex flex-col gap-3 min-h-0">
+        <div className="col-span-2 flex flex-col gap-2 min-h-0">
           {/* Active Shuttles */}
           <div className="flex-1 flex flex-col min-h-0">
             <div className="flex items-center justify-between mb-2">
@@ -1618,10 +1618,10 @@ export default function ControlRoomPage() {
           </div>
 
           {/* Response Time Trend */}
-          <Card className="shrink-0 p-3">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold">
-                Response Time Trend <span className="text-muted-foreground font-normal">(Minutes)</span>
+          <Card className="shrink-0 p-2">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xs font-semibold">
+                Response Time <span className="text-muted-foreground font-normal">(Min)</span>
               </h2>
               <Badge variant="outline" className="text-[10px]">
                 Today
@@ -1659,7 +1659,7 @@ export default function ControlRoomPage() {
 
               return (
                 <div className="relative">
-                  <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ height: 120 }}>
+                  <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ height: 80 }}>
                     {/* Grid lines */}
                     {[0, 5, 10, 15].filter(v => v <= roundedMax).map(val => {
                       const y = padding.top + chartHeight - (val / roundedMax) * chartHeight
@@ -1713,13 +1713,13 @@ export default function ControlRoomPage() {
           </Card>
 
           {/* Driver Availability Donut */}
-          <Card className="shrink-0 p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-semibold">Driver Availability</h2>
+          <Card className="shrink-0 p-2">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-xs font-semibold">Driver Availability</h2>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               {/* Donut Chart */}
-              <div className="relative w-20 h-20">
+              <div className="relative w-16 h-16">
                 <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
                   {/* Background circle */}
                   <circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" strokeWidth="3" className="text-muted/30" />
@@ -1751,12 +1751,12 @@ export default function ControlRoomPage() {
                   />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-lg font-bold">{totalDrivers}</span>
-                  <span className="text-[8px] text-muted-foreground">Drivers</span>
+                  <span className="text-sm font-bold">{totalDrivers}</span>
+                  <span className="text-[7px] text-muted-foreground">Drivers</span>
                 </div>
               </div>
               {/* Legend */}
-              <div className="flex-1 space-y-1 text-xs">
+              <div className="flex-1 space-y-0.5 text-[10px]">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <div className="w-2 h-2 rounded-full bg-green-500" />
@@ -1790,9 +1790,9 @@ export default function ControlRoomPage() {
           </Card>
 
           {/* Trips by Zone */}
-          <Card className="shrink-0 p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-semibold">Trips by Zone</h2>
+          <Card className="shrink-0 p-2">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-xs font-semibold">Trips by Zone</h2>
               <span className="text-[10px] text-muted-foreground">Today</span>
             </div>
             {(() => {
@@ -1838,9 +1838,9 @@ export default function ControlRoomPage() {
               })
 
               return (
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   {/* Donut Chart */}
-                  <div className="relative w-20 h-20 shrink-0">
+                  <div className="relative w-16 h-16 shrink-0">
                     <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
                       <circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" strokeWidth="3" className="text-muted/30" />
                       {sortedZones.map(([_, count], i) => (
@@ -1856,12 +1856,12 @@ export default function ControlRoomPage() {
                       ))}
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-lg font-bold">{totalTrips}</span>
-                      <span className="text-[8px] text-muted-foreground">Trips</span>
+                      <span className="text-sm font-bold">{totalTrips}</span>
+                      <span className="text-[7px] text-muted-foreground">Trips</span>
                     </div>
                   </div>
                   {/* Legend */}
-                  <div className="flex-1 space-y-1 text-xs">
+                  <div className="flex-1 space-y-0.5 text-[10px]">
                     {sortedZones.map(([zone, count], i) => (
                       <div key={zone} className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
@@ -1884,14 +1884,14 @@ export default function ControlRoomPage() {
           </Card>
 
           {/* Recent Alerts / Delays */}
-          <Card className="shrink-0 p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-semibold flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-400" />
+          <Card className="shrink-0 p-2">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-xs font-semibold flex items-center gap-1.5">
+                <AlertTriangle className="h-3 w-3 text-amber-400" />
                 Recent Alerts
               </h2>
             </div>
-            <div className="space-y-1.5 max-h-[120px] overflow-y-auto">
+            <div className="space-y-1 max-h-[80px] overflow-y-auto">
               {/* Long wait alerts */}
               {activeTrips.filter(t => t.status === "pending" && (Date.now() - new Date(t.created_at).getTime()) / 1000 > 180).map((trip) => (
                 <div key={`wait-${trip.id}`} className="flex items-start gap-2 p-1.5 rounded bg-red-500/10 border border-red-500/30">

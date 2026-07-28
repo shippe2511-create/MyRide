@@ -812,16 +812,16 @@ export default function ControlRoomPage() {
     <PermissionGate permission="rides:view">
     <TooltipProvider delayDuration={300}>
     <div className="h-full w-full flex flex-col p-4 gap-4">
-      {/* Top Bar */}
-      <div className="flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-4">
+      {/* Top Bar - Responsive */}
+      <div className="flex flex-wrap items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-4">
           <div className="flex items-center gap-2">
-            <Activity className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-bold">Transport Operations</h1>
+            <Activity className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+            <h1 className="text-base sm:text-xl font-bold">Transport Operations</h1>
           </div>
           <Badge
             variant="outline"
-            className={`
+            className={`text-[10px] sm:text-xs
               ${attentionLevel === "calm" ? "border-green-500 text-green-500" : ""}
               ${attentionLevel === "amber" ? "border-amber-500 text-amber-500 animate-pulse" : ""}
               ${attentionLevel === "red" ? "border-red-500 text-red-500 animate-pulse" : ""}
@@ -833,16 +833,16 @@ export default function ControlRoomPage() {
           </Badge>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <div className="text-2xl font-mono font-bold tabular-nums">
+        <div className="flex items-center gap-2 sm:gap-4">
+          <div className="text-right hidden sm:block">
+            <div className="text-lg sm:text-2xl font-mono font-bold tabular-nums">
               {format(currentTime, "HH:mm:ss")}
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-[10px] sm:text-xs text-muted-foreground">
               {format(currentTime, "EEEE, d MMMM yyyy")}
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 sm:gap-1">
             {/* Command Palette Trigger */}
             <Button
               variant="outline"
@@ -943,8 +943,8 @@ export default function ControlRoomPage() {
         </div>
       </div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-8 gap-3 shrink-0">
+      {/* Metrics Row - Responsive */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 lg:gap-3 shrink-0">
         <MetricCard
           icon={<Car className="h-5 w-5" />}
           label="Active Trips"
@@ -1001,10 +1001,10 @@ export default function ControlRoomPage() {
         />
       </div>
 
-      {/* Main Content - 3 columns */}
-      <div className="flex-1 grid grid-cols-12 gap-3 min-h-0">
+      {/* Main Content - Responsive 3 columns */}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 min-h-0 overflow-y-auto lg:overflow-hidden">
         {/* Left Column - Live Trips Table with Timeline */}
-        <div className="col-span-6 flex flex-col min-h-0">
+        <div className="col-span-1 lg:col-span-6 flex flex-col min-h-[300px] lg:min-h-0">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-semibold flex items-center gap-2">
               <Car className="h-4 w-4 text-blue-400" />
@@ -1297,7 +1297,7 @@ export default function ControlRoomPage() {
         </div>
 
         {/* Center Column - Map + Alerts */}
-        <div className="col-span-4 flex flex-col gap-2 min-h-0">
+        <div className="col-span-1 lg:col-span-4 flex flex-col gap-2 min-h-[400px] lg:min-h-0">
           {/* SOS Alerts Panel - TOP PRIORITY */}
           {sosAlerts.length > 0 && (
             <Card className="shrink-0 border-red-500 bg-red-500/10 p-3 animate-pulse">
@@ -1531,7 +1531,7 @@ export default function ControlRoomPage() {
         </div>
 
         {/* Right Column - Shuttles + Trends */}
-        <div className="col-span-2 flex flex-col gap-2 min-h-0">
+        <div className="col-span-1 lg:col-span-2 flex flex-col gap-2 min-h-0">
           {/* Active Shuttles */}
           <div className="flex-1 flex flex-col min-h-0">
             <div className="flex items-center justify-between mb-2">
@@ -2056,14 +2056,14 @@ export default function ControlRoomPage() {
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
+      {/* Footer - Responsive */}
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] sm:text-xs text-muted-foreground shrink-0">
+        <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-1 sm:gap-2">
             <Circle className={`h-2 w-2 fill-green-500 text-green-500 ${isUpdating ? "" : "animate-pulse"}`} />
-            <span>Live • Realtime updates</span>
+            <span>Live</span>
           </div>
-          <div className="flex items-center gap-3 text-[10px]">
+          <div className="hidden sm:flex items-center gap-3 text-[10px]">
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">R</kbd> Refresh
             </span>
@@ -2073,9 +2073,6 @@ export default function ControlRoomPage() {
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">M</kbd> Mute
             </span>
-            <span className="flex items-center gap-1">
-              <kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">0-2</kbd> Filter
-            </span>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -2084,7 +2081,7 @@ export default function ControlRoomPage() {
               <VolumeX className="h-3 w-3" /> Muted
             </span>
           )}
-          <span>Updated: {format(lastUpdate, "HH:mm:ss")}</span>
+          <span>{format(lastUpdate, "HH:mm:ss")}</span>
         </div>
       </div>
 

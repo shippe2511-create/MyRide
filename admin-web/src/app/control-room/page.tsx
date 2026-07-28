@@ -177,6 +177,10 @@ export default function ControlRoomPage() {
   const [recentCollapsed, setRecentCollapsed] = useState(false)
   const [hourlyCollapsed, setHourlyCollapsed] = useState(false)
   const [attentionCollapsed, setAttentionCollapsed] = useState(false)
+  const [responseTimeCollapsed, setResponseTimeCollapsed] = useState(false)
+  const [driverAvailCollapsed, setDriverAvailCollapsed] = useState(false)
+  const [tripsByZoneCollapsed, setTripsByZoneCollapsed] = useState(false)
+  const [alertsCollapsed, setAlertsCollapsed] = useState(false)
 
   // Resizable panels state (percentage widths)
   const [leftPanelWidth, setLeftPanelWidth] = useState(42) // 42% default
@@ -1777,17 +1781,21 @@ export default function ControlRoomPage() {
             ) : null}
           </div>
 
-          {/* Response Time Trend */}
-          <Card className="shrink-0 p-2">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-xs font-semibold">
-                Response Time <span className="text-muted-foreground font-normal">(Min)</span>
-              </h2>
-              <Badge variant="outline" className="text-[10px]">
-                Today
-              </Badge>
-            </div>
-            {(() => {
+          {/* Response Time Trend - Collapsible */}
+          <Card className="shrink-0 overflow-hidden">
+            <button
+              onClick={() => setResponseTimeCollapsed(!responseTimeCollapsed)}
+              className="w-full flex items-center justify-between p-2 hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <h2 className="text-xs font-semibold">
+                  Response Time <span className="text-muted-foreground font-normal">(Min)</span>
+                </h2>
+                <Badge variant="outline" className="text-[10px]">Today</Badge>
+              </div>
+              {responseTimeCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            {!responseTimeCollapsed && (() => {
               // Calculate response time data per hour (in minutes)
               const responseData = hourlyTrends.map(h => {
                 if (h.completed > 0) {
@@ -1872,12 +1880,16 @@ export default function ControlRoomPage() {
             })()}
           </Card>
 
-          {/* Driver Availability Donut */}
-          <Card className="shrink-0 p-2">
-            <div className="flex items-center justify-between mb-1">
+          {/* Driver Availability Donut - Collapsible */}
+          <Card className="shrink-0 overflow-hidden">
+            <button
+              onClick={() => setDriverAvailCollapsed(!driverAvailCollapsed)}
+              className="w-full flex items-center justify-between p-2 hover:bg-muted/30 transition-colors"
+            >
               <h2 className="text-xs font-semibold">Driver Availability</h2>
-            </div>
-            <div className="flex items-center gap-3">
+              {driverAvailCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            {!driverAvailCollapsed && <div className="flex items-center gap-3 px-2 pb-2">
               {/* Donut Chart */}
               <div className="relative w-16 h-16">
                 <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
@@ -1946,16 +1958,22 @@ export default function ControlRoomPage() {
                   <span className="font-medium">{offlineDrivers} ({totalDrivers > 0 ? Math.round((offlineDrivers / totalDrivers) * 100) : 0}%)</span>
                 </div>
               </div>
-            </div>
+            </div>}
           </Card>
 
-          {/* Trips by Zone */}
-          <Card className="shrink-0 p-2">
-            <div className="flex items-center justify-between mb-1">
-              <h2 className="text-xs font-semibold">Trips by Zone</h2>
-              <span className="text-[10px] text-muted-foreground">Today</span>
-            </div>
-            {(() => {
+          {/* Trips by Zone - Collapsible */}
+          <Card className="shrink-0 overflow-hidden">
+            <button
+              onClick={() => setTripsByZoneCollapsed(!tripsByZoneCollapsed)}
+              className="w-full flex items-center justify-between p-2 hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <h2 className="text-xs font-semibold">Trips by Zone</h2>
+                <span className="text-[10px] text-muted-foreground">Today</span>
+              </div>
+              {tripsByZoneCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            {!tripsByZoneCollapsed && (() => {
               // Calculate zone distribution from active + completed trips
               const allTrips = [...activeTrips, ...recentlyCompleted]
               const zones: Record<string, number> = {}
@@ -2043,15 +2061,19 @@ export default function ControlRoomPage() {
             </button>
           </Card>
 
-          {/* Recent Alerts / Delays */}
-          <Card className="shrink-0 p-2">
-            <div className="flex items-center justify-between mb-1">
+          {/* Recent Alerts / Delays - Collapsible */}
+          <Card className="shrink-0 overflow-hidden">
+            <button
+              onClick={() => setAlertsCollapsed(!alertsCollapsed)}
+              className="w-full flex items-center justify-between p-2 hover:bg-muted/30 transition-colors"
+            >
               <h2 className="text-xs font-semibold flex items-center gap-1.5">
                 <AlertTriangle className="h-3 w-3 text-amber-400" />
                 Recent Alerts
               </h2>
-            </div>
-            <div className="space-y-1 max-h-[80px] overflow-y-auto">
+              {alertsCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            {!alertsCollapsed && <div className="space-y-1 max-h-[80px] overflow-y-auto px-2 pb-2">
               {/* Long wait alerts */}
               {activeTrips.filter(t => t.status === "pending" && (Date.now() - new Date(t.created_at).getTime()) / 1000 > 180).map((trip) => (
                 <div key={`wait-${trip.id}`} className="flex items-start gap-2 p-1.5 rounded bg-red-500/10 border border-red-500/30">
@@ -2108,7 +2130,7 @@ export default function ControlRoomPage() {
                   All clear - no alerts
                 </div>
               )}
-            </div>
+            </div>}
           </Card>
 
           {/* Scheduled Rides Queue */}

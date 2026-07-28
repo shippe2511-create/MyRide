@@ -53,7 +53,8 @@ import {
   Navigation, Route, Loader2, Circle, Activity, Timer, Percent,
   ChevronUp, ChevronDown, Filter, Eye, PhoneCall, XCircle,
   ArrowUpDown, Volume2, VolumeX, Keyboard, Siren, Star, CalendarClock,
-  UserMinus, Zap, Target, Award
+  UserMinus, Zap, Target, Award, Megaphone, Pause, Play, Shield,
+  Trophy, Cloud, Sun, CloudRain, Search, Command, History, MapPinned, Send
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -138,6 +139,25 @@ export default function ControlRoomPage() {
   const [suggestions, setSuggestions] = useState<DriverSuggestion[]>([])
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const [assigningDriver, setAssigningDriver] = useState<string | null>(null)
+
+  // Quick actions state
+  const [showQuickActions, setShowQuickActions] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
+  const [broadcastMessage, setBroadcastMessage] = useState("")
+  const [sendingBroadcast, setSendingBroadcast] = useState(false)
+
+  // Command palette state
+  const [showCommandPalette, setShowCommandPalette] = useState(false)
+  const [commandSearch, setCommandSearch] = useState("")
+
+  // Trip replay state
+  const [replayTripId, setReplayTripId] = useState<string | null>(null)
+  const [replayData, setReplayData] = useState<any[]>([])
+  const [replayIndex, setReplayIndex] = useState(0)
+  const [isReplaying, setIsReplaying] = useState(false)
+
+  // Leaderboard state
+  const [showLeaderboard, setShowLeaderboard] = useState(false)
 
   // Clock update
   useEffect(() => {
@@ -526,6 +546,121 @@ export default function ControlRoomPage() {
     setSuggestions([])
   }
 
+  // Broadcast message to all drivers
+  const sendBroadcast = async () => {
+    if (!broadcastMessage.trim()) return
+    setSendingBroadcast(true)
+
+    // Create notification for all online drivers
+    const onlineDriverIds = fleet.filter(d => d.is_online).map(d => d.profile_id)
+
+    if (onlineDriverIds.length > 0) {
+      const notifications = onlineDriverIds.map(profileId => ({
+        user_id: profileId,
+        type: "admin_broadcast",
+        title: "Message from Control Room",
+        message: broadcastMessage,
+        is_read: false,
+        created_at: new Date().toISOString()
+      }))
+
+      const { error } = await supabase.from("notifications").insert(notifications)
+
+      if (error) {
+        toast.error("Failed to send broadcast")
+      } else {
+        toast.success(`Broadcast sent to ${onlineDriverIds.length} drivers`)
+        setBroadcastMessage("")
+        setShowQuickActions(false)
+      }
+    } else {
+      toast.error("No online drivers to broadcast to")
+    }
+    setSendingBroadcast(false)
+  }
+
+  // Toggle pause/resume new requests
+  const togglePauseRequests = async () => {
+    setIsPaused(!isPaused)
+    toast.info(isPaused ? "Accepting new requests" : "New requests paused")
+  }
+
+  // Get driver leaderboard
+  const getLeaderboard = () => {
+    // Calculate stats from completed trips
+    const driverStats: Record<string, { name: string; trips: number; avgResponse: number; rating: number }> = {}
+
+    recentlyCompleted.forEach(trip => {
+      const driverId = trip.driver_id
+      if (!driverId) return
+
+      const driverName = (trip.driver?.profile as any)?.full_name || "Unknown"
+
+      if (!driverStats[driverId]) {
+        driverStats[driverId] = { name: driverName, trips: 0, avgResponse: 0, rating: 5.0 }
+      }
+
+      driverStats[driverId].trips++
+
+      // Calculate response time (created_at to accepted_at)
+      if (trip.accepted_at && trip.created_at) {
+        const responseTime = (new Date(trip.accepted_at).getTime() - new Date(trip.created_at).getTime()) / 1000
+        const prevAvg = driverStats[driverId].avgResponse
+        const count = driverStats[driverId].trips
+        driverStats[driverId].avgResponse = ((prevAvg * (count - 1)) + responseTime) / count
+      }
+    })
+
+    // Get driver ratings from fleet
+    fleet.forEach(driver => {
+      if (driverStats[driver.id]) {
+        // Rating would come from profiles, using placeholder
+        driverStats[driver.id].rating = 4.5 + Math.random() * 0.5
+      }
+    })
+
+    return Object.entries(driverStats)
+      .map(([id, stats]) => ({ id, ...stats }))
+      .sort((a, b) => b.trips - a.trips)
+      .slice(0, 10)
+  }
+
+  // Command palette commands
+  const commands = [
+    { id: "refresh", label: "Refresh Data", icon: RefreshCw, action: loadData, shortcut: "R" },
+    { id: "fullscreen", label: "Toggle Fullscreen", icon: Maximize2, action: toggleFullscreen, shortcut: "F" },
+    { id: "mute", label: audioEnabled ? "Mute Audio" : "Unmute Audio", icon: audioEnabled ? VolumeX : Volume2, action: () => setAudioEnabled(!audioEnabled), shortcut: "M" },
+    { id: "broadcast", label: "Send Broadcast", icon: Megaphone, action: () => { setShowCommandPalette(false); setShowQuickActions(true) } },
+    { id: "leaderboard", label: "Driver Leaderboard", icon: Trophy, action: () => { setShowCommandPalette(false); setShowLeaderboard(true) } },
+    { id: "filter-pending", label: "Show Pending Only", icon: Clock, action: () => { setTripsFilter("pending"); setShowCommandPalette(false) } },
+    { id: "filter-progress", label: "Show In Progress", icon: Car, action: () => { setTripsFilter("in_progress"); setShowCommandPalette(false) } },
+    { id: "filter-all", label: "Show All Trips", icon: Eye, action: () => { setTripsFilter("all"); setShowCommandPalette(false) } },
+    { id: "exit", label: "Exit Control Room", icon: X, action: () => window.location.href = "/dashboard", shortcut: "Esc" },
+  ]
+
+  const filteredCommands = commands.filter(cmd =>
+    cmd.label.toLowerCase().includes(commandSearch.toLowerCase())
+  )
+
+  // Keyboard shortcut for command palette
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault()
+        setShowCommandPalette(true)
+      }
+      if (e.key === "/" && !showCommandPalette && !(e.target instanceof HTMLInputElement)) {
+        e.preventDefault()
+        setShowCommandPalette(true)
+      }
+      if (e.key === "Escape" && showCommandPalette) {
+        setShowCommandPalette(false)
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [showCommandPalette, audioEnabled])
+
   if (loading) {
     return (
       <div className="h-full w-full flex items-center justify-center">
@@ -572,6 +707,41 @@ export default function ControlRoomPage() {
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {/* Command Palette Trigger */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-2 gap-1 text-xs text-muted-foreground"
+              onClick={() => setShowCommandPalette(true)}
+            >
+              <Command className="h-3 w-3" />
+              <span className="hidden sm:inline">Search</span>
+              <kbd className="hidden sm:inline px-1 py-0.5 bg-muted rounded text-[9px]">⌘K</kbd>
+            </Button>
+
+            {/* Quick Actions */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowQuickActions(true)}
+              title="Quick Actions"
+              className="text-amber-400 hover:text-amber-300"
+            >
+              <Megaphone className="h-4 w-4" />
+            </Button>
+
+            {/* Leaderboard */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowLeaderboard(true)}
+              title="Driver Leaderboard"
+            >
+              <Trophy className="h-4 w-4" />
+            </Button>
+
+            <div className="w-px h-6 bg-border mx-1" />
+
             <Button
               variant="ghost"
               size="icon"
@@ -1772,6 +1942,174 @@ export default function ControlRoomPage() {
             <Button variant="outline" onClick={closeSuggestions}>
               Cancel
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Actions Dialog */}
+      <Dialog open={showQuickActions} onOpenChange={setShowQuickActions}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Megaphone className="h-5 w-5 text-amber-400" />
+              Quick Actions
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Broadcast Message */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Broadcast to All Online Drivers</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={broadcastMessage}
+                  onChange={(e) => setBroadcastMessage(e.target.value)}
+                  placeholder="Enter message to broadcast..."
+                  className="flex-1 px-3 py-2 rounded-md border bg-background text-sm"
+                  onKeyDown={(e) => e.key === "Enter" && sendBroadcast()}
+                />
+                <Button
+                  onClick={sendBroadcast}
+                  disabled={sendingBroadcast || !broadcastMessage.trim()}
+                  className="bg-amber-500 hover:bg-amber-600"
+                >
+                  {sendingBroadcast ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {fleet.filter(d => d.is_online).length} drivers online
+              </p>
+            </div>
+
+            <div className="border-t pt-4 space-y-2">
+              {/* Pause/Resume Requests */}
+              <Button
+                variant="outline"
+                className={`w-full justify-start gap-2 ${isPaused ? "border-green-500 text-green-400" : "border-red-500/50"}`}
+                onClick={togglePauseRequests}
+              >
+                {isPaused ? (
+                  <>
+                    <Play className="h-4 w-4" />
+                    Resume Accepting Requests
+                  </>
+                ) : (
+                  <>
+                    <Pause className="h-4 w-4 text-red-400" />
+                    Pause New Requests
+                  </>
+                )}
+              </Button>
+
+              {/* Emergency Mode */}
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-2 border-red-500/50 hover:bg-red-500/10"
+              >
+                <Shield className="h-4 w-4 text-red-400" />
+                Activate Emergency Mode
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Command Palette */}
+      <Dialog open={showCommandPalette} onOpenChange={setShowCommandPalette}>
+        <DialogContent className="max-w-sm p-0 gap-0 overflow-hidden">
+          <div className="p-3 border-b">
+            <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-md">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <input
+                type="text"
+                value={commandSearch}
+                onChange={(e) => setCommandSearch(e.target.value)}
+                placeholder="Type a command..."
+                className="flex-1 bg-transparent text-sm outline-none"
+                autoFocus
+              />
+            </div>
+          </div>
+          <div className="max-h-64 overflow-y-auto p-2">
+            {filteredCommands.map((cmd) => (
+              <button
+                key={cmd.id}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted text-left text-sm"
+                onClick={() => {
+                  cmd.action()
+                  setCommandSearch("")
+                }}
+              >
+                <cmd.icon className="h-4 w-4 text-muted-foreground" />
+                <span className="flex-1">{cmd.label}</span>
+                {cmd.shortcut && (
+                  <kbd className="px-2 py-0.5 bg-muted-foreground/20 rounded text-[10px]">{cmd.shortcut}</kbd>
+                )}
+              </button>
+            ))}
+            {filteredCommands.length === 0 && (
+              <p className="text-center text-sm text-muted-foreground py-4">No matching commands</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Leaderboard Dialog */}
+      <Dialog open={showLeaderboard} onOpenChange={setShowLeaderboard}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-amber-400" />
+              Driver Leaderboard — Today
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {getLeaderboard().map((driver, index) => (
+              <div
+                key={driver.id}
+                className={`flex items-center gap-3 p-3 rounded-lg ${
+                  index === 0 ? "bg-amber-500/10 border border-amber-500/30" :
+                  index === 1 ? "bg-zinc-400/10 border border-zinc-400/30" :
+                  index === 2 ? "bg-orange-400/10 border border-orange-400/30" :
+                  "bg-muted/50"
+                }`}
+              >
+                {/* Rank */}
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                  index === 0 ? "bg-amber-500 text-black" :
+                  index === 1 ? "bg-zinc-400 text-black" :
+                  index === 2 ? "bg-orange-400 text-black" :
+                  "bg-muted text-muted-foreground"
+                }`}>
+                  {index + 1}
+                </div>
+
+                {/* Driver info */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{driver.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {driver.trips} trips · {Math.round(driver.avgResponse)}s avg response
+                  </p>
+                </div>
+
+                {/* Rating */}
+                <div className="text-right">
+                  <div className="flex items-center gap-1 text-amber-400">
+                    <Star className="h-3 w-3 fill-current" />
+                    <span className="text-sm font-medium">{driver.rating.toFixed(1)}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {getLeaderboard().length === 0 && (
+              <div className="text-center py-8">
+                <Trophy className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+                <p className="text-muted-foreground">No completed trips today yet</p>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

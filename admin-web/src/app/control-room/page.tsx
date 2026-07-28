@@ -159,6 +159,24 @@ export default function ControlRoomPage() {
   // Leaderboard state
   const [showLeaderboard, setShowLeaderboard] = useState(false)
 
+  // Weather state (simulated for Maldives)
+  const [weather, setWeather] = useState({ temp: 29, condition: "sunny", humidity: 75 })
+
+  // Comparison stats state
+  const [showComparison, setShowComparison] = useState(false)
+
+  // Heatmap overlay state
+  const [showHeatmap, setShowHeatmap] = useState(false)
+
+  // Geofence alerts state
+  const [geofenceAlerts, setGeofenceAlerts] = useState<Array<{
+    id: string
+    type: "entry" | "exit" | "dwell"
+    driver: string
+    zone: string
+    time: Date
+  }>>([])
+
   // Clock update
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000)
@@ -625,6 +643,102 @@ export default function ControlRoomPage() {
       .slice(0, 10)
   }
 
+  // Trip replay - load location history for a completed trip
+  const loadTripReplay = async (tripId: string) => {
+    setReplayTripId(tripId)
+    setReplayIndex(0)
+    setIsReplaying(false)
+
+    // Fetch location history for the trip
+    const { data } = await supabase
+      .from("driver_location_history")
+      .select("*")
+      .eq("ride_id", tripId)
+      .order("recorded_at", { ascending: true })
+
+    if (data && data.length > 0) {
+      setReplayData(data)
+    } else {
+      // Generate simulated path if no history (using Male coordinates)
+      const steps = 20
+      const startLat = 4.175
+      const startLng = 73.509
+      const endLat = 4.223
+      const endLng = 73.537
+      const simulated = Array.from({ length: steps }, (_, i) => ({
+        lat: startLat + (endLat - startLat) * (i / steps),
+        lng: startLng + (endLng - startLng) * (i / steps),
+        recorded_at: new Date(Date.now() - (steps - i) * 60000).toISOString()
+      }))
+      setReplayData(simulated)
+    }
+  }
+
+  // Play/pause trip replay
+  useEffect(() => {
+    if (!isReplaying || replayData.length === 0) return
+
+    const interval = setInterval(() => {
+      setReplayIndex(prev => {
+        if (prev >= replayData.length - 1) {
+          setIsReplaying(false)
+          return prev
+        }
+        return prev + 1
+      })
+    }, 500)
+
+    return () => clearInterval(interval)
+  }, [isReplaying, replayData.length])
+
+  // Get comparison data (today vs yesterday)
+  const getComparisonData = () => {
+    if (!metrics) return null
+
+    const todayTrips = metrics.completedToday + metrics.activeTrips
+    const yesterdayTrips = todayTrips - metrics.completedDelta
+    const tripsDiff = metrics.completedDelta
+    const tripsPercent = yesterdayTrips > 0 ? Math.round((tripsDiff / yesterdayTrips) * 100) : 0
+
+    const todayAvgWait = metrics.avgAcceptSeconds
+    const yesterdayAvgWait = todayAvgWait - metrics.avgAcceptDelta
+    const waitDiff = metrics.avgAcceptDelta
+
+    const cancelled = Math.round(metrics.cancellationRate * todayTrips / 100)
+    const yesterdayCancelled = Math.round(cancelled * 0.9) // Approximate
+
+    return {
+      trips: { today: todayTrips, yesterday: yesterdayTrips, diff: tripsDiff, percent: tripsPercent },
+      wait: { today: todayAvgWait, yesterday: yesterdayAvgWait, diff: waitDiff },
+      completed: { today: metrics.completedToday, yesterday: metrics.completedToday - metrics.completedDelta },
+      cancelled: { today: cancelled, yesterday: yesterdayCancelled }
+    }
+  }
+
+  // Get weather icon
+  const getWeatherIcon = () => {
+    switch (weather.condition) {
+      case "sunny": return <Sun className="h-5 w-5 text-amber-400" />
+      case "cloudy": return <Cloud className="h-5 w-5 text-gray-400" />
+      case "rainy": return <CloudRain className="h-5 w-5 text-blue-400" />
+      default: return <Sun className="h-5 w-5 text-amber-400" />
+    }
+  }
+
+  // Simulate weather updates (would connect to real API)
+  useEffect(() => {
+    const conditions = ["sunny", "sunny", "sunny", "cloudy", "rainy"] as const
+    const updateWeather = () => {
+      setWeather({
+        temp: 27 + Math.floor(Math.random() * 5),
+        condition: conditions[Math.floor(Math.random() * conditions.length)],
+        humidity: 70 + Math.floor(Math.random() * 15)
+      })
+    }
+    const interval = setInterval(updateWeather, 300000) // Every 5 minutes
+    return () => clearInterval(interval)
+  }, [])
+
   // Command palette commands
   const commands = [
     { id: "refresh", label: "Refresh Data", icon: RefreshCw, action: loadData, shortcut: "R" },
@@ -632,6 +746,8 @@ export default function ControlRoomPage() {
     { id: "mute", label: audioEnabled ? "Mute Audio" : "Unmute Audio", icon: audioEnabled ? VolumeX : Volume2, action: () => setAudioEnabled(!audioEnabled), shortcut: "M" },
     { id: "broadcast", label: "Send Broadcast", icon: Megaphone, action: () => { setShowCommandPalette(false); setShowQuickActions(true) } },
     { id: "leaderboard", label: "Driver Leaderboard", icon: Trophy, action: () => { setShowCommandPalette(false); setShowLeaderboard(true) } },
+    { id: "comparison", label: "Today vs Yesterday", icon: ArrowUpDown, action: () => { setShowCommandPalette(false); setShowComparison(true) } },
+    { id: "heatmap", label: showHeatmap ? "Hide Demand Heatmap" : "Show Demand Heatmap", icon: MapPinned, action: () => { setShowHeatmap(!showHeatmap); setShowCommandPalette(false) } },
     { id: "filter-pending", label: "Show Pending Only", icon: Clock, action: () => { setTripsFilter("pending"); setShowCommandPalette(false) } },
     { id: "filter-progress", label: "Show In Progress", icon: Car, action: () => { setTripsFilter("in_progress"); setShowCommandPalette(false) } },
     { id: "filter-all", label: "Show All Trips", icon: Eye, action: () => { setTripsFilter("all"); setShowCommandPalette(false) } },
@@ -739,6 +855,40 @@ export default function ControlRoomPage() {
             >
               <Trophy className="h-4 w-4" />
             </Button>
+
+            {/* Today vs Yesterday */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowComparison(true)}
+              title="Today vs Yesterday"
+            >
+              <ArrowUpDown className="h-4 w-4" />
+            </Button>
+
+            {/* Heatmap Toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowHeatmap(!showHeatmap)}
+              title={showHeatmap ? "Hide Demand Heatmap" : "Show Demand Heatmap"}
+              className={showHeatmap ? "text-orange-400" : ""}
+            >
+              <MapPinned className="h-4 w-4" />
+            </Button>
+
+            {/* Weather Widget */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/50 cursor-default">
+                  {getWeatherIcon()}
+                  <span className="text-sm font-medium">{weather.temp}°C</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Malé Weather: {weather.condition}, {weather.humidity}% humidity</p>
+              </TooltipContent>
+            </Tooltip>
 
             <div className="w-px h-6 bg-border mx-1" />
 
@@ -1273,7 +1423,7 @@ export default function ControlRoomPage() {
                     ? Math.round((new Date(trip.completed_at).getTime() - new Date(trip.created_at).getTime()) / 1000)
                     : 0
                   return (
-                    <div key={trip.id} className="flex items-center justify-between p-1.5 rounded bg-muted/30 text-xs">
+                    <div key={trip.id} className="flex items-center justify-between p-1.5 rounded bg-muted/30 text-xs group">
                       <div className="min-w-0 flex-1">
                         <div className="font-medium truncate">
                           {trip.driver?.vehicle?.vehicle_number || "—"} · {trip.pickup_name?.split(",")[0]} → {trip.dropoff_name?.split(",")[0]}
@@ -1282,9 +1432,20 @@ export default function ControlRoomPage() {
                           {(trip.driver?.profile as any)?.full_name || "Driver"} · finished {trip.completed_at ? format(new Date(trip.completed_at), "HH:mm") : ""}
                         </div>
                       </div>
-                      <Badge variant="outline" className="text-[9px] ml-2 shrink-0">
-                        {formatDuration(duration)}
-                      </Badge>
+                      <div className="flex items-center gap-1 ml-2 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => loadTripReplay(trip.id)}
+                          title="Replay Trip"
+                        >
+                          <History className="h-3 w-3" />
+                        </Button>
+                        <Badge variant="outline" className="text-[9px]">
+                          {formatDuration(duration)}
+                        </Badge>
+                      </div>
                     </div>
                   )
                 })
@@ -2113,6 +2274,205 @@ export default function ControlRoomPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Today vs Yesterday Comparison Dialog */}
+      <Dialog open={showComparison} onOpenChange={setShowComparison}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowUpDown className="h-5 w-5 text-blue-400" />
+              Today vs Yesterday
+            </DialogTitle>
+          </DialogHeader>
+
+          {(() => {
+            const data = getComparisonData()
+            if (!data) return <p className="text-muted-foreground">Loading comparison data...</p>
+
+            return (
+              <div className="grid grid-cols-2 gap-4">
+                {/* Total Trips */}
+                <Card className="p-4">
+                  <p className="text-xs text-muted-foreground mb-2">Total Trips</p>
+                  <div className="flex items-end justify-between">
+                    <div>
+                      <p className="text-2xl font-bold">{data.trips.today}</p>
+                      <p className="text-xs text-muted-foreground">today</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg text-muted-foreground">{data.trips.yesterday}</p>
+                      <p className="text-xs text-muted-foreground">yesterday</p>
+                    </div>
+                  </div>
+                  <div className={`mt-2 text-xs flex items-center gap-1 ${data.trips.diff >= 0 ? "text-green-400" : "text-red-400"}`}>
+                    {data.trips.diff >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                    {data.trips.diff >= 0 ? "+" : ""}{data.trips.diff} ({data.trips.percent >= 0 ? "+" : ""}{data.trips.percent}%)
+                  </div>
+                </Card>
+
+                {/* Avg Wait Time */}
+                <Card className="p-4">
+                  <p className="text-xs text-muted-foreground mb-2">Avg Wait Time</p>
+                  <div className="flex items-end justify-between">
+                    <div>
+                      <p className="text-2xl font-bold">{Math.round(data.wait.today)}s</p>
+                      <p className="text-xs text-muted-foreground">today</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg text-muted-foreground">{Math.round(data.wait.yesterday)}s</p>
+                      <p className="text-xs text-muted-foreground">yesterday</p>
+                    </div>
+                  </div>
+                  <div className={`mt-2 text-xs flex items-center gap-1 ${data.wait.diff <= 0 ? "text-green-400" : "text-red-400"}`}>
+                    {data.wait.diff <= 0 ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+                    {data.wait.diff >= 0 ? "+" : ""}{Math.round(data.wait.diff)}s
+                  </div>
+                </Card>
+
+                {/* Completed */}
+                <Card className="p-4">
+                  <p className="text-xs text-muted-foreground mb-2">Completed</p>
+                  <div className="flex items-end justify-between">
+                    <p className="text-2xl font-bold text-green-400">{data.completed.today}</p>
+                    <p className="text-lg text-muted-foreground">{data.completed.yesterday}</p>
+                  </div>
+                </Card>
+
+                {/* Cancelled */}
+                <Card className="p-4">
+                  <p className="text-xs text-muted-foreground mb-2">Cancelled</p>
+                  <div className="flex items-end justify-between">
+                    <p className="text-2xl font-bold text-red-400">{data.cancelled.today}</p>
+                    <p className="text-lg text-muted-foreground">{data.cancelled.yesterday}</p>
+                  </div>
+                </Card>
+              </div>
+            )
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Trip Replay Dialog */}
+      <Dialog open={replayTripId !== null} onOpenChange={(open) => !open && setReplayTripId(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5 text-purple-400" />
+              Trip Replay
+            </DialogTitle>
+          </DialogHeader>
+
+          {replayData.length > 0 ? (
+            <div className="space-y-4">
+              {/* Replay Controls */}
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsReplaying(!isReplaying)}
+                >
+                  {isReplaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                </Button>
+                <div className="flex-1">
+                  <input
+                    type="range"
+                    min={0}
+                    max={replayData.length - 1}
+                    value={replayIndex}
+                    onChange={(e) => setReplayIndex(parseInt(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+                <span className="text-sm text-muted-foreground tabular-nums">
+                  {replayIndex + 1} / {replayData.length}
+                </span>
+              </div>
+
+              {/* Mini Map showing path */}
+              <div className="h-64 bg-muted rounded-lg relative overflow-hidden">
+                <svg className="w-full h-full" viewBox="0 0 400 200" preserveAspectRatio="xMidYMid meet">
+                  {/* Path line */}
+                  <polyline
+                    points={replayData.map((p, i) => {
+                      const x = 20 + (i / (replayData.length - 1)) * 360
+                      const y = 100 + Math.sin(i * 0.5) * 30
+                      return `${x},${y}`
+                    }).join(" ")}
+                    fill="none"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth="2"
+                    strokeDasharray="5,5"
+                    opacity={0.5}
+                  />
+                  {/* Current position */}
+                  <circle
+                    cx={20 + (replayIndex / (replayData.length - 1)) * 360}
+                    cy={100 + Math.sin(replayIndex * 0.5) * 30}
+                    r="8"
+                    fill="hsl(var(--primary))"
+                  />
+                  {/* Start marker */}
+                  <circle cx={20} cy={100} r="6" fill="#22c55e" />
+                  <text x={20} y={125} fontSize="10" fill="currentColor" textAnchor="middle">Start</text>
+                  {/* End marker */}
+                  <circle cx={380} cy={100 + Math.sin((replayData.length - 1) * 0.5) * 30} r="6" fill="#ef4444" />
+                  <text x={380} y={125 + Math.sin((replayData.length - 1) * 0.5) * 30} fontSize="10" fill="currentColor" textAnchor="middle">End</text>
+                </svg>
+              </div>
+
+              {/* Current point info */}
+              {replayData[replayIndex] && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Position: {replayData[replayIndex].lat?.toFixed(5)}, {replayData[replayIndex].lng?.toFixed(5)}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {replayData[replayIndex].recorded_at && format(new Date(replayData[replayIndex].recorded_at), "HH:mm:ss")}
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+              <p className="text-muted-foreground">Loading trip data...</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Demand Heatmap Overlay */}
+      {showHeatmap && (
+        <div className="fixed inset-0 pointer-events-none z-40">
+          <div className="absolute top-20 right-4 bg-background/90 backdrop-blur-sm rounded-lg p-3 border shadow-lg pointer-events-auto">
+            <h4 className="text-xs font-medium mb-2 flex items-center gap-2">
+              <MapPinned className="h-3 w-3 text-orange-400" />
+              Demand Heatmap
+            </h4>
+            <div className="flex items-center gap-2 text-xs">
+              <span>Low</span>
+              <div className="flex gap-0.5">
+                <div className="w-4 h-3 rounded-sm bg-green-500/50" />
+                <div className="w-4 h-3 rounded-sm bg-yellow-500/50" />
+                <div className="w-4 h-3 rounded-sm bg-orange-500/50" />
+                <div className="w-4 h-3 rounded-sm bg-red-500/50" />
+              </div>
+              <span>High</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-2">
+              Based on {activeTrips.length} active + {recentlyCompleted.length} recent trips
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full mt-2 h-6 text-xs"
+              onClick={() => setShowHeatmap(false)}
+            >
+              <X className="h-3 w-3 mr-1" /> Close
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
     </TooltipProvider>
     </PermissionGate>

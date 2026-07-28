@@ -1048,11 +1048,12 @@ export default function ControlRoomPage() {
                 <table className="w-full text-xs">
                   <thead className="bg-muted/50 sticky top-0 z-10">
                     <tr>
-                      <th className="text-left p-2 font-medium w-[80px]">Request ID</th>
-                      <th className="text-left p-2 font-medium w-[130px]">User / Dept</th>
-                      <th className="text-left p-2 font-medium w-[90px]">Vehicle No.</th>
-                      <th className="text-left p-2 font-medium w-[100px]">Driver Name</th>
-                      <th className="text-center p-2 font-medium w-[90px]">Status</th>
+                      <th className="text-left p-2 font-medium w-[70px]">Request ID</th>
+                      <th className="text-left p-2 font-medium w-[110px]">User / Dept</th>
+                      <th className="text-left p-2 font-medium w-[140px]">Pickup / Dropoff</th>
+                      <th className="text-left p-2 font-medium w-[70px]">Vehicle</th>
+                      <th className="text-left p-2 font-medium w-[90px]">Driver</th>
+                      <th className="text-center p-2 font-medium w-[80px]">Status</th>
                       <th className="text-center p-2 font-medium" colSpan={4}>
                         <div className="flex flex-col items-center">
                           <span>Journey Progress</span>
@@ -1061,7 +1062,7 @@ export default function ControlRoomPage() {
                           </span>
                         </div>
                       </th>
-                      <th className="w-8"></th>
+                      <th className="w-6"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1096,11 +1097,28 @@ export default function ControlRoomPage() {
                           </td>
                           {/* User / Dept */}
                           <td className="p-2">
-                            <div className="font-medium truncate max-w-[120px]">
+                            <div className="font-medium truncate max-w-[100px]">
                               {trip.customer?.full_name || "Unknown"}
                             </div>
-                            <div className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                            <div className="text-[10px] text-muted-foreground truncate max-w-[100px]">
                               {trip.customer?.department?.name || "—"}
+                            </div>
+                          </td>
+                          {/* Pickup / Dropoff */}
+                          <td className="p-2">
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-1">
+                                <div className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+                                <span className="truncate max-w-[120px] text-[10px]">
+                                  {trip.pickup_name?.split(",")[0] || "—"}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <div className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                                <span className="truncate max-w-[120px] text-[10px] text-muted-foreground">
+                                  {trip.dropoff_name?.split(",")[0] || "—"}
+                                </span>
+                              </div>
                             </div>
                           </td>
                           {/* Vehicle No. */}

@@ -19,6 +19,15 @@ interface TripMarker {
   label: string
   sublabel?: string
   isAlert?: boolean
+  heading?: number
+}
+
+interface GeofenceAlert {
+  id: string
+  type: "entry" | "exit" | "dwell"
+  driver: string
+  zone: string
+  time: Date
 }
 
 interface ControlRoomMapProps {
@@ -28,6 +37,8 @@ interface ControlRoomMapProps {
   selectedId?: string | null
   followingId?: string | null
   onFollowToggle?: (id: string | null) => void
+  onGeofenceAlert?: (alert: GeofenceAlert) => void
+  showHeatmap?: boolean
 }
 
 const darkMapStyle = [
@@ -70,6 +81,8 @@ export function ControlRoomMap({
   selectedId,
   followingId,
   onFollowToggle,
+  onGeofenceAlert,
+  showHeatmap = false,
 }: ControlRoomMapProps) {
   const { isLoaded, loadError } = useGoogleMaps()
   const mapRef = useRef<google.maps.Map | null>(null)
@@ -85,6 +98,119 @@ export function ControlRoomMap({
   const [showSearch, setShowSearch] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [isDark, setIsDark] = useState(true)
+
+  // Track previous positions for smooth animation
+  const prevPositionsRef = useRef<Map<string, { lat: number; lng: number }>>(new Map())
+  const [animatedPositions, setAnimatedPositions] = useState<Map<string, { lat: number; lng: number; heading: number }>>(new Map())
+
+  // Track which vehicles are inside geofence
+  const insideGeofenceRef = useRef<Set<string>>(new Set())
+
+  // Smooth position animation
+  useEffect(() => {
+    const animationDuration = 1000 // 1 second smooth transition
+    const fps = 30
+    const steps = animationDuration / (1000 / fps)
+
+    trips.forEach(trip => {
+      const prevPos = prevPositionsRef.current.get(trip.id)
+      const currentAnimated = animatedPositions.get(trip.id)
+
+      if (!prevPos) {
+        // First time seeing this vehicle
+        prevPositionsRef.current.set(trip.id, { lat: trip.lat, lng: trip.lng })
+        setAnimatedPositions(prev => {
+          const next = new Map(prev)
+          next.set(trip.id, { lat: trip.lat, lng: trip.lng, heading: trip.heading || 0 })
+          return next
+        })
+        return
+      }
+
+      // Check if position changed
+      if (prevPos.lat !== trip.lat || prevPos.lng !== trip.lng) {
+        // Calculate heading based on movement direction
+        const heading = Math.atan2(
+          trip.lng - prevPos.lng,
+          trip.lat - prevPos.lat
+        ) * (180 / Math.PI)
+
+        const startLat = currentAnimated?.lat || prevPos.lat
+        const startLng = currentAnimated?.lng || prevPos.lng
+        let step = 0
+
+        const animate = () => {
+          step++
+          const progress = Math.min(step / steps, 1)
+          // Ease-out cubic for smooth deceleration
+          const eased = 1 - Math.pow(1 - progress, 3)
+
+          const newLat = startLat + (trip.lat - startLat) * eased
+          const newLng = startLng + (trip.lng - startLng) * eased
+
+          setAnimatedPositions(prev => {
+            const next = new Map(prev)
+            next.set(trip.id, { lat: newLat, lng: newLng, heading })
+            return next
+          })
+
+          if (progress < 1) {
+            requestAnimationFrame(animate)
+          } else {
+            prevPositionsRef.current.set(trip.id, { lat: trip.lat, lng: trip.lng })
+          }
+        }
+
+        requestAnimationFrame(animate)
+      }
+    })
+  }, [trips])
+
+  // Geofence detection
+  useEffect(() => {
+    if (!onGeofenceAlert) return
+
+    const checkGeofence = (id: string, lat: number, lng: number, label: string) => {
+      // Calculate distance from center (Haversine approximation for small distances)
+      const R = 6371000 // Earth radius in meters
+      const dLat = (lat - defaultCenter.lat) * Math.PI / 180
+      const dLng = (lng - defaultCenter.lng) * Math.PI / 180
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(defaultCenter.lat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) *
+                Math.sin(dLng/2) * Math.sin(dLng/2)
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+      const distance = R * c
+
+      const isInside = distance <= serviceAreaRadius
+      const wasInside = insideGeofenceRef.current.has(id)
+
+      if (isInside && !wasInside) {
+        // Vehicle entered geofence
+        insideGeofenceRef.current.add(id)
+        onGeofenceAlert({
+          id: `${id}-entry-${Date.now()}`,
+          type: "entry",
+          driver: label,
+          zone: "Service Area",
+          time: new Date()
+        })
+      } else if (!isInside && wasInside) {
+        // Vehicle exited geofence
+        insideGeofenceRef.current.delete(id)
+        onGeofenceAlert({
+          id: `${id}-exit-${Date.now()}`,
+          type: "exit",
+          driver: label,
+          zone: "Service Area",
+          time: new Date()
+        })
+      }
+    }
+
+    trips.forEach(trip => {
+      checkGeofence(trip.id, trip.lat, trip.lng, trip.label)
+    })
+  }, [trips, onGeofenceAlert])
 
   const onLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map
@@ -264,26 +390,45 @@ export function ControlRoomMap({
           </OverlayView>
         ))}
 
-        {/* Trip/Driver markers */}
-        {trips.map((trip) => (
-          <OverlayView
-            key={trip.id}
-            position={{ lat: trip.lat, lng: trip.lng }}
-            mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-          >
-            <TripMarkerComponent
-              trip={trip}
-              isSelected={selectedId === trip.id}
-              isFollowing={followingId === trip.id}
-              isSearchMatch={searchMatchIds.has(trip.id)}
-              onClick={() => onMarkerClick?.(trip.id, trip.type)}
-              onFollowClick={(e) => {
-                e.stopPropagation()
-                onFollowToggle?.(followingId === trip.id ? null : trip.id)
-              }}
-            />
-          </OverlayView>
+        {/* Heatmap overlay - shows demand hotspots */}
+        {showHeatmap && pickups.length > 0 && pickups.map((pickup, i) => (
+          <Circle
+            key={`heat-${pickup.tripId}-${i}`}
+            center={{ lat: pickup.lat, lng: pickup.lng }}
+            radius={300}
+            options={{
+              strokeColor: "transparent",
+              strokeWeight: 0,
+              fillColor: "#ef4444",
+              fillOpacity: 0.25,
+            }}
+          />
         ))}
+
+        {/* Trip/Driver markers with smooth animation */}
+        {trips.map((trip) => {
+          const animPos = animatedPositions.get(trip.id)
+          const pos = animPos || { lat: trip.lat, lng: trip.lng, heading: 0 }
+          return (
+            <OverlayView
+              key={trip.id}
+              position={{ lat: pos.lat, lng: pos.lng }}
+              mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+            >
+              <TripMarkerComponent
+                trip={{ ...trip, heading: pos.heading }}
+                isSelected={selectedId === trip.id}
+                isFollowing={followingId === trip.id}
+                isSearchMatch={searchMatchIds.has(trip.id)}
+                onClick={() => onMarkerClick?.(trip.id, trip.type)}
+                onFollowClick={(e) => {
+                  e.stopPropagation()
+                  onFollowToggle?.(followingId === trip.id ? null : trip.id)
+                }}
+              />
+            </OverlayView>
+          )
+        })}
       </GoogleMap>
 
       {/* Search Bar */}
@@ -494,12 +639,26 @@ function TripMarkerComponent({
           <Navigation className="h-2.5 w-2.5" style={{ transform: isFollowing ? "none" : "rotate(-45deg)" }} />
         </button>
 
+        {/* Direction indicator arrow */}
+        {trip.heading !== undefined && trip.status === "in_progress" && (
+          <div
+            className="absolute -top-4 left-1/2 -translate-x-1/2 w-0 h-0"
+            style={{
+              borderLeft: "4px solid transparent",
+              borderRight: "4px solid transparent",
+              borderBottom: `8px solid ${color}`,
+              transform: `translateX(-50%) rotate(${trip.heading}deg)`,
+              transformOrigin: "center bottom",
+            }}
+          />
+        )}
+
         {/* Marker body */}
         <div
           className={`
             flex items-center gap-1 px-2 py-1 rounded-full
             text-white text-[10px] font-medium whitespace-nowrap
-            shadow-lg border-2
+            shadow-lg border-2 transition-transform duration-300
             ${trip.isAlert ? "animate-pulse" : ""}
           `}
           style={{
@@ -508,9 +667,9 @@ function TripMarkerComponent({
           }}
         >
           {isTaxi ? (
-            <Car className="h-3 w-3" />
+            <Car className="h-3 w-3" style={{ transform: trip.heading !== undefined ? `rotate(${trip.heading - 90}deg)` : undefined }} />
           ) : (
-            <Bus className="h-3 w-3" />
+            <Bus className="h-3 w-3" style={{ transform: trip.heading !== undefined ? `rotate(${trip.heading - 90}deg)` : undefined }} />
           )}
           <span>{trip.label}</span>
         </div>

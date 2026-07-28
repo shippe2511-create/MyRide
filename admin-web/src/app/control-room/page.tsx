@@ -1308,6 +1308,7 @@ export default function ControlRoomPage() {
             <ControlRoomMap
               trips={mapMarkers}
               followingId={followingId}
+              showHeatmap={showHeatmap}
               onMarkerClick={(id, type) => {
                 if (type === 'taxi') {
                   const trip = activeTrips.find(t => t.driver_id === id)
@@ -1315,6 +1316,12 @@ export default function ControlRoomPage() {
                 }
               }}
               onFollowToggle={(id) => setFollowingId(id)}
+              onGeofenceAlert={(alert) => {
+                setGeofenceAlerts(prev => [alert, ...prev].slice(0, 10))
+                if (alert.type === "exit") {
+                  toast.warning(`${alert.driver} left ${alert.zone}`)
+                }
+              }}
             />
           </Card>
 
@@ -1711,10 +1718,26 @@ export default function ControlRoomPage() {
                   </div>
                 </div>
               ))}
+              {/* Geofence alerts */}
+              {geofenceAlerts.slice(0, 3).map((alert) => (
+                <div key={alert.id} className={`flex items-start gap-2 p-1.5 rounded ${
+                  alert.type === "exit" ? "bg-red-500/10 border border-red-500/30" : "bg-blue-500/10 border border-blue-500/30"
+                }`}>
+                  <MapPinned className={`h-3 w-3 mt-0.5 shrink-0 ${alert.type === "exit" ? "text-red-400" : "text-blue-400"}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className={`text-[10px] font-medium ${alert.type === "exit" ? "text-red-400" : "text-blue-400"}`}>
+                      {alert.type === "exit" ? "Left" : "Entered"} {alert.zone}
+                    </div>
+                    <div className="text-[9px] text-muted-foreground truncate">{alert.driver}</div>
+                  </div>
+                  <span className="text-[9px] text-muted-foreground">{format(alert.time, "HH:mm")}</span>
+                </div>
+              ))}
               {/* No alerts message */}
               {activeTrips.filter(t => t.status === "pending" && (Date.now() - new Date(t.created_at).getTime()) / 1000 > 180).length === 0 &&
                shiftWarnings.filter(w => w.has_active_ride).length === 0 &&
-               rosterGaps.length === 0 && (
+               rosterGaps.length === 0 &&
+               geofenceAlerts.length === 0 && (
                 <div className="text-[10px] text-muted-foreground text-center py-2">
                   <CheckCircle2 className="h-4 w-4 mx-auto mb-1 text-green-400" />
                   All clear - no alerts

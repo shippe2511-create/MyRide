@@ -92,7 +92,7 @@ export function ControlRoomMap({
   const [mapReady, setMapReady] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showTraffic, setShowTraffic] = useState(false)
-  const [showGeofence, setShowGeofence] = useState(true)
+  const [showGeofence, setShowGeofence] = useState(false)
   const [mapType, setMapType] = useState<"roadmap" | "satellite">("roadmap")
   const [searchQuery, setSearchQuery] = useState("")
   const [showSearch, setShowSearch] = useState(false)

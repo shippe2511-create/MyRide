@@ -508,10 +508,12 @@ export default function ControlRoomPage() {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [loadData, toggleFullscreen, tripDetailOpen, isFullscreen, audioEnabled])
 
-  // Fleet counts
+  // Fleet counts - include bus shuttle drivers as "on trip"
+  const busShuttleDriverIds = new Set(activeShuttles.map(s => s.driver_id))
   const onlineDrivers = fleet.filter(d => d.is_online && !d.is_on_break).length
   const onBreakDrivers = fleet.filter(d => d.is_online && d.is_on_break).length
-  const offlineDrivers = fleet.filter(d => !d.is_online).length
+  const driversOnBusTrip = fleet.filter(d => busShuttleDriverIds.has(d.id) && !d.is_on_break).length
+  const offlineDrivers = fleet.filter(d => !d.is_online && !busShuttleDriverIds.has(d.id)).length
   const totalDrivers = fleet.length
 
   // Attention level
@@ -1915,12 +1917,12 @@ export default function ControlRoomPage() {
                     strokeDasharray={`${totalDrivers > 0 ? (Math.max(0, onlineDrivers - activeTrips.length) / totalDrivers) * 97.4 : 0} 97.4`}
                     strokeLinecap="round"
                   />
-                  {/* On Trip segment (blue) */}
+                  {/* On Trip segment (blue) - includes ride-hailing + bus shuttle drivers */}
                   <circle
                     cx="18" cy="18" r="15.5" fill="none"
                     stroke="#3b82f6"
                     strokeWidth="3"
-                    strokeDasharray={`${totalDrivers > 0 ? (activeTrips.filter(t => t.status === "in_progress").length / totalDrivers) * 97.4 : 0} 97.4`}
+                    strokeDasharray={`${totalDrivers > 0 ? ((activeTrips.filter(t => t.status === "in_progress").length + driversOnBusTrip) / totalDrivers) * 97.4 : 0} 97.4`}
                     strokeDashoffset={`${-(totalDrivers > 0 ? (Math.max(0, onlineDrivers - activeTrips.length) / totalDrivers) * 97.4 : 0)}`}
                     strokeLinecap="round"
                   />
@@ -1953,7 +1955,7 @@ export default function ControlRoomPage() {
                     <div className="w-2 h-2 rounded-full bg-blue-500" />
                     <span>On Trip</span>
                   </div>
-                  <span className="font-medium">{activeTrips.filter(t => t.status === "in_progress").length} ({totalDrivers > 0 ? Math.round((activeTrips.filter(t => t.status === "in_progress").length / totalDrivers) * 100) : 0}%)</span>
+                  <span className="font-medium">{activeTrips.filter(t => t.status === "in_progress").length + driversOnBusTrip} ({totalDrivers > 0 ? Math.round(((activeTrips.filter(t => t.status === "in_progress").length + driversOnBusTrip) / totalDrivers) * 100) : 0}%)</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">

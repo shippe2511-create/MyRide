@@ -1676,7 +1676,7 @@ export default function ControlRoomPage() {
           </Button>
 
           {/* Active Shuttles - Collapsible */}
-          <div className="flex flex-col min-h-0 shrink-0">
+          <div className="flex flex-col min-h-0 flex-1">
             <button
               onClick={() => setShuttlesCollapsed(!shuttlesCollapsed)}
               className="flex items-center justify-between mb-2 hover:opacity-80 transition-opacity w-full"
@@ -1689,13 +1689,13 @@ export default function ControlRoomPage() {
               {shuttlesCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
             {!shuttlesCollapsed ? (
-            <Card className="flex-1 overflow-hidden">
-              <div className="h-full overflow-y-auto p-2 space-y-2">
+            <Card className="flex-1 overflow-hidden min-h-[300px]">
+              <div className="h-full overflow-y-auto p-3 space-y-2">
                 {activeShuttles.length === 0 ? (
-                  <div className="h-full flex items-center justify-center text-muted-foreground">
+                  <div className="h-full flex items-center justify-center text-muted-foreground py-12">
                     <div className="text-center">
-                      <Bus className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">No active shuttles</p>
+                      <Bus className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                      <p className="text-base">No active shuttles</p>
                     </div>
                   </div>
                 ) : (

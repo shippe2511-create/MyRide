@@ -229,6 +229,7 @@ export async function getActiveTrips(
   supabase: SupabaseClient,
   departmentId?: string | null
 ): Promise<ActiveTrip[]> {
+  // Only fetch truly active trips (not completed/cancelled)
   let query = supabase
     .from('rides')
     .select(`
@@ -244,7 +245,7 @@ export async function getActiveTrips(
         vehicle:vehicles(vehicle_number, vehicle_model)
       )
     `)
-    .in('status', ['pending', 'accepted', 'arrived', 'in_progress', 'completed'])
+    .in('status', ['pending', 'accepted', 'arrived', 'in_progress'])
     .order('created_at', { ascending: true })
 
   const { data, error } = await query
@@ -344,6 +345,44 @@ export async function getRecentlyCompletedTrips(
   }
 
   return trips
+}
+
+/**
+ * Get today's trips for zone analysis (all trips from today with pickup locations)
+ */
+export async function getTodayTripsForZones(
+  supabase: SupabaseClient,
+  departmentId?: string | null
+): Promise<{ pickup_name: string | null; status: string }[]> {
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+
+  let query = supabase
+    .from('rides')
+    .select(`
+      pickup_name, status,
+      customer:profiles!rides_customer_id_fkey(department_id)
+    `)
+    .gte('created_at', todayStart.toISOString())
+    .not('status', 'eq', 'cancelled')
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error fetching today trips for zones:', error)
+    return []
+  }
+
+  let trips = data || []
+
+  if (departmentId) {
+    trips = trips.filter((t: any) => t.customer?.department_id === departmentId)
+  }
+
+  return trips.map((t: any) => ({
+    pickup_name: t.pickup_name,
+    status: t.status
+  }))
 }
 
 /**

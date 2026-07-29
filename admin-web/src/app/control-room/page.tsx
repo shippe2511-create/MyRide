@@ -1,6 +1,9 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import dynamic from "next/dynamic"
+import "./grid-layout.css"
+import { GridLayoutWrapper, type LayoutItem } from "@/components/grid-layout-wrapper"
 import { createClient } from "@/lib/supabase/client"
 import {
   getActiveTrips,
@@ -17,6 +20,7 @@ import {
   getRecentRatings,
   getRecentlyCompletedTrips,
   getDispatchSuggestions,
+  getTodayTripsForZones,
   computeMetrics,
   subscribeToControlRoomUpdates,
   unsubscribeFromControlRoom,
@@ -37,8 +41,6 @@ import {
   type RecentRating,
   type DriverSuggestion,
 } from "@/lib/control-room-data"
-import dynamic from "next/dynamic"
-
 const ControlRoomMap = dynamic(
   () => import("@/components/control-room-map").then(mod => mod.ControlRoomMap),
   { ssr: false, loading: () => <div className="h-full w-full bg-muted/50 animate-pulse rounded-lg" /> }
@@ -114,6 +116,7 @@ export default function ControlRoomPage() {
   const [scheduledRides, setScheduledRides] = useState<ScheduledRide[]>([])
   const [recentRatings, setRecentRatings] = useState<RecentRating[]>([])
   const [recentlyCompleted, setRecentlyCompleted] = useState<ActiveTrip[]>([])
+  const [todayZoneTrips, setTodayZoneTrips] = useState<{ pickup_name: string | null; status: string }[]>([])
   const [departmentId, setDepartmentId] = useState<string | null>(null)
 
   // UI state
@@ -182,6 +185,92 @@ export default function ControlRoomPage() {
   const [tripsByZoneCollapsed, setTripsByZoneCollapsed] = useState(false)
   const [alertsCollapsed, setAlertsCollapsed] = useState(false)
   const [ratingsCollapsed, setRatingsCollapsed] = useState(false)
+
+  // Grid layout state
+  const [editMode, setEditMode] = useState(false)
+  const [backupLayout, setBackupLayout] = useState<LayoutItem[] | null>(null)
+  // Grid layout width tracking
+  const [gridWidth, setGridWidth] = useState(1200)
+  const gridContainerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!gridContainerRef.current) return
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setGridWidth(entry.contentRect.width)
+      }
+    })
+    resizeObserver.observe(gridContainerRef.current)
+    return () => resizeObserver.disconnect()
+  }, [editMode])
+
+  // Default layout configuration (single layout, responsive handled by width)
+  const defaultLayout: LayoutItem[] = [
+    { i: "trips", x: 0, y: 0, w: 5, h: 10, minW: 3, minH: 4 },
+    { i: "map", x: 5, y: 0, w: 4, h: 7, minW: 3, minH: 4 },
+    { i: "shuttles", x: 9, y: 0, w: 3, h: 4, minW: 2, minH: 2 },
+    { i: "response", x: 9, y: 4, w: 3, h: 3, minW: 2, minH: 2 },
+    { i: "availability", x: 9, y: 7, w: 3, h: 3, minW: 2, minH: 2 },
+    { i: "zones", x: 5, y: 7, w: 4, h: 3, minW: 2, minH: 2 },
+  ]
+
+  // Load saved layout from localStorage
+  const [layout, setLayout] = useState<LayoutItem[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("control-room-layout")
+      if (saved) {
+        try {
+          return JSON.parse(saved)
+        } catch {
+          return defaultLayout
+        }
+      }
+    }
+    return defaultLayout
+  })
+
+  // Save layout to localStorage
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const onLayoutChange = useCallback((newLayout: any) => {
+    setLayout(newLayout)
+    if (typeof window !== "undefined") {
+      localStorage.setItem("control-room-layout", JSON.stringify(newLayout))
+    }
+  }, [])
+
+  // Reset layout to default
+  const resetLayout = useCallback(() => {
+    setLayout(defaultLayout)
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("control-room-layout")
+    }
+    toast.success("Layout reset to default")
+  }, [])
+
+  // Enter edit mode - save backup
+  const enterEditMode = useCallback(() => {
+    setBackupLayout([...layout])
+    setEditMode(true)
+  }, [layout])
+
+  // Apply layout changes
+  const applyLayout = useCallback(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("control-room-layout", JSON.stringify(layout))
+    }
+    setBackupLayout(null)
+    setEditMode(false)
+    toast.success("Layout saved")
+  }, [layout])
+
+  // Cancel layout changes
+  const cancelLayout = useCallback(() => {
+    if (backupLayout) {
+      setLayout(backupLayout)
+    }
+    setBackupLayout(null)
+    setEditMode(false)
+  }, [backupLayout])
 
   // Resizable panels state (percentage widths)
   const [leftPanelWidth, setLeftPanelWidth] = useState(42) // 42% default
@@ -392,7 +481,7 @@ export default function ControlRoomPage() {
   // Load all data
   const loadData = useCallback(async () => {
     setIsUpdating(true)
-    const [trips, shuttles, fleetData, locations, todayStats, yesterdayStats, gaps, trends, sos, shifts, scheduled, ratings, completed] = await Promise.all([
+    const [trips, shuttles, fleetData, locations, todayStats, yesterdayStats, gaps, trends, sos, shifts, scheduled, ratings, completed, zoneTrips] = await Promise.all([
       getActiveTrips(supabase, departmentId),
       getActiveShuttles(supabase),
       getFleetStatus(supabase, departmentId),
@@ -406,6 +495,7 @@ export default function ControlRoomPage() {
       getScheduledRides(supabase, departmentId),
       getRecentRatings(supabase),
       getRecentlyCompletedTrips(supabase, departmentId),
+      getTodayTripsForZones(supabase, departmentId),
     ])
 
     setActiveTrips(trips)
@@ -419,6 +509,7 @@ export default function ControlRoomPage() {
     setScheduledRides(scheduled)
     setRecentRatings(ratings)
     setRecentlyCompleted(completed)
+    setTodayZoneTrips(zoneTrips)
 
     const computedMetrics = computeMetrics(trips, shuttles, fleetData, todayStats, yesterdayStats, gaps)
     setMetrics(computedMetrics)
@@ -1006,6 +1097,30 @@ export default function ControlRoomPage() {
             <Button variant="ghost" size="icon" onClick={toggleFullscreen} title="Fullscreen (F)">
               {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </Button>
+            {/* Edit Layout Toggle */}
+            {!editMode ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={enterEditMode}
+                title="Edit Layout"
+              >
+                <GripVertical className="h-4 w-4" />
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-2 py-1">
+                <span className="text-xs text-primary font-medium">Editing Layout</span>
+                <Button variant="outline" size="sm" onClick={resetLayout} className="h-7 text-xs">
+                  Reset
+                </Button>
+                <Button variant="ghost" size="sm" onClick={cancelLayout} className="h-7 text-xs">
+                  Cancel
+                </Button>
+                <Button variant="default" size="sm" onClick={applyLayout} className="h-7 text-xs bg-green-600 hover:bg-green-700">
+                  Apply
+                </Button>
+              </div>
+            )}
             <Button variant="ghost" size="icon" onClick={() => window.location.href = "/dashboard"} title="Exit (Esc)">
               <X className="h-4 w-4" />
             </Button>
@@ -1071,11 +1186,198 @@ export default function ControlRoomPage() {
         />
       </div>
 
-      {/* Main Content - Resizable 3 columns */}
+      {/* Main Content - Grid Mode or Standard Mode */}
+      {editMode ? (
+        <div ref={gridContainerRef} className="flex-1 min-h-0 edit-mode-active overflow-auto">
+          <GridLayoutWrapper
+            className="layout"
+            layout={layout}
+            cols={12}
+            rowHeight={50}
+            width={gridWidth}
+            onLayoutChange={onLayoutChange}
+            draggableHandle=".drag-handle"
+            isResizable
+            isDraggable
+            margin={[8, 8]}
+          >
+            {/* Trips Panel */}
+            <div key="trips" className="grid-panel">
+              <div className="grid-panel-header drag-handle">
+                <h3 className="flex items-center gap-2">
+                  <GripVertical className="h-3 w-3 text-primary" />
+                  <Car className="h-4 w-4 text-blue-400" />
+                  Live Trip Monitoring
+                  <Badge className="bg-blue-500 text-white text-[9px] ml-2">LIVE</Badge>
+                </h3>
+              </div>
+              <div className="grid-panel-content">
+                <div className="h-full overflow-auto">
+                  {sortedFilteredTrips.length === 0 ? (
+                    <div className="h-full flex items-center justify-center text-muted-foreground">
+                      <div className="text-center">
+                        <Car className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No active rides</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 p-2">
+                      {sortedFilteredTrips.slice(0, 10).map((trip) => (
+                        <div key={trip.id} className="p-2 rounded border bg-card hover:bg-muted/50">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">{trip.customer?.full_name || "Customer"}</span>
+                            <Badge className={STATUS_COLORS[trip.status as keyof typeof STATUS_COLORS]} variant="secondary">
+                              {trip.status}
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1 truncate">
+                            {trip.pickup_name?.split(",")[0]}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Map Panel */}
+            <div key="map" className="grid-panel">
+              <div className="grid-panel-header drag-handle">
+                <h3 className="flex items-center gap-2">
+                  <GripVertical className="h-3 w-3 text-primary" />
+                  <MapPin className="h-4 w-4 text-green-400" />
+                  Live Map
+                </h3>
+              </div>
+              <div className="grid-panel-content p-0">
+                <ControlRoomMap
+                  trips={mapMarkers}
+                  onMarkerClick={(id, type) => {
+                    if (type === 'taxi') {
+                      const trip = activeTrips.find(t => t.driver_id === id)
+                      if (trip) viewTripDetails(trip)
+                    }
+                  }}
+                  followingId={followingId}
+                  onFollowToggle={(id) => setFollowingId(id)}
+                  showHeatmap={showHeatmap}
+                  onGeofenceAlert={(alert) => {
+                    setGeofenceAlerts(prev => [alert, ...prev].slice(0, 10))
+                    if (alert.type === "exit") {
+                      toast.warning(`${alert.driver} left ${alert.zone}`)
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Active Shuttles Panel */}
+            <div key="shuttles" className="grid-panel">
+              <div className="grid-panel-header drag-handle">
+                <h3 className="flex items-center gap-2">
+                  <GripVertical className="h-3 w-3 text-primary" />
+                  <Bus className="h-4 w-4 text-green-400" />
+                  Active Shuttles
+                  <Badge variant="outline" className="text-[10px]">{activeShuttles.length}</Badge>
+                </h3>
+              </div>
+              <div className="grid-panel-content">
+                {activeShuttles.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">
+                    <div className="text-center">
+                      <Bus className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No active shuttles</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {activeShuttles.map((shuttle) => (
+                      <div key={shuttle.id} className="p-2 rounded border bg-card">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">{shuttle.vehicle_number}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {shuttle.passengers_on_board}/{shuttle.vehicle_capacity}
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">{shuttle.route?.route_name}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Response Time Panel */}
+            <div key="response" className="grid-panel">
+              <div className="grid-panel-header drag-handle">
+                <h3 className="flex items-center gap-2">
+                  <GripVertical className="h-3 w-3 text-primary" />
+                  <TrendingUp className="h-4 w-4 text-cyan-400" />
+                  Response Time
+                </h3>
+              </div>
+              <div className="grid-panel-content">
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-cyan-400">
+                      {formatDuration(metrics?.avgAcceptSeconds ?? 0)}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Avg Accept Time</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Driver Availability Panel */}
+            <div key="availability" className="grid-panel">
+              <div className="grid-panel-header drag-handle">
+                <h3 className="flex items-center gap-2">
+                  <GripVertical className="h-3 w-3 text-primary" />
+                  <Users className="h-4 w-4 text-blue-400" />
+                  Driver Availability
+                </h3>
+              </div>
+              <div className="grid-panel-content">
+                <div className="flex items-center gap-4 h-full justify-center">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">{totalDrivers}</div>
+                    <p className="text-xs text-muted-foreground">Total</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-400">{onlineDrivers}</div>
+                    <p className="text-xs text-muted-foreground">Online</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-400">{offlineDrivers}</div>
+                    <p className="text-xs text-muted-foreground">Offline</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Trips by Zone Panel */}
+            <div key="zones" className="grid-panel">
+              <div className="grid-panel-header drag-handle">
+                <h3 className="flex items-center gap-2">
+                  <GripVertical className="h-3 w-3 text-primary" />
+                  <Target className="h-4 w-4 text-purple-400" />
+                  Trips by Zone
+                </h3>
+              </div>
+              <div className="grid-panel-content">
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  <p className="text-sm">Zone distribution chart</p>
+                </div>
+              </div>
+            </div>
+          </GridLayoutWrapper>
+        </div>
+      ) : (
       <div ref={containerRef} className="flex-1 flex flex-col lg:flex-row gap-0 min-h-0 overflow-y-auto lg:overflow-hidden">
         {/* Left Column - Live Trips Table with Timeline */}
         <div
-          className="flex flex-col min-h-[300px] lg:min-h-0 shrink-0"
+          className="flex flex-col min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden"
           style={{ width: isLargeScreen ? `${leftPanelWidth}%` : '100%' }}
         >
           <div className="flex items-center justify-between mb-2">
@@ -1378,7 +1680,7 @@ export default function ControlRoomPage() {
         </div>
 
         {/* Center Column - Map + Alerts */}
-        <div className="flex-1 flex flex-col gap-2 min-h-[400px] lg:min-h-0 overflow-hidden px-1">
+        <div className="flex-1 flex flex-col gap-2 min-h-[400px] lg:min-h-0 overflow-y-auto px-1">
           {/* SOS Alerts Panel - TOP PRIORITY */}
           {sosAlerts.length > 0 && (
             <Card className="shrink-0 border-red-500 bg-red-500/10 p-3 animate-pulse">
@@ -1451,9 +1753,34 @@ export default function ControlRoomPage() {
                   </div>
                 )}
                 {rosterGaps.length > 0 && (
-                  <div className="flex items-center justify-between p-2 rounded bg-muted/50">
-                    <span>Roster gaps (no driver)</span>
-                    <span className="text-amber-400 font-medium">{rosterGaps.length}</span>
+                  <div className="space-y-1">
+                    <div
+                      className="flex items-center justify-between p-2 rounded bg-muted/50 hover:bg-muted cursor-pointer transition-colors"
+                      onClick={() => window.location.href = "/dashboard/bus-roster"}
+                    >
+                      <span>Roster gaps (no driver)</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-400 font-medium">{rosterGaps.length}</span>
+                        <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                      </div>
+                    </div>
+                    <div className="pl-2 space-y-0.5 max-h-[80px] overflow-y-auto">
+                      {rosterGaps.slice(0, 5).map((gap, i) => (
+                        <div
+                          key={i}
+                          className="text-xs text-muted-foreground flex items-center justify-between py-0.5 px-2 rounded hover:bg-muted/30 cursor-pointer"
+                          onClick={() => window.location.href = "/dashboard/bus-roster"}
+                        >
+                          <span className="truncate">{gap.route_name}</span>
+                          <span className="text-amber-400/80 shrink-0 ml-2">{gap.departure_time?.slice(0, 5)}</span>
+                        </div>
+                      ))}
+                      {rosterGaps.length > 5 && (
+                        <div className="text-xs text-muted-foreground/60 pl-2">
+                          +{rosterGaps.length - 5} more...
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1557,47 +1884,54 @@ export default function ControlRoomPage() {
               </div>
               {fleetCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
-            {!fleetCollapsed && <div className="space-y-2 px-2 pb-2">
-              {/* On Trip */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs w-16">On trip</span>
-                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-green-500 rounded-full"
-                    style={{ width: `${totalDrivers > 0 ? (activeTrips.filter(t => t.status === "in_progress").length / totalDrivers) * 100 : 0}%` }}
-                  />
+            {!fleetCollapsed && (() => {
+              const onTripCount = activeTrips.filter(t => t.status === "in_progress").length + driversOnBusTrip
+              const toPickupCount = activeTrips.filter(t => t.status === "accepted" || t.status === "arrived").length
+              const availableCount = Math.max(0, onlineDrivers - onTripCount - toPickupCount)
+              return (
+                <div className="space-y-2 px-2 pb-2">
+                  {/* On Trip */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs w-16">On trip</span>
+                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-green-500 rounded-full transition-all"
+                        style={{ width: `${totalDrivers > 0 ? (onTripCount / totalDrivers) * 100 : 0}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-bold w-6 text-right text-green-400">
+                      {onTripCount}
+                    </span>
+                  </div>
+                  {/* To Pickup */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs w-16">To pickup</span>
+                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500 rounded-full transition-all"
+                        style={{ width: `${totalDrivers > 0 ? (toPickupCount / totalDrivers) * 100 : 0}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-bold w-6 text-right text-blue-400">
+                      {toPickupCount}
+                    </span>
+                  </div>
+                  {/* Available */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs w-16">Available</span>
+                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-emerald-500 rounded-full transition-all"
+                        style={{ width: `${totalDrivers > 0 ? (availableCount / totalDrivers) * 100 : 0}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-bold w-6 text-right text-emerald-400">
+                      {availableCount}
+                    </span>
+                  </div>
                 </div>
-                <span className="text-xs font-bold w-6 text-right text-green-400">
-                  {activeTrips.filter(t => t.status === "in_progress").length}
-                </span>
-              </div>
-              {/* To Pickup */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs w-16">To pickup</span>
-                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-blue-500 rounded-full"
-                    style={{ width: `${totalDrivers > 0 ? (activeTrips.filter(t => t.status === "accepted" || t.status === "arrived").length / totalDrivers) * 100 : 0}%` }}
-                  />
-                </div>
-                <span className="text-xs font-bold w-6 text-right text-blue-400">
-                  {activeTrips.filter(t => t.status === "accepted" || t.status === "arrived").length}
-                </span>
-              </div>
-              {/* Available */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs w-16">Available</span>
-                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-emerald-500 rounded-full"
-                    style={{ width: `${totalDrivers > 0 ? (onlineDrivers - activeTrips.length) / totalDrivers * 100 : 0}%` }}
-                  />
-                </div>
-                <span className="text-xs font-bold w-6 text-right text-emerald-400">
-                  {Math.max(0, onlineDrivers - activeTrips.length)}
-                </span>
-              </div>
-            </div>}
+              )
+            })()}
           </Card>
 
           {/* Recently Completed - Collapsible */}
@@ -1617,8 +1951,9 @@ export default function ControlRoomPage() {
                 <div className="text-xs text-muted-foreground text-center py-4">No completed trips yet</div>
               ) : (
                 recentlyCompleted.slice(0, 5).map((trip) => {
-                  const duration = trip.completed_at && trip.created_at
-                    ? Math.round((new Date(trip.completed_at).getTime() - new Date(trip.created_at).getTime()) / 1000)
+                  // Trip duration from started_at to completed_at (actual ride time)
+                  const duration = trip.completed_at && trip.started_at
+                    ? Math.round((new Date(trip.completed_at).getTime() - new Date(trip.started_at).getTime()) / 1000)
                     : 0
                   return (
                     <div key={trip.id} className="flex items-center justify-between p-1.5 rounded bg-muted/30 text-xs group">
@@ -1988,11 +2323,10 @@ export default function ControlRoomPage() {
               {tripsByZoneCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
             {!tripsByZoneCollapsed && (() => {
-              // Calculate zone distribution from active + completed trips
-              const allTrips = [...activeTrips, ...recentlyCompleted]
+              // Calculate zone distribution from all today's trips
               const zones: Record<string, number> = {}
 
-              allTrips.forEach(trip => {
+              todayZoneTrips.forEach(trip => {
                 // Extract zone from pickup name (first part before comma)
                 const zoneName = trip.pickup_name?.split(",")[0]?.trim() || "Other"
                 // Group similar zones
@@ -2004,7 +2338,7 @@ export default function ControlRoomPage() {
                 zones[zone] = (zones[zone] || 0) + 1
               })
 
-              const totalTrips = allTrips.length
+              const totalTrips = todayZoneTrips.length
               const sortedZones = Object.entries(zones)
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 5)
@@ -2283,6 +2617,7 @@ export default function ControlRoomPage() {
         </div>
         )}
       </div>
+      )}
 
       {/* Footer - Responsive */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] sm:text-xs text-muted-foreground shrink-0">

@@ -189,6 +189,17 @@ export default function ControlRoomPage() {
   const [isResizingLeft, setIsResizingLeft] = useState(false)
   const [isResizingRight, setIsResizingRight] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [isLargeScreen, setIsLargeScreen] = useState(true)
+
+  // Track screen size for responsive layout
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsLargeScreen(window.innerWidth >= 1024)
+    }
+    checkScreenSize()
+    window.addEventListener('resize', checkScreenSize)
+    return () => window.removeEventListener('resize', checkScreenSize)
+  }, [])
 
   // Handle resize drag
   const handleMouseMove = useCallback((e: MouseEvent) => {
@@ -1063,7 +1074,7 @@ export default function ControlRoomPage() {
         {/* Left Column - Live Trips Table with Timeline */}
         <div
           className="flex flex-col min-h-[300px] lg:min-h-0 shrink-0"
-          style={{ width: typeof window !== 'undefined' && window.innerWidth >= 1024 ? `${leftPanelWidth}%` : '100%' }}
+          style={{ width: isLargeScreen ? `${leftPanelWidth}%` : '100%' }}
         >
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-semibold flex items-center gap-2">
@@ -1650,8 +1661,8 @@ export default function ControlRoomPage() {
         {/* Right Column - Shuttles + Trends - Collapsible */}
         {!rightPanelCollapsed ? (
         <div
-          className="flex flex-col gap-2 min-h-0 relative overflow-hidden shrink-0"
-          style={{ width: typeof window !== 'undefined' && window.innerWidth >= 1024 ? `${rightPanelWidth}%` : '100%' }}
+          className="flex flex-col gap-2 min-h-0 relative overflow-y-auto shrink-0"
+          style={{ width: isLargeScreen ? `${rightPanelWidth}%` : '100%' }}
         >
           {/* Collapse Right Panel Button */}
           <Button
@@ -1665,7 +1676,7 @@ export default function ControlRoomPage() {
           </Button>
 
           {/* Active Shuttles - Collapsible */}
-          <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex flex-col min-h-0 shrink-0">
             <button
               onClick={() => setShuttlesCollapsed(!shuttlesCollapsed)}
               className="flex items-center justify-between mb-2 hover:opacity-80 transition-opacity w-full"

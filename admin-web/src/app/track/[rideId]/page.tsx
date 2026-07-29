@@ -60,7 +60,11 @@ export default async function TrackingPage({ params }: PageProps) {
 
       if (profile) {
         driverName = profile.full_name || 'Driver';
-        driverPhone = profile.phone || '';
+        // Mask phone for privacy - show only last 4 digits
+        if (profile.phone) {
+          const phone = profile.phone.replace(/\D/g, '');
+          driverPhone = phone.length >= 4 ? `****${phone.slice(-4)}` : '****';
+        }
       }
 
       // Get vehicle info

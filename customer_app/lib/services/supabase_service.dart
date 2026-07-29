@@ -210,7 +210,7 @@ class SupabaseService {
   static Future<void> loadSessionToken() async {
     final prefs = await SharedPreferences.getInstance();
     _sessionToken = prefs.getString('session_token');
-    debugPrint('Loaded session token: $_sessionToken');
+    debugPrint('Session token loaded: ${_sessionToken != null}');
   }
 
   // Register session after login - invalidates other devices
@@ -237,7 +237,7 @@ class SupabaseService {
         payload: {'token': _sessionToken, 'app_type': 'customer'},
       );
 
-      debugPrint('Session registered: $_sessionToken');
+      debugPrint('Session registered successfully');
       return true;
     } catch (e) {
       debugPrint('Error registering session: $e');

@@ -280,7 +280,7 @@ class SupabaseService {
   static Future<void> loadSessionToken() async {
     final prefs = await SharedPreferences.getInstance();
     _sessionToken = prefs.getString('driver_session_token');
-    debugPrint('Loaded driver session token: $_sessionToken');
+    debugPrint('Driver session token loaded: ${_sessionToken != null}');
   }
 
   // Register session after login - invalidates other devices
@@ -307,7 +307,7 @@ class SupabaseService {
         payload: {'token': _sessionToken, 'app_type': 'driver'},
       );
 
-      debugPrint('Driver session registered: $_sessionToken');
+      debugPrint('Driver session registered successfully');
       return true;
     } catch (e) {
       debugPrint('Error registering driver session: $e');
@@ -2548,6 +2548,8 @@ class SupabaseService {
   /// Complete a bus trip
   static Future<bool> completeBusTrip(String tripId, String assignmentId) async {
     try {
+      debugPrint('completeBusTrip: Starting completion for tripId=$tripId, assignmentId=$assignmentId');
+
       // Update bus trip
       await client
           .from('bus_trips')
@@ -2556,18 +2558,22 @@ class SupabaseService {
             'status': 'completed',
           })
           .eq('id', tripId);
+      debugPrint('completeBusTrip: bus_trips updated');
 
       // Update roster assignment
       await client
           .from('roster_assignments')
           .update({'status': 'completed'})
           .eq('id', assignmentId);
+      debugPrint('completeBusTrip: roster_assignments updated');
 
       // Mark bus location tracking as completed
-      await client
+      final trackingResult = await client
           .from('bus_location_tracking')
           .update({'status': 'completed'})
-          .eq('trip_id', tripId);
+          .eq('trip_id', tripId)
+          .select();
+      debugPrint('completeBusTrip: bus_location_tracking updated, result=$trackingResult');
 
       return true;
     } catch (e) {

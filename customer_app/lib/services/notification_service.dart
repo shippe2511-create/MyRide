@@ -204,13 +204,13 @@ class NotificationService {
       // Get FCM token and save to database
       final token = await messaging.getToken();
       if (token != null) {
-        debugPrint('FCM Token: $token');
+        debugPrint('FCM Token registered');
         await SupabaseService.registerFcmToken(token);
       }
 
       // Listen for token refresh
       messaging.onTokenRefresh.listen((newToken) {
-        debugPrint('FCM Token refreshed: $newToken');
+        debugPrint('FCM Token refreshed');
         SupabaseService.registerFcmToken(newToken);
       });
 

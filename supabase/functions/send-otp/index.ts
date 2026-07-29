@@ -9,10 +9,21 @@ const TWILIO_PHONE_NUMBER = Deno.env.get("TWILIO_PHONE_NUMBER");
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// Allow requests from mobile apps and admin panel
+const ALLOWED_ORIGINS = [
+  "https://my-ride-ashen.vercel.app",
+  "http://localhost:3000",
+  "capacitor://localhost",
+  "http://localhost",
+];
+
+function getCorsHeaders(origin: string | null) {
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  };
+}
 
 function isValidMaldivesPhone(phone: string): boolean {
   const cleaned = phone.replace(/\D/g, "");
@@ -70,6 +81,9 @@ async function sendTwilioSMS(to: string, body: string): Promise<boolean> {
 }
 
 serve(async (req) => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -111,7 +125,8 @@ serve(async (req) => {
       const smsSent = await sendTwilioSMS(normalizedPhone, message);
 
       if (!smsSent) {
-        console.log(`DEV MODE: OTP for ${normalizedPhone} is ${code}`);
+        // Don't log the actual OTP code in production
+        console.log(`DEV MODE: OTP sent to ${normalizedPhone.slice(0, 4)}****`);
       }
 
       return new Response(

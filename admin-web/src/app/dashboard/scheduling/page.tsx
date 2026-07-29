@@ -684,7 +684,7 @@ export default function SchedulingPage() {
         const container = L.DomUtil.create("div", "leaflet-bar leaflet-control")
         const btn = L.DomUtil.create("a", "", container)
         btn.href = "#"
-        btn.innerHTML = "⊕"
+        btn.textContent = "⊕"
         btn.title = "Center on marker"
         btn.style.cssText = "width: 30px; height: 30px; line-height: 30px; display: block; text-align: center; font-size: 18px; text-decoration: none; color: #333; background: white;"
         L.DomEvent.on(btn, "click", function(e) {

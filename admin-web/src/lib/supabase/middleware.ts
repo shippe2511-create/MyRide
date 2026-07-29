@@ -66,10 +66,9 @@ export async function updateSession(request: NextRequest) {
   // Check if user has admin role
   if (user && isProtectedRoute) {
     const profile = await findProfile()
-    console.log('[Middleware] User:', user.id, user.email, 'Profile:', profile)
 
     if (!profile || !ADMIN_ROLES.includes(profile.role) || profile.status !== 'approved') {
-      console.log('[Middleware] Access denied - profile:', profile, 'ADMIN_ROLES:', ADMIN_ROLES)
+      console.log('[Middleware] Access denied - role check failed')
       const url = request.nextUrl.clone()
       url.pathname = '/login'
       url.searchParams.set('error', 'unauthorized')

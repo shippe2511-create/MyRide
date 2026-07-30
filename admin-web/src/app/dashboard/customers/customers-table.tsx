@@ -145,6 +145,9 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
   const [importError, setImportError] = useState<string | null>(null)
   const [departments, setDepartments] = useState<Department[]>([])
   const [departmentFilter, setDepartmentFilter] = useState(userDepartmentId || "all")
+  const [customerPools, setCustomerPools] = useState<Record<string, Array<{ id: string; name: string }>>>({})
+  const [pools, setPools] = useState<Array<{ id: string; name: string }>>([])
+  const [poolFilter, setPoolFilter] = useState("all")
 
   // Update department filter when user's department loads
   useEffect(() => {
@@ -153,9 +156,11 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
     }
   }, [userDepartmentId])
 
-  // Load departments
+  // Load departments and pools
   useEffect(() => {
     loadDepartments()
+    loadPools()
+    loadCustomerPools()
   }, [])
 
   const loadDepartments = async () => {
@@ -165,6 +170,32 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
       .eq("is_active", true)
       .order("name")
     setDepartments(data || [])
+  }
+
+  const loadCustomerPools = async () => {
+    const { data } = await supabase
+      .from("customer_pools")
+      .select("customer_id, pool:pools(id, name)")
+    if (data) {
+      const poolMap: Record<string, Array<{ id: string; name: string }>> = {}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      data.forEach((cp: any) => {
+        if (cp.pool) {
+          if (!poolMap[cp.customer_id]) poolMap[cp.customer_id] = []
+          poolMap[cp.customer_id].push(cp.pool)
+        }
+      })
+      setCustomerPools(poolMap)
+    }
+  }
+
+  const loadPools = async () => {
+    const { data } = await supabase
+      .from("pools")
+      .select("id, name")
+      .eq("is_active", true)
+      .order("name")
+    setPools(data || [])
   }
 
   // Sync with server data when props change
@@ -482,11 +513,20 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
     setLoading(false)
   }
 
-  // Filter customers by department
+  // Filter customers by department and pool
   const filteredCustomers = customers.filter(customer => {
-    if (departmentFilter === "all") return true
-    if (departmentFilter === "none") return !customer.department_id
-    return customer.department_id === departmentFilter
+    // Department filter
+    if (departmentFilter !== "all") {
+      if (departmentFilter === "none" && customer.department_id) return false
+      if (departmentFilter !== "none" && customer.department_id !== departmentFilter) return false
+    }
+    // Pool filter
+    if (poolFilter !== "all") {
+      const customerPoolIds = customerPools[customer.id]?.map(p => p.id) || []
+      if (poolFilter === "none" && customerPoolIds.length > 0) return false
+      if (poolFilter !== "none" && !customerPoolIds.includes(poolFilter)) return false
+    }
+    return true
   })
 
   const toggleSelectAll = () => {
@@ -839,6 +879,20 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
               ))}
             </SelectContent>
           </Select>
+          <Select value={poolFilter} onValueChange={setPoolFilter}>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="Pool" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Pools</SelectItem>
+              <SelectItem value="none">No Pool</SelectItem>
+              {pools.map((pool) => (
+                <SelectItem key={pool.id} value={pool.id}>
+                  {pool.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={exportCSV}>
@@ -893,6 +947,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
               <TableHead>Contact</TableHead>
               <TableHead>Employee ID</TableHead>
               <TableHead>Department</TableHead>
+              <TableHead>Pool</TableHead>
               <TableHead>Active</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead className="w-12"></TableHead>
@@ -901,7 +956,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
           <TableBody>
             {filteredCustomers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   {customers.length === 0 ? "No customers found" : "No customers match the selected filters"}
                 </TableCell>
               </TableRow>
@@ -961,6 +1016,19 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                       </Badge>
                     ) : (
                       <span className="text-muted-foreground text-xs">Unassigned</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {customerPools[customer.id] && customerPools[customer.id].length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {customerPools[customer.id].map((pool) => (
+                          <Badge key={pool.id} variant="secondary" className="text-xs font-normal bg-blue-500/10 text-blue-500 border-blue-500/20">
+                            {pool.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">-</span>
                     )}
                   </TableCell>
                   <TableCell>

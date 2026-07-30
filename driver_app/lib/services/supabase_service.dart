@@ -996,9 +996,22 @@ class SupabaseService {
     }
   }
 
+  // Auto-mark missed shifts as absent (call this on app load)
+  static Future<void> autoMarkMissedShifts() async {
+    try {
+      final result = await client.rpc('auto_mark_missed_shifts');
+      debugPrint('autoMarkMissedShifts: marked $result shifts as absent');
+    } catch (e) {
+      debugPrint('Error auto-marking missed shifts: $e');
+    }
+  }
+
   // Get today's shift for driver (for quick attendance marking)
   static Future<Map<String, dynamic>?> getTodayShift(String driverId) async {
     try {
+      // First, auto-mark any missed shifts
+      await autoMarkMissedShifts();
+
       final today = MaldivesTimezone.todayDateString();
       debugPrint('getTodayShift: driverId=$driverId, today=$today');
       final response = await client

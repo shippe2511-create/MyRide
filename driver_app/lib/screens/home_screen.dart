@@ -1058,6 +1058,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   (_todayShift!['attendance_status'] as String? ?? 'pending') == 'absent';
               final absenceReason = _todayShift?['absence_reason'] as String?;
 
+              // Check if shift has ended with pending status (missed)
+              final now = DateTime.now();
+              final endTimeStr = (_todayShift?['end_time']?.toString() ?? '23:59:00').substring(0, 5);
+              final endTimeParts = endTimeStr.split(':');
+              final shiftEndTime = DateTime(now.year, now.month, now.day,
+                  int.parse(endTimeParts[0]), int.parse(endTimeParts[1]));
+              final shiftEnded = _todayShift != null && now.isAfter(shiftEndTime);
+              final isMissed = _todayShift != null &&
+                  (_todayShift!['attendance_status'] as String? ?? 'pending') == 'pending' &&
+                  shiftEnded;
+
               // Checklist done for THIS shift AND THIS vehicle
               final currentShiftId = _todayShift?['id'] as String?;
               final currentVehicleId = state.vehicleId;
@@ -1066,6 +1077,44 @@ class _HomeScreenState extends State<HomeScreen> {
               final checklistDone = state.checklistCompleted && shiftMatch && vehicleMatch && !state.vehicleChangedNeedsChecklist;
               final vehicleChanged = state.vehicleChangedNeedsChecklist || (!vehicleMatch && state.checklistCompleted);
               debugPrint('OfflineWidget: checklistCompleted=${state.checklistCompleted}, shiftMatch=$shiftMatch, vehicleMatch=$vehicleMatch, vehicleChanged=$vehicleChanged, checklistDone=$checklistDone');
+
+              // Determine icon, color, and message based on state
+              IconData iconData;
+              Color iconColor;
+              Color bgColor;
+              String titleText;
+              String subtitleText;
+
+              if (_todayShift == null) {
+                // No shift today
+                iconData = Icons.event_busy;
+                iconColor = AppColors.error;
+                bgColor = AppColors.error.withValues(alpha: 0.15);
+                titleText = 'No Shift Today';
+                subtitleText = 'You don\'t have a shift scheduled for today';
+              } else if (isMissed) {
+                iconData = Icons.history;
+                iconColor = Colors.grey;
+                bgColor = Colors.grey.withValues(alpha: 0.15);
+                titleText = 'Shift Ended';
+                subtitleText = 'Your shift has ended without attendance marked';
+              } else if (isAbsent) {
+                iconData = Icons.block;
+                iconColor = AppColors.error;
+                bgColor = AppColors.error.withValues(alpha: 0.15);
+                titleText = 'You\'re Absent Today';
+                subtitleText = 'You have marked yourself absent for today\'s shift';
+              } else {
+                iconData = Icons.power_settings_new;
+                iconColor = context.mutedColor;
+                bgColor = context.cardColor;
+                titleText = 'You\'re Offline';
+                subtitleText = checklistDone
+                    ? 'Tap below to start receiving ride requests'
+                    : vehicleChanged
+                        ? 'New vehicle assigned - complete checklist'
+                        : 'Complete vehicle checklist to go online';
+              }
 
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 16),
@@ -1077,37 +1126,31 @@ class _HomeScreenState extends State<HomeScreen> {
                         width: 70,
                         height: 70,
                         decoration: BoxDecoration(
-                          color: isAbsent ? AppColors.error.withValues(alpha: 0.15) : context.cardColor,
+                          color: bgColor,
                           borderRadius: BorderRadius.circular(18),
                           border: Border.all(
-                            color: isAbsent ? AppColors.error : context.borderColor,
+                            color: isMissed ? Colors.grey : (isAbsent ? AppColors.error : context.borderColor),
                             width: 2,
                           ),
                         ),
                         child: Icon(
-                          isAbsent ? Icons.block : Icons.power_settings_new,
+                          iconData,
                           size: 32,
-                          color: isAbsent ? AppColors.error : context.mutedColor,
+                          color: iconColor,
                         ),
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        isAbsent ? 'You\'re Absent Today' : 'You\'re Offline',
+                        titleText,
                         style: TextStyle(
-                          color: isAbsent ? AppColors.error : context.textColor,
+                          color: isMissed ? Colors.grey : (isAbsent ? AppColors.error : context.textColor),
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        isAbsent
-                            ? 'You have marked yourself absent for today\'s shift'
-                            : checklistDone
-                                ? 'Tap below to start receiving ride requests'
-                                : vehicleChanged
-                                    ? 'New vehicle assigned - complete checklist'
-                                    : 'Complete vehicle checklist to go online',
+                        subtitleText,
                         style: TextStyle(
                           color: context.mutedColor,
                           fontSize: 14,
@@ -1139,7 +1182,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ],
                       const SizedBox(height: 32),
-                      if (!isAbsent)
+                      // Show Go Online button only if:
+                      // - Has a shift today AND
+                      // - Not absent AND
+                      // - Not missed (shift ended without marking attendance)
+                      if (_todayShift != null && !isAbsent && !isMissed)
                         ElevatedButton.icon(
                           onPressed: () {
                             debugPrint('Go Online button tapped!');
@@ -1198,6 +1245,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final shiftType = shiftTypeRaw.split('_').map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '').join(' ');
     final absenceReason = _todayShift!['absence_reason'] as String?;
 
+    // Check if shift has ended (current time > end_time)
+    final now = DateTime.now();
+    final endTimeParts = endTime.split(':');
+    final shiftEndTime = DateTime(now.year, now.month, now.day,
+        int.parse(endTimeParts[0]), int.parse(endTimeParts[1]));
+    final shiftEnded = now.isAfter(shiftEndTime);
+
     // When PRESENT: show compact chip only
     if (attendanceStatus == 'present') {
       return Container(
@@ -1251,21 +1305,30 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    // For PENDING and ABSENT: show full card
+    // Check if shift ended with pending status (missed attendance)
+    final isMissed = attendanceStatus == 'pending' && shiftEnded;
+
+    // For PENDING, ABSENT, and MISSED: show full card
     Color statusColor;
     IconData statusIcon;
     String statusText;
 
-    switch (attendanceStatus) {
-      case 'absent':
-        statusColor = AppColors.error;
-        statusIcon = Icons.cancel;
-        statusText = 'Absent';
-        break;
-      default:
-        statusColor = AppColors.yellow;
-        statusIcon = Icons.schedule;
-        statusText = 'Pending';
+    if (isMissed) {
+      statusColor = Colors.grey;
+      statusIcon = Icons.history;
+      statusText = 'Missed';
+    } else {
+      switch (attendanceStatus) {
+        case 'absent':
+          statusColor = AppColors.error;
+          statusIcon = Icons.cancel;
+          statusText = 'Absent';
+          break;
+        default:
+          statusColor = AppColors.yellow;
+          statusIcon = Icons.schedule;
+          statusText = 'Pending';
+      }
     }
 
     return Container(
@@ -1343,7 +1406,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          if (attendanceStatus == 'pending') ...[
+          // Show Present/Absent buttons only if pending AND shift hasn't ended
+          if (attendanceStatus == 'pending' && !shiftEnded) ...[
             const SizedBox(height: 16),
             Row(
               children: [
@@ -1378,6 +1442,47 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ],
+            ),
+          ],
+          // Missed shift (pending but shift ended)
+          if (isMissed) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.grey, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Shift ended without attendance marked',
+                      style: TextStyle(color: context.mutedColor, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ShiftScheduleScreen()),
+                );
+              },
+              icon: Icon(Icons.calendar_month, size: 16, color: context.mutedColor),
+              label: Text('View My Schedule', style: TextStyle(color: context.textColor, fontSize: 13)),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: context.borderColor),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
             ),
           ],
           if (attendanceStatus == 'absent') ...[

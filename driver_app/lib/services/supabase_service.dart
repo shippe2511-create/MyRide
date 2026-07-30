@@ -1882,24 +1882,12 @@ class SupabaseService {
     if (id == null || id.isEmpty) return [];
 
     try {
-      dynamic response;
-      if (logType != null && logType.isNotEmpty) {
-        response = await client
-            .from('vehicle_logs')
-            .select()
-            .eq('driver_id', id)
-            .eq('log_type', logType)
-            .order('created_at', ascending: false)
-            .limit(limit);
-      } else {
-        response = await client
-            .from('vehicle_logs')
-            .select()
-            .eq('driver_id', id)
-            .order('created_at', ascending: false)
-            .limit(limit);
-      }
-      return List<Map<String, dynamic>>.from(response);
+      // Use RPC to bypass RLS (phone login doesn't set auth.uid())
+      final response = await client.rpc('get_vehicle_logs', params: {
+        'p_driver_id': id,
+        'p_log_type': logType,
+      });
+      return List<Map<String, dynamic>>.from(response ?? []);
     } catch (e) {
       debugPrint('Error getting vehicle logs: $e');
       return [];
@@ -1919,19 +1907,19 @@ class SupabaseService {
     if (id == null || id.isEmpty) return null;
 
     try {
-      final data = {
-        'driver_id': id,
-        'log_type': logType,
-        'amount': amount,
-        'odometer': odometer,
-        'notes': notes,
-        'log_date': (logDate ?? DateTime.now()).toIso8601String().split('T')[0],
-      };
-      if (fuelType != null) data['fuel_type'] = fuelType;
-      if (liters != null) data['liters'] = liters;
-
-      final response = await client.from('vehicle_logs').insert(data).select().single();
-      return response;
+      // Use RPC to bypass RLS (phone login doesn't set auth.uid())
+      final response = await client.rpc('add_vehicle_log', params: {
+        'p_driver_id': id,
+        'p_log_type': logType,
+        'p_amount': amount,
+        'p_odometer': odometer,
+        'p_notes': notes,
+        'p_log_date': (logDate ?? DateTime.now()).toIso8601String().split('T')[0],
+        'p_fuel_type': fuelType,
+        'p_liters': liters,
+      });
+      debugPrint('addVehicleLog: success - $response');
+      return response as Map<String, dynamic>?;
     } catch (e) {
       debugPrint('Error adding vehicle log: $e');
       return null;
@@ -1953,60 +1941,11 @@ class SupabaseService {
     if (id == null || id.isEmpty) return {};
 
     try {
-      final now = DateTime.now();
-      final monthStart = DateTime(now.year, now.month, 1);
-
-      final response = await client
-          .from('vehicle_logs')
-          .select('log_type, amount, liters')
-          .eq('driver_id', id)
-          .gte('log_date', monthStart.toIso8601String().split('T')[0]);
-
-      final logs = List<Map<String, dynamic>>.from(response);
-
-      double fuelLiters = 0;  // Total liters for fuel
-      double maintenanceTotal = 0;
-      double repairTotal = 0;
-      double cleaningTotal = 0;
-      int fuelCount = 0;
-      int maintenanceCount = 0;
-      int repairCount = 0;
-      int cleaningCount = 0;
-
-      for (final log in logs) {
-        final amount = (log['amount'] ?? 0).toDouble();
-        final fuelAmount = (log['liters'] ?? 0).toDouble();
-        switch (log['log_type']) {
-          case 'fuel':
-            fuelLiters += fuelAmount;  // Use liters for fuel
-            fuelCount++;
-            break;
-          case 'maintenance':
-            maintenanceTotal += amount;
-            maintenanceCount++;
-            break;
-          case 'repair':
-            repairTotal += amount;
-            repairCount++;
-            break;
-          case 'cleaning':
-            cleaningTotal += amount;
-            cleaningCount++;
-            break;
-        }
-      }
-
-      return {
-        'fuel_liters': fuelLiters,  // Liters for fuel
-        'fuel_count': fuelCount,
-        'maintenance_total': maintenanceTotal,
-        'maintenance_count': maintenanceCount,
-        'repair_total': repairTotal,
-        'repair_count': repairCount,
-        'cleaning_total': cleaningTotal,
-        'cleaning_count': cleaningCount,
-        'total': maintenanceTotal + repairTotal + cleaningTotal,  // Total expenses (excluding fuel liters)
-      };
+      // Use RPC to bypass RLS (phone login doesn't set auth.uid())
+      final response = await client.rpc('get_vehicle_log_stats', params: {
+        'p_driver_id': id,
+      });
+      return Map<String, dynamic>.from(response ?? {});
     } catch (e) {
       debugPrint('Error getting vehicle log stats: $e');
       return {};

@@ -214,20 +214,20 @@ export default function ControlRoomPage() {
     { i: "zones", x: 5, y: 7, w: 4, h: 3, minW: 2, minH: 2 },
   ]
 
-  // Load saved layout from localStorage
-  const [layout, setLayout] = useState<LayoutItem[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("control-room-layout")
-      if (saved) {
-        try {
-          return JSON.parse(saved)
-        } catch {
-          return defaultLayout
-        }
+  // Layout state
+  const [layout, setLayout] = useState<LayoutItem[]>(defaultLayout)
+
+  // Load saved layout from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("control-room-layout")
+    if (saved) {
+      try {
+        setLayout(JSON.parse(saved))
+      } catch {
+        // Invalid JSON, use default
       }
     }
-    return defaultLayout
-  })
+  }, [])
 
   // Save layout to localStorage
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -254,14 +254,15 @@ export default function ControlRoomPage() {
   }, [layout])
 
   // Apply layout changes
-  const applyLayout = useCallback(() => {
+  const applyLayout = () => {
+    console.log("Apply clicked, layout:", layout)
     if (typeof window !== "undefined") {
       localStorage.setItem("control-room-layout", JSON.stringify(layout))
     }
     setBackupLayout(null)
     setEditMode(false)
     toast.success("Layout saved")
-  }, [layout])
+  }
 
   // Cancel layout changes
   const cancelLayout = useCallback(() => {
@@ -1116,7 +1117,7 @@ export default function ControlRoomPage() {
                 <Button variant="ghost" size="sm" onClick={cancelLayout} className="h-7 text-xs">
                   Cancel
                 </Button>
-                <Button variant="default" size="sm" onClick={applyLayout} className="h-7 text-xs bg-green-600 hover:bg-green-700">
+                <Button variant="default" size="sm" onClick={() => { console.log("Button clicked"); applyLayout(); }} className="h-7 text-xs bg-green-600 hover:bg-green-700">
                   Apply
                 </Button>
               </div>
@@ -1186,19 +1187,18 @@ export default function ControlRoomPage() {
         />
       </div>
 
-      {/* Main Content - Grid Mode or Standard Mode */}
-      {editMode ? (
-        <div ref={gridContainerRef} className="flex-1 min-h-0 edit-mode-active overflow-auto">
+      {/* Main Content - Always use GridLayout, just toggle drag/resize */}
+        <div ref={gridContainerRef} className={`flex-1 min-h-0 overflow-auto ${editMode ? 'edit-mode-active' : ''}`}>
           <GridLayoutWrapper
             className="layout"
             layout={layout}
             cols={12}
             rowHeight={50}
             width={gridWidth}
-            onLayoutChange={onLayoutChange}
+            onLayoutChange={editMode ? onLayoutChange : undefined}
             draggableHandle=".drag-handle"
-            isResizable
-            isDraggable
+            isResizable={editMode}
+            isDraggable={editMode}
             margin={[8, 8]}
           >
             {/* Trips Panel */}
@@ -1373,8 +1373,10 @@ export default function ControlRoomPage() {
             </div>
           </GridLayoutWrapper>
         </div>
-      ) : (
-      <div ref={containerRef} className="flex-1 flex flex-col lg:flex-row gap-0 min-h-0 overflow-y-auto lg:overflow-hidden">
+
+      {/* Floating indicators - only show on larger screens and NOT in edit mode */}
+      {!editMode && (
+      <div className="hidden lg:block">
         {/* Left Column - Live Trips Table with Timeline */}
         <div
           className="flex flex-col min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden"

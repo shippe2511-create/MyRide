@@ -697,7 +697,7 @@ export async function getDriverLocations(
     .select(`
       id, department_id, is_online,
       profile:profiles(full_name),
-      vehicle:vehicle_types(display_name, capacity)
+      vehicle:vehicles(vehicle_number, vehicle_type)
     `)
     .eq('is_online', true)
 
@@ -740,8 +740,8 @@ export async function getDriverLocations(
     const vehicle = Array.isArray(d.vehicle) ? d.vehicle[0] : d.vehicle
     driverInfo[d.id] = {
       driver_name: profile?.full_name || 'Unknown',
-      vehicle_number: vehicle?.display_name || null,
-      vehicle_capacity: vehicle?.capacity || null,
+      vehicle_number: vehicle?.vehicle_number || null,
+      vehicle_capacity: null, // Not used for taxi drivers
       department_id: d.department_id,
     }
   })

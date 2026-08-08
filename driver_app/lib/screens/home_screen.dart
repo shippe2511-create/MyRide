@@ -371,21 +371,21 @@ class _HomeScreenState extends State<HomeScreen> {
     final driverId = driverState.driverId;
     if (driverId.isEmpty) return;
 
-    debugPrint('Subscribing to shift schedule changes for driver: $driverId');
+    debugPrint('Subscribing to shift changes for driver: $driverId');
     final supabase = SupabaseService.client;
-    _shiftScheduleChannel = supabase.channel('shift_schedule_$driverId');
+    _shiftScheduleChannel = supabase.channel('shifts_$driverId');
     _shiftScheduleChannel!
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
-          table: 'driver_schedules',
+          table: 'shifts',
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
             column: 'driver_id',
             value: driverId,
           ),
           callback: (payload) {
-            debugPrint('Shift schedule change: ${payload.eventType}');
+            debugPrint('Shift change: ${payload.eventType}');
             // Reload today's shift when schedule changes
             if (mounted) {
               _loadTodayShift();
@@ -393,7 +393,7 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         )
         .subscribe((status, error) {
-          debugPrint('Shift schedule subscription: $status, error: $error');
+          debugPrint('Shifts subscription: $status, error: $error');
         });
   }
 

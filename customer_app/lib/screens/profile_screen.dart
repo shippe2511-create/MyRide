@@ -767,11 +767,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
 
         appState.updateProfilePhoto(savedPath);
-        setModalState(() {});
-        setState(() {});
-        HapticFeedback.lightImpact();
+        if (mounted) {
+          setState(() {});
+          HapticFeedback.lightImpact();
+          AppSnackbar.success(context, 'Profile photo updated');
+        }
       }
     } catch (e) {
+      debugPrint('Error picking image: $e');
       if (mounted) {
         AppSnackbar.error(context, 'Could not access camera/gallery');
       }
@@ -781,8 +784,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildProfileAvatar(AppState appState, double size, double iconSize) {
     // Priority: avatarUrl (cloud) > profilePhotoPath (local) > icon
     if (appState.avatarUrl != null && appState.avatarUrl!.isNotEmpty) {
+      // Add cache buster to force refresh after upload
+      final urlWithCacheBuster = '${appState.avatarUrl}?v=${appState.avatarCacheKey}';
       return CachedImage(
-        imageUrl: appState.avatarUrl,
+        imageUrl: urlWithCacheBuster,
         width: size,
         height: size,
         fit: BoxFit.cover,

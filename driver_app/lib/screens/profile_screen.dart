@@ -620,8 +620,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildProfileImage(DriverState state) {
     // Priority: avatarUrl > local file > initials
     if (state.avatarUrl.isNotEmpty) {
+      // Add cache buster to force refresh after upload
+      final urlWithCacheBuster = '${state.avatarUrl}?v=${state.avatarCacheKey}';
       return CachedImage(
-        imageUrl: state.avatarUrl,
+        imageUrl: urlWithCacheBuster,
         width: 110,
         height: 110,
         fit: BoxFit.cover,

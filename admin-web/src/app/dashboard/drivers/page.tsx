@@ -101,7 +101,9 @@ function useDriversData(search?: string, status?: string, page: number = 1) {
         }
       }
     },
-    staleTime: 30 * 1000,
+    staleTime: 0, // Always refetch on change
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
     placeholderData: (previousData) => previousData,
   })
 }

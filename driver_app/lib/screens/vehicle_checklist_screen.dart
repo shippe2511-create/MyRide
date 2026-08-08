@@ -190,11 +190,11 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
   Future<void> _loadPreviousRunningHours() async {
     try {
       final driverState = context.read<DriverState>();
+      debugPrint('_loadPreviousRunningHours: driverId=${driverState.driverId}, vehicleNumber=${driverState.vehicleNumber}');
 
-      // Ensure vehicle info is loaded
-      if (driverState.vehicleNumber.isEmpty) {
-        await driverState.refreshVehicleInfo();
-      }
+      // Always refresh vehicle info to ensure we have latest
+      await driverState.refreshVehicleInfo();
+      debugPrint('After refresh: vehicleNumber=${driverState.vehicleNumber}');
 
       final vehicleNumber = driverState.vehicleNumber;
       if (vehicleNumber.isEmpty) {

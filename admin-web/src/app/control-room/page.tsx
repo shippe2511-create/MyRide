@@ -1043,6 +1043,33 @@ export default function ControlRoomPage() {
               <span className="hidden sm:inline">Actions</span>
             </Button>
 
+            {/* Alert Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                // Scroll to Attention Items section or show alert modal
+                const attentionSection = document.querySelector('[data-section="attention-items"]')
+                if (attentionSection) {
+                  attentionSection.scrollIntoView({ behavior: 'smooth' })
+                }
+              }}
+              title="View Alerts"
+              className={`gap-1.5 ${
+                (sosAlerts.length > 0 || (metrics && metrics.awaitingDriver > 0))
+                  ? 'bg-red-500/20 border-red-500/50 text-red-400 hover:bg-red-500/30 hover:text-red-300 animate-pulse'
+                  : 'bg-muted/50 border-border text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              <AlertTriangle className="h-4 w-4" />
+              <span className="hidden sm:inline">Alerts</span>
+              {(sosAlerts.length > 0 || (metrics && metrics.awaitingDriver > 0)) && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-red-500 text-white rounded-full">
+                  {sosAlerts.length + (metrics?.awaitingDriver || 0)}
+                </span>
+              )}
+            </Button>
+
             {/* Leaderboard */}
             <Button
               variant="ghost"
@@ -1744,7 +1771,7 @@ export default function ControlRoomPage() {
 
           {/* Attention Items Panel - Collapsible */}
           {(metrics?.awaitingDriver ?? 0) > 0 || (metrics?.shuttlesNearCapacity ?? 0) > 0 || (metrics?.rosterGaps ?? 0) > 0 ? (
-            <Card className="shrink-0 border-amber-500/50 bg-amber-500/5 overflow-hidden">
+            <Card data-section="attention-items" className="shrink-0 border-amber-500/50 bg-amber-500/5 overflow-hidden">
               <button
                 onClick={() => setAttentionCollapsed(!attentionCollapsed)}
                 className="w-full flex items-center justify-between p-2 hover:bg-amber-500/10 transition-colors"
@@ -2978,6 +3005,33 @@ export default function ControlRoomPage() {
                 {fleet.filter(d => d.is_online).length} drivers online
               </p>
             </div>
+
+            {/* Assign Backup Bus - Show when shuttles are full */}
+            {activeShuttles.filter(s => s.is_full && !s.has_backup_assigned).length > 0 && (
+              <div className="border-t pt-4 space-y-2">
+                <label className="text-sm font-medium text-red-400 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Full Shuttles Need Backup
+                </label>
+                {activeShuttles.filter(s => s.is_full && !s.has_backup_assigned).map(shuttle => (
+                  <Button
+                    key={shuttle.id}
+                    variant="outline"
+                    className="w-full justify-start gap-2 border-red-500/50 bg-red-500/10 hover:bg-red-500/20 text-red-400"
+                    onClick={() => {
+                      // Navigate to Bus Roster page to assign backup
+                      window.location.href = '/dashboard/bus-roster'
+                    }}
+                  >
+                    <Bus className="h-4 w-4" />
+                    <span className="flex-1 text-left">
+                      Assign Backup for {shuttle.vehicle_number}
+                    </span>
+                    <span className="text-xs opacity-70">@ {shuttle.current_stop_name}</span>
+                  </Button>
+                ))}
+              </div>
+            )}
 
             <div className="border-t pt-4 space-y-2">
               {/* Pause/Resume Requests */}

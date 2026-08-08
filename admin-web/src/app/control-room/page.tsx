@@ -3149,6 +3149,9 @@ export default function ControlRoomPage() {
               <Button
                 variant="outline"
                 className="w-full justify-start gap-2 border-red-500/50 hover:bg-red-500/10"
+                onClick={() => {
+                  toast.info("Emergency Mode would halt all non-critical operations. Feature coming soon.")
+                }}
               >
                 <Shield className="h-4 w-4 text-red-400" />
                 Activate Emergency Mode

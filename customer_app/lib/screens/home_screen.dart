@@ -696,10 +696,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildProfileAvatar(AppState appState) {
     // Priority: avatarUrl (cloud) > profilePhotoPath (local) > icon
     if (appState.avatarUrl != null && appState.avatarUrl!.isNotEmpty) {
+      final urlWithCacheBuster = '${appState.avatarUrl}?v=${appState.avatarCacheKey}';
       return ClipRRect(
         borderRadius: BorderRadius.circular(14),
         child: CachedImage(
-          imageUrl: appState.avatarUrl,
+          imageUrl: urlWithCacheBuster,
           width: 52,
           height: 52,
           fit: BoxFit.cover,

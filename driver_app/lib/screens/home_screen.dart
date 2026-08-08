@@ -992,8 +992,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildProfileAvatar(DriverState state, double size) {
     // Priority: avatarUrl (cloud) > profileImagePath (local) > initials
     if (state.avatarUrl.isNotEmpty) {
+      final urlWithCacheBuster = '${state.avatarUrl}?v=${state.avatarCacheKey}';
       return CachedImage(
-        imageUrl: state.avatarUrl,
+        imageUrl: urlWithCacheBuster,
         width: size,
         height: size,
         fit: BoxFit.cover,

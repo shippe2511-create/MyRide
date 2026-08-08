@@ -58,6 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
   RealtimeChannel? _breakTipsChannel;
   RealtimeChannel? _quotesChannel;
   RealtimeChannel? _notificationsChannel;
+  RealtimeChannel? _shiftScheduleChannel;
   int _unreadNotificationCount = 0;
   Timer? _notificationPollTimer;
   Map<String, dynamic>? _todayShift;
@@ -100,8 +101,9 @@ class _HomeScreenState extends State<HomeScreen> {
       // Refresh stats from database (Today, Total, Rating)
       await state.loadDriverStats();
 
-      // Load today's shift for attendance
+      // Load today's shift for attendance and subscribe to changes
       await _loadTodayShift();
+      _subscribeToShiftChanges();
 
       _checkForActiveRide();
 
@@ -364,6 +366,37 @@ class _HomeScreenState extends State<HomeScreen> {
 
   RealtimeChannel? _sessionBroadcastChannel;
 
+  void _subscribeToShiftChanges() {
+    final driverState = context.read<DriverState>();
+    final driverId = driverState.driverId;
+    if (driverId.isEmpty) return;
+
+    debugPrint('Subscribing to shift schedule changes for driver: $driverId');
+    final supabase = SupabaseService.client;
+    _shiftScheduleChannel = supabase.channel('shift_schedule_$driverId');
+    _shiftScheduleChannel!
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'driver_schedules',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'driver_id',
+            value: driverId,
+          ),
+          callback: (payload) {
+            debugPrint('Shift schedule change: ${payload.eventType}');
+            // Reload today's shift when schedule changes
+            if (mounted) {
+              _loadTodayShift();
+            }
+          },
+        )
+        .subscribe((status, error) {
+          debugPrint('Shift schedule subscription: $status, error: $error');
+        });
+  }
+
   @override
   void dispose() {
     _notificationPollTimer?.cancel();
@@ -372,6 +405,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_breakTipsChannel != null) SupabaseService.client.removeChannel(_breakTipsChannel!);
     if (_quotesChannel != null) SupabaseService.client.removeChannel(_quotesChannel!);
     if (_notificationsChannel != null) SupabaseService.client.removeChannel(_notificationsChannel!);
+    if (_shiftScheduleChannel != null) SupabaseService.client.removeChannel(_shiftScheduleChannel!);
     // Remove listener
     try {
       context.read<DriverState>().removeListener(_onDriverStateChanged);

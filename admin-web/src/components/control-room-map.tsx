@@ -693,8 +693,8 @@ function TripMarkerComponent({
             return (
               <div className="relative">
                 <svg
-                  width="48"
-                  height="48"
+                  width="32"
+                  height="32"
                   viewBox="0 0 48 48"
                   fill="none"
                   style={{
@@ -709,17 +709,8 @@ function TripMarkerComponent({
                   <rect x="14" y="12" width="20" height="6" rx="2" fill={busColor} />
                   <rect x="18" y="13" width="12" height="4" rx="1" fill="white" fillOpacity="0.7" />
                 </svg>
-                {/* Passenger count badge */}
-                {trip.passengersOnBoard !== undefined && (
-                  <div
-                    className="absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-white"
-                    style={{ backgroundColor: busColor }}
-                  >
-                    {trip.passengersOnBoard}
-                  </div>
-                )}
                 <div
-                  className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded text-[10px] font-medium whitespace-nowrap"
+                  className="absolute -bottom-5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded text-[10px] font-medium whitespace-nowrap"
                   style={{ backgroundColor: busColor }}
                 >
                   <span className="text-white">{trip.label}</span>

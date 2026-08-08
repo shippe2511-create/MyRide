@@ -2230,6 +2230,26 @@ export default function ControlRoomPage() {
                             @ {shuttle.current_stop_name}
                           </div>
                         )}
+
+                        {/* Show Backup Assigned text or Assign Backup button */}
+                        {shuttle.is_full && (
+                          shuttle.has_backup_assigned ? (
+                            <div className="mt-2 text-[10px] text-green-400 font-medium flex items-center gap-1">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Backup bus assigned
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="mt-2 h-6 text-[10px] w-full border-red-500/50 text-red-400 hover:bg-red-500/10"
+                              onClick={() => window.location.href = '/dashboard/bus-roster'}
+                            >
+                              <Bus className="h-3 w-3 mr-1" />
+                              Assign Backup Bus
+                            </Button>
+                          )
+                        )}
                       </div>
                     )
                   })

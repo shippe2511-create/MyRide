@@ -681,9 +681,9 @@ export default function ControlRoomPage() {
     setTripDetailOpen(true)
   }
 
-  // Build map markers from driver locations (vehicles only, capacity <= 10)
+  // Build map markers from driver locations (taxi vehicles only)
   const mapMarkers: MapMarker[] = driverLocations
-    .filter(loc => !loc.vehicle_capacity || loc.vehicle_capacity <= 10)
+    .filter(loc => loc.vehicle_type !== 'bus')
     .map(loc => ({
       id: loc.driver_id,
       type: 'taxi' as const,

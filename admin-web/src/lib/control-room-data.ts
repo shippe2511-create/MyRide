@@ -130,6 +130,7 @@ export interface DriverLocation {
   driver_name?: string
   vehicle_number?: string
   vehicle_capacity?: number | null
+  vehicle_type?: "taxi" | "bus" | null
   active_ride_id?: string | null
   active_ride_status?: string | null
 }
@@ -774,7 +775,8 @@ export async function getDriverLocations(
     driverInfo[d.id] = {
       driver_name: profile?.full_name || 'Unknown',
       vehicle_number: vehicle?.vehicle_number || null,
-      vehicle_capacity: null, // Not used for taxi drivers
+      vehicle_capacity: null,
+      vehicle_type: vehicle?.vehicle_type || 'taxi',
       department_id: d.department_id,
     }
   })
@@ -793,6 +795,7 @@ export async function getDriverLocations(
       driver_name: info.driver_name || 'Unknown',
       vehicle_number: info.vehicle_number,
       vehicle_capacity: info.vehicle_capacity,
+      vehicle_type: info.vehicle_type,
       department_id: info.department_id,
       active_ride_id: activeRide?.id || null,
       active_ride_status: activeRide?.status || null,

@@ -42,6 +42,7 @@ interface VehicleType {
   make_model: string | null
   color: string | null
   capacity: number
+  vehicle_type: "taxi" | "bus"
   base_fare: number
   per_km_rate: number
   per_min_rate: number
@@ -121,6 +122,7 @@ export default function VehiclesPage() {
     make_model: "",
     color: "",
     capacity: 4,
+    vehicle_type: "taxi" as "taxi" | "bus",
     is_active: true,
     features: "",
     department_id: ""
@@ -185,6 +187,7 @@ export default function VehiclesPage() {
       make_model: "",
       color: "",
       capacity: 4,
+      vehicle_type: "taxi",
       is_active: true,
       features: "",
       department_id: ""
@@ -203,6 +206,7 @@ export default function VehiclesPage() {
       make_model: vehicle.make_model || "",
       color: vehicle.color || "",
       capacity: vehicle.capacity,
+      vehicle_type: vehicle.vehicle_type || "taxi",
       is_active: vehicle.is_active,
       features: (vehicle.features || []).join(", "),
       department_id: vehicle.department_id || ""
@@ -231,6 +235,7 @@ export default function VehiclesPage() {
       make_model: formData.make_model || null,
       color: formData.color || null,
       capacity: formData.capacity,
+      vehicle_type: formData.vehicle_type,
       is_active: formData.is_active,
       features: formData.features.split(",").map(f => f.trim()).filter(Boolean),
       sort_order: selectedVehicle?.sort_order || vehicles.length + 1,
@@ -705,6 +710,18 @@ export default function VehiclesPage() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Vehicle Type</label>
+                <Select value={formData.vehicle_type} onValueChange={(v: "taxi" | "bus") => setFormData({ ...formData, vehicle_type: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="taxi">Taxi (receives ride requests)</SelectItem>
+                    <SelectItem value="bus">Bus (roster assignments only)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Features (comma separated)</label>
                 <Input

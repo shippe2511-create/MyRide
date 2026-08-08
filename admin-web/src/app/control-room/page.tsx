@@ -1376,11 +1376,11 @@ export default function ControlRoomPage() {
 
       {/* Floating indicators - only show on larger screens and NOT in edit mode */}
       {!editMode && (
-      <div className="hidden lg:block">
+      <div className="hidden lg:flex flex-1 min-h-0 gap-2" ref={containerRef}>
         {/* Left Column - Live Trips Table with Timeline */}
         <div
-          className="flex flex-col min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden"
-          style={{ width: isLargeScreen ? `${leftPanelWidth}%` : '100%' }}
+          className="flex flex-col min-h-0 overflow-hidden"
+          style={{ width: `${leftPanelWidth}%` }}
         >
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-semibold flex items-center gap-2">

@@ -664,9 +664,9 @@ export function ShiftsTable() {
   const downloadTemplate = () => {
     const headers = ["Driver Name", "Shift Date", "Start Time", "End Time", "Shift Type"]
     const exampleRows = [
-      ["Hussain Moosa", "2026-07-28", "08:00", "16:00", "full_day"],
-      ["Mujuthaba Nizar", "2026-07-28", "08:00", "12:00", "morning"],
-      ["Mohamed Fazeem", "2026-07-29", "12:00", "18:00", "afternoon"],
+      ["Hussain Moosa", "2026-07-28", "08:00", "16:00", "Full Day"],
+      ["Mujuthaba Nizar", "2026-07-28", "08:00", "12:00", "Morning"],
+      ["Mohamed Fazeem", "2026-07-29", "12:00", "18:00", "Afternoon"],
     ]
 
     const csv = [headers, ...exampleRows].map(row => row.join(",")).join("\n")
@@ -722,13 +722,17 @@ export function ShiftsTable() {
               driverName.toLowerCase().includes(profile?.full_name?.toLowerCase() || "xxx")
           })
 
+          // Convert readable shift type to snake_case
+          let shiftType = typeIdx !== -1 ? (values[typeIdx] || "full_day") : "full_day"
+          shiftType = shiftType.toLowerCase().replace(/\s+/g, "_")
+
           parsed.push({
             driver_name: driverName,
             driver_id: matchedDriver?.id || null,
             shift_date: shiftDate,
             start_time: startIdx !== -1 ? (values[startIdx] || "08:00") : "08:00",
             end_time: endIdx !== -1 ? (values[endIdx] || "16:00") : "16:00",
-            shift_type: typeIdx !== -1 ? (values[typeIdx] || "full_day") : "full_day",
+            shift_type: shiftType,
           })
         }
 

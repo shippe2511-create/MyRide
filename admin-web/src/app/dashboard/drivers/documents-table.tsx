@@ -66,6 +66,7 @@ interface Document {
   driver?: {
     id: string
     profile_id: string
+    department_id: string | null
     profile?: {
       full_name: string
       avatar_url: string | null
@@ -99,10 +100,14 @@ export function DocumentsTable() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [bulkLoading, setBulkLoading] = useState(false)
   const [driverFilter, setDriverFilter] = useState("all")
+  const [departmentFilter, setDepartmentFilter] = useState("all")
+  const [departments, setDepartments] = useState<{id: string, name: string}[]>([])
+  const [driverSearch, setDriverSearch] = useState("")
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   useEffect(() => {
     loadDocuments(true)
     loadCurrentUser()
+    loadDepartments()
 
     const channel = supabase
       .channel('documents-realtime')
@@ -130,6 +135,16 @@ export function DocumentsTable() {
     }
   }
 
+  const loadDepartments = async () => {
+    const { data } = await supabase
+      .from("departments")
+      .select("id, name")
+      .order("name")
+    if (data) {
+      setDepartments(data)
+    }
+  }
+
   const loadDocuments = async (showLoading = true) => {
     if (showLoading) setLoading(true)
     const { data, error } = await supabase
@@ -139,6 +154,7 @@ export function DocumentsTable() {
         driver:drivers!inner(
           id,
           profile_id,
+          department_id,
           profile:profiles(
             full_name,
             avatar_url,
@@ -195,7 +211,8 @@ export function DocumentsTable() {
 
     const matchesType = typeFilter === "all" || doc.document_type === typeFilter
     const matchesDriver = driverFilter === "all" || doc.driver_id === driverFilter
-    return matchesSearch && matchesStatus && matchesType && matchesDriver
+    const matchesDepartment = departmentFilter === "all" || doc.driver?.department_id === departmentFilter
+    return matchesSearch && matchesStatus && matchesType && matchesDriver && matchesDepartment
   })
 
   const handleApprove = async (doc: Document) => {
@@ -422,15 +439,37 @@ export function DocumentsTable() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={driverFilter} onValueChange={setDriverFilter}>
+          <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map(dept => (
+                <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={driverFilter} onValueChange={(v) => { setDriverFilter(v); setDriverSearch(""); }}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Driver" />
             </SelectTrigger>
             <SelectContent>
+              <div className="p-2 sticky top-0 bg-popover">
+                <Input
+                  placeholder="Search driver..."
+                  value={driverSearch}
+                  onChange={(e) => setDriverSearch(e.target.value)}
+                  className="h-8"
+                  onKeyDown={(e) => e.stopPropagation()}
+                />
+              </div>
               <SelectItem value="all">All Drivers</SelectItem>
-              {uniqueDrivers.map(driver => (
-                <SelectItem key={driver.id} value={driver.id}>{driver.name}</SelectItem>
-              ))}
+              {uniqueDrivers
+                .filter(driver => driverSearch === "" || driver.name.toLowerCase().includes(driverSearch.toLowerCase()))
+                .map(driver => (
+                  <SelectItem key={driver.id} value={driver.id}>{driver.name}</SelectItem>
+                ))}
             </SelectContent>
           </Select>
         </div>

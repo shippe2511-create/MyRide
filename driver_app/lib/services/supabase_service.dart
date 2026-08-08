@@ -623,14 +623,15 @@ class SupabaseService {
     // Update drivers table
     await updateDriverStatus(driverId: driverId, isOnline: isOnline);
 
-    // Update live tracking table
+    // Update driver_locations table (use update, not upsert, to avoid lat/lng requirement)
     try {
       await client.from('driver_locations')
-          .upsert({
-            'driver_id': driverId,
+          .update({
             'is_online': isOnline,
             'last_updated': DateTime.now().toIso8601String(),
-          }, onConflict: 'driver_id');
+          })
+          .eq('driver_id', driverId);
+      debugPrint('driver_locations.is_online set to $isOnline');
     } catch (e) {
       debugPrint('Error updating driver_locations: $e');
     }

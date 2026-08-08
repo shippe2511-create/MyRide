@@ -20,6 +20,9 @@ interface TripMarker {
   sublabel?: string
   isAlert?: boolean
   heading?: number
+  passengersOnBoard?: number
+  vehicleCapacity?: number
+  isFull?: boolean
 }
 
 interface GeofenceAlert {
@@ -654,26 +657,77 @@ function TripMarkerComponent({
           />
         )}
 
-        {/* Marker body */}
-        <div
-          className={`
-            flex items-center gap-1 px-2 py-1 rounded-full
-            text-white text-[10px] font-medium whitespace-nowrap
-            shadow-lg border-2 transition-transform duration-300
-            ${trip.isAlert ? "animate-pulse" : ""}
-          `}
-          style={{
-            backgroundColor: color,
-            borderColor: isSelected || isFollowing ? "#fff" : "rgba(255,255,255,0.3)",
-          }}
-        >
-          {isTaxi ? (
-            <Car className="h-3 w-3" style={{ transform: trip.heading !== undefined ? `rotate(${trip.heading - 90}deg)` : undefined }} />
-          ) : (
-            <Bus className="h-3 w-3" style={{ transform: trip.heading !== undefined ? `rotate(${trip.heading - 90}deg)` : undefined }} />
-          )}
-          <span>{trip.label}</span>
-        </div>
+        {/* Vehicle icon */}
+        {isTaxi ? (
+          <div className="relative">
+            <img
+              src="/vehicle-icon.png"
+              alt="Vehicle"
+              className="h-10 w-10"
+              style={{
+                transform: trip.heading !== undefined ? `rotate(${trip.heading}deg)` : undefined,
+                filter: isSelected || isFollowing ? "drop-shadow(0 0 8px rgba(255,255,255,0.8))" : "drop-shadow(0 2px 4px rgba(0,0,0,0.5))",
+              }}
+            />
+            <div
+              className="absolute -bottom-5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded text-[10px] font-medium whitespace-nowrap"
+              style={{ backgroundColor: color }}
+            >
+              <span className="text-white">{trip.label}</span>
+            </div>
+          </div>
+        ) : (
+          (() => {
+            // Calculate bus color based on capacity
+            const capacityRatio = trip.vehicleCapacity && trip.vehicleCapacity > 0
+              ? (trip.passengersOnBoard || 0) / trip.vehicleCapacity
+              : 0
+            const busColor = trip.isFull
+              ? "#ef4444"  // red - full
+              : capacityRatio >= 0.8
+                ? "#f97316"  // orange - nearly full
+                : capacityRatio >= 0.5
+                  ? "#eab308"  // yellow - half full
+                  : "#22c55e"  // green - available
+
+            return (
+              <div className="relative">
+                <svg
+                  width="48"
+                  height="48"
+                  viewBox="0 0 48 48"
+                  fill="none"
+                  style={{
+                    filter: isSelected || isFollowing ? "drop-shadow(0 0 8px rgba(255,255,255,0.5))" : "drop-shadow(0 2px 4px rgba(0,0,0,0.3))",
+                  }}
+                >
+                  <rect x="12" y="16" width="24" height="20" rx="4" fill={busColor} />
+                  <rect x="14" y="18" width="8" height="6" rx="1" fill="white" fillOpacity="0.9" />
+                  <rect x="26" y="18" width="8" height="6" rx="1" fill="white" fillOpacity="0.9" />
+                  <circle cx="18" cy="36" r="3" fill="#1f2937" />
+                  <circle cx="30" cy="36" r="3" fill="#1f2937" />
+                  <rect x="14" y="12" width="20" height="6" rx="2" fill={busColor} />
+                  <rect x="18" y="13" width="12" height="4" rx="1" fill="white" fillOpacity="0.7" />
+                </svg>
+                {/* Passenger count badge */}
+                {trip.passengersOnBoard !== undefined && (
+                  <div
+                    className="absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-white"
+                    style={{ backgroundColor: busColor }}
+                  >
+                    {trip.passengersOnBoard}
+                  </div>
+                )}
+                <div
+                  className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded text-[10px] font-medium whitespace-nowrap"
+                  style={{ backgroundColor: busColor }}
+                >
+                  <span className="text-white">{trip.label}</span>
+                </div>
+              </div>
+            )
+          })()
+        )}
 
         {/* Following badge */}
         {isFollowing && (

@@ -129,6 +129,7 @@ export interface DriverLocation {
   last_updated: string
   driver_name?: string
   vehicle_number?: string
+  vehicle_capacity?: number | null
   active_ride_id?: string | null
   active_ride_status?: string | null
 }
@@ -143,6 +144,9 @@ export interface MapMarker {
   label: string
   sublabel?: string
   isAlert?: boolean
+  passengersOnBoard?: number
+  vehicleCapacity?: number
+  isFull?: boolean
 }
 
 export interface PickupMarker {
@@ -695,7 +699,7 @@ export async function getDriverLocations(
       driver:drivers!driver_locations_driver_id_fkey(
         id, department_id,
         profile:profiles(full_name),
-        vehicle:vehicles(vehicle_number)
+        vehicle:vehicle_types(display_name, capacity)
       )
     `)
     .eq('is_online', true)
@@ -732,7 +736,8 @@ export async function getDriverLocations(
       is_online: row.is_online,
       last_updated: row.last_updated,
       driver_name: profile?.full_name || 'Unknown',
-      vehicle_number: vehicle?.vehicle_number || null,
+      vehicle_number: vehicle?.display_name || null,
+      vehicle_capacity: vehicle?.capacity || null,
       department_id: driver?.department_id || null,
       active_ride_id: activeRide?.id || null,
       active_ride_status: activeRide?.status || null,

@@ -969,35 +969,18 @@ class _MyBusScheduleScreenState extends State<MyBusScheduleScreen> with SingleTi
                     _formatTime(assignment['departure_time']),
                     style: TextStyle(color: context.textColor, fontSize: 13, fontWeight: FontWeight.w600),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 12),
                   // Vehicle
                   if (vehicle != null) ...[
                     Icon(Icons.directions_bus_rounded, size: 14, color: context.mutedColor),
                     const SizedBox(width: 6),
-                    Text(
-                      vehicle['vehicle_number'] ?? '',
-                      style: TextStyle(color: context.textColor, fontSize: 13, fontWeight: FontWeight.w600),
-                    ),
-                    if (vehicle['capacity'] != null) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: context.cardColor,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.people_rounded, size: 12, color: context.mutedColor),
-                            const SizedBox(width: 3),
-                            Text(
-                              '${vehicle['capacity']}',
-                              style: TextStyle(color: context.textColor, fontSize: 11, fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                        ),
+                    Flexible(
+                      child: Text(
+                        vehicle['vehicle_number'] ?? '',
+                        style: TextStyle(color: context.textColor, fontSize: 13, fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
+                    ),
                   ],
                 ],
               ),

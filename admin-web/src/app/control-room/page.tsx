@@ -652,24 +652,38 @@ export default function ControlRoomPage() {
     setTripDetailOpen(true)
   }
 
-  // Build map markers from driver locations
-  const mapMarkers: MapMarker[] = driverLocations.map(loc => ({
-    id: loc.driver_id,
-    type: 'taxi' as const,
-    lat: loc.lat,
-    lng: loc.lng,
-    status: loc.active_ride_status || 'available',
-    label: loc.driver_name?.split(' ')[0] || 'Driver',
-    sublabel: loc.vehicle_number || undefined,
-    isAlert: false,
-  }))
+  // Build map markers from driver locations (vehicles only, capacity <= 10)
+  const mapMarkers: MapMarker[] = driverLocations
+    .filter(loc => !loc.vehicle_capacity || loc.vehicle_capacity <= 10)
+    .map(loc => ({
+      id: loc.driver_id,
+      type: 'taxi' as const,
+      lat: loc.lat,
+      lng: loc.lng,
+      status: loc.active_ride_status || 'available',
+      label: loc.driver_name?.split(' ')[0] || 'Driver',
+      sublabel: loc.vehicle_number || undefined,
+      isAlert: false,
+    }))
 
-  // Add shuttle markers from bus_location_tracking (they have lat/lng)
+  // Add shuttle markers from bus_location_tracking (they have real-time passenger data)
   activeShuttles.forEach(shuttle => {
-    // bus_location_tracking has latitude/longitude directly
-    const lat = typeof shuttle.route === 'object' ? 0 : 0 // Placeholder, we need actual coords
-    const lng = 0
-    // Skip shuttles without valid coordinates for now
+    if (shuttle.latitude && shuttle.longitude) {
+      mapMarkers.push({
+        id: shuttle.id,
+        type: 'shuttle' as const,
+        lat: shuttle.latitude,
+        lng: shuttle.longitude,
+        heading: shuttle.bearing || undefined,
+        status: shuttle.status || 'active',
+        label: shuttle.driver_name?.split(' ')[0] || shuttle.vehicle_number || 'Bus',
+        sublabel: shuttle.vehicle_number || undefined,
+        isAlert: shuttle.is_full || false,
+        passengersOnBoard: shuttle.passengers_on_board,
+        vehicleCapacity: shuttle.vehicle_capacity,
+        isFull: shuttle.is_full,
+      })
+    }
   })
 
   // Cancel trip action

@@ -356,7 +356,7 @@ export async function getRecentlyCompletedTrips(
 }
 
 /**
- * Service zone with keywords for matching
+ * Saved location for zone matching
  */
 export interface ServiceZone {
   name: string
@@ -365,26 +365,27 @@ export interface ServiceZone {
 }
 
 /**
- * Get active service zones with keywords for zone matching
+ * Get active saved locations for zone matching (uses locations table)
  */
 export async function getServiceZones(
   supabase: SupabaseClient
 ): Promise<ServiceZone[]> {
   const { data, error } = await supabase
-    .from('service_zones')
-    .select('name, keywords, priority')
+    .from('locations')
+    .select('name')
     .eq('is_active', true)
-    .order('priority')
+    .order('name')
 
   if (error) {
-    console.error('Error fetching service zones:', error)
+    console.error('Error fetching locations:', error)
     return []
   }
 
-  return (data || []).map(z => ({
-    name: z.name,
-    keywords: z.keywords || [],
-    priority: z.priority || 99
+  // Each location name is its own keyword (lowercase)
+  return (data || []).map((loc, i) => ({
+    name: loc.name,
+    keywords: [loc.name.toLowerCase()],
+    priority: i + 1
   }))
 }
 

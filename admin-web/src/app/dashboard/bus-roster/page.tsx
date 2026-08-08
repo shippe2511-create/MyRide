@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select"
 import { ComboboxInput } from "@/components/ui/combobox-input"
 import { toast } from "sonner"
-import { Loader2, Clock, Calendar, Users, Car, ChevronLeft, ChevronRight, Wand2, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
+import { Loader2, Clock, Calendar, Users, Car, ChevronLeft, ChevronRight, Wand2, Trash2, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, Bus, CheckCircle2 } from "lucide-react"
 import { PermissionGate } from "@/components/permission-gate"
 import { format, addDays, subDays, parse } from "date-fns"
 
@@ -76,9 +76,23 @@ interface RosterAssignment {
   departure_time: string
   service_date: string
   status: string
+  is_backup?: boolean
+  backup_for_trip_id?: string | null
   route?: TransportRoute
   driver?: Driver
   vehicle?: Vehicle
+}
+
+interface FullShuttle {
+  trip_id: string
+  vehicle_number: string
+  route_name: string
+  route_id: string
+  current_stop_name: string
+  passengers_on_board: number
+  vehicle_capacity: number
+  driver_name: string
+  has_backup: boolean
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -110,6 +124,12 @@ export default function BusRosterPage() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [driverShifts, setDriverShifts] = useState<DriverShift[]>([])
   const [showDriverPanel, setShowDriverPanel] = useState(true)
+  const [fullShuttles, setFullShuttles] = useState<FullShuttle[]>([])
+  const [showBackupDialog, setShowBackupDialog] = useState(false)
+  const [selectedFullShuttle, setSelectedFullShuttle] = useState<FullShuttle | null>(null)
+  const [backupDriverId, setBackupDriverId] = useState<string | null>(null)
+  const [backupVehicleId, setBackupVehicleId] = useState<string | null>(null)
+  const [assigningBackup, setAssigningBackup] = useState(false)
 
   const [generateForm, setGenerateForm] = useState({
     startDate: format(new Date(), "yyyy-MM-dd"),
@@ -124,7 +144,25 @@ export default function BusRosterPage() {
     setSelectedIds(new Set()) // Clear selection when date/type changes
     loadRoster()
     loadDriverShifts()
+    loadFullShuttles()
   }, [selectedDate, transportType])
+
+  // Realtime subscription for bus_location_tracking (full shuttles)
+  useEffect(() => {
+    const trackingChannel = supabase
+      .channel('bus_tracking_roster')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'bus_location_tracking' },
+        () => {
+          loadFullShuttles()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(trackingChannel)
+    }
+  }, [])
 
   // Realtime subscription for shifts attendance updates
   useEffect(() => {
@@ -172,6 +210,88 @@ export default function BusRosterPage() {
 
     if (data) {
       setDriverShifts(data as unknown as DriverShift[])
+    }
+  }
+
+  const loadFullShuttles = async () => {
+    // Get shuttles that are full (passengers = capacity) and in_progress
+    const { data: tracking } = await supabase
+      .from("bus_location_tracking")
+      .select(`
+        id, trip_id, vehicle_number, passengers_on_board, vehicle_capacity,
+        current_stop_name, status,
+        route:transport_routes(id, route_name),
+        driver:drivers(profile:profiles(full_name))
+      `)
+      .eq("status", "in_progress")
+
+    if (!tracking) {
+      setFullShuttles([])
+      return
+    }
+
+    // Filter to only full shuttles
+    const full = tracking.filter(t =>
+      t.vehicle_capacity > 0 && t.passengers_on_board >= t.vehicle_capacity
+    )
+
+    // Check which have backups assigned
+    const tripIds = full.map(f => f.trip_id)
+    const { data: backups } = tripIds.length > 0
+      ? await supabase
+          .from("roster_assignments")
+          .select("backup_for_trip_id")
+          .in("backup_for_trip_id", tripIds)
+      : { data: [] }
+
+    const tripsWithBackup = new Set((backups || []).map(b => b.backup_for_trip_id))
+
+    setFullShuttles(full.map(t => ({
+      trip_id: t.trip_id,
+      vehicle_number: t.vehicle_number,
+      route_name: (t.route as any)?.route_name || "Unknown",
+      route_id: (t.route as any)?.id || "",
+      current_stop_name: t.current_stop_name || "",
+      passengers_on_board: t.passengers_on_board,
+      vehicle_capacity: t.vehicle_capacity,
+      driver_name: (t.driver as any)?.profile?.full_name || "Unknown",
+      has_backup: tripsWithBackup.has(t.trip_id)
+    })))
+  }
+
+  const assignBackupBus = async () => {
+    if (!selectedFullShuttle || !backupDriverId || !backupVehicleId) {
+      toast.error("Please select driver and vehicle")
+      return
+    }
+
+    setAssigningBackup(true)
+
+    // Create a backup roster assignment
+    const { error } = await supabase
+      .from("roster_assignments")
+      .insert({
+        route_id: selectedFullShuttle.route_id,
+        driver_id: backupDriverId,
+        vehicle_id: backupVehicleId,
+        service_date: format(new Date(), "yyyy-MM-dd"),
+        departure_time: format(new Date(), "HH:mm:ss"),
+        status: "scheduled",
+        is_backup: true,
+        backup_for_trip_id: selectedFullShuttle.trip_id
+      })
+
+    setAssigningBackup(false)
+
+    if (error) {
+      toast.error("Failed to assign backup: " + error.message)
+    } else {
+      toast.success(`Backup bus assigned for ${selectedFullShuttle.vehicle_number}`)
+      setShowBackupDialog(false)
+      setSelectedFullShuttle(null)
+      setBackupDriverId(null)
+      setBackupVehicleId(null)
+      loadFullShuttles()
     }
   }
 
@@ -558,6 +678,54 @@ export default function BusRosterPage() {
             </Button>
           </div>
         </div>
+
+        {/* Full Shuttles Alert */}
+        {fullShuttles.filter(s => !s.has_backup).length > 0 && (
+          <Card className="border-red-500/50 bg-red-500/5">
+            <CardHeader className="py-3">
+              <CardTitle className="text-sm flex items-center gap-2 text-red-400">
+                <AlertTriangle className="h-4 w-4" />
+                Full Shuttles Need Backup ({fullShuttles.filter(s => !s.has_backup).length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="grid gap-2">
+                {fullShuttles.filter(s => !s.has_backup).map(shuttle => (
+                  <div
+                    key={shuttle.trip_id}
+                    className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-red-500/30"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Bus className="h-4 w-4 text-red-400" />
+                      <div>
+                        <div className="font-medium text-sm">{shuttle.vehicle_number}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {shuttle.route_name} • {shuttle.driver_name} • @ {shuttle.current_stop_name}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-red-500 text-white">
+                        {shuttle.passengers_on_board}/{shuttle.vehicle_capacity} FULL
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                        onClick={() => {
+                          setSelectedFullShuttle(shuttle)
+                          setShowBackupDialog(true)
+                        }}
+                      >
+                        Assign Backup
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Transport Type Filter */}
         <div className="flex gap-2">
@@ -1011,6 +1179,79 @@ export default function BusRosterPage() {
                   </>
                 ) : (
                   "Generate"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Assign Backup Dialog */}
+        <Dialog open={showBackupDialog} onOpenChange={setShowBackupDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Bus className="h-5 w-5 text-red-400" />
+                Assign Backup Bus
+              </DialogTitle>
+              <DialogDescription>
+                {selectedFullShuttle && (
+                  <>
+                    Assign a backup bus for <strong>{selectedFullShuttle.vehicle_number}</strong> on route{" "}
+                    <strong>{selectedFullShuttle.route_name}</strong>.
+                    Current stop: {selectedFullShuttle.current_stop_name}
+                  </>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Backup Driver</label>
+                <Select value={backupDriverId || ""} onValueChange={setBackupDriverId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select driver..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {drivers.map(driver => (
+                      <SelectItem key={driver.id} value={driver.id}>
+                        {driver.profile?.full_name || "Unknown"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Backup Vehicle</label>
+                <Select value={backupVehicleId || ""} onValueChange={setBackupVehicleId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select vehicle..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vehicles.map(vehicle => (
+                      <SelectItem key={vehicle.id} value={vehicle.id}>
+                        {vehicle.display_name} ({vehicle.plate_no}) - {vehicle.capacity} seats
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowBackupDialog(false)}>Cancel</Button>
+              <Button
+                onClick={assignBackupBus}
+                disabled={assigningBackup || !backupDriverId || !backupVehicleId}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {assigningBackup ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Assigning...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Assign Backup
+                  </>
                 )}
               </Button>
             </DialogFooter>

@@ -190,11 +190,20 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
   Future<void> _loadPreviousRunningHours() async {
     try {
       final driverState = context.read<DriverState>();
+
+      // Ensure vehicle info is loaded
+      if (driverState.vehicleNumber.isEmpty) {
+        await driverState.refreshVehicleInfo();
+      }
+
       final vehicleNumber = driverState.vehicleNumber;
       if (vehicleNumber.isEmpty) {
+        debugPrint('No vehicle number found for driver');
         setState(() => _loadingRunningHours = false);
         return;
       }
+
+      debugPrint('Loading running hours for vehicle: $vehicleNumber');
 
       // Get current running hours from vehicle
       final vehicleData = await SupabaseService.client
@@ -205,11 +214,13 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
 
       if (vehicleData != null && mounted) {
         final hours = vehicleData['current_running_hours'];
+        debugPrint('Previous running hours: $hours');
         setState(() {
           _previousRunningHours = hours != null ? (hours as num).toDouble() : 0;
           _loadingRunningHours = false;
         });
       } else {
+        debugPrint('No vehicle data found for plate: $vehicleNumber');
         setState(() => _loadingRunningHours = false);
       }
     } catch (e) {

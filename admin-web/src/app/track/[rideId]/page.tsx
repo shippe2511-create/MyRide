@@ -29,8 +29,22 @@ export default async function TrackingPage({ params }: PageProps) {
     return (
       <div className="h-screen bg-black flex flex-col items-center justify-center text-white p-4">
         <p className="text-red-400 text-xl">Ride not found</p>
-        <p className="text-zinc-500 text-sm mt-2">ID: {rideId}</p>
-        <p className="text-zinc-600 text-xs mt-1">{rideError?.message}</p>
+        <p className="text-zinc-500 text-sm mt-2">The ride may have been completed or cancelled.</p>
+      </div>
+    );
+  }
+
+  // Only allow tracking for active rides
+  const trackableStatuses = ['accepted', 'arriving', 'arrived', 'in_progress'];
+  if (!trackableStatuses.includes(rideData.status)) {
+    return (
+      <div className="h-screen bg-black flex flex-col items-center justify-center text-white p-4">
+        <p className="text-zinc-400 text-xl">Tracking not available</p>
+        <p className="text-zinc-500 text-sm mt-2">
+          {rideData.status === 'completed' ? 'This ride has been completed.' :
+           rideData.status === 'cancelled' ? 'This ride was cancelled.' :
+           'This ride is not currently active.'}
+        </p>
       </div>
     );
   }

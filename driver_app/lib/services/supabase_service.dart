@@ -272,10 +272,7 @@ class SupabaseService {
   }
 
   // Secure storage for session tokens
-  static const _secureStorage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
-  );
+  static const _secureStorage = FlutterSecureStorage();
 
   // Save session token to secure storage
   static Future<void> _saveSessionToken(String token) async {

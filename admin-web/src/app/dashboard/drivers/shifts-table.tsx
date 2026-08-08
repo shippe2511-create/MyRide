@@ -90,6 +90,8 @@ export function ShiftsTable() {
   const [datePickerOpen, setDatePickerOpen] = useState(false)
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear())
   const [selectedDriver, setSelectedDriver] = useState<string>("all")
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("d5772aaa-02f7-4b56-bc3c-96cd7aaacd7d") // Default to Transport
+  const [departments, setDepartments] = useState<{id: string, name: string}[]>([])
   const [selectedShifts, setSelectedShifts] = useState<string[]>([])
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [clearAllOpen, setClearAllOpen] = useState(false)
@@ -159,6 +161,7 @@ export function ShiftsTable() {
   const weekOffsetRef = useRef(weekOffset)
   const customStartDateRef = useRef(customStartDate)
   const customEndDateRef = useRef(customEndDate)
+  const selectedDepartmentRef = useRef(selectedDepartment)
   const supabaseRef = useRef(supabase)
 
   // Keep refs in sync
@@ -170,6 +173,24 @@ export function ShiftsTable() {
     customStartDateRef.current = customStartDate
     customEndDateRef.current = customEndDate
   }, [customStartDate, customEndDate])
+
+  useEffect(() => {
+    selectedDepartmentRef.current = selectedDepartment
+  }, [selectedDepartment])
+
+  // Load departments
+  useEffect(() => {
+    const loadDepartments = async () => {
+      const { data } = await supabase
+        .from("departments")
+        .select("id, name")
+        .order("name")
+      if (data) {
+        setDepartments(data)
+      }
+    }
+    loadDepartments()
+  }, [])
 
   // Stable load function using refs
   const loadData = useCallback(async (showLoading = true) => {
@@ -195,41 +216,46 @@ export function ShiftsTable() {
       endStr = formatDateInput(sunday)
     }
 
-    // Only show drivers from Transport department
-    const TRANSPORT_DEPT_ID = "d5772aaa-02f7-4b56-bc3c-96cd7aaacd7d"
+    // Filter by selected department
+    const deptId = selectedDepartmentRef.current
 
-    const [shiftsRes, driversRes] = await Promise.all([
-      supabaseRef.current
-        .from("shifts")
-        .select(`
-          *,
-          driver:drivers!inner(
-            id,
-            profile_id,
-            department_id,
-            profile:profiles(full_name, avatar_url, phone)
-          )
-        `)
-        .eq("driver.department_id", TRANSPORT_DEPT_ID)
-        .gte("shift_date", startStr)
-        .lte("shift_date", endStr)
-        .order("shift_date")
-        .order("start_time"),
-      supabaseRef.current
-        .from("drivers")
-        .select("id, profile_id, department_id, profile:profiles(full_name, avatar_url, phone)")
-        .eq("department_id", TRANSPORT_DEPT_ID)
-    ])
+    let shiftsQuery = supabaseRef.current
+      .from("shifts")
+      .select(`
+        *,
+        driver:drivers!inner(
+          id,
+          profile_id,
+          department_id,
+          profile:profiles(full_name, avatar_url, phone)
+        )
+      `)
+      .gte("shift_date", startStr)
+      .lte("shift_date", endStr)
+      .order("shift_date")
+      .order("start_time")
+
+    let driversQuery = supabaseRef.current
+      .from("drivers")
+      .select("id, profile_id, department_id, profile:profiles(full_name, avatar_url, phone)")
+
+    // Apply department filter if not "all"
+    if (deptId !== "all") {
+      shiftsQuery = shiftsQuery.eq("driver.department_id", deptId)
+      driversQuery = driversQuery.eq("department_id", deptId)
+    }
+
+    const [shiftsRes, driversRes] = await Promise.all([shiftsQuery, driversQuery])
 
     setShifts(shiftsRes.data || [])
     setDrivers(driversRes.data || [])
     if (showLoading) setLoading(false)
   }, []) // Empty deps - uses refs for all changing values
 
-  // Load data when week changes or custom date range changes - no loading spinner for navigation
+  // Load data when week changes, custom date range changes, or department changes
   useEffect(() => {
     loadData(false)
-  }, [weekOffset, customStartDate, customEndDate]) // Reload when date range changes
+  }, [weekOffset, customStartDate, customEndDate, selectedDepartment]) // Reload when filters change
 
   // Initial load with spinner - runs once
   const initialLoadDone = useRef(false)
@@ -1020,6 +1046,17 @@ export function ShiftsTable() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <Select value={selectedDepartment} onValueChange={(v) => { setSelectedDepartment(v); setSelectedDriver("all"); }}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="Department" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.map(dept => (
+                  <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <DriverFilterDropdown
               drivers={drivers}
               selectedDriver={selectedDriver}

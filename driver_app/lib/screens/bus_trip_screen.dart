@@ -538,15 +538,6 @@ class _BusTripScreenState extends State<BusTripScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              // Skip button
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, null),
-                child: Text(
-                  'Skip this stop',
-                  style: TextStyle(color: context.mutedColor, fontSize: 14),
-                ),
-              ),
             ],
           ),
         );

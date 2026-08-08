@@ -843,7 +843,7 @@ export function ShiftsTable() {
 
       <Card className="p-4">
         {/* Header with navigation and actions */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="flex items-center bg-muted/50 rounded-lg p-1">
               <Button variant="ghost" size="sm" className="h-8 px-3" onClick={() => {
@@ -1045,7 +1045,7 @@ export function ShiftsTable() {
               </Button>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Select value={selectedDepartment} onValueChange={(v) => { setSelectedDepartment(v); setSelectedDriver("all"); }}>
               <SelectTrigger className="w-44">
                 <SelectValue placeholder="Department" />
@@ -1063,32 +1063,34 @@ export function ShiftsTable() {
               onSelect={setSelectedDriver}
               getDriverProfile={getDriverProfile}
             />
-            {selectedShifts.length > 0 && (
-              <Button size="sm" variant="destructive" onClick={handleBulkDelete} disabled={bulkDeleting}>
-                {bulkDeleting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
-                Delete {selectedShifts.length}
+            <div className="flex items-center gap-2 ml-auto">
+              {selectedShifts.length > 0 && (
+                <Button size="sm" variant="destructive" onClick={handleBulkDelete} disabled={bulkDeleting}>
+                  {bulkDeleting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                  Delete {selectedShifts.length}
+                </Button>
+              )}
+              <Button size="sm" variant="outline" className="text-red-500 border-red-500/50 hover:bg-red-500/10" onClick={() => setClearAllOpen(true)}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Clear All
               </Button>
-            )}
-            <Button size="sm" variant="outline" className="text-red-500 border-red-500/50 hover:bg-red-500/10" onClick={() => setClearAllOpen(true)}>
-              <Trash2 className="h-4 w-4 mr-2" />
-              Clear All
-            </Button>
-            <Button size="sm" variant="outline" onClick={exportCSV}>
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setImportDialogOpen(true)}>
-              <Upload className="h-4 w-4 mr-2" />
-              Import
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setAutoScheduleOpen(true)}>
-              <Wand2 className="h-4 w-4 mr-2" />
-              Auto Schedule
-            </Button>
-            <Button size="sm" onClick={() => setDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Shift
-            </Button>
+              <Button size="sm" variant="outline" onClick={exportCSV}>
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setImportDialogOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Import
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setAutoScheduleOpen(true)}>
+                <Wand2 className="h-4 w-4 mr-2" />
+                Auto Schedule
+              </Button>
+              <Button size="sm" onClick={() => setDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Shift
+              </Button>
+            </div>
           </div>
         </div>
 

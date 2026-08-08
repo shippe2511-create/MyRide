@@ -186,6 +186,9 @@ export default function ControlRoomPage() {
   const [alertsCollapsed, setAlertsCollapsed] = useState(false)
   const [ratingsCollapsed, setRatingsCollapsed] = useState(false)
 
+  // Dismissed capacity alerts (shuttle trip_ids that have been acknowledged)
+  const [dismissedCapacityAlerts, setDismissedCapacityAlerts] = useState<Set<string>>(new Set())
+
   // Grid layout state
   const [editMode, setEditMode] = useState(false)
   const [backupLayout, setBackupLayout] = useState<LayoutItem[] | null>(null)
@@ -610,6 +613,27 @@ export default function ControlRoomPage() {
 
   // Attention level
   const attentionLevel = metrics ? getAttentionLevel(metrics) : "calm"
+
+  // Shuttles near capacity that haven't been dismissed and don't have backup assigned
+  const shuttlesNearCapacityFiltered = activeShuttles.filter(s =>
+    s.vehicle_capacity > 0 &&
+    (s.passengers_on_board / s.vehicle_capacity) >= 0.8 &&
+    !s.has_backup_assigned &&
+    !dismissedCapacityAlerts.has(s.trip_id)
+  )
+
+  // Dismiss capacity alert for a shuttle
+  const dismissCapacityAlert = (tripId: string) => {
+    setDismissedCapacityAlerts(prev => new Set([...prev, tripId]))
+    toast.success("Alert dismissed")
+  }
+
+  // Dismiss all capacity alerts
+  const dismissAllCapacityAlerts = () => {
+    const tripIds = shuttlesNearCapacityFiltered.map(s => s.trip_id)
+    setDismissedCapacityAlerts(prev => new Set([...prev, ...tripIds]))
+    toast.success("All capacity alerts dismissed")
+  }
 
   // Sort and filter trips - include completed trips for 5 seconds before removing
   const sortedFilteredTrips = activeTrips
@@ -1770,7 +1794,7 @@ export default function ControlRoomPage() {
           )}
 
           {/* Attention Items Panel - Collapsible */}
-          {(metrics?.awaitingDriver ?? 0) > 0 || (metrics?.shuttlesNearCapacity ?? 0) > 0 || (metrics?.rosterGaps ?? 0) > 0 ? (
+          {(metrics?.awaitingDriver ?? 0) > 0 || shuttlesNearCapacityFiltered.length > 0 || (metrics?.rosterGaps ?? 0) > 0 ? (
             <Card data-section="attention-items" className="shrink-0 border-amber-500/50 bg-amber-500/5 overflow-hidden">
               <button
                 onClick={() => setAttentionCollapsed(!attentionCollapsed)}
@@ -1792,10 +1816,49 @@ export default function ControlRoomPage() {
                     </span>
                   </div>
                 )}
-                {metrics && metrics.shuttlesNearCapacity > 0 && (
-                  <div className="flex items-center justify-between p-2 rounded bg-muted/50">
-                    <span>Shuttles near capacity</span>
-                    <span className="text-amber-400 font-medium">{metrics.shuttlesNearCapacity}</span>
+                {shuttlesNearCapacityFiltered.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between p-2 rounded bg-muted/50">
+                      <span>Shuttles near capacity</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-400 font-medium">{shuttlesNearCapacityFiltered.length}</span>
+                        {shuttlesNearCapacityFiltered.length > 1 && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); dismissAllCapacityAlerts() }}
+                            className="text-xs text-muted-foreground hover:text-amber-400 transition-colors"
+                            title="Dismiss all"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="pl-2 space-y-0.5 max-h-[80px] overflow-y-auto">
+                      {shuttlesNearCapacityFiltered.map((shuttle) => (
+                        <div
+                          key={shuttle.trip_id}
+                          className="text-xs text-muted-foreground flex items-center justify-between py-0.5 px-2 rounded hover:bg-muted/30 group"
+                        >
+                          <span className="truncate">{shuttle.vehicle_number} ({Math.round((shuttle.passengers_on_board / shuttle.vehicle_capacity) * 100)}%)</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => window.location.href = '/dashboard/bus-roster'}
+                              className="text-xs text-blue-400 hover:underline"
+                              title="Assign backup"
+                            >
+                              Backup
+                            </button>
+                            <button
+                              onClick={() => dismissCapacityAlert(shuttle.trip_id)}
+                              className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-amber-400 transition-all"
+                              title="Dismiss"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
                 {rosterGaps.length > 0 && (
@@ -3006,29 +3069,38 @@ export default function ControlRoomPage() {
               </p>
             </div>
 
-            {/* Assign Backup Bus - Show when shuttles are full */}
-            {activeShuttles.filter(s => s.is_full && !s.has_backup_assigned).length > 0 && (
+            {/* Assign Backup Bus - Show when shuttles are full and not dismissed */}
+            {activeShuttles.filter(s => s.is_full && !s.has_backup_assigned && !dismissedCapacityAlerts.has(s.trip_id)).length > 0 && (
               <div className="border-t pt-4 space-y-2">
                 <label className="text-sm font-medium text-red-400 flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4" />
                   Full Shuttles Need Backup
                 </label>
-                {activeShuttles.filter(s => s.is_full && !s.has_backup_assigned).map(shuttle => (
-                  <Button
-                    key={shuttle.id}
-                    variant="outline"
-                    className="w-full justify-start gap-2 border-red-500/50 bg-red-500/10 hover:bg-red-500/20 text-red-400"
-                    onClick={() => {
-                      // Navigate to Bus Roster page to assign backup
-                      window.location.href = '/dashboard/bus-roster'
-                    }}
-                  >
-                    <Bus className="h-4 w-4" />
-                    <span className="flex-1 text-left">
-                      Assign Backup for {shuttle.vehicle_number}
-                    </span>
-                    <span className="text-xs opacity-70">@ {shuttle.current_stop_name}</span>
-                  </Button>
+                {activeShuttles.filter(s => s.is_full && !s.has_backup_assigned && !dismissedCapacityAlerts.has(s.trip_id)).map(shuttle => (
+                  <div key={shuttle.id} className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 justify-start gap-2 border-red-500/50 bg-red-500/10 hover:bg-red-500/20 text-red-400"
+                      onClick={() => {
+                        window.location.href = '/dashboard/bus-roster'
+                      }}
+                    >
+                      <Bus className="h-4 w-4" />
+                      <span className="flex-1 text-left">
+                        Assign Backup for {shuttle.vehicle_number}
+                      </span>
+                      <span className="text-xs opacity-70">@ {shuttle.current_stop_name}</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-muted-foreground hover:text-amber-400"
+                      onClick={() => dismissCapacityAlert(shuttle.trip_id)}
+                      title="Dismiss alert"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
                 ))}
               </div>
             )}

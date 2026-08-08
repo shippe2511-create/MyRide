@@ -621,18 +621,31 @@ export function ShiftsTable() {
 
   // Export shifts to CSV
   const exportCSV = () => {
+    const formatPhone = (phone: string | null | undefined) => {
+      if (!phone) return ""
+      return phone.replace(/^\+?960/, "")
+    }
+    const formatShiftType = (type: string) => {
+      if (!type) return ""
+      return type.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+    }
+    const formatAttendance = (status: string) => {
+      if (!status) return "Pending"
+      return status.charAt(0).toUpperCase() + status.slice(1)
+    }
+
     const headers = ["Driver Name", "Phone", "Date", "Start Time", "End Time", "Shift Type", "Status", "Attendance"]
     const rows = shifts.map(shift => {
       const profile = getDriverProfile(shift.driver)
       return [
         profile?.full_name || "Unknown",
-        profile?.phone || "",
+        formatPhone(profile?.phone),
         shift.shift_date,
         shift.start_time?.substring(0, 5) || "",
         shift.end_time?.substring(0, 5) || "",
-        shift.shift_type || "",
-        shift.status || "",
-        shift.attendance_status || "pending"
+        formatShiftType(shift.shift_type || ""),
+        formatShiftType(shift.status || ""),
+        formatAttendance(shift.attendance_status || "pending")
       ]
     })
 

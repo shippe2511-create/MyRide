@@ -72,17 +72,13 @@ function LoginContent() {
           .eq("id", data.user.id)
           .single()
 
-        console.log("Profile by ID:", profile, "Error:", profileError)
-
         if (!profile) {
           // Try to find by email instead
-          const { data: profileByEmail, error: emailError } = await supabase
+          const { data: profileByEmail } = await supabase
             .from("profiles")
             .select("id, role, status")
             .eq("email", data.user.email)
             .single()
-
-          console.log("Profile by email:", profileByEmail, "Error:", emailError)
 
           if (profileByEmail) {
             // Profile exists with different ID - use it as-is
@@ -98,10 +94,7 @@ function LoginContent() {
           return
         }
 
-        console.log("Final profile:", profile)
-
         if (!["super_admin", "admin", "manager", "supervisor", "operator", "support", "viewer"].includes(profile.role)) {
-          console.log("Role check failed. Role:", profile.role)
           toast.error("Access denied. Admin privileges required.")
           await supabase.auth.signOut()
           setLoading(false)

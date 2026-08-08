@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { Bell, Plus, Trash2, Send, Clock, Users, User, Calendar } from "lucide-react"
 import { format } from "date-fns"
+import { PermissionGate } from "@/components/permission-gate"
 
 interface Reminder {
   id: string
@@ -220,6 +221,7 @@ export default function RemindersPage() {
   const sentReminders = reminders.filter(r => r.is_sent)
 
   return (
+    <PermissionGate permission="settings:manage">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -457,5 +459,6 @@ export default function RemindersPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </PermissionGate>
   )
 }

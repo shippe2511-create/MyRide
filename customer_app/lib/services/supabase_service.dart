@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/image_utils.dart';
 
@@ -200,16 +201,20 @@ class SupabaseService {
     return 'customer_app_${DateTime.now().millisecondsSinceEpoch}';
   }
 
-  // Save session token to persistent storage
+  // Secure storage for session tokens
+  static const _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+  );
+
+  // Save session token to secure storage
   static Future<void> _saveSessionToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('session_token', token);
+    await _secureStorage.write(key: 'session_token', value: token);
   }
 
-  // Load session token from persistent storage
+  // Load session token from secure storage
   static Future<void> loadSessionToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    _sessionToken = prefs.getString('session_token');
+    _sessionToken = await _secureStorage.read(key: 'session_token');
     debugPrint('Session token loaded: ${_sessionToken != null}');
   }
 

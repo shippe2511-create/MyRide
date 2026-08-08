@@ -2456,14 +2456,16 @@ export default function ControlRoomPage() {
               const zones: Record<string, number> = {}
 
               todayZoneTrips.forEach(trip => {
-                // Extract zone from pickup name (first part before comma)
-                const zoneName = trip.pickup_name?.split(",")[0]?.trim() || "Other"
-                // Group similar zones
-                const zone = zoneName.includes("Terminal") ? zoneName :
-                            zoneName.includes("Airport") ? "Airport" :
-                            zoneName.includes("Hulhumale") ? "Hulhumalé" :
-                            zoneName.includes("Male") || zoneName.includes("Malé") ? "Malé" :
-                            "Other Zones"
+                const name = (trip.pickup_name || "").toLowerCase()
+                // Hulhule zones (airport island)
+                const zone =
+                  name.includes("atc") || name.includes("water supply") ? "ATC / Water Supply" :
+                  name.includes("domestic") ? "Domestic Terminal" :
+                  name.includes("trans maldivian") || name.includes("tma") || name.includes("seaplane") ? "TMA Seaplane" :
+                  name.includes("airport") ? "Airport" :
+                  name.includes("hulhumale") || name.includes("hulhumalé") ? "Hulhumalé" :
+                  name.includes("male") || name.includes("malé") ? "Malé" :
+                  "Other"
                 zones[zone] = (zones[zone] || 0) + 1
               })
 

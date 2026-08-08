@@ -450,21 +450,20 @@ export async function getActiveShuttles(
     })
   }
 
-  // Check for backup assignments for FULL shuttles
+  // Check for backup assignments for FULL shuttles - query roster_assignments directly
   const fullShuttleTripIds = shuttles.filter(s => s.is_full).map(s => s.trip_id)
   if (fullShuttleTripIds.length > 0) {
-    const { data: backupTrips } = await supabase
-      .from('bus_trips')
-      .select('roster_assignment:roster_assignments!bus_trips_roster_assignment_id_fkey(backup_for_trip_id)')
-      .in('status', ['scheduled', 'active', 'in_progress'])
+    const { data: backupAssignments } = await supabase
+      .from('roster_assignments')
+      .select('backup_for_trip_id')
+      .in('backup_for_trip_id', fullShuttleTripIds)
+      .eq('is_backup', true)
 
-    const tripsWithBackup = new Set<string>()
-    ;(backupTrips || []).forEach((bt: any) => {
-      const ra = Array.isArray(bt.roster_assignment) ? bt.roster_assignment[0] : bt.roster_assignment
-      if (ra?.backup_for_trip_id) {
-        tripsWithBackup.add(ra.backup_for_trip_id)
-      }
-    })
+    const tripsWithBackup = new Set<string>(
+      (backupAssignments || [])
+        .map(ra => ra.backup_for_trip_id)
+        .filter(Boolean) as string[]
+    )
 
     shuttles.forEach(s => {
       s.has_backup_assigned = tripsWithBackup.has(s.trip_id)

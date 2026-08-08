@@ -691,26 +691,38 @@ export async function getDriverLocations(
   supabase: SupabaseClient,
   departmentId?: string | null
 ): Promise<DriverLocation[]> {
-  // Get driver locations with driver info
-  // Filter by drivers.is_online (source of truth) not driver_locations.is_online
-  const { data, error } = await supabase
-    .from('driver_locations')
+  // Get online drivers directly from drivers table (source of truth)
+  const { data: onlineDrivers, error: driversError } = await supabase
+    .from('drivers')
     .select(`
-      driver_id, lat, lng, heading, is_online, last_updated,
-      driver:drivers!driver_locations_driver_id_fkey(
-        id, department_id, is_online,
-        profile:profiles(full_name),
-        vehicle:vehicle_types(display_name, capacity)
-      )
+      id, department_id, is_online,
+      profile:profiles(full_name),
+      vehicle:vehicle_types(display_name, capacity)
     `)
-    .order('last_updated', { ascending: false })
+    .eq('is_online', true)
 
-  if (error) {
-    console.error('Error fetching driver locations:', error)
+  if (driversError) {
+    console.error('Error fetching online drivers:', driversError)
     return []
   }
 
-  // Get active rides to link drivers to their current trip
+  if (!onlineDrivers || onlineDrivers.length === 0) {
+    return []
+  }
+
+  // Get locations for online drivers
+  const onlineDriverIds = onlineDrivers.map((d: any) => d.id)
+  const { data: locations, error: locError } = await supabase
+    .from('driver_locations')
+    .select('driver_id, lat, lng, heading, last_updated')
+    .in('driver_id', onlineDriverIds)
+
+  if (locError) {
+    console.error('Error fetching driver locations:', locError)
+    return []
+  }
+
+  // Get active rides
   const { data: activeRides } = await supabase
     .from('rides')
     .select('id, driver_id, status')
@@ -721,37 +733,45 @@ export async function getDriverLocations(
     if (r.driver_id) rideByDriver[r.driver_id] = { id: r.id, status: r.status }
   })
 
-  // Transform and filter by drivers.is_online (source of truth)
-  let locations = (data || [])
-    .map((row: any) => {
-      const driver = Array.isArray(row.driver) ? row.driver[0] : row.driver
-      const profile = driver?.profile ? (Array.isArray(driver.profile) ? driver.profile[0] : driver.profile) : null
-      const vehicle = driver?.vehicle ? (Array.isArray(driver.vehicle) ? driver.vehicle[0] : driver.vehicle) : null
-      const activeRide = rideByDriver[row.driver_id]
+  // Build driver info map
+  const driverInfo: Record<string, any> = {}
+  onlineDrivers.forEach((d: any) => {
+    const profile = Array.isArray(d.profile) ? d.profile[0] : d.profile
+    const vehicle = Array.isArray(d.vehicle) ? d.vehicle[0] : d.vehicle
+    driverInfo[d.id] = {
+      driver_name: profile?.full_name || 'Unknown',
+      vehicle_number: vehicle?.display_name || null,
+      vehicle_capacity: vehicle?.capacity || null,
+      department_id: d.department_id,
+    }
+  })
 
-      return {
-        driver_id: row.driver_id,
-        lat: parseFloat(row.lat),
-        lng: parseFloat(row.lng),
-        heading: row.heading ? parseFloat(row.heading) : null,
-        is_online: driver?.is_online ?? false, // Use drivers.is_online as source of truth
-        last_updated: row.last_updated,
-        driver_name: profile?.full_name || 'Unknown',
-        vehicle_number: vehicle?.display_name || null,
-        vehicle_capacity: vehicle?.capacity || null,
-        department_id: driver?.department_id || null,
-        active_ride_id: activeRide?.id || null,
-        active_ride_status: activeRide?.status || null,
-      }
-    })
-    .filter((loc: any) => loc.is_online) as (DriverLocation & { department_id?: string })[] // Only include online drivers
+  // Transform locations
+  let result = (locations || []).map((loc: any) => {
+    const info = driverInfo[loc.driver_id] || {}
+    const activeRide = rideByDriver[loc.driver_id]
+    return {
+      driver_id: loc.driver_id,
+      lat: parseFloat(loc.lat),
+      lng: parseFloat(loc.lng),
+      heading: loc.heading ? parseFloat(loc.heading) : null,
+      is_online: true,
+      last_updated: loc.last_updated,
+      driver_name: info.driver_name || 'Unknown',
+      vehicle_number: info.vehicle_number,
+      vehicle_capacity: info.vehicle_capacity,
+      department_id: info.department_id,
+      active_ride_id: activeRide?.id || null,
+      active_ride_status: activeRide?.status || null,
+    }
+  }) as (DriverLocation & { department_id?: string })[]
 
   // Filter by department if needed
   if (departmentId) {
-    locations = locations.filter(l => l.department_id === departmentId)
+    result = result.filter(l => l.department_id === departmentId)
   }
 
-  return locations
+  return result
 }
 
 /**

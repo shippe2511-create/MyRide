@@ -494,6 +494,7 @@ class AppState extends ChangeNotifier {
     final url = await SupabaseService.getProfileAvatarUrl(_profileId!);
     if (url != null && url.isNotEmpty) {
       _avatarUrl = url;
+      _avatarCacheKey = DateTime.now().millisecondsSinceEpoch; // Force cache refresh
       _saveAvatarUrl();
       notifyListeners();
     }
@@ -541,6 +542,10 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _profilePhotoPath = prefs.getString('profile_photo');
     _avatarUrl = prefs.getString('avatar_url');
+    // Initialize cache key on load to ensure fresh fetch
+    if (_avatarUrl != null) {
+      _avatarCacheKey = DateTime.now().millisecondsSinceEpoch;
+    }
     notifyListeners();
   }
 

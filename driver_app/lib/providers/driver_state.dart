@@ -300,6 +300,10 @@ class DriverState extends ChangeNotifier {
       _phoneNumber = prefs.getString('phoneNumber') ?? '';
       _profileImagePath = prefs.getString('profileImagePath') ?? '';
       _avatarUrl = prefs.getString('avatarUrl') ?? '';
+      // Initialize cache key on load to ensure fresh fetch
+      if (_avatarUrl.isNotEmpty) {
+        _avatarCacheKey = DateTime.now().millisecondsSinceEpoch;
+      }
 
       // Fetch latest avatar from DB if logged in
       if (_isLoggedIn && _driverId.isNotEmpty) {
@@ -392,6 +396,7 @@ class DriverState extends ChangeNotifier {
       final url = await SupabaseService.getDriverAvatarUrl(_driverId);
       if (url != null && url.isNotEmpty && url != _avatarUrl) {
         _avatarUrl = url;
+        _avatarCacheKey = DateTime.now().millisecondsSinceEpoch; // Force cache refresh
         final prefs = await SharedPreferences.getInstance();
         prefs.setString('avatarUrl', url);
         notifyListeners();

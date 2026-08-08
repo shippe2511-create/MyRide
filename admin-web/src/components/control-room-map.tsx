@@ -663,7 +663,7 @@ function TripMarkerComponent({
             <img
               src="/vehicle-icon.png"
               alt="Vehicle"
-              className="h-10 w-10"
+              className="h-8 w-8"
               style={{
                 transform: trip.heading !== undefined ? `rotate(${trip.heading}deg)` : undefined,
                 filter: isSelected || isFollowing ? "drop-shadow(0 0 8px rgba(255,255,255,0.8))" : "drop-shadow(0 2px 4px rgba(0,0,0,0.5))",
@@ -692,22 +692,45 @@ function TripMarkerComponent({
 
             return (
               <div className="relative">
+                {/* Compact realistic bus - same size as vehicle */}
                 <svg
-                  width="32"
+                  width="18"
                   height="32"
-                  viewBox="0 0 48 48"
+                  viewBox="0 0 18 32"
                   fill="none"
                   style={{
-                    filter: isSelected || isFollowing ? "drop-shadow(0 0 8px rgba(255,255,255,0.5))" : "drop-shadow(0 2px 4px rgba(0,0,0,0.3))",
+                    filter: isSelected || isFollowing ? "drop-shadow(0 0 4px rgba(255,255,255,0.6))" : "drop-shadow(0 1px 2px rgba(0,0,0,0.4))",
+                    transform: trip.heading !== undefined ? `rotate(${trip.heading}deg)` : undefined,
                   }}
                 >
-                  <rect x="12" y="16" width="24" height="20" rx="4" fill={busColor} />
-                  <rect x="14" y="18" width="8" height="6" rx="1" fill="white" fillOpacity="0.9" />
-                  <rect x="26" y="18" width="8" height="6" rx="1" fill="white" fillOpacity="0.9" />
-                  <circle cx="18" cy="36" r="3" fill="#1f2937" />
-                  <circle cx="30" cy="36" r="3" fill="#1f2937" />
-                  <rect x="14" y="12" width="20" height="6" rx="2" fill={busColor} />
-                  <rect x="18" y="13" width="12" height="4" rx="1" fill="white" fillOpacity="0.7" />
+                  {/* Main body */}
+                  <rect x="2" y="1" width="14" height="30" rx="2.5" fill={busColor} />
+
+                  {/* Front windshield */}
+                  <rect x="3" y="2" width="12" height="4" rx="1.5" fill="#c4e4f5" />
+
+                  {/* Windows left */}
+                  <rect x="2.5" y="8" width="3" height="3" rx="0.5" fill="#c4e4f5" />
+                  <rect x="2.5" y="13" width="3" height="3" rx="0.5" fill="#c4e4f5" />
+                  <rect x="2.5" y="18" width="3" height="3" rx="0.5" fill="#c4e4f5" />
+
+                  {/* Windows right */}
+                  <rect x="12.5" y="8" width="3" height="3" rx="0.5" fill="#c4e4f5" />
+                  <rect x="12.5" y="13" width="3" height="3" rx="0.5" fill="#c4e4f5" />
+                  <rect x="12.5" y="18" width="3" height="3" rx="0.5" fill="#c4e4f5" />
+
+                  {/* Wheels */}
+                  <rect x="1" y="6" width="2" height="4" rx="1" fill="#333" />
+                  <rect x="15" y="6" width="2" height="4" rx="1" fill="#333" />
+                  <rect x="1" y="22" width="2" height="4" rx="1" fill="#333" />
+                  <rect x="15" y="22" width="2" height="4" rx="1" fill="#333" />
+
+                  {/* Rear */}
+                  <rect x="4" y="26" width="10" height="3" rx="1" fill="#c4e4f5" fillOpacity="0.7" />
+
+                  {/* Tail lights */}
+                  <circle cx="5" cy="30" r="1" fill="#ef4444" />
+                  <circle cx="13" cy="30" r="1" fill="#ef4444" />
                 </svg>
                 <div
                   className="absolute -bottom-5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded text-[10px] font-medium whitespace-nowrap"

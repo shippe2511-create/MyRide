@@ -649,7 +649,7 @@ export function ShiftsTable() {
 
   // Download import template
   const downloadTemplate = () => {
-    const headers = ["driver_name", "shift_date", "start_time", "end_time", "shift_type"]
+    const headers = ["Driver Name", "Shift Date", "Start Time", "End Time", "Shift Type"]
     const exampleRows = [
       ["Hussain Moosa", "2026-07-28", "08:00", "16:00", "full_day"],
       ["Mujuthaba Nizar", "2026-07-28", "08:00", "12:00", "morning"],

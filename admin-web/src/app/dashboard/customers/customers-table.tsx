@@ -656,7 +656,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
   }
 
   const downloadTemplate = () => {
-    const headers = ["full_name", "email", "phone", "employee_id", "department", "gender"]
+    const headers = ["Full Name", "Email", "Phone", "Employee ID", "Department", "Gender"]
     const example = ["John Doe", "john@example.com", "+9601234567", "A-1234", "IT Division", "male"]
     const csv = [headers.join(","), example.join(",")].join("\n")
     const blob = new Blob([csv], { type: "text/csv" })
@@ -682,7 +682,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
           return
         }
 
-        const headers = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/"/g, ""))
+        const headers = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/"/g, "").replace(/\s+/g, "_"))
         const nameIdx = headers.findIndex(h => h === "full_name" || h === "name")
         const emailIdx = headers.findIndex(h => h === "email")
         const phoneIdx = headers.findIndex(h => h === "phone")
@@ -691,7 +691,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
         const genderIdx = headers.findIndex(h => h === "gender" || h === "sex")
 
         if (nameIdx === -1) {
-          setImportError("CSV must have a 'full_name' or 'name' column")
+          setImportError("CSV must have a 'Full Name' or 'Name' column")
           return
         }
 

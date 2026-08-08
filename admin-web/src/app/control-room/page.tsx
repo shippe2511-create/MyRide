@@ -1033,13 +1033,14 @@ export default function ControlRoomPage() {
 
             {/* Quick Actions */}
             <Button
-              variant="ghost"
-              size="icon"
+              variant="outline"
+              size="sm"
               onClick={() => setShowQuickActions(true)}
               title="Quick Actions"
-              className="text-amber-400 hover:text-amber-300"
+              className="bg-amber-500/20 border-amber-500/50 text-amber-400 hover:bg-amber-500/30 hover:text-amber-300 gap-1.5"
             >
               <Megaphone className="h-4 w-4" />
+              <span className="hidden sm:inline">Actions</span>
             </Button>
 
             {/* Leaderboard */}

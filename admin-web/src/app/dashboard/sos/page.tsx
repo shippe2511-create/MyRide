@@ -39,6 +39,12 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 
+interface UserEmergencyContact {
+  phone: string
+  relation: string
+  name?: string
+}
+
 interface SOSAlert {
   id: string
   user_id: string
@@ -49,7 +55,12 @@ interface SOSAlert {
   location_address: string | null
   notes: string | null
   created_at: string
-  user?: { full_name: string; phone: string | null; role: string | null }
+  user?: {
+    full_name: string
+    phone: string | null
+    role: string | null
+    emergency_contacts: UserEmergencyContact[] | null
+  }
 }
 
 const PAGE_SIZE = 15
@@ -221,7 +232,7 @@ export default function SOSPage() {
 
     let query = supabase
       .from("sos_alerts")
-      .select("*, user:profiles!sos_alerts_user_id_fkey(full_name, phone, role)", { count: "exact" })
+      .select("*, user:profiles!sos_alerts_user_id_fkey(full_name, phone, role, emergency_contacts)", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(start, end)
 
@@ -656,6 +667,7 @@ export default function SOSPage() {
                 />
               </TableHead>
               <TableHead>User</TableHead>
+              <TableHead>Emergency Contact</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Location</TableHead>
               <TableHead>Time</TableHead>
@@ -665,7 +677,7 @@ export default function SOSPage() {
           <TableBody>
             {filteredAlerts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   <Shield className="h-12 w-12 mx-auto mb-2 opacity-20" />
                   {search ? "No matching SOS alerts" : "No SOS alerts"}
                 </TableCell>
@@ -698,6 +710,26 @@ export default function SOSPage() {
                         <p className="text-xs text-muted-foreground">{alert.user?.phone || "-"}</p>
                       </div>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    {alert.user?.emergency_contacts && alert.user.emergency_contacts.length > 0 ? (
+                      <div className="space-y-1">
+                        {alert.user.emergency_contacts.slice(0, 2).map((ec, idx) => (
+                          <a
+                            key={idx}
+                            href={`tel:${ec.phone}`}
+                            className="flex items-center gap-1.5 text-sm hover:text-primary transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Phone className="h-3 w-3 text-orange-500" />
+                            <span className="text-muted-foreground">{ec.name || ec.relation}:</span>
+                            <span className="font-medium">{ec.phone}</span>
+                          </a>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Not set</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge className={STATUS_COLORS[alert.status] || "bg-gray-500"}>
@@ -856,6 +888,34 @@ export default function SOSPage() {
                   {selectedAlert.status}
                 </Badge>
               </div>
+
+              {/* User's Personal Emergency Contacts */}
+              {selectedAlert.user?.emergency_contacts && selectedAlert.user.emergency_contacts.length > 0 && (
+                <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                  <p className="text-sm font-semibold text-orange-600 dark:text-orange-400 mb-2 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    User&apos;s Emergency Contacts
+                  </p>
+                  <div className="space-y-2">
+                    {selectedAlert.user.emergency_contacts.map((ec, idx) => (
+                      <a
+                        key={idx}
+                        href={`tel:${ec.phone}`}
+                        className="flex items-center justify-between p-2 bg-background rounded border hover:border-orange-500 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-orange-500" />
+                          <div>
+                            <p className="font-medium text-sm">{ec.name || ec.relation}</p>
+                            <p className="text-xs text-muted-foreground capitalize">{ec.relation}</p>
+                          </div>
+                        </div>
+                        <span className="font-mono text-sm">{ec.phone}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {selectedAlert.latitude && selectedAlert.longitude && (
                 <Button

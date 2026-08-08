@@ -652,7 +652,7 @@ export default function ControlRoomPage() {
     setTripDetailOpen(true)
   }
 
-  // Build map markers from driver locations
+  // Build map markers from driver locations (taxis)
   const mapMarkers: MapMarker[] = driverLocations.map(loc => ({
     id: loc.driver_id,
     type: 'taxi' as const,
@@ -664,12 +664,21 @@ export default function ControlRoomPage() {
     isAlert: false,
   }))
 
-  // Add shuttle markers from bus_location_tracking (they have lat/lng)
+  // Add shuttle markers from bus_location_tracking
   activeShuttles.forEach(shuttle => {
-    // bus_location_tracking has latitude/longitude directly
-    const lat = typeof shuttle.route === 'object' ? 0 : 0 // Placeholder, we need actual coords
-    const lng = 0
-    // Skip shuttles without valid coordinates for now
+    if (shuttle.latitude && shuttle.longitude) {
+      mapMarkers.push({
+        id: shuttle.driver_id,
+        type: 'shuttle' as const,
+        lat: Number(shuttle.latitude),
+        lng: Number(shuttle.longitude),
+        heading: shuttle.bearing ? Number(shuttle.bearing) : undefined,
+        status: shuttle.status,
+        label: shuttle.vehicle_number || 'Bus',
+        sublabel: shuttle.route?.route_name || shuttle.current_stop_name || undefined,
+        isAlert: shuttle.is_full,
+      })
+    }
   })
 
   // Cancel trip action
@@ -1187,8 +1196,8 @@ export default function ControlRoomPage() {
         />
       </div>
 
-      {/* Main Content - Always use GridLayout, just toggle drag/resize */}
-        <div ref={gridContainerRef} className={`flex-1 min-h-0 overflow-auto ${editMode ? 'edit-mode-active' : ''}`}>
+      {/* Main Content - GridLayout only in edit mode or on smaller screens */}
+        <div ref={gridContainerRef} className={`flex-1 min-h-0 overflow-auto ${editMode ? 'edit-mode-active' : 'lg:hidden'}`}>
           <GridLayoutWrapper
             className="layout"
             layout={layout}

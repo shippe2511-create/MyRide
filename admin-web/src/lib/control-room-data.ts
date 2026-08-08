@@ -53,6 +53,9 @@ export interface ActiveShuttle {
   status: string
   vehicle_number: string
   last_updated_at: string
+  latitude: number | null
+  longitude: number | null
+  bearing: number | null
   // Joined data
   route?: { route_name: string; route_code: string }
   driver_name?: string
@@ -135,6 +138,7 @@ export interface MapMarker {
   type: 'taxi' | 'shuttle'
   lat: number
   lng: number
+  heading?: number
   status: string
   label: string
   sublabel?: string
@@ -397,6 +401,7 @@ export async function getActiveShuttles(
       id, trip_id, driver_id, vehicle_id, route_id,
       current_stop_name, current_stop_index, passengers_on_board,
       vehicle_capacity, is_full, status, vehicle_number, last_updated_at,
+      latitude, longitude, bearing,
       route:transport_routes(route_name, route_code),
       driver:drivers!bus_location_tracking_driver_id_fkey(
         profile:profiles(full_name)

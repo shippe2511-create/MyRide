@@ -21,6 +21,7 @@ import {
   getRecentlyCompletedTrips,
   getDispatchSuggestions,
   getTodayTripsForZones,
+  getServiceZones,
   computeMetrics,
   subscribeToControlRoomUpdates,
   unsubscribeFromControlRoom,
@@ -40,6 +41,7 @@ import {
   type ScheduledRide,
   type RecentRating,
   type DriverSuggestion,
+  type ServiceZone,
 } from "@/lib/control-room-data"
 const ControlRoomMap = dynamic(
   () => import("@/components/control-room-map").then(mod => mod.ControlRoomMap),
@@ -117,6 +119,7 @@ export default function ControlRoomPage() {
   const [recentRatings, setRecentRatings] = useState<RecentRating[]>([])
   const [recentlyCompleted, setRecentlyCompleted] = useState<ActiveTrip[]>([])
   const [todayZoneTrips, setTodayZoneTrips] = useState<{ pickup_name: string | null; status: string }[]>([])
+  const [serviceZones, setServiceZones] = useState<ServiceZone[]>([])
   const [departmentId, setDepartmentId] = useState<string | null>(null)
 
   // UI state
@@ -485,7 +488,7 @@ export default function ControlRoomPage() {
   // Load all data
   const loadData = useCallback(async () => {
     setIsUpdating(true)
-    const [trips, shuttles, fleetData, locations, todayStats, yesterdayStats, gaps, trends, sos, shifts, scheduled, ratings, completed, zoneTrips] = await Promise.all([
+    const [trips, shuttles, fleetData, locations, todayStats, yesterdayStats, gaps, trends, sos, shifts, scheduled, ratings, completed, zoneTrips, zones] = await Promise.all([
       getActiveTrips(supabase, departmentId),
       getActiveShuttles(supabase),
       getFleetStatus(supabase, departmentId),
@@ -500,6 +503,7 @@ export default function ControlRoomPage() {
       getRecentRatings(supabase),
       getRecentlyCompletedTrips(supabase, departmentId),
       getTodayTripsForZones(supabase, departmentId),
+      getServiceZones(supabase),
     ])
 
     setActiveTrips(trips)
@@ -514,6 +518,7 @@ export default function ControlRoomPage() {
     setRecentRatings(ratings)
     setRecentlyCompleted(completed)
     setTodayZoneTrips(zoneTrips)
+    setServiceZones(zones)
 
     const computedMetrics = computeMetrics(trips, shuttles, fleetData, todayStats, yesterdayStats, gaps)
     setMetrics(computedMetrics)
@@ -2457,16 +2462,15 @@ export default function ControlRoomPage() {
 
               todayZoneTrips.forEach(trip => {
                 const name = (trip.pickup_name || "").toLowerCase()
-                // Hulhule zones (airport island)
-                const zone =
-                  name.includes("atc") || name.includes("water supply") ? "ATC / Water Supply" :
-                  name.includes("domestic") ? "Domestic Terminal" :
-                  name.includes("trans maldivian") || name.includes("tma") || name.includes("seaplane") ? "TMA Seaplane" :
-                  name.includes("airport") ? "Airport" :
-                  name.includes("hulhumale") || name.includes("hulhumalé") ? "Hulhumalé" :
-                  name.includes("male") || name.includes("malé") ? "Malé" :
-                  "Other"
-                zones[zone] = (zones[zone] || 0) + 1
+                // Match against database zones (sorted by priority)
+                let matchedZone = "Other"
+                for (const sz of serviceZones) {
+                  if (sz.keywords?.some(kw => name.includes(kw.toLowerCase()))) {
+                    matchedZone = sz.name
+                    break
+                  }
+                }
+                zones[matchedZone] = (zones[matchedZone] || 0) + 1
               })
 
               const totalTrips = todayZoneTrips.length

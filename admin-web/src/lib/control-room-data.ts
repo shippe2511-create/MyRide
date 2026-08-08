@@ -356,6 +356,39 @@ export async function getRecentlyCompletedTrips(
 }
 
 /**
+ * Service zone with keywords for matching
+ */
+export interface ServiceZone {
+  name: string
+  keywords: string[]
+  priority: number
+}
+
+/**
+ * Get active service zones with keywords for zone matching
+ */
+export async function getServiceZones(
+  supabase: SupabaseClient
+): Promise<ServiceZone[]> {
+  const { data, error } = await supabase
+    .from('service_zones')
+    .select('name, keywords, priority')
+    .eq('is_active', true)
+    .order('priority')
+
+  if (error) {
+    console.error('Error fetching service zones:', error)
+    return []
+  }
+
+  return (data || []).map(z => ({
+    name: z.name,
+    keywords: z.keywords || [],
+    priority: z.priority || 99
+  }))
+}
+
+/**
  * Get today's trips for zone analysis (all trips from today with pickup locations)
  */
 export async function getTodayTripsForZones(

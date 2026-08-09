@@ -251,7 +251,7 @@ export async function getActiveTrips(
       driver:drivers!rides_driver_id_fkey(
         profile:profiles(full_name),
         vehicle_id,
-        vehicle:vehicles(vehicle_number, vehicle_model)
+        vehicle:vehicles!drivers_vehicle_id_fkey(vehicle_number, vehicle_model)
       )
     `)
     .in('status', ['pending', 'accepted', 'arrived', 'in_progress'])
@@ -315,7 +315,7 @@ export async function getRecentlyCompletedTrips(
       driver:drivers!rides_driver_id_fkey(
         profile:profiles(full_name),
         vehicle_id,
-        vehicle:vehicles(vehicle_number)
+        vehicle:vehicles!drivers_vehicle_id_fkey(vehicle_number)
       )
     `)
     .eq('status', 'completed')
@@ -523,7 +523,7 @@ export async function getFleetStatus(
       id, profile_id, is_online, is_on_break, break_type, break_start_time,
       vehicle_id, department_id,
       profile:profiles(full_name),
-      vehicle:vehicles(vehicle_number)
+      vehicle:vehicles!drivers_vehicle_id_fkey(vehicle_number)
     `)
 
   const { data: drivers, error } = await query
@@ -586,7 +586,7 @@ export async function getDispatchSuggestions(
     .select(`
       id, profile_id, is_online, is_on_break,
       profile:profiles(full_name, rating),
-      vehicle:vehicles(vehicle_number)
+      vehicle:vehicles!drivers_vehicle_id_fkey(vehicle_number)
     `)
     .eq('is_online', true)
     .eq('is_on_break', false)
@@ -1122,7 +1122,7 @@ export async function getDriverLocations(
     .select(`
       id, department_id, is_online,
       profile:profiles(full_name),
-      vehicle:vehicles(vehicle_number, vehicle_type)
+      vehicle:vehicles!drivers_vehicle_id_fkey(vehicle_number, vehicle_type)
     `)
     .eq('is_online', true)
 

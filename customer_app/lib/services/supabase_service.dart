@@ -576,7 +576,7 @@ class SupabaseService {
     if (id == null) return [];
     final response = await client
         .from('rides')
-        .select('*, driver:drivers(*, profile:profiles(*), vehicle:vehicle_types(*))')
+        .select('*, driver:drivers(*, profile:profiles(*), vehicle:vehicles!drivers_vehicle_id_fkey(*))')
         .eq('customer_id', id)
         .order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(response);
@@ -593,7 +593,7 @@ class SupabaseService {
             driver:drivers!rides_driver_id_fkey(
               id, rating, avatar_url,
               profile:profiles!drivers_profile_id_fkey(id, full_name, phone, avatar_url),
-              vehicle:vehicle_types!drivers_vehicle_id_fkey(id, display_name, plate_no, name)
+              vehicle:vehicles!drivers_vehicle_id_fkey(id, vehicle_number, vehicle_model)
             )
           ''')
           .eq('customer_id', customerId)
@@ -614,7 +614,7 @@ class SupabaseService {
     try {
       final response = await client
           .from('rides')
-          .select('*, driver:drivers(*, profile:profiles(*), vehicle:vehicle_types(*))')
+          .select('*, driver:drivers(*, profile:profiles(*), vehicle:vehicles!drivers_vehicle_id_fkey(*))')
           .eq('customer_id', id)
           .inFilter('status', ['pending', 'accepted', 'arrived', 'in_progress'])
           .order('created_at', ascending: false)
@@ -636,7 +636,7 @@ class SupabaseService {
             driver:drivers!rides_driver_id_fkey(
               *,
               profile:profiles!drivers_profile_id_fkey(id, full_name, phone, avatar_url),
-              vehicle:vehicle_types!drivers_vehicle_id_fkey(display_name, plate_no, name)
+              vehicle:vehicles!drivers_vehicle_id_fkey(vehicle_number, vehicle_model)
             )
           ''')
           .eq('id', rideId)
@@ -1142,7 +1142,7 @@ class SupabaseService {
       // Get drivers who are in pools the customer has access to
       final response = await client
           .from('drivers')
-          .select('*, profile:profiles(*), vehicle:vehicle_types(*), pools:driver_pools(pool)')
+          .select('*, profile:profiles(*), vehicle:vehicles!drivers_vehicle_id_fkey(*), pools:driver_pools(pool)')
           .eq('is_online', true)
           .eq('is_on_break', false);
 
@@ -1182,7 +1182,7 @@ class SupabaseService {
 
       final response = await client
           .from('drivers')
-          .select('*, profile:profiles(*), vehicle:vehicle_types(*), pools:driver_pools(pool)')
+          .select('*, profile:profiles(*), vehicle:vehicles!drivers_vehicle_id_fkey(*), pools:driver_pools(pool)')
           .eq('is_online', true)
           .eq('is_on_break', false);
 
@@ -1236,7 +1236,7 @@ class SupabaseService {
     try {
       final response = await client
           .from('drivers')
-          .select('*, profile:profiles(*), vehicle:vehicle_types(*)')
+          .select('*, profile:profiles(*), vehicle:vehicles!drivers_vehicle_id_fkey(*)')
           .eq('id', driverId)
           .single();
       return response;
@@ -1250,7 +1250,7 @@ class SupabaseService {
     try {
       final response = await client
           .from('drivers')
-          .select('*, profile:profiles(*), vehicle:vehicle_types(*)')
+          .select('*, profile:profiles(*), vehicle:vehicles!drivers_vehicle_id_fkey(*)')
           .eq('profile_id', profileId)
           .single();
       return response;
@@ -1724,13 +1724,15 @@ class SupabaseService {
   static Future<String?> getProfileAvatarUrl(String profileId) async {
     try {
       debugPrint('getProfileAvatarUrl: fetching for $profileId');
-      final response = await client
-          .from('profiles')
-          .select('avatar_url')
-          .eq('id', profileId)
-          .maybeSingle();
+      // Use secure RPC function - requires knowing profile_id, can't enumerate all profiles
+      final response = await client.rpc(
+        'get_profile_avatar',
+        params: {'p_profile_id': profileId},
+      );
       debugPrint('getProfileAvatarUrl: response=$response');
-      return response?['avatar_url'] as String?;
+      // RPC returns the string directly, not a map
+      if (response == null || response.toString().isEmpty) return null;
+      return response.toString();
     } catch (e) {
       debugPrint('getProfileAvatarUrl error: $e');
       return null;
@@ -1745,7 +1747,7 @@ class SupabaseService {
     try {
       final response = await client
           .from('rides')
-          .select('*, driver:drivers(*, profile:profiles(*), vehicle:vehicle_types(*))')
+          .select('*, driver:drivers(*, profile:profiles(*), vehicle:vehicles!drivers_vehicle_id_fkey(*))')
           .eq('customer_id', userId)
           .inFilter('status', ['completed', 'cancelled'])
           .order('created_at', ascending: false)

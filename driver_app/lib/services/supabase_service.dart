@@ -2598,7 +2598,7 @@ class SupabaseService {
             roster_assignment:roster_assignments!bus_trips_roster_assignment_id_fkey(
               *,
               route:transport_routes(id, route_name, route_code, direction),
-              vehicle:vehicles(id, vehicle_model, vehicle_number)
+              vehicle:vehicles!roster_assignments_vehicle_id_fkey(id, vehicle_model, vehicle_number)
             )
           ''')
           .eq('status', 'in_progress')

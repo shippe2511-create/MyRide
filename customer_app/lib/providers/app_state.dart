@@ -413,8 +413,8 @@ class AppState extends ChangeNotifier {
       loadTripHistory();
       loadSavedAddresses();
       loadUserStats();
-      // Fetch latest avatar URL from DB
-      _loadAvatarFromDb();
+      // Fetch latest avatar URL from DB - await to ensure it's loaded before UI renders
+      await _loadAvatarFromDb();
       // Subscribe to profile updates from admin
       _subscribeToProfileUpdates();
     }
@@ -490,12 +490,18 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _loadAvatarFromDb() async {
-    if (_profileId == null) return;
+    if (_profileId == null) {
+      debugPrint('_loadAvatarFromDb: profileId is null');
+      return;
+    }
+    debugPrint('_loadAvatarFromDb: fetching avatar for $_profileId');
     final url = await SupabaseService.getProfileAvatarUrl(_profileId!);
+    debugPrint('_loadAvatarFromDb: got url=$url');
     if (url != null && url.isNotEmpty) {
       _avatarUrl = url;
       _avatarCacheKey = DateTime.now().millisecondsSinceEpoch; // Force cache refresh
-      _saveAvatarUrl();
+      await _saveAvatarUrl();
+      debugPrint('_loadAvatarFromDb: saved avatarUrl=$_avatarUrl');
       notifyListeners();
     }
   }

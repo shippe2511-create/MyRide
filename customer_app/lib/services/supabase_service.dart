@@ -1723,13 +1723,16 @@ class SupabaseService {
 
   static Future<String?> getProfileAvatarUrl(String profileId) async {
     try {
+      debugPrint('getProfileAvatarUrl: fetching for $profileId');
       final response = await client
           .from('profiles')
           .select('avatar_url')
           .eq('id', profileId)
           .maybeSingle();
+      debugPrint('getProfileAvatarUrl: response=$response');
       return response?['avatar_url'] as String?;
     } catch (e) {
+      debugPrint('getProfileAvatarUrl error: $e');
       return null;
     }
   }

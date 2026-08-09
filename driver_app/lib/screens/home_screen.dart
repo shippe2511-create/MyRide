@@ -1095,10 +1095,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
               // Check if shift has ended with pending status (missed)
               final now = DateTime.now();
+              final startTimeStr = (_todayShift?['start_time']?.toString() ?? '00:00:00').substring(0, 5);
               final endTimeStr = (_todayShift?['end_time']?.toString() ?? '23:59:00').substring(0, 5);
+              final startTimeParts = startTimeStr.split(':');
               final endTimeParts = endTimeStr.split(':');
-              final shiftEndTime = DateTime(now.year, now.month, now.day,
-                  int.parse(endTimeParts[0]), int.parse(endTimeParts[1]));
+              final startHour = int.parse(startTimeParts[0]);
+              final endHour = int.parse(endTimeParts[0]);
+              final endMinute = int.parse(endTimeParts[1]);
+
+              // For overnight shifts (end_time < start_time), end is on NEXT day
+              final isOvernightShift = endHour < startHour;
+              DateTime shiftEndTime;
+              if (isOvernightShift) {
+                // End time is tomorrow
+                final tomorrow = now.add(const Duration(days: 1));
+                shiftEndTime = DateTime(tomorrow.year, tomorrow.month, tomorrow.day, endHour, endMinute);
+              } else {
+                shiftEndTime = DateTime(now.year, now.month, now.day, endHour, endMinute);
+              }
               final shiftEnded = _todayShift != null && now.isAfter(shiftEndTime);
               final isMissed = _todayShift != null &&
                   (_todayShift!['attendance_status'] as String? ?? 'pending') == 'pending' &&
@@ -1281,10 +1295,21 @@ class _HomeScreenState extends State<HomeScreen> {
     final absenceReason = _todayShift!['absence_reason'] as String?;
 
     // Check if shift has ended (current time > end_time)
+    // For overnight shifts (end_time < start_time), end is on NEXT day
     final now = DateTime.now();
+    final startTimeParts = startTime.split(':');
     final endTimeParts = endTime.split(':');
-    final shiftEndTime = DateTime(now.year, now.month, now.day,
-        int.parse(endTimeParts[0]), int.parse(endTimeParts[1]));
+    final startHour = int.parse(startTimeParts[0]);
+    final endHour = int.parse(endTimeParts[0]);
+    final endMinute = int.parse(endTimeParts[1]);
+    final isOvernightShift = endHour < startHour;
+    DateTime shiftEndTime;
+    if (isOvernightShift) {
+      final tomorrow = now.add(const Duration(days: 1));
+      shiftEndTime = DateTime(tomorrow.year, tomorrow.month, tomorrow.day, endHour, endMinute);
+    } else {
+      shiftEndTime = DateTime(now.year, now.month, now.day, endHour, endMinute);
+    }
     final shiftEnded = now.isAfter(shiftEndTime);
 
     // When PRESENT: show compact chip only

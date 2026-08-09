@@ -1091,7 +1091,7 @@ class DriverState extends ChangeNotifier {
         .onPostgresChanges(
           event: PostgresChangeEvent.update,
           schema: 'public',
-          table: 'vehicle_types',
+          table: 'vehicles',
           callback: (payload) async {
             debugPrint('Vehicle status update received: ${payload.newRecord}');
             // Check if this is our vehicle and if it was disabled

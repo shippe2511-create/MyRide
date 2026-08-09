@@ -436,7 +436,7 @@ class SupabaseService {
     try {
       final response = await client
           .from('drivers')
-          .select('*, profile:profiles(*), vehicle:vehicle_types(*)')
+          .select('*, profile:profiles(*)')
           .eq('profile_id', visibleUserId!)
           .single();
       return response;
@@ -477,14 +477,32 @@ class SupabaseService {
   /// Get driver's assigned vehicle info
   static Future<Map<String, dynamic>?> getDriverVehicle(String driverId) async {
     try {
+      // Get driver's vehicle_id first
       final driver = await client
           .from('drivers')
-          .select('vehicle:vehicle_types(id, plate_no, display_name, name, is_active)')
+          .select('vehicle_id')
           .eq('id', driverId)
           .maybeSingle();
 
-      if (driver == null) return null;
-      return driver['vehicle'] as Map<String, dynamic>?;
+      if (driver == null || driver['vehicle_id'] == null) return null;
+
+      // Then fetch vehicle from vehicles table
+      final vehicle = await client
+          .from('vehicles')
+          .select('id, vehicle_number, vehicle_model, status')
+          .eq('id', driver['vehicle_id'])
+          .maybeSingle();
+
+      if (vehicle == null) return null;
+
+      // Map to expected format
+      return {
+        'id': vehicle['id'],
+        'plate_no': vehicle['vehicle_number'],
+        'display_name': vehicle['vehicle_number'],
+        'name': vehicle['vehicle_model'],
+        'is_active': vehicle['status'] == 'active',
+      };
     } catch (e) {
       debugPrint('Error getting driver vehicle: $e');
       return null;
@@ -519,19 +537,26 @@ class SupabaseService {
   /// Returns false if: no vehicle assigned, vehicle is inactive, or driver not found
   static Future<bool> isDriverVehicleActive(String driverId) async {
     try {
+      // Get driver's vehicle_id first
       final driver = await client
           .from('drivers')
-          .select('vehicle_id, vehicle:vehicle_types(is_active)')
+          .select('vehicle_id')
           .eq('id', driverId)
           .maybeSingle();
 
       if (driver == null) return false;
       if (driver['vehicle_id'] == null) return false; // No vehicle assigned - block
 
-      final vehicle = driver['vehicle'] as Map<String, dynamic>?;
+      // Then check vehicle status from vehicles table
+      final vehicle = await client
+          .from('vehicles')
+          .select('status')
+          .eq('id', driver['vehicle_id'])
+          .maybeSingle();
+
       if (vehicle == null) return false;
 
-      return vehicle['is_active'] == true;
+      return vehicle['status'] == 'active';
     } catch (e) {
       debugPrint('Error checking vehicle status: $e');
       return false; // Block on error to be safe
@@ -1277,16 +1302,15 @@ class SupabaseService {
     final response = await client.from('vehicle_checklists').insert(data).select();
     debugPrint('Checklist saved: $response');
 
-    // Update vehicle's current running hours
+    // Update vehicle's mileage
     if (runningHours != null && vehicleNumber.isNotEmpty) {
       try {
-        await client.from('vehicle_types').update({
-          'current_running_hours': runningHours,
-          'last_running_hours_update': DateTime.now().toUtc().toIso8601String(),
-        }).eq('plate_no', vehicleNumber);
-        debugPrint('Vehicle running hours updated to $runningHours');
+        await client.from('vehicles').update({
+          'mileage': runningHours.toInt(),
+        }).eq('vehicle_number', vehicleNumber);
+        debugPrint('Vehicle mileage updated to $runningHours');
       } catch (e) {
-        debugPrint('Failed to update vehicle running hours: $e');
+        debugPrint('Failed to update vehicle mileage: $e');
       }
     }
   }
@@ -2287,33 +2311,17 @@ class SupabaseService {
         final vehicleId = map['vehicle_id'];
         if (vehicleId != null && vehicleId.toString().isNotEmpty) {
           try {
-            // Try vehicle_types table first (bus roster uses this)
+            // Fetch from vehicles table
             final vehicleData = await client
-                .from('vehicle_types')
-                .select('id, name, capacity')
+                .from('vehicles')
+                .select('id, vehicle_number, vehicle_model, capacity')
                 .eq('id', vehicleId)
                 .maybeSingle();
             if (vehicleData != null) {
-              // Parse name like "st26_c1290" or "st_34_c1305" to "ST26 (C1290)" or "ST34 (C1305)"
-              final name = vehicleData['name'] as String? ?? '';
-              String vehicleNumber = name.toUpperCase();
-
-              // Try to extract plate and code from various formats
-              final regex = RegExp(r'[Ss][Tt]_?(\d+)_[Cc](\d+)');
-              final match = regex.firstMatch(name);
-              if (match != null) {
-                vehicleNumber = 'ST${match.group(1)} (C${match.group(2)})';
-              } else if (name.contains('_')) {
-                // Fallback: split by underscore and format
-                final parts = name.split('_');
-                if (parts.length == 2) {
-                  vehicleNumber = '${parts[0].toUpperCase()} (${parts[1].toUpperCase()})';
-                }
-              }
-
               map['vehicle'] = {
                 'id': vehicleData['id'],
-                'vehicle_number': vehicleNumber,
+                'vehicle_number': vehicleData['vehicle_number'] ?? '',
+                'vehicle_model': vehicleData['vehicle_model'],
                 'capacity': vehicleData['capacity'],
               };
             }

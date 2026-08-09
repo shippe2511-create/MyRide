@@ -207,13 +207,13 @@ class _VehicleChecklistScreenState extends State<VehicleChecklistScreen>
 
       // Get current running hours from vehicle
       final vehicleData = await SupabaseService.client
-          .from('vehicle_types')
-          .select('current_running_hours')
-          .eq('plate_no', vehicleNumber)
+          .from('vehicles')
+          .select('mileage')
+          .eq('vehicle_number', vehicleNumber)
           .maybeSingle();
 
       if (vehicleData != null && mounted) {
-        final hours = vehicleData['current_running_hours'];
+        final hours = vehicleData['mileage'];
         debugPrint('Previous running hours: $hours');
         setState(() {
           _previousRunningHours = hours != null ? (hours as num).toDouble() : 0;

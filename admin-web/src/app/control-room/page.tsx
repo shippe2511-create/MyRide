@@ -23,6 +23,7 @@ import {
   getTodayTripsForZones,
   getServiceZones,
   getShiftTimeline,
+  getDriverHoursToday,
   computeMetrics,
   subscribeToControlRoomUpdates,
   unsubscribeFromControlRoom,
@@ -44,6 +45,7 @@ import {
   type DriverSuggestion,
   type ServiceZone,
   type ShiftTimelineEntry,
+  type DriverHoursEntry,
 } from "@/lib/control-room-data"
 const ControlRoomMap = dynamic(
   () => import("@/components/control-room-map").then(mod => mod.ControlRoomMap),
@@ -123,6 +125,7 @@ export default function ControlRoomPage() {
   const [todayZoneTrips, setTodayZoneTrips] = useState<{ pickup_name: string | null; status: string }[]>([])
   const [serviceZones, setServiceZones] = useState<ServiceZone[]>([])
   const [shiftTimeline, setShiftTimeline] = useState<ShiftTimelineEntry[]>([])
+  const [driverHours, setDriverHours] = useState<DriverHoursEntry[]>([])
   const [departmentId, setDepartmentId] = useState<string | null>(null)
 
   // UI state
@@ -190,6 +193,7 @@ export default function ControlRoomPage() {
   const [driverAvailCollapsed, setDriverAvailCollapsed] = useState(false)
   const [tripsByZoneCollapsed, setTripsByZoneCollapsed] = useState(false)
   const [shiftTimelineCollapsed, setShiftTimelineCollapsed] = useState(false)
+  const [driverHoursCollapsed, setDriverHoursCollapsed] = useState(false)
   const [alertsCollapsed, setAlertsCollapsed] = useState(false)
   const [ratingsCollapsed, setRatingsCollapsed] = useState(false)
 
@@ -492,7 +496,7 @@ export default function ControlRoomPage() {
   // Load all data
   const loadData = useCallback(async () => {
     setIsUpdating(true)
-    const [trips, shuttles, fleetData, locations, todayStats, yesterdayStats, gaps, trends, sos, shifts, scheduled, ratings, completed, zoneTrips, zones, timeline] = await Promise.all([
+    const [trips, shuttles, fleetData, locations, todayStats, yesterdayStats, gaps, trends, sos, shifts, scheduled, ratings, completed, zoneTrips, zones, timeline, hoursData] = await Promise.all([
       getActiveTrips(supabase, departmentId),
       getActiveShuttles(supabase),
       getFleetStatus(supabase, departmentId),
@@ -509,6 +513,7 @@ export default function ControlRoomPage() {
       getTodayTripsForZones(supabase, departmentId),
       getServiceZones(supabase),
       getShiftTimeline(supabase, departmentId),
+      getDriverHoursToday(supabase, departmentId),
     ])
 
     setActiveTrips(trips)
@@ -525,6 +530,7 @@ export default function ControlRoomPage() {
     setTodayZoneTrips(zoneTrips)
     setServiceZones(zones)
     setShiftTimeline(timeline)
+    setDriverHours(hoursData)
 
     const computedMetrics = computeMetrics(trips, shuttles, fleetData, todayStats, yesterdayStats, gaps)
     setMetrics(computedMetrics)
@@ -2658,6 +2664,64 @@ export default function ControlRoomPage() {
                           ({entry.minutes_from_now < 60
                             ? `${entry.minutes_from_now}m`
                             : `${Math.floor(entry.minutes_from_now / 60)}h ${entry.minutes_from_now % 60}m`})
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </Card>
+
+          {/* Driver Hours Monitor - Collapsible */}
+          <Card className="shrink-0 overflow-hidden">
+            <button
+              onClick={() => setDriverHoursCollapsed(!driverHoursCollapsed)}
+              className="w-full flex items-center justify-between p-2 hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <h2 className="text-xs font-semibold flex items-center gap-1.5">
+                  <Timer className="h-3 w-3 text-orange-400" />
+                  Driver Hours
+                </h2>
+                {driverHours.filter(d => d.is_approaching_limit).length > 0 && (
+                  <Badge variant="destructive" className="text-[9px]">
+                    {driverHours.filter(d => d.is_approaching_limit).length} &gt; 8h
+                  </Badge>
+                )}
+              </div>
+              {driverHoursCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            {!driverHoursCollapsed && (
+              <div className="px-2 pb-2 space-y-1 max-h-[120px] overflow-y-auto">
+                {driverHours.length === 0 ? (
+                  <div className="text-[10px] text-muted-foreground text-center py-2">
+                    No drivers on shift yet
+                  </div>
+                ) : (
+                  driverHours.map((entry, i) => (
+                    <div
+                      key={`${entry.driver_id}-${i}`}
+                      className={`flex items-center justify-between p-1.5 rounded text-[10px] ${
+                        entry.is_approaching_limit
+                          ? 'bg-red-500/10 border border-red-500/30'
+                          : 'bg-muted/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={`w-1.5 h-1.5 rounded-full ${
+                          entry.is_approaching_limit ? 'bg-red-500' : 'bg-green-500'
+                        }`} />
+                        <span className="font-medium truncate max-w-[80px]">{entry.driver_name}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-muted-foreground">
+                          {entry.trips_completed} trips
+                        </span>
+                        <span className={`font-mono font-bold ${
+                          entry.is_approaching_limit ? 'text-red-400' : 'text-green-400'
+                        }`}>
+                          {entry.hours_worked.toFixed(1)}h
                         </span>
                       </div>
                     </div>

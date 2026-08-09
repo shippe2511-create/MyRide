@@ -809,6 +809,105 @@ export async function getShiftTimeline(
 }
 
 /**
+ * Driver hours entry
+ */
+export interface DriverHoursEntry {
+  driver_id: string
+  driver_name: string
+  hours_worked: number
+  trips_completed: number
+  is_approaching_limit: boolean // > 8 hours
+}
+
+/**
+ * Get drivers with hours worked today - sorted by most hours
+ */
+export async function getDriverHoursToday(
+  supabase: SupabaseClient,
+  departmentId?: string | null
+): Promise<DriverHoursEntry[]> {
+  const today = new Date().toISOString().split('T')[0]
+  const now = new Date()
+  const currentHour = now.getHours()
+  const currentMinute = now.getMinutes()
+  const currentMinutes = currentHour * 60 + currentMinute
+
+  // Get today's shifts with attendance marked as present
+  let query = supabase
+    .from('shifts')
+    .select(`
+      driver_id, start_time, end_time, attendance_status,
+      driver:drivers(profile:profiles(full_name), department_id)
+    `)
+    .eq('shift_date', today)
+    .eq('attendance_status', 'present')
+
+  const { data: shifts, error } = await query
+  if (error || !shifts) return []
+
+  // Get completed trips count for each driver today
+  const driverIds = shifts.map((s: any) => s.driver_id).filter(Boolean)
+  if (driverIds.length === 0) return []
+
+  const startOfDay = new Date()
+  startOfDay.setHours(0, 0, 0, 0)
+
+  const { data: tripCounts } = await supabase
+    .from('rides')
+    .select('driver_id')
+    .in('driver_id', driverIds)
+    .eq('status', 'completed')
+    .gte('completed_at', startOfDay.toISOString())
+
+  const tripsPerDriver = new Map<string, number>()
+  tripCounts?.forEach((t: any) => {
+    tripsPerDriver.set(t.driver_id, (tripsPerDriver.get(t.driver_id) || 0) + 1)
+  })
+
+  const entries: DriverHoursEntry[] = []
+
+  shifts.forEach((shift: any) => {
+    const driver = Array.isArray(shift.driver) ? shift.driver[0] : shift.driver
+    const profile = driver?.profile
+    const driverName = Array.isArray(profile) ? profile[0]?.full_name : profile?.full_name
+
+    if (departmentId && driver?.department_id !== departmentId) return
+
+    if (!shift.start_time) return
+
+    const [startH, startM] = shift.start_time.split(':').map(Number)
+    const startMinutes = startH * 60 + startM
+
+    // Calculate hours worked (from shift start to now, or shift end if ended)
+    let endMinutes = currentMinutes
+    if (shift.end_time) {
+      const [endH, endM] = shift.end_time.split(':').map(Number)
+      const shiftEndMinutes = endH * 60 + endM
+      // If shift ended, cap at end time
+      if (shiftEndMinutes < currentMinutes) {
+        endMinutes = shiftEndMinutes
+      }
+    }
+
+    const minutesWorked = Math.max(0, endMinutes - startMinutes)
+    const hoursWorked = minutesWorked / 60
+
+    entries.push({
+      driver_id: shift.driver_id,
+      driver_name: driverName || 'Unknown',
+      hours_worked: hoursWorked,
+      trips_completed: tripsPerDriver.get(shift.driver_id) || 0,
+      is_approaching_limit: hoursWorked >= 8
+    })
+  })
+
+  // Sort by hours worked descending
+  entries.sort((a, b) => b.hours_worked - a.hours_worked)
+
+  return entries.slice(0, 10) // Top 10
+}
+
+/**
  * Get driver locations for map display
  */
 export async function getDriverLocations(

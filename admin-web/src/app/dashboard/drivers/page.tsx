@@ -39,10 +39,8 @@ function useDriversData(search?: string, status?: string, page: number = 1) {
           rating,
           updated_at,
           profiles!inner(id, full_name, email, phone, avatar_url, status, employee_id, role, gender),
-          vehicle:vehicles(id, vehicle_number, vehicle_model),
           department:departments(id, name)
         `, { count: "exact" })
-        .order("profiles(full_name)", { ascending: true })
 
       if (status) {
         query = query.eq("profiles.status", status)
@@ -57,15 +55,40 @@ function useDriversData(search?: string, status?: string, page: number = 1) {
         supabase.from("drivers").select("*, profiles!inner(*)", { count: "exact", head: true }).eq("profiles.status", "pending"),
       ])
 
+      // Log any errors
+      if (driversRes.error) {
+        console.error("Drivers query error:", driversRes.error)
+      }
+
+      // Fetch vehicles separately to avoid join issues
+      const vehicleIds = (driversRes.data || [])
+        .map((d: any) => d.vehicle_id)
+        .filter(Boolean)
+
+      let vehiclesMap: Record<string, { vehicle_number: string; vehicle_model: string | null }> = {}
+      if (vehicleIds.length > 0) {
+        const { data: vehicles } = await supabase
+          .from("vehicles")
+          .select("id, vehicle_number, vehicle_model")
+          .in("id", vehicleIds)
+
+        if (vehicles) {
+          vehiclesMap = Object.fromEntries(
+            vehicles.map(v => [v.id, { vehicle_number: v.vehicle_number, vehicle_model: v.vehicle_model }])
+          )
+        }
+      }
+
       // Transform driver records to match expected format
       let driversWithVehicles = (driversRes.data || []).map(driver => {
         const profile = driver.profiles as any
+        const vehicle = driver.vehicle_id ? vehiclesMap[driver.vehicle_id] : null
         return {
           ...profile,
           driver_record: {
             id: driver.id,
             vehicle_id: driver.vehicle_id,
-            vehicle: driver.vehicle,
+            vehicle: vehicle ? { id: driver.vehicle_id, vehicle_number: vehicle.vehicle_number, vehicle_model: vehicle.vehicle_model } : null,
             department_id: driver.department_id,
             department: driver.department,
             is_online: driver.is_online,

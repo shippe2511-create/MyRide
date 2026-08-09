@@ -39,7 +39,7 @@ function useDriversData(search?: string, status?: string, page: number = 1) {
           rating,
           updated_at,
           profiles!inner(id, full_name, email, phone, avatar_url, status, employee_id, role, gender),
-          vehicle:vehicle_types(id, display_name, plate_no),
+          vehicle:vehicles(id, vehicle_number, vehicle_model),
           department:departments(id, name)
         `, { count: "exact" })
         .order("profiles(full_name)", { ascending: true })
@@ -127,7 +127,7 @@ export default function DriversPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => {
         queryClient.invalidateQueries({ queryKey: ["drivers-page"], exact: false })
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_types' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicles' }, () => {
         queryClient.invalidateQueries({ queryKey: ["drivers-page"], exact: false })
       })
       .subscribe()

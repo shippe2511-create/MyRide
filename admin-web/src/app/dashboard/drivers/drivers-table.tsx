@@ -75,10 +75,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 
 interface Vehicle {
   id: string
-  name: string
-  display_name: string
-  plate_no: string | null
-  is_active: boolean
+  vehicle_number: string
+  vehicle_model: string | null
+  status: string
 }
 
 interface Department {
@@ -238,10 +237,10 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
 
   const loadVehicles = async () => {
     const { data, error } = await supabase
-      .from("vehicle_types")
-      .select("id, name, display_name, plate_no, is_active")
-      .eq("is_active", true)
-      .order("display_name")
+      .from("vehicles")
+      .select("id, vehicle_number, vehicle_model, status")
+      .eq("status", "active")
+      .order("vehicle_number")
     if (error) {
       console.error("Error loading vehicles:", error)
     }
@@ -578,7 +577,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
           driver_record: {
             ...d.driver_record,
             vehicle_id: vehicleId,
-            vehicle: selectedVehicle ? { id: selectedVehicle.id, display_name: selectedVehicle.display_name, plate_no: selectedVehicle.plate_no } : null,
+            vehicle: selectedVehicle ? { id: selectedVehicle.id, vehicle_number: selectedVehicle.vehicle_number, vehicle_model: selectedVehicle.vehicle_model } : null,
             department_id: deptId,
             department: selectedDept ? { id: selectedDept.id, name: selectedDept.name } : null
           }
@@ -1145,9 +1144,9 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                     {driver.driver_record?.vehicle ? (
                       <div className="flex items-center gap-2">
                         <Car className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">{driver.driver_record.vehicle.display_name || 'Vehicle'}</span>
-                        {driver.driver_record.vehicle.plate_no && (
-                          <span className="text-xs text-muted-foreground">({driver.driver_record.vehicle.plate_no})</span>
+                        <span className="text-sm font-medium">{driver.driver_record.vehicle.vehicle_number || 'Vehicle'}</span>
+                        {driver.driver_record.vehicle.vehicle_model && (
+                          <span className="text-xs text-muted-foreground">({driver.driver_record.vehicle.vehicle_model})</span>
                         )}
                       </div>
                     ) : (
@@ -1418,7 +1417,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                       const isAssigned = assignedVehicleIds.has(vehicle.id) && vehicle.id !== formData.vehicle_id
                       return {
                         value: vehicle.id,
-                        label: `${vehicle.display_name} ${vehicle.plate_no ? `(${vehicle.plate_no})` : ""}`.trim(),
+                        label: `${vehicle.vehicle_number} ${vehicle.vehicle_model ? `(${vehicle.vehicle_model})` : ""}`.trim(),
                         status: isAssigned ? "assigned" as const : "available" as const
                       }
                     })

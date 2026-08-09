@@ -504,7 +504,6 @@ class SupabaseService {
         'is_active': vehicle['status'] == 'active',
       };
     } catch (e) {
-      debugPrint('Error getting driver vehicle: $e');
       return null;
     }
   }

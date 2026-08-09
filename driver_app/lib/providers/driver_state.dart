@@ -1632,23 +1632,25 @@ class DriverState extends ChangeNotifier {
   Future<void> refreshVehicleInfo() async {
     if (_driverId.isEmpty) return;
     try {
-      final vehicle = await SupabaseService.getDriverVehicle(_driverId);
+      final vehicle = await SupabaseService.getDriverVehicle(_driverId).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => null,
+      );
       if (vehicle != null) {
-        _vehicleId = vehicle['id'] ?? '';
-        _vehicleNumber = vehicle['plate_no'] ?? '';
-        _vehicleModel = vehicle['display_name'] ?? '';
-      } else {
-        _vehicleId = '';
-        _vehicleNumber = '';
-        _vehicleModel = '';
+        _vehicleId = vehicle['id']?.toString() ?? '';
+        _vehicleNumber = vehicle['plate_no']?.toString() ?? '';
+        _vehicleModel = vehicle['name']?.toString() ?? '';
       }
-      final prefs = await SharedPreferences.getInstance();
-      prefs.setString('vehicleId', _vehicleId);
-      prefs.setString('vehicleNumber', _vehicleNumber);
-      prefs.setString('vehicleModel', _vehicleModel);
+      // Only update prefs if we got valid data
+      if (_vehicleNumber.isNotEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('vehicleId', _vehicleId);
+        await prefs.setString('vehicleNumber', _vehicleNumber);
+        await prefs.setString('vehicleModel', _vehicleModel);
+      }
       notifyListeners();
     } catch (e) {
-      debugPrint('Error refreshing vehicle info: $e');
+      // Silently fail - don't block app startup
     }
   }
 

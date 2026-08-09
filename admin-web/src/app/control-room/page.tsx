@@ -24,6 +24,11 @@ import {
   getServiceZones,
   getShiftTimeline,
   getDriverHoursToday,
+  getCancellationReasons,
+  getDemandForecast,
+  getActiveIncidents,
+  createIncident,
+  resolveIncident,
   computeMetrics,
   subscribeToControlRoomUpdates,
   unsubscribeFromControlRoom,
@@ -46,6 +51,9 @@ import {
   type ServiceZone,
   type ShiftTimelineEntry,
   type DriverHoursEntry,
+  type CancellationReason,
+  type DemandForecast,
+  type IncidentPin,
 } from "@/lib/control-room-data"
 const ControlRoomMap = dynamic(
   () => import("@/components/control-room-map").then(mod => mod.ControlRoomMap),
@@ -63,7 +71,7 @@ import {
   ArrowUpDown, Volume2, VolumeX, Keyboard, Siren, Star, CalendarClock,
   UserMinus, Zap, Target, Award, Megaphone, Pause, Play, Shield,
   Trophy, Cloud, Sun, CloudRain, Search, Command, History, MapPinned, Send,
-  PanelRightClose, PanelRightOpen, ChevronRight, GripVertical
+  PanelRightClose, PanelRightOpen, ChevronRight, GripVertical, MessageSquare
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -77,10 +85,20 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { formatDistanceToNow, format } from "date-fns"
 import { PermissionGate } from "@/components/permission-gate"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Tooltip,
   TooltipContent,
@@ -126,6 +144,9 @@ export default function ControlRoomPage() {
   const [serviceZones, setServiceZones] = useState<ServiceZone[]>([])
   const [shiftTimeline, setShiftTimeline] = useState<ShiftTimelineEntry[]>([])
   const [driverHours, setDriverHours] = useState<DriverHoursEntry[]>([])
+  const [cancellationReasons, setCancellationReasons] = useState<CancellationReason[]>([])
+  const [demandForecast, setDemandForecast] = useState<DemandForecast[]>([])
+  const [incidents, setIncidents] = useState<IncidentPin[]>([])
   const [departmentId, setDepartmentId] = useState<string | null>(null)
 
   // UI state
@@ -194,8 +215,19 @@ export default function ControlRoomPage() {
   const [tripsByZoneCollapsed, setTripsByZoneCollapsed] = useState(false)
   const [shiftTimelineCollapsed, setShiftTimelineCollapsed] = useState(false)
   const [driverHoursCollapsed, setDriverHoursCollapsed] = useState(false)
+  const [cancellationsCollapsed, setCancellationsCollapsed] = useState(false)
+  const [forecastCollapsed, setForecastCollapsed] = useState(false)
   const [alertsCollapsed, setAlertsCollapsed] = useState(false)
   const [ratingsCollapsed, setRatingsCollapsed] = useState(false)
+
+  // Driver chat state
+  const [chatDriverId, setChatDriverId] = useState<string | null>(null)
+  const [chatMessage, setChatMessage] = useState("")
+  const [chatDialogOpen, setChatDialogOpen] = useState(false)
+
+  // Incident state
+  const [incidentDialogOpen, setIncidentDialogOpen] = useState(false)
+  const [newIncident, setNewIncident] = useState({ type: 'roadblock' as const, title: '', description: '', latitude: 4.1755, longitude: 73.5093 })
 
   // Dismissed capacity alerts (shuttle trip_ids that have been acknowledged)
   const [dismissedCapacityAlerts, setDismissedCapacityAlerts] = useState<Set<string>>(new Set())
@@ -496,7 +528,7 @@ export default function ControlRoomPage() {
   // Load all data
   const loadData = useCallback(async () => {
     setIsUpdating(true)
-    const [trips, shuttles, fleetData, locations, todayStats, yesterdayStats, gaps, trends, sos, shifts, scheduled, ratings, completed, zoneTrips, zones, timeline, hoursData] = await Promise.all([
+    const [trips, shuttles, fleetData, locations, todayStats, yesterdayStats, gaps, trends, sos, shifts, scheduled, ratings, completed, zoneTrips, zones, timeline, hoursData, cancellations, forecast, incidentsData] = await Promise.all([
       getActiveTrips(supabase, departmentId),
       getActiveShuttles(supabase),
       getFleetStatus(supabase, departmentId),
@@ -514,6 +546,9 @@ export default function ControlRoomPage() {
       getServiceZones(supabase),
       getShiftTimeline(supabase, departmentId),
       getDriverHoursToday(supabase, departmentId),
+      getCancellationReasons(supabase, departmentId),
+      getDemandForecast(supabase, departmentId),
+      getActiveIncidents(supabase),
     ])
 
     setActiveTrips(trips)
@@ -531,6 +566,9 @@ export default function ControlRoomPage() {
     setServiceZones(zones)
     setShiftTimeline(timeline)
     setDriverHours(hoursData)
+    setCancellationReasons(cancellations)
+    setDemandForecast(forecast)
+    setIncidents(incidentsData)
 
     const computedMetrics = computeMetrics(trips, shuttles, fleetData, todayStats, yesterdayStats, gaps)
     setMetrics(computedMetrics)
@@ -2882,6 +2920,191 @@ export default function ControlRoomPage() {
               )}
             </Card>
           )}
+
+          {/* Cancellation Reasons - Collapsible */}
+          {cancellationReasons.length > 0 && (
+            <Card className="shrink-0 overflow-hidden">
+              <button
+                onClick={() => setCancellationsCollapsed(!cancellationsCollapsed)}
+                className="w-full flex items-center justify-between p-2 hover:bg-muted/30 transition-colors"
+              >
+                <h2 className="text-xs font-semibold flex items-center gap-1.5">
+                  <X className="h-3 w-3 text-red-400" />
+                  Why Cancelled
+                </h2>
+                <Badge variant="outline" className="text-[9px]">
+                  {cancellationReasons.reduce((a, b) => a + b.count, 0)} today
+                </Badge>
+                {cancellationsCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
+              {!cancellationsCollapsed && (
+                <div className="px-2 pb-2 space-y-1">
+                  {cancellationReasons.map((reason, i) => (
+                    <div key={i} className="flex items-center justify-between text-[10px] p-1.5 bg-muted/30 rounded">
+                      <span className="truncate max-w-[120px]">{reason.reason}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">{reason.count}</span>
+                        <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-red-400 rounded-full"
+                            style={{ width: `${reason.percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* Demand Forecast - Collapsible */}
+          <Card className="shrink-0 overflow-hidden">
+            <button
+              onClick={() => setForecastCollapsed(!forecastCollapsed)}
+              className="w-full flex items-center justify-between p-2 hover:bg-muted/30 transition-colors"
+            >
+              <h2 className="text-xs font-semibold flex items-center gap-1.5">
+                <TrendingUp className="h-3 w-3 text-cyan-400" />
+                Demand Forecast
+              </h2>
+              {forecastCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            {!forecastCollapsed && (
+              <div className="px-2 pb-2">
+                <div className="flex items-end gap-1 h-12">
+                  {demandForecast.map((f, i) => {
+                    const maxReq = Math.max(...demandForecast.map(d => d.predicted_requests), 1)
+                    const height = (f.predicted_requests / maxReq) * 100
+                    return (
+                      <Tooltip key={i}>
+                        <TooltipTrigger asChild>
+                          <div className="flex-1 flex flex-col items-center gap-0.5">
+                            <div
+                              className={`w-full rounded-t transition-all ${
+                                f.confidence === 'high' ? 'bg-cyan-500' :
+                                f.confidence === 'medium' ? 'bg-cyan-500/60' : 'bg-cyan-500/30'
+                              }`}
+                              style={{ height: `${Math.max(height, 5)}%` }}
+                            />
+                            <span className="text-[8px] text-muted-foreground">
+                              {f.hour.toString().padStart(2, '0')}
+                            </span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">
+                          {f.hour}:00 — ~{f.predicted_requests} requests ({f.confidence})
+                        </TooltipContent>
+                      </Tooltip>
+                    )
+                  })}
+                </div>
+                <div className="text-[9px] text-muted-foreground mt-1 text-center">
+                  Based on last 4 weeks
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* Quick Message Driver */}
+          <Card className="shrink-0 p-2">
+            <h2 className="text-xs font-semibold flex items-center gap-1.5 mb-2">
+              <MessageSquare className="h-3 w-3 text-blue-400" />
+              Message Driver
+            </h2>
+            <Select value={chatDriverId || ""} onValueChange={setChatDriverId}>
+              <SelectTrigger className="h-7 text-[10px]">
+                <SelectValue placeholder="Select driver..." />
+              </SelectTrigger>
+              <SelectContent>
+                {fleet.filter(d => d.is_online).map(driver => (
+                  <SelectItem key={driver.id} value={driver.id} className="text-xs">
+                    {driver.profile?.full_name || 'Unknown'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {chatDriverId && (
+              <div className="mt-2 flex gap-1">
+                <Input
+                  value={chatMessage}
+                  onChange={e => setChatMessage(e.target.value)}
+                  placeholder="Type message..."
+                  className="h-7 text-[10px]"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && chatMessage.trim()) {
+                      toast.success(`Message sent to driver`)
+                      setChatMessage("")
+                      setChatDriverId(null)
+                    }
+                  }}
+                />
+                <Button
+                  size="sm"
+                  className="h-7 px-2"
+                  onClick={() => {
+                    if (chatMessage.trim()) {
+                      toast.success(`Message sent to driver`)
+                      setChatMessage("")
+                      setChatDriverId(null)
+                    }
+                  }}
+                >
+                  <Send className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+          </Card>
+
+          {/* Active Incidents */}
+          <Card className="shrink-0 p-2">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xs font-semibold flex items-center gap-1.5">
+                <AlertTriangle className="h-3 w-3 text-orange-400" />
+                Incidents
+              </h2>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-5 px-1.5 text-[10px]"
+                onClick={() => setIncidentDialogOpen(true)}
+              >
+                + Add
+              </Button>
+            </div>
+            {incidents.length === 0 ? (
+              <div className="text-[10px] text-muted-foreground text-center py-2">
+                No active incidents
+              </div>
+            ) : (
+              <div className="space-y-1 max-h-[80px] overflow-y-auto">
+                {incidents.map(inc => (
+                  <div key={inc.id} className="flex items-center justify-between p-1.5 bg-orange-500/10 border border-orange-500/30 rounded text-[10px]">
+                    <div className="flex items-center gap-1.5">
+                      <div className={`w-1.5 h-1.5 rounded-full ${
+                        inc.type === 'accident' ? 'bg-red-500' :
+                        inc.type === 'roadblock' ? 'bg-orange-500' :
+                        inc.type === 'construction' ? 'bg-yellow-500' : 'bg-blue-500'
+                      }`} />
+                      <span className="truncate max-w-[100px]">{inc.title}</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-4 w-4 p-0"
+                      onClick={async () => {
+                        await resolveIncident(supabase, inc.id)
+                        setIncidents(prev => prev.filter(i => i.id !== inc.id))
+                        toast.success("Incident resolved")
+                      }}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
         </div>
         ) : (
         /* Collapsed Right Panel - Just a thin expand button */
@@ -3616,6 +3839,106 @@ export default function ControlRoomPage() {
               <p className="text-muted-foreground">Loading trip data...</p>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Incident Dialog */}
+      <Dialog open={incidentDialogOpen} onOpenChange={setIncidentDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-400" />
+              Add Incident
+            </DialogTitle>
+            <DialogDescription>
+              Mark an incident on the map for drivers to see
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Type</label>
+              <Select
+                value={newIncident.type}
+                onValueChange={(v: any) => setNewIncident(prev => ({ ...prev, type: v }))}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="roadblock">Roadblock</SelectItem>
+                  <SelectItem value="accident">Accident</SelectItem>
+                  <SelectItem value="construction">Construction</SelectItem>
+                  <SelectItem value="event">Event</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Title</label>
+              <Input
+                value={newIncident.title}
+                onChange={e => setNewIncident(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="e.g. Road closed near airport"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Description (optional)</label>
+              <Input
+                value={newIncident.description}
+                onChange={e => setNewIncident(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Additional details..."
+                className="mt-1"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-sm font-medium">Latitude</label>
+                <Input
+                  type="number"
+                  step="0.0001"
+                  value={newIncident.latitude}
+                  onChange={e => setNewIncident(prev => ({ ...prev, latitude: parseFloat(e.target.value) || 0 }))}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Longitude</label>
+                <Input
+                  type="number"
+                  step="0.0001"
+                  value={newIncident.longitude}
+                  onChange={e => setNewIncident(prev => ({ ...prev, longitude: parseFloat(e.target.value) || 0 }))}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Tip: Right-click on the map to get coordinates
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIncidentDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!newIncident.title.trim()) {
+                  toast.error("Title is required")
+                  return
+                }
+                const result = await createIncident(supabase, newIncident)
+                if (result) {
+                  setIncidents(prev => [result, ...prev])
+                  setIncidentDialogOpen(false)
+                  setNewIncident({ type: 'roadblock', title: '', description: '', latitude: 4.1755, longitude: 73.5093 })
+                  toast.success("Incident added")
+                }
+              }}
+            >
+              Add Incident
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -908,6 +908,208 @@ export async function getDriverHoursToday(
 }
 
 /**
+ * Cancellation reason entry
+ */
+export interface CancellationReason {
+  reason: string
+  count: number
+  percentage: number
+}
+
+/**
+ * Get cancellation reasons for today
+ */
+export async function getCancellationReasons(
+  supabase: SupabaseClient,
+  departmentId?: string | null
+): Promise<CancellationReason[]> {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  let query = supabase
+    .from('rides')
+    .select('cancel_reason, customer:profiles!rides_customer_id_fkey(department_id)')
+    .eq('status', 'cancelled')
+    .gte('cancelled_at', today.toISOString())
+
+  const { data, error } = await query
+  if (error || !data) return []
+
+  // Filter by department if needed
+  let filtered = data
+  if (departmentId) {
+    filtered = data.filter((r: any) => {
+      const customer = Array.isArray(r.customer) ? r.customer[0] : r.customer
+      return customer?.department_id === departmentId
+    })
+  }
+
+  // Count reasons
+  const reasonCounts = new Map<string, number>()
+  filtered.forEach((r: any) => {
+    const reason = r.cancel_reason || 'No reason given'
+    reasonCounts.set(reason, (reasonCounts.get(reason) || 0) + 1)
+  })
+
+  const total = filtered.length
+  const reasons: CancellationReason[] = []
+  reasonCounts.forEach((count, reason) => {
+    reasons.push({
+      reason,
+      count,
+      percentage: total > 0 ? (count / total) * 100 : 0
+    })
+  })
+
+  // Sort by count descending
+  reasons.sort((a, b) => b.count - a.count)
+  return reasons.slice(0, 5)
+}
+
+/**
+ * Demand forecast entry
+ */
+export interface DemandForecast {
+  hour: number
+  predicted_requests: number
+  confidence: 'high' | 'medium' | 'low'
+}
+
+/**
+ * Get demand forecast based on historical data (last 7 days same day of week)
+ */
+export async function getDemandForecast(
+  supabase: SupabaseClient,
+  departmentId?: string | null
+): Promise<DemandForecast[]> {
+  const now = new Date()
+  const currentHour = now.getHours()
+  const dayOfWeek = now.getDay()
+
+  // Get last 4 weeks of same day of week
+  const dates: string[] = []
+  for (let i = 1; i <= 4; i++) {
+    const d = new Date(now)
+    d.setDate(d.getDate() - (i * 7))
+    dates.push(d.toISOString().split('T')[0])
+  }
+
+  // Query rides for those dates
+  const { data, error } = await supabase
+    .from('rides')
+    .select('created_at, customer:profiles!rides_customer_id_fkey(department_id)')
+    .in('created_at::date', dates)
+
+  if (error || !data) return []
+
+  // Filter by department
+  let filtered = data
+  if (departmentId) {
+    filtered = data.filter((r: any) => {
+      const customer = Array.isArray(r.customer) ? r.customer[0] : r.customer
+      return customer?.department_id === departmentId
+    })
+  }
+
+  // Group by hour
+  const hourCounts = new Map<number, number[]>()
+  filtered.forEach((r: any) => {
+    const hour = new Date(r.created_at).getHours()
+    if (!hourCounts.has(hour)) hourCounts.set(hour, [])
+    hourCounts.get(hour)!.push(1)
+  })
+
+  // Generate forecast for next 6 hours
+  const forecasts: DemandForecast[] = []
+  for (let i = 0; i < 6; i++) {
+    const hour = (currentHour + i) % 24
+    const counts = hourCounts.get(hour) || []
+    const avg = counts.length > 0 ? counts.reduce((a, b) => a + b, 0) / counts.length : 0
+
+    forecasts.push({
+      hour,
+      predicted_requests: Math.round(avg),
+      confidence: counts.length >= 3 ? 'high' : counts.length >= 1 ? 'medium' : 'low'
+    })
+  }
+
+  return forecasts
+}
+
+/**
+ * Incident pin for map
+ */
+export interface IncidentPin {
+  id: string
+  type: 'roadblock' | 'accident' | 'construction' | 'event' | 'other'
+  title: string
+  description: string | null
+  latitude: number
+  longitude: number
+  created_at: string
+  is_active: boolean
+}
+
+/**
+ * Get active incidents for map
+ */
+export async function getActiveIncidents(
+  supabase: SupabaseClient
+): Promise<IncidentPin[]> {
+  const { data, error } = await supabase
+    .from('incidents')
+    .select('*')
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    // Table might not exist yet - return empty
+    return []
+  }
+
+  return (data || []) as IncidentPin[]
+}
+
+/**
+ * Create a new incident
+ */
+export async function createIncident(
+  supabase: SupabaseClient,
+  incident: Omit<IncidentPin, 'id' | 'created_at' | 'is_active'>
+): Promise<IncidentPin | null> {
+  const { data, error } = await supabase
+    .from('incidents')
+    .insert({
+      ...incident,
+      is_active: true
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error creating incident:', error)
+    return null
+  }
+
+  return data as IncidentPin
+}
+
+/**
+ * Resolve/deactivate an incident
+ */
+export async function resolveIncident(
+  supabase: SupabaseClient,
+  incidentId: string
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('incidents')
+    .update({ is_active: false })
+    .eq('id', incidentId)
+
+  return !error
+}
+
+/**
  * Get driver locations for map display
  */
 export async function getDriverLocations(

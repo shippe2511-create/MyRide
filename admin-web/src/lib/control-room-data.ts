@@ -719,6 +719,96 @@ export async function getDispatchSuggestions(
 }
 
 /**
+ * Shift timeline entry
+ */
+export interface ShiftTimelineEntry {
+  driver_id: string
+  driver_name: string
+  shift_type: 'start' | 'end'
+  time: string
+  minutes_from_now: number
+}
+
+/**
+ * Get shift timeline - who's starting/ending shifts in next 2 hours
+ */
+export async function getShiftTimeline(
+  supabase: SupabaseClient,
+  departmentId?: string | null
+): Promise<ShiftTimelineEntry[]> {
+  const today = new Date().toISOString().split('T')[0]
+  const now = new Date()
+  const currentHour = now.getHours()
+  const currentMinute = now.getMinutes()
+  const currentMinutes = currentHour * 60 + currentMinute
+
+  // Get today's shifts
+  let query = supabase
+    .from('shifts')
+    .select(`
+      driver_id, start_time, end_time,
+      driver:drivers(profile:profiles(full_name), department_id)
+    `)
+    .eq('shift_date', today)
+
+  const { data: shifts, error } = await query
+
+  if (error || !shifts) return []
+
+  const entries: ShiftTimelineEntry[] = []
+
+  shifts.forEach((shift: any) => {
+    const driver = Array.isArray(shift.driver) ? shift.driver[0] : shift.driver
+    const profile = driver?.profile
+    const driverName = Array.isArray(profile) ? profile[0]?.full_name : profile?.full_name
+
+    // Filter by department if needed
+    if (departmentId && driver?.department_id !== departmentId) return
+
+    // Parse start time
+    if (shift.start_time) {
+      const [startH, startM] = shift.start_time.split(':').map(Number)
+      const startMinutes = startH * 60 + startM
+      const minutesFromNow = startMinutes - currentMinutes
+
+      // Starting in next 2 hours (and not already past)
+      if (minutesFromNow > 0 && minutesFromNow <= 120) {
+        entries.push({
+          driver_id: shift.driver_id,
+          driver_name: driverName || 'Unknown',
+          shift_type: 'start',
+          time: shift.start_time.slice(0, 5),
+          minutes_from_now: minutesFromNow
+        })
+      }
+    }
+
+    // Parse end time
+    if (shift.end_time) {
+      const [endH, endM] = shift.end_time.split(':').map(Number)
+      const endMinutes = endH * 60 + endM
+      const minutesFromNow = endMinutes - currentMinutes
+
+      // Ending in next 2 hours (and not already past)
+      if (minutesFromNow > 0 && minutesFromNow <= 120) {
+        entries.push({
+          driver_id: shift.driver_id,
+          driver_name: driverName || 'Unknown',
+          shift_type: 'end',
+          time: shift.end_time.slice(0, 5),
+          minutes_from_now: minutesFromNow
+        })
+      }
+    }
+  })
+
+  // Sort by time
+  entries.sort((a, b) => a.minutes_from_now - b.minutes_from_now)
+
+  return entries
+}
+
+/**
  * Get driver locations for map display
  */
 export async function getDriverLocations(

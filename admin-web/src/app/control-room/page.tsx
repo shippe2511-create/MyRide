@@ -22,6 +22,7 @@ import {
   getDispatchSuggestions,
   getTodayTripsForZones,
   getServiceZones,
+  getShiftTimeline,
   computeMetrics,
   subscribeToControlRoomUpdates,
   unsubscribeFromControlRoom,
@@ -42,6 +43,7 @@ import {
   type RecentRating,
   type DriverSuggestion,
   type ServiceZone,
+  type ShiftTimelineEntry,
 } from "@/lib/control-room-data"
 const ControlRoomMap = dynamic(
   () => import("@/components/control-room-map").then(mod => mod.ControlRoomMap),
@@ -120,6 +122,7 @@ export default function ControlRoomPage() {
   const [recentlyCompleted, setRecentlyCompleted] = useState<ActiveTrip[]>([])
   const [todayZoneTrips, setTodayZoneTrips] = useState<{ pickup_name: string | null; status: string }[]>([])
   const [serviceZones, setServiceZones] = useState<ServiceZone[]>([])
+  const [shiftTimeline, setShiftTimeline] = useState<ShiftTimelineEntry[]>([])
   const [departmentId, setDepartmentId] = useState<string | null>(null)
 
   // UI state
@@ -186,6 +189,7 @@ export default function ControlRoomPage() {
   const [responseTimeCollapsed, setResponseTimeCollapsed] = useState(false)
   const [driverAvailCollapsed, setDriverAvailCollapsed] = useState(false)
   const [tripsByZoneCollapsed, setTripsByZoneCollapsed] = useState(false)
+  const [shiftTimelineCollapsed, setShiftTimelineCollapsed] = useState(false)
   const [alertsCollapsed, setAlertsCollapsed] = useState(false)
   const [ratingsCollapsed, setRatingsCollapsed] = useState(false)
 
@@ -488,7 +492,7 @@ export default function ControlRoomPage() {
   // Load all data
   const loadData = useCallback(async () => {
     setIsUpdating(true)
-    const [trips, shuttles, fleetData, locations, todayStats, yesterdayStats, gaps, trends, sos, shifts, scheduled, ratings, completed, zoneTrips, zones] = await Promise.all([
+    const [trips, shuttles, fleetData, locations, todayStats, yesterdayStats, gaps, trends, sos, shifts, scheduled, ratings, completed, zoneTrips, zones, timeline] = await Promise.all([
       getActiveTrips(supabase, departmentId),
       getActiveShuttles(supabase),
       getFleetStatus(supabase, departmentId),
@@ -504,6 +508,7 @@ export default function ControlRoomPage() {
       getRecentlyCompletedTrips(supabase, departmentId),
       getTodayTripsForZones(supabase, departmentId),
       getServiceZones(supabase),
+      getShiftTimeline(supabase, departmentId),
     ])
 
     setActiveTrips(trips)
@@ -519,6 +524,7 @@ export default function ControlRoomPage() {
     setRecentlyCompleted(completed)
     setTodayZoneTrips(zoneTrips)
     setServiceZones(zones)
+    setShiftTimeline(timeline)
 
     const computedMetrics = computeMetrics(trips, shuttles, fleetData, todayStats, yesterdayStats, gaps)
     setMetrics(computedMetrics)
@@ -787,6 +793,52 @@ export default function ControlRoomPage() {
   const closeSuggestions = () => {
     setDispatchTripId(null)
     setSuggestions([])
+  }
+
+  // Quick assign nearest available driver (one-click)
+  const quickAssign = async (trip: ActiveTrip) => {
+    // Get pickup coordinates
+    const { data: rideData } = await supabase
+      .from("rides")
+      .select("pickup_lat, pickup_lng")
+      .eq("id", trip.id)
+      .single()
+
+    if (!rideData?.pickup_lat || !rideData?.pickup_lng) {
+      toast.error("Cannot find pickup location")
+      return
+    }
+
+    // Get suggestions and pick the best one
+    const results = await getDispatchSuggestions(
+      supabase,
+      trip.id,
+      parseFloat(rideData.pickup_lat),
+      parseFloat(rideData.pickup_lng)
+    )
+
+    if (results.length === 0) {
+      toast.error("No available drivers nearby")
+      return
+    }
+
+    // Assign the top-ranked driver
+    const bestDriver = results[0]
+    const { error } = await supabase
+      .from("rides")
+      .update({
+        driver_id: bestDriver.driver_id,
+        status: "accepted",
+        accepted_at: new Date().toISOString()
+      })
+      .eq("id", trip.id)
+
+    if (error) {
+      toast.error("Failed to assign driver")
+    } else {
+      toast.success(`Assigned to ${bestDriver.driver_name}`)
+      loadData()
+    }
   }
 
   // Broadcast message to all drivers
@@ -1526,7 +1578,8 @@ export default function ControlRoomPage() {
                   </thead>
                   <tbody>
                     {sortedFilteredTrips.map((trip) => {
-                      const waitSeconds = (Date.now() - new Date(trip.created_at).getTime()) / 1000
+                      // Use currentTime for live updates (updates every second)
+                      const waitSeconds = (currentTime.getTime() - new Date(trip.created_at).getTime()) / 1000
                       const isLongWait = trip.status === "pending" && waitSeconds > 300
 
                       // Calculate time differences for timeline
@@ -1597,23 +1650,30 @@ export default function ControlRoomPage() {
                               {(trip.driver?.profile as any)?.full_name || "Unassigned"}
                             </span>
                           </td>
-                          {/* Status Badge */}
+                          {/* Status Badge + Live Wait Time */}
                           <td className="p-2 text-center">
-                            <Badge className={`${
-                              trip.status === "pending" ? "bg-amber-500" :
-                              trip.status === "accepted" ? "bg-purple-500" :
-                              trip.status === "arrived" ? "bg-blue-500" :
-                              trip.status === "in_progress" ? "bg-green-500" :
-                              trip.status === "completed" ? "bg-emerald-500" :
-                              "bg-gray-500"
-                            } text-white text-[9px] px-2`}>
-                              {trip.status === "pending" ? "PENDING" :
-                               trip.status === "accepted" ? "EN ROUTE" :
-                               trip.status === "arrived" ? "ARRIVED" :
-                               trip.status === "in_progress" ? "IN PROGRESS" :
-                               trip.status === "completed" ? "COMPLETED" :
-                               "UNKNOWN"}
-                            </Badge>
+                            <div className="flex flex-col items-center gap-1">
+                              <Badge className={`${
+                                trip.status === "pending" ? "bg-amber-500" :
+                                trip.status === "accepted" ? "bg-purple-500" :
+                                trip.status === "arrived" ? "bg-blue-500" :
+                                trip.status === "in_progress" ? "bg-green-500" :
+                                trip.status === "completed" ? "bg-emerald-500" :
+                                "bg-gray-500"
+                              } text-white text-[9px] px-2`}>
+                                {trip.status === "pending" ? "PENDING" :
+                                 trip.status === "accepted" ? "EN ROUTE" :
+                                 trip.status === "arrived" ? "ARRIVED" :
+                                 trip.status === "in_progress" ? "IN PROGRESS" :
+                                 trip.status === "completed" ? "COMPLETED" :
+                                 "UNKNOWN"}
+                              </Badge>
+                              {trip.status === "pending" && (
+                                <span className={`text-[10px] font-mono tabular-nums ${isLongWait ? "text-red-400 animate-pulse" : "text-amber-400"}`}>
+                                  {Math.floor(waitSeconds / 60)}:{String(Math.floor(waitSeconds % 60)).padStart(2, '0')}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           {/* Journey Progress - 4 stages with connecting lines */}
                           <td className="p-2" colSpan={4}>
@@ -1698,6 +1758,10 @@ export default function ControlRoomPage() {
                                 <DropdownMenuContent align="end">
                                   {trip.status === "pending" && (
                                     <>
+                                      <DropdownMenuItem onClick={() => quickAssign(trip)} className="text-green-400">
+                                        <Target className="h-3 w-3 mr-2" />
+                                        Quick Assign (Nearest)
+                                      </DropdownMenuItem>
                                       <DropdownMenuItem onClick={() => loadSuggestions(trip)} className="text-amber-400">
                                         <Zap className="h-3 w-3 mr-2" />
                                         Smart Dispatch
@@ -2542,6 +2606,65 @@ export default function ControlRoomPage() {
             >
               View Zone Report <ArrowRight className="h-3 w-3" />
             </button>
+          </Card>
+
+          {/* Shift Timeline - Collapsible */}
+          <Card className="shrink-0 overflow-hidden">
+            <button
+              onClick={() => setShiftTimelineCollapsed(!shiftTimelineCollapsed)}
+              className="w-full flex items-center justify-between p-2 hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <h2 className="text-xs font-semibold flex items-center gap-1.5">
+                  <Clock className="h-3 w-3 text-blue-400" />
+                  Shift Timeline
+                </h2>
+                {shiftTimeline.length > 0 && (
+                  <Badge variant="outline" className="text-[9px]">{shiftTimeline.length}</Badge>
+                )}
+              </div>
+              {shiftTimelineCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            {!shiftTimelineCollapsed && (
+              <div className="px-2 pb-2 space-y-1 max-h-[120px] overflow-y-auto">
+                {shiftTimeline.length === 0 ? (
+                  <div className="text-[10px] text-muted-foreground text-center py-2">
+                    No shifts starting/ending in next 2 hours
+                  </div>
+                ) : (
+                  shiftTimeline.map((entry, i) => (
+                    <div
+                      key={`${entry.driver_id}-${entry.shift_type}-${i}`}
+                      className={`flex items-center justify-between p-1.5 rounded text-[10px] ${
+                        entry.shift_type === 'start'
+                          ? 'bg-green-500/10 border border-green-500/30'
+                          : 'bg-amber-500/10 border border-amber-500/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={`w-1.5 h-1.5 rounded-full ${
+                          entry.shift_type === 'start' ? 'bg-green-500' : 'bg-amber-500'
+                        }`} />
+                        <span className="font-medium truncate max-w-[80px]">{entry.driver_name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`${
+                          entry.shift_type === 'start' ? 'text-green-400' : 'text-amber-400'
+                        }`}>
+                          {entry.shift_type === 'start' ? 'Starts' : 'Ends'}
+                        </span>
+                        <span className="font-mono">{entry.time}</span>
+                        <span className="text-muted-foreground">
+                          ({entry.minutes_from_now < 60
+                            ? `${entry.minutes_from_now}m`
+                            : `${Math.floor(entry.minutes_from_now / 60)}h ${entry.minutes_from_now % 60}m`})
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </Card>
 
           {/* Recent Alerts / Delays - Collapsible */}

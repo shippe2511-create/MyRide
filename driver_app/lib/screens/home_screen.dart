@@ -117,8 +117,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadTodayShift() async {
-    final driverId = SupabaseService.driverId;
-    if (driverId == null) return;
+    // Get driverId from DriverState first (restored from SharedPreferences)
+    // Fall back to SupabaseService which is set later
+    final state = context.read<DriverState>();
+    final driverId = state.driverId.isNotEmpty ? state.driverId : SupabaseService.driverId;
+    debugPrint('_loadTodayShift: driverId from state=${state.driverId}, from SupabaseService=${SupabaseService.driverId}, using=$driverId');
+    if (driverId == null || driverId.isEmpty) {
+      debugPrint('_loadTodayShift: driverId is NULL or empty, cannot load shift');
+      return;
+    }
 
     setState(() => _loadingTodayShift = true);
 
@@ -374,9 +381,11 @@ class _HomeScreenState extends State<HomeScreen> {
     debugPrint('Subscribing to shift changes for driver: $driverId');
     final supabase = SupabaseService.client;
     _shiftScheduleChannel = supabase.channel('shifts_$driverId');
+
+    // Subscribe to INSERT and UPDATE with driver_id filter
     _shiftScheduleChannel!
         .onPostgresChanges(
-          event: PostgresChangeEvent.all,
+          event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'shifts',
           filter: PostgresChangeFilter(
@@ -385,11 +394,33 @@ class _HomeScreenState extends State<HomeScreen> {
             value: driverId,
           ),
           callback: (payload) {
-            debugPrint('Shift change: ${payload.eventType}');
-            // Reload today's shift when schedule changes
-            if (mounted) {
-              _loadTodayShift();
-            }
+            debugPrint('Shift INSERT: ${payload.newRecord}');
+            if (mounted) _loadTodayShift();
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'shifts',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'driver_id',
+            value: driverId,
+          ),
+          callback: (payload) {
+            debugPrint('Shift UPDATE: ${payload.newRecord}');
+            if (mounted) _loadTodayShift();
+          },
+        )
+        .onPostgresChanges(
+          // DELETE events - always reload to check if our shift was deleted
+          // oldRecord requires REPLICA IDENTITY FULL, so just reload on any delete
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'shifts',
+          callback: (payload) {
+            debugPrint('Shift DELETE detected, reloading shifts');
+            if (mounted) _loadTodayShift();
           },
         )
         .subscribe((status, error) {
@@ -1230,12 +1261,18 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 32),
-                      // Show Go Online button only if:
-                      // - Has a shift today AND
-                      // - Not absent AND
-                      // - Not missed (shift ended without marking attendance)
-                      if (_todayShift != null && !isAbsent && !isMissed)
+                      const SizedBox(height: 24),
+                      // SHIFT CARD FIRST (context before action)
+                      // Show shift status/attendance at top so driver sees schedule first
+                      if (_todayShift != null)
+                        _buildTodayShiftCard(context)
+                      else
+                        _buildNoShiftCard(context),
+                      // GO ONLINE BUTTON AFTER (action after context)
+                      // Show only if: has shift AND marked PRESENT (not pending/absent/missed)
+                      if (_todayShift != null &&
+                          (_todayShift!['attendance_status'] as String? ?? 'pending') == 'present') ...[
+                        const SizedBox(height: 24),
                         ElevatedButton.icon(
                           onPressed: () {
                             debugPrint('Go Online button tapped!');
@@ -1264,13 +1301,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         ),
-                      // Today's Shift Card or No Shift Card
-                      if (_todayShift != null) ...[
-                        const SizedBox(height: 24),
-                        _buildTodayShiftCard(context),
-                      ] else ...[
-                        const SizedBox(height: 24),
-                        _buildNoShiftCard(context),
                       ],
                       const SizedBox(height: 100), // Extra padding for bottom nav
                     ],

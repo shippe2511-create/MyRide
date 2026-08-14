@@ -371,6 +371,8 @@ class AppState extends ChangeNotifier {
         OneSignalService.requestPermission();
       });
 
+      // Load avatar from database
+      _loadAvatarFromDb();
       loadEmergencyContactsFromProfile();
       loadBlockedUsersFromProfile();
       loadTripHistory();

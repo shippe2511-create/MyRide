@@ -28,6 +28,7 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
     {'shifts': []}, {'shifts': []}, {'shifts': []},
   ];
 
+
   @override
   void initState() {
     super.initState();
@@ -481,37 +482,40 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
     final selectedDate = startOfWeek.add(Duration(days: _selectedDay));
 
     if (shifts.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: context.cardColor,
-                borderRadius: BorderRadius.circular(20),
+      return Padding(
+        padding: const EdgeInsets.only(top: 60, bottom: 40),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: context.cardColor,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Icon(Icons.beach_access, color: context.mutedColor, size: 40),
               ),
-              child: Icon(Icons.beach_access, color: context.mutedColor, size: 40),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Day Off',
-              style: TextStyle(
-                color: context.textColor,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
+              const SizedBox(height: 16),
+              Text(
+                'Day Off',
+                style: TextStyle(
+                  color: context.textColor,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'No shifts scheduled',
-              style: TextStyle(
-                color: context.mutedColor,
-                fontSize: 14,
+              const SizedBox(height: 4),
+              Text(
+                'No shifts scheduled',
+                style: TextStyle(
+                  color: context.mutedColor,
+                  fontSize: 14,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
@@ -1058,6 +1062,40 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
     }
   }
 
+  Future<Set<int>> _loadMonthShiftDaysAsync() async {
+    final driverId = SupabaseService.driverId; // Use actual driver_id, not profile_id
+    debugPrint('Loading month shifts for driverId: $driverId');
+    if (driverId == null) return {};
+
+    final now = DateTime.now();
+    final startOfMonth = DateTime(now.year, now.month, 1);
+    final endOfMonth = DateTime(now.year, now.month + 1, 0);
+
+    try {
+      final shifts = await SupabaseService.client
+          .from('shifts')
+          .select('shift_date')
+          .eq('driver_id', driverId)
+          .gte('shift_date', startOfMonth.toIso8601String().split('T')[0])
+          .lte('shift_date', endOfMonth.toIso8601String().split('T')[0]);
+
+      debugPrint('Found ${shifts.length} shifts for month');
+      final days = <int>{};
+      for (final shift in shifts) {
+        final dateStr = shift['shift_date'] as String?;
+        if (dateStr != null) {
+          final date = DateTime.parse(dateStr);
+          days.add(date.day);
+          debugPrint('Adding shift day: ${date.day}');
+        }
+      }
+      return days;
+    } catch (e) {
+      debugPrint('Error loading month shifts: $e');
+      return {};
+    }
+  }
+
   void _showMonthView(BuildContext context) {
     HapticFeedback.lightImpact();
     final now = DateTime.now();
@@ -1069,7 +1107,18 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (ctx) => Container(
+      builder: (ctx) {
+        // Load shift days and rebuild when ready
+        Set<int> localShiftDays = {};
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            // Load on first build
+            if (localShiftDays.isEmpty) {
+              _loadMonthShiftDaysAsync().then((days) {
+                setModalState(() => localShiftDays = days);
+              });
+            }
+            return Container(
         height: MediaQuery.of(context).size.height * 0.7,
         decoration: BoxDecoration(
           color: context.cardColor,
@@ -1117,10 +1166,8 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
                     return const SizedBox();
                   }
                   final isToday = dayOffset == now.day;
-                  // Check if any day in _weekSchedule has shifts for this day
-                  final dayIndex = DateTime(now.year, now.month, dayOffset).weekday - 1;
-                  final hasShift = dayIndex >= 0 && dayIndex < 7 &&
-                      (_weekSchedule[dayIndex]['shifts'] as List).isNotEmpty;
+                  // Check if this day has any scheduled shifts
+                  final hasShift = localShiftDays.contains(dayOffset);
                   return Container(
                     margin: const EdgeInsets.all(2),
                     decoration: BoxDecoration(
@@ -1158,7 +1205,10 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
             SizedBox(height: MediaQuery.of(ctx).padding.bottom),
           ],
         ),
-      ),
+      );
+          },
+        );
+      },
     );
   }
 }

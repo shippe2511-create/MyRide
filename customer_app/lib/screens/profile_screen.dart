@@ -1729,12 +1729,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(color: context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5), borderRadius: BorderRadius.circular(14)),
-      child: ExpansionTile(
-        title: Text(question, style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600)),
-        iconColor: AppColors.yellow,
-        collapsedIconColor: context.mutedColor,
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        children: [Text(answer, style: TextStyle(color: context.mutedColor, fontSize: 13))],
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          title: Text(question, style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600)),
+          iconColor: AppColors.yellow,
+          collapsedIconColor: context.mutedColor,
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          children: [Text(answer, style: TextStyle(color: context.mutedColor, fontSize: 13))],
+        ),
       ),
     );
   }

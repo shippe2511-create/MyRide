@@ -1728,7 +1728,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildFAQItem(String question, String answer) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(color: context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5), borderRadius: BorderRadius.circular(14), border: Border.all(color: context.borderColor)),
+      decoration: BoxDecoration(color: context.isDark ? AppColors.bgDark : const Color(0xFFF5F5F5), borderRadius: BorderRadius.circular(14)),
       child: ExpansionTile(
         title: Text(question, style: TextStyle(color: context.textColor, fontSize: 14, fontWeight: FontWeight.w600)),
         iconColor: AppColors.yellow,

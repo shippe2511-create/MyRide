@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
+import '../services/onesignal_service.dart';
 
 class AppState extends ChangeNotifier {
   bool _isInitialized = false;
@@ -364,6 +365,11 @@ class AppState extends ChangeNotifier {
     SupabaseService.setProfileId(id);
     _saveProfileId();
     if (id != null) {
+      // Login to OneSignal with profile ID for targeted push notifications
+      OneSignalService.login(id);
+      // Request push permission after login (user has context now)
+      OneSignalService.requestPermission();
+
       loadEmergencyContactsFromProfile();
       loadBlockedUsersFromProfile();
       loadTripHistory();
@@ -1094,6 +1100,9 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // Logout from OneSignal first (before clearing data)
+    OneSignalService.logout();
+
     try {
       await SupabaseService.signOut();
     } catch (e) {

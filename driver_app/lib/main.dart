@@ -3,8 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
+import 'services/onesignal_service.dart';
 import 'providers/driver_state.dart';
 import 'screens/splash_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -265,13 +264,6 @@ class SmoothPageRoute<T> extends PageRouteBuilder<T> {
         );
 }
 
-// Handle background FCM messages
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-  debugPrint('Background message: ${message.messageId}');
-}
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -281,14 +273,11 @@ void main() async {
     debugPrint('STACK: ${details.stack}');
   };
 
+  // Initialize OneSignal for push notifications
   try {
-    // Initialize Firebase - wrapped carefully for devices without Google Play Services
-    await Firebase.initializeApp();
-    // Set up background message handler only if Firebase initialized
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    await OneSignalService.initialize();
   } catch (e) {
-    debugPrint('Firebase init error (continuing without Firebase): $e');
-    // Continue without Firebase - app should still work
+    debugPrint('OneSignal init error: $e');
   }
 
   try {

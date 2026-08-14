@@ -9,6 +9,7 @@ import '../services/notification_service.dart';
 import '../services/supabase_service.dart';
 import '../services/voice_service.dart';
 import '../services/background_location_service.dart';
+import '../services/onesignal_service.dart';
 import '../utils/timezone_utils.dart';
 
 class DriverState extends ChangeNotifier {
@@ -455,6 +456,11 @@ class DriverState extends ChangeNotifier {
 
     // Sync to SupabaseService
     SupabaseService.setDriverId(id);
+
+    // Login to OneSignal with driver ID for targeted push notifications
+    OneSignalService.login(id);
+    // Request push permission after login (driver has context now)
+    OneSignalService.requestPermission();
 
     final prefs = await SharedPreferences.getInstance();
     // Await all writes to ensure they're persisted
@@ -1596,6 +1602,9 @@ class DriverState extends ChangeNotifier {
   }
 
   void logout() async {
+    // Logout from OneSignal first (before clearing data)
+    OneSignalService.logout();
+
     _isLoggedIn = false;
     _isOnline = false;
     _currentRide = null;

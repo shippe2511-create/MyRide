@@ -13,6 +13,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _initializeAll() async {
+    // First load basic UI state in parallel
     await Future.wait([
       _loadFavorites(),
       _loadReminders(),
@@ -22,10 +23,12 @@ class AppState extends ChangeNotifier {
       _loadLanguage(),
       _loadUserRegistration(),
       _loadTheme(),
-      _loadProfileId(),
       _loadNotificationSettings(),
       loadFaceIdSetting(),
     ]);
+    // Then load profile ID which fetches avatar from DB
+    // Must run after _loadProfilePhoto to properly update avatar
+    await _loadProfileId();
     _isInitialized = true;
     notifyListeners();
   }

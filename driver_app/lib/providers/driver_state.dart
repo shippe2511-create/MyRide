@@ -261,7 +261,10 @@ class DriverState extends ChangeNotifier {
       if (_driverId.isNotEmpty) {
         SupabaseService.setDriverId(_driverId);
         // Re-login to OneSignal on app restart for push notifications
-        OneSignalService.login(_driverId);
+        // Don't await - let it happen in background
+        OneSignalService.login(_driverId).then((_) {
+          debugPrint('OneSignal: login completed for $_driverId');
+        });
 
         // Fetch profileId from database if not set
         if (_profileId.isEmpty) {
@@ -460,9 +463,10 @@ class DriverState extends ChangeNotifier {
     SupabaseService.setDriverId(id);
 
     // Login to OneSignal with driver ID for targeted push notifications
-    OneSignalService.login(id);
-    // Request push permission after login (driver has context now)
-    OneSignalService.requestPermission();
+    // Then request permission
+    OneSignalService.login(id).then((_) {
+      OneSignalService.requestPermission();
+    });
 
     final prefs = await SharedPreferences.getInstance();
     // Await all writes to ensure they're persisted

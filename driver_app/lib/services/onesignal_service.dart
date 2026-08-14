@@ -2,18 +2,12 @@ import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:flutter/foundation.dart';
 
 /// OneSignal Push Notification Service for MyRide Driver App
-///
-/// Setup required:
-/// 1. Replace _appId with your OneSignal App ID from dashboard
-/// 2. iOS: Add Push Notifications capability in Xcode
-/// 3. iOS: Add Background Modes > Remote notifications in Xcode
-/// 4. iOS: Create Notification Service Extension for terminated-state delivery
-/// 5. iOS: Upload APNs credentials to OneSignal dashboard
 class OneSignalService {
   // OneSignal Driver App ID
   static const String _appId = '53a7d5ba-e062-4e2d-abf0-950264b168e4';
 
   static bool _initialized = false;
+  static String? _pendingLoginId;
   static Function(String rideId, String eventType)? _onNotificationTap;
 
   /// Initialize OneSignal - call in main() before runApp()
@@ -32,6 +26,12 @@ class OneSignalService {
 
     _initialized = true;
     debugPrint('OneSignal: initialized for driver app');
+
+    // If there was a pending login, do it now
+    if (_pendingLoginId != null) {
+      await _doLogin(_pendingLoginId!);
+      _pendingLoginId = null;
+    }
   }
 
   /// Set callback for notification tap - for deep linking
@@ -41,15 +41,37 @@ class OneSignalService {
 
   /// Login - call after driver authenticates
   /// Pass the driver_id (UUID) so backend can target this driver
-  static void login(String driverId) {
+  static Future<void> login(String driverId) async {
     if (driverId.isEmpty) return;
-    OneSignal.login(driverId);
-    debugPrint('OneSignal: logged in driver $driverId');
+
+    if (!_initialized) {
+      // Queue the login for after initialization
+      _pendingLoginId = driverId;
+      debugPrint('OneSignal: queued login for $driverId (SDK not yet initialized)');
+      return;
+    }
+
+    await _doLogin(driverId);
+  }
+
+  static Future<void> _doLogin(String driverId) async {
+    try {
+      // Login sets the external_id for this user
+      await OneSignal.login(driverId);
+      debugPrint('OneSignal: logged in driver $driverId');
+
+      // Verify the login worked
+      await Future.delayed(const Duration(milliseconds: 500));
+      final subscriptionId = OneSignal.User.pushSubscription.id;
+      debugPrint('OneSignal: subscriptionId=$subscriptionId');
+    } catch (e) {
+      debugPrint('OneSignal: login error: $e');
+    }
   }
 
   /// Logout - call when driver logs out
-  static void logout() {
-    OneSignal.logout();
+  static Future<void> logout() async {
+    await OneSignal.logout();
     debugPrint('OneSignal: logged out');
   }
 
@@ -66,6 +88,7 @@ class OneSignalService {
 
   /// Get the OneSignal subscription ID (for debugging)
   static String? get subscriptionId => OneSignal.User.pushSubscription.id;
+
 
   /// Add a tag for segmentation (e.g., vehicle_type, department)
   static void setTag(String key, String value) {
@@ -106,11 +129,12 @@ class OneSignalService {
       debugPrint('OneSignal: permission changed to $permission');
     });
 
-    // Subscription change observer
+    // Subscription change observer - this fires when push token is received
     OneSignal.User.pushSubscription.addObserver((state) {
       debugPrint('OneSignal: subscription changed');
       debugPrint('OneSignal: subscriptionId=${state.current.id}');
       debugPrint('OneSignal: optedIn=${state.current.optedIn}');
+      debugPrint('OneSignal: token=${state.current.token?.substring(0, 20)}...');
     });
   }
 

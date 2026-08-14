@@ -366,9 +366,10 @@ class AppState extends ChangeNotifier {
     _saveProfileId();
     if (id != null) {
       // Login to OneSignal with profile ID for targeted push notifications
-      OneSignalService.login(id);
-      // Request push permission after login (user has context now)
-      OneSignalService.requestPermission();
+      // Then request permission
+      OneSignalService.login(id).then((_) {
+        OneSignalService.requestPermission();
+      });
 
       loadEmergencyContactsFromProfile();
       loadBlockedUsersFromProfile();
@@ -407,6 +408,10 @@ class AppState extends ChangeNotifier {
     }
     if (_profileId != null) {
       SupabaseService.setProfileId(_profileId);
+      // Re-login to OneSignal on app restart for push notifications
+      OneSignalService.login(_profileId!).then((_) {
+        debugPrint('OneSignal: login completed for $_profileId');
+      });
       // Check if account is suspended and load profile data
       await _checkAccountStatus();
       if (_isSuspended) {

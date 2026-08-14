@@ -232,9 +232,19 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
 
     for (var day in _weekSchedule) {
       for (var shift in day['shifts'] as List) {
-        final start = int.parse((shift['start'] as String).split(':')[0]);
-        final end = int.parse((shift['end'] as String).split(':')[0]);
-        totalHours += (end - start);
+        final startParts = (shift['start'] as String).split(':');
+        final endParts = (shift['end'] as String).split(':');
+        final startMinutes = int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
+        final endMinutes = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+
+        // Handle overnight shifts (e.g., 22:00 to 05:00)
+        int durationMinutes;
+        if (endMinutes >= startMinutes) {
+          durationMinutes = endMinutes - startMinutes;
+        } else {
+          durationMinutes = (24 * 60 - startMinutes) + endMinutes;
+        }
+        totalHours += (durationMinutes / 60).round();
 
         if (shift['status'] == 'completed') completedShifts++;
         if (shift['status'] == 'upcoming' || shift['status'] == 'current') upcomingShifts++;

@@ -2434,8 +2434,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
           if (data['status'] == 'OK' && (data['results'] as List).isNotEmpty) {
-            final address = data['results'][0]['formatted_address'] ?? 'Pinned Location';
-            return cleanAddress(address);
+            // Find the best result - skip Plus Codes (they contain + sign)
+            for (final result in data['results']) {
+              final address = result['formatted_address'] as String? ?? '';
+              // Skip if it starts with a Plus Code pattern (e.g., "5GVG+XQP")
+              if (!RegExp(r'^[A-Z0-9]{4,}\+').hasMatch(address)) {
+                return cleanAddress(address);
+              }
+            }
+            // If all results have Plus Codes, try to extract a readable part
+            final firstAddress = data['results'][0]['formatted_address'] as String? ?? 'Pinned Location';
+            // Remove Plus Code prefix if present (e.g., "5GVG+XQP, Airport Main Rd" -> "Airport Main Rd")
+            final cleaned = firstAddress.replaceFirst(RegExp(r'^[A-Z0-9]{4,}\+[A-Z0-9]+,?\s*'), '');
+            return cleaned.isNotEmpty ? cleanAddress(cleaned) : 'Pinned Location';
           }
         }
       } catch (e) {

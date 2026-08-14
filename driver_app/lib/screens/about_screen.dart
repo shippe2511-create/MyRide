@@ -70,7 +70,7 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  String _aboutText = 'MyRide is the official staff transportation app for IT Division employees. As a driver, you help provide free, safe, and comfortable rides for staff members.\n\nThis app allows you to receive ride requests, navigate to pickup locations, and manage your trips efficiently.';
+  String _aboutText = 'MyRide is the official staff transportation app for MACL employees. As a driver, you help provide free, safe, and comfortable rides for staff members.\n\nThis app allows you to receive ride requests, navigate to pickup locations, and manage your trips efficiently.';
 
   @override
   void initState() {
@@ -318,7 +318,7 @@ class _AboutScreenState extends State<AboutScreen> {
                 // Copyright
                 Center(
                   child: Text(
-                    '© 2026 IT Division',
+                    '© 2026 MACL',
                     style: TextStyle(
                       color: context.mutedColor,
                       fontSize: 13,

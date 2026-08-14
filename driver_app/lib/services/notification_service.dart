@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
@@ -242,58 +241,10 @@ class NotificationService {
       final granted = await _requestPermissions();
       debugPrint('NotificationService: Permissions granted=$granted');
       _initialized = true;
-
-      // Set up FCM
-      await _setupFCM();
     } catch (e) {
       debugPrint('NotificationService: Init error: $e');
       // Still mark as initialized to prevent repeated attempts
       _initialized = true;
-    }
-  }
-
-  static Future<void> _setupFCM() async {
-    try {
-      // Request FCM permission
-      final messaging = FirebaseMessaging.instance;
-      await messaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-
-      // Get FCM token and save to database
-      final token = await messaging.getToken();
-      if (token != null) {
-        debugPrint('FCM Token registered');
-        await SupabaseService.registerFcmToken(token);
-      }
-
-      // Listen for token refresh
-      messaging.onTokenRefresh.listen((newToken) {
-        debugPrint('FCM Token refreshed');
-        SupabaseService.registerFcmToken(newToken);
-      });
-
-      // Handle foreground messages
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        debugPrint('FCM foreground message: ${message.notification?.title}');
-        if (message.notification != null) {
-          showNotification(
-            title: message.notification!.title ?? 'MyRide Driver',
-            body: message.notification!.body ?? '',
-            payload: message.data['rideId'],
-          );
-        }
-      });
-
-      // Handle notification tap when app was in background
-      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        debugPrint('FCM message opened app: ${message.data}');
-        // Navigate based on payload if needed
-      });
-    } catch (e) {
-      debugPrint('FCM setup error: $e');
     }
   }
 

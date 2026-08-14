@@ -4,7 +4,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// OneSignal API credentials (set in Supabase Dashboard > Edge Functions > Secrets)
+// Internal API key for securing the function (set in Supabase secrets)
+const PUSH_API_KEY = Deno.env.get("PUSH_API_KEY");
+
+// OneSignal API credentials
 const ONESIGNAL_CUSTOMER_APP_ID = Deno.env.get("ONESIGNAL_CUSTOMER_APP_ID")!;
 const ONESIGNAL_CUSTOMER_API_KEY = Deno.env.get("ONESIGNAL_CUSTOMER_API_KEY")!;
 const ONESIGNAL_DRIVER_APP_ID = Deno.env.get("ONESIGNAL_DRIVER_APP_ID")!;
@@ -20,6 +23,33 @@ interface NotificationPayload {
   title: string;
   body: string;
   data?: Record<string, unknown>;
+}
+
+// Verify the request is authorized
+function isAuthorized(req: Request): boolean {
+  // Check for API key in header
+  const apiKey = req.headers.get("x-push-api-key");
+  if (apiKey && PUSH_API_KEY && apiKey === PUSH_API_KEY) {
+    return true;
+  }
+
+  // Check for service role key (for internal Supabase calls like triggers)
+  const authHeader = req.headers.get("Authorization");
+  if (authHeader) {
+    const token = authHeader.replace("Bearer ", "");
+    if (token === SUPABASE_SERVICE_ROLE_KEY) {
+      return true;
+    }
+  }
+
+  // Allow calls from database triggers (no auth header but comes from Supabase internal network)
+  // These calls have a specific user-agent from pg_net
+  const userAgent = req.headers.get("user-agent") || "";
+  if (userAgent.includes("pg_net") || userAgent.includes("Supabase")) {
+    return true;
+  }
+
+  return false;
 }
 
 async function sendOneSignalNotification(payload: NotificationPayload): Promise<{ success: boolean; error?: string }> {
@@ -180,13 +210,23 @@ async function handleDirectNotification(req: Request): Promise<Response> {
 }
 
 serve(async (req) => {
+  // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, {
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, x-push-api-key",
       },
+    });
+  }
+
+  // Authorization check
+  if (!isAuthorized(req)) {
+    console.log("Unauthorized request blocked");
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
     });
   }
 

@@ -10,8 +10,8 @@ import 'package:flutter/foundation.dart';
 /// 4. iOS: Create Notification Service Extension for terminated-state delivery
 /// 5. iOS: Upload APNs credentials to OneSignal dashboard
 class OneSignalService {
-  // TODO: Replace with your OneSignal Customer App ID
-  static const String _appId = 'YOUR_ONESIGNAL_CUSTOMER_APP_ID';
+  // OneSignal Customer App ID
+  static const String _appId = 'ddb93663-5792-489f-9c3a-f5b8ba4868e1';
 
   static bool _initialized = false;
   static Function(String rideId, String eventType)? _onNotificationTap;

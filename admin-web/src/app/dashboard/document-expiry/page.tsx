@@ -21,6 +21,14 @@ interface ExpiringDocument {
   reminder_sent: boolean
 }
 
+const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  license: "Driver's License",
+  id_card: "ID Card",
+  vehicle_reg: "Vehicle Registration",
+  insurance: "Insurance",
+  medical: "Medical Certificate",
+}
+
 export default function DocumentExpiryPage() {
   const supabase = createClient()
   const [documents, setDocuments] = useState<ExpiringDocument[]>([])
@@ -218,7 +226,7 @@ export default function DocumentExpiryPage() {
                       <p className="font-medium">{doc.driver_name}</p>
                       {doc.reminder_sent && <Badge variant="outline" className="text-xs text-green-500 border-green-500">Notified</Badge>}
                     </div>
-                    <p className="text-sm text-muted-foreground">{doc.document_type}</p>
+                    <p className="text-sm text-muted-foreground">{DOCUMENT_TYPE_LABELS[doc.document_type] || doc.document_type}</p>
                   </div>
                   <div className="text-right">
                     {getExpiryBadge(doc.days_until_expiry)}
@@ -252,7 +260,7 @@ export default function DocumentExpiryPage() {
                       <p className="font-medium">{doc.driver_name}</p>
                       {doc.reminder_sent && <Badge variant="outline" className="text-xs text-green-500 border-green-500">Notified</Badge>}
                     </div>
-                    <p className="text-sm text-muted-foreground">{doc.document_type}</p>
+                    <p className="text-sm text-muted-foreground">{DOCUMENT_TYPE_LABELS[doc.document_type] || doc.document_type}</p>
                   </div>
                   <div className="text-right">
                     {getExpiryBadge(doc.days_until_expiry)}
@@ -283,7 +291,7 @@ export default function DocumentExpiryPage() {
                 <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div>
                     <p className="font-medium">{doc.driver_name}</p>
-                    <p className="text-sm text-muted-foreground">{doc.document_type}</p>
+                    <p className="text-sm text-muted-foreground">{DOCUMENT_TYPE_LABELS[doc.document_type] || doc.document_type}</p>
                   </div>
                   <div className="text-right">
                     {getExpiryBadge(doc.days_until_expiry)}
@@ -314,7 +322,7 @@ export default function DocumentExpiryPage() {
                 <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div>
                     <p className="font-medium">{doc.driver_name}</p>
-                    <p className="text-sm text-muted-foreground">{doc.document_type}</p>
+                    <p className="text-sm text-muted-foreground">{DOCUMENT_TYPE_LABELS[doc.document_type] || doc.document_type}</p>
                   </div>
                   <div className="text-right">
                     {getExpiryBadge(doc.days_until_expiry)}

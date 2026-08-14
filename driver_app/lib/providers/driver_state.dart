@@ -257,9 +257,11 @@ class DriverState extends ChangeNotifier {
       _vehicleId = prefs.getString('vehicleId') ?? '';
       _vehicleNumber = prefs.getString('vehicleNumber') ?? '';
 
-      // Sync driverId to SupabaseService
+      // Sync driverId to SupabaseService and OneSignal
       if (_driverId.isNotEmpty) {
         SupabaseService.setDriverId(_driverId);
+        // Re-login to OneSignal on app restart for push notifications
+        OneSignalService.login(_driverId);
 
         // Fetch profileId from database if not set
         if (_profileId.isEmpty) {

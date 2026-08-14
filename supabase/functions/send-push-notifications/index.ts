@@ -3,156 +3,202 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const FCM_SERVER_KEY = Deno.env.get("FCM_SERVER_KEY"); // Set this in Supabase Dashboard > Edge Functions > Secrets
+
+// OneSignal API credentials (set in Supabase Dashboard > Edge Functions > Secrets)
+const ONESIGNAL_CUSTOMER_APP_ID = Deno.env.get("ONESIGNAL_CUSTOMER_APP_ID")!;
+const ONESIGNAL_CUSTOMER_API_KEY = Deno.env.get("ONESIGNAL_CUSTOMER_API_KEY")!;
+const ONESIGNAL_DRIVER_APP_ID = Deno.env.get("ONESIGNAL_DRIVER_APP_ID")!;
+const ONESIGNAL_DRIVER_API_KEY = Deno.env.get("ONESIGNAL_DRIVER_API_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-interface PushNotification {
-  id: string;
-  user_id: string;
+type TargetApp = "customer" | "driver";
+
+interface NotificationPayload {
+  target_app: TargetApp;
+  external_user_id: string;
   title: string;
   body: string;
-  data: Record<string, unknown> | null;
+  data?: Record<string, unknown>;
 }
 
-interface PushToken {
-  token: string;
-  platform: string;
-}
+async function sendOneSignalNotification(payload: NotificationPayload): Promise<{ success: boolean; error?: string }> {
+  const isCustomer = payload.target_app === "customer";
+  const appId = isCustomer ? ONESIGNAL_CUSTOMER_APP_ID : ONESIGNAL_DRIVER_APP_ID;
+  const apiKey = isCustomer ? ONESIGNAL_CUSTOMER_API_KEY : ONESIGNAL_DRIVER_API_KEY;
 
-async function sendFCMNotification(
-  token: string,
-  title: string,
-  body: string,
-  data?: Record<string, unknown>
-): Promise<boolean> {
-  if (!FCM_SERVER_KEY) {
-    console.error("FCM_SERVER_KEY not configured");
-    return false;
+  if (!appId || !apiKey) {
+    return { success: false, error: `OneSignal ${payload.target_app} credentials not configured` };
   }
 
   try {
-    const response = await fetch("https://fcm.googleapis.com/fcm/send", {
+    const response = await fetch("https://onesignal.com/api/v1/notifications", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `key=${FCM_SERVER_KEY}`,
+        "Authorization": `Basic ${apiKey}`,
       },
       body: JSON.stringify({
-        to: token,
-        notification: {
-          title,
-          body,
-          sound: "default",
-          badge: 1,
-        },
-        data: data || {},
-        priority: "high",
+        app_id: appId,
+        include_external_user_ids: [payload.external_user_id],
+        headings: { en: payload.title },
+        contents: { en: payload.body },
+        data: payload.data || {},
+        ios_sound: "default",
+        android_sound: "default",
+        priority: 10,
+        ttl: 86400,
       }),
     });
 
     const result = await response.json();
-    return result.success === 1;
+    if (result.errors) {
+      return { success: false, error: JSON.stringify(result.errors) };
+    }
+    return { success: result.recipients > 0 };
   } catch (error) {
-    console.error("FCM send error:", error);
-    return false;
+    return { success: false, error: (error as Error).message };
   }
 }
 
-async function processQueue() {
-  // Fetch pending notifications (limit batch size)
-  const { data: pending, error: fetchError } = await supabase
-    .from("push_notification_queue")
-    .select("*")
-    .eq("status", "pending")
-    .lt("attempts", 3)
-    .order("created_at", { ascending: true })
-    .limit(50);
+async function handleRideEvent(req: Request): Promise<Response> {
+  const { event_type, ride_id, ride } = await req.json();
 
-  if (fetchError) {
-    console.error("Error fetching queue:", fetchError);
-    return { processed: 0, errors: [fetchError.message] };
+  if (!event_type || !ride_id) {
+    return new Response(JSON.stringify({ error: "Missing event_type or ride_id" }), { status: 400 });
   }
 
-  if (!pending || pending.length === 0) {
-    return { processed: 0, errors: [] };
+  let rideData = ride;
+  if (!rideData) {
+    const { data, error } = await supabase
+      .from("rides")
+      .select("*, profiles:profile_id(full_name), drivers:driver_id(full_name)")
+      .eq("id", ride_id)
+      .single();
+    if (error) return new Response(JSON.stringify({ error: "Ride not found" }), { status: 404 });
+    rideData = data;
   }
 
-  console.log(`Processing ${pending.length} notifications`);
+  const notifications: NotificationPayload[] = [];
 
-  let successCount = 0;
-  const errors: string[] = [];
-
-  for (const notification of pending as PushNotification[]) {
-    // Get user's push tokens
-    const { data: tokens, error: tokenError } = await supabase
-      .from("push_tokens")
-      .select("token, platform")
-      .eq("user_id", notification.user_id);
-
-    if (tokenError || !tokens || tokens.length === 0) {
-      // No tokens - mark as failed
-      await supabase
-        .from("push_notification_queue")
-        .update({
-          status: "failed",
-          error_message: "No push tokens found for user",
-          attempts: (notification as any).attempts + 1,
-        })
-        .eq("id", notification.id);
-      errors.push(`No tokens for user ${notification.user_id}`);
-      continue;
-    }
-
-    // Send to all user's devices
-    let anySent = false;
-    for (const { token } of tokens as PushToken[]) {
-      const sent = await sendFCMNotification(
-        token,
-        notification.title,
-        notification.body,
-        notification.data || undefined
-      );
-      if (sent) anySent = true;
-    }
-
-    // Update queue status
-    await supabase
-      .from("push_notification_queue")
-      .update({
-        status: anySent ? "sent" : "failed",
-        sent_at: anySent ? new Date().toISOString() : null,
-        error_message: anySent ? null : "FCM delivery failed",
-        attempts: (notification as any).attempts + 1,
-      })
-      .eq("id", notification.id);
-
-    if (anySent) successCount++;
+  switch (event_type) {
+    case "ride_assigned":
+      if (rideData.driver_id) {
+        notifications.push({
+          target_app: "driver",
+          external_user_id: rideData.driver_id,
+          title: "New Ride Assigned",
+          body: `Pickup: ${rideData.pickup_address || "See app"}`,
+          data: { ride_id, event_type },
+        });
+      }
+      break;
+    case "driver_accepted":
+      if (rideData.profile_id) {
+        notifications.push({
+          target_app: "customer",
+          external_user_id: rideData.profile_id,
+          title: "Driver Accepted",
+          body: `${rideData.drivers?.full_name || "Your driver"} is on the way`,
+          data: { ride_id, event_type },
+        });
+      }
+      break;
+    case "driver_arrived":
+      if (rideData.profile_id) {
+        notifications.push({
+          target_app: "customer",
+          external_user_id: rideData.profile_id,
+          title: "Driver Arrived",
+          body: "Your driver has arrived at the pickup location",
+          data: { ride_id, event_type },
+        });
+      }
+      break;
+    case "ride_started":
+      if (rideData.profile_id) {
+        notifications.push({
+          target_app: "customer",
+          external_user_id: rideData.profile_id,
+          title: "Ride Started",
+          body: "Your ride is now in progress",
+          data: { ride_id, event_type },
+        });
+      }
+      break;
+    case "ride_completed":
+      if (rideData.profile_id) {
+        notifications.push({
+          target_app: "customer",
+          external_user_id: rideData.profile_id,
+          title: "Ride Completed",
+          body: "You have arrived at your destination",
+          data: { ride_id, event_type },
+        });
+      }
+      break;
+    case "ride_cancelled":
+      if (rideData.profile_id) {
+        notifications.push({
+          target_app: "customer",
+          external_user_id: rideData.profile_id,
+          title: "Ride Cancelled",
+          body: "Your ride has been cancelled",
+          data: { ride_id, event_type },
+        });
+      }
+      if (rideData.driver_id) {
+        notifications.push({
+          target_app: "driver",
+          external_user_id: rideData.driver_id,
+          title: "Ride Cancelled",
+          body: "The ride has been cancelled",
+          data: { ride_id, event_type },
+        });
+      }
+      break;
   }
 
-  return { processed: successCount, errors };
+  const results = await Promise.all(notifications.map(n => sendOneSignalNotification(n)));
+  const sent = results.filter(r => r.success).length;
+
+  return new Response(JSON.stringify({ sent, total: notifications.length }), {
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+async function handleDirectNotification(req: Request): Promise<Response> {
+  const payload: NotificationPayload = await req.json();
+  if (!payload.external_user_id || !payload.title || !payload.body || !payload.target_app) {
+    return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400 });
+  }
+  const result = await sendOneSignalNotification(payload);
+  return new Response(JSON.stringify(result), {
+    status: result.success ? 200 : 500,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 serve(async (req) => {
-  // Allow CRON or manual invocation
-  if (req.method === "POST" || req.method === "GET") {
-    try {
-      const result = await processQueue();
-      return new Response(JSON.stringify(result), {
-        headers: { "Content-Type": "application/json" },
-        status: 200,
-      });
-    } catch (error) {
-      console.error("Queue processing error:", error);
-      return new Response(
-        JSON.stringify({ error: (error as Error).message }),
-        {
-          headers: { "Content-Type": "application/json" },
-          status: 500,
-        }
-      );
-    }
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      },
+    });
   }
 
-  return new Response("Method not allowed", { status: 405 });
+  const url = new URL(req.url);
+  const action = url.searchParams.get("action");
+
+  try {
+    if (action === "ride-event") {
+      return await handleRideEvent(req);
+    }
+    return await handleDirectNotification(req);
+  } catch (error) {
+    return new Response(JSON.stringify({ error: (error as Error).message }), { status: 500 });
+  }
 });

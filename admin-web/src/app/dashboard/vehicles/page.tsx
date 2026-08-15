@@ -31,6 +31,7 @@ import {
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { PermissionGate } from "@/components/permission-gate"
+import { usePermissions } from "@/hooks/usePermissions"
 
 interface VehicleType {
   id: string
@@ -103,6 +104,7 @@ const supabase = createClient()
 
 export default function VehiclesPage() {
   const queryClient = useQueryClient()
+  const { departmentId: userDepartmentId } = usePermissions()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType | null>(null)
@@ -144,7 +146,14 @@ export default function VehiclesPage() {
     staleTime: 30 * 1000,
   })
 
-  // Load departments and set Transport as default
+  // Set department filter to user's department when it loads
+  useEffect(() => {
+    if (userDepartmentId && !departmentFilter) {
+      setDepartmentFilter(userDepartmentId)
+    }
+  }, [userDepartmentId])
+
+  // Load departments
   useEffect(() => {
     const loadDepartments = async () => {
       const { data } = await supabase
@@ -153,9 +162,6 @@ export default function VehiclesPage() {
         .eq("is_active", true)
         .order("name")
       setDepartments(data || [])
-      // Set Transport as default filter
-      const transport = data?.find(d => d.name.toLowerCase() === "transport")
-      if (transport) setDepartmentFilter(transport.id)
     }
     loadDepartments()
   }, [])

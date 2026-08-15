@@ -3,6 +3,14 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { usePermissions } from "@/hooks/usePermissions"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 interface RecentRide {
   id: string
@@ -10,9 +18,15 @@ interface RecentRide {
   pickup_address: string | null
   dropoff_address: string | null
   created_at: string
-  customer?: { full_name: string } | null
-  driver?: { profile?: { full_name: string } | null } | null
+  customer?: { full_name: string; department_id?: string | null } | null
+  driver?: { profile?: { full_name: string } | null; department_id?: string | null } | null
 }
+
+interface Department {
+  id: string
+  name: string
+}
+
 import { Badge } from "@/components/ui/badge"
 import {
   Car,
@@ -44,18 +58,80 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { formatDistanceToNow, format } from "date-fns"
 
-function useDashboardData() {
+function useDashboardData(departmentFilter: string) {
   const supabase = createClient()
 
   return useQuery({
-    queryKey: ["dashboard"],
+    queryKey: ["dashboard", departmentFilter],
     queryFn: async () => {
+      // Get customer IDs and driver IDs for department filtering
+      let customerIds: string[] | null = null
+      let driverIds: string[] | null = null
+      let driverProfileIds: string[] | null = null
+
+      if (departmentFilter && departmentFilter !== "all") {
+        const [{ data: customers }, { data: drivers }] = await Promise.all([
+          supabase.from("profiles").select("id").eq("department_id", departmentFilter).eq("role", "customer"),
+          supabase.from("drivers").select("id, profile_id").eq("department_id", departmentFilter)
+        ])
+        customerIds = customers?.map(c => c.id) || []
+        driverIds = drivers?.map(d => d.id) || []
+        driverProfileIds = drivers?.map(d => d.profile_id) || []
+      }
       const now = new Date()
       const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
       const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
       const todayStart = new Date()
       todayStart.setHours(0, 0, 0, 0)
       const todayISO = todayStart.toISOString()
+
+      // Build queries with department filter
+      let customersQuery = supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer")
+      let driversQuery = supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver")
+      let ridesQuery = supabase.from("rides").select("*", { count: "exact", head: true })
+      let activeRidesQuery = supabase.from("rides").select("*", { count: "exact", head: true }).in("status", ["pending", "accepted", "in_progress"])
+      let completedRidesQuery = supabase.from("rides").select("*", { count: "exact", head: true }).eq("status", "completed")
+      let onlineDriversQuery = supabase.from("drivers").select("*").eq("is_online", true)
+      let recentRidesQuery = supabase.from("rides").select(`
+          *,
+          customer:profiles!rides_customer_id_fkey(full_name, department_id),
+          driver:drivers!rides_driver_id_fkey(
+            department_id,
+            profile:profiles(full_name)
+          )
+        `).order("created_at", { ascending: false }).limit(20)
+      let todayRidesQuery = supabase.from("rides").select("id, status, created_at, accepted_at, arrived_at, completed_at, customer_id").gte("created_at", todayISO)
+      let driversOnBreakQuery = supabase.from("drivers").select("id, profile:profiles(full_name)").eq("is_on_break", true)
+      let topDriverQuery = supabase.from("rides").select("driver_id, driver:drivers(department_id, profile:profiles(full_name))").eq("status", "completed").gte("created_at", thisMonth.toISOString())
+      let weekRidesQuery = supabase.from("rides").select("id, status, created_at, customer_id").gte("created_at", new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString())
+      let lastWeekRidesQuery = supabase.from("rides").select("id, status, created_at, customer_id").gte("created_at", new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString()).lt("created_at", new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString())
+      let cancelledTodayQuery = supabase.from("rides").select("*", { count: "exact", head: true }).eq("status", "cancelled").gte("created_at", todayISO)
+      let shiftsQuery = supabase.from("shifts").select("id, attendance_status, driver_id").eq("shift_date", todayISO.split('T')[0])
+      let pendingApprovalsQuery = supabase.from("profiles").select("*", { count: "exact", head: true }).eq("status", "pending")
+      let unassignedQuery = supabase.from("rides").select("*", { count: "exact", head: true }).eq("status", "pending")
+      let vehiclesQuery = supabase.from("vehicles").select("*", { count: "exact", head: true }).eq("is_active", true)
+
+      // Apply department filter
+      if (customerIds && customerIds.length > 0) {
+        customersQuery = customersQuery.in("id", customerIds)
+        ridesQuery = ridesQuery.in("customer_id", customerIds)
+        activeRidesQuery = activeRidesQuery.in("customer_id", customerIds)
+        completedRidesQuery = completedRidesQuery.in("customer_id", customerIds)
+        todayRidesQuery = todayRidesQuery.in("customer_id", customerIds)
+        weekRidesQuery = weekRidesQuery.in("customer_id", customerIds)
+        lastWeekRidesQuery = lastWeekRidesQuery.in("customer_id", customerIds)
+        cancelledTodayQuery = cancelledTodayQuery.in("customer_id", customerIds)
+        unassignedQuery = unassignedQuery.in("customer_id", customerIds)
+        pendingApprovalsQuery = pendingApprovalsQuery.in("id", customerIds)
+      }
+      if (driverProfileIds && driverProfileIds.length > 0) {
+        driversQuery = driversQuery.in("id", driverProfileIds)
+      }
+      if (driverIds && driverIds.length > 0) {
+        onlineDriversQuery = onlineDriversQuery.in("id", driverIds)
+        driversOnBreakQuery = driversOnBreakQuery.in("id", driverIds)
+        shiftsQuery = shiftsQuery.in("driver_id", driverIds)
+      }
 
       const [
         { count: totalCustomers },
@@ -84,38 +160,51 @@ function useDashboardData() {
         { count: cancelledToday },
         { data: shiftsToday }
       ] = await Promise.all([
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer"),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver"),
-        supabase.from("rides").select("*", { count: "exact", head: true }),
-        supabase.from("rides").select("*", { count: "exact", head: true }).in("status", ["pending", "accepted", "in_progress"]),
-        supabase.from("rides").select("*", { count: "exact", head: true }).eq("status", "completed"),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("status", "pending"),
-        supabase.from("drivers").select("*").eq("is_online", true),
-        supabase.from("rides").select(`
-          *,
-          customer:profiles!rides_customer_id_fkey(full_name),
-          driver:drivers!rides_driver_id_fkey(
-            profile:profiles(full_name)
-          )
-        `).order("created_at", { ascending: false }).limit(5),
+        customersQuery,
+        driversQuery,
+        ridesQuery,
+        activeRidesQuery,
+        completedRidesQuery,
+        pendingApprovalsQuery,
+        onlineDriversQuery,
+        recentRidesQuery,
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "customer").lt("created_at", thisMonth.toISOString()),
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "driver").lt("created_at", thisMonth.toISOString()),
         supabase.from("rides").select("*", { count: "exact", head: true }).lt("created_at", thisMonth.toISOString()),
-        supabase.from("rides").select("id, status, created_at, accepted_at, arrived_at, completed_at").gte("created_at", todayISO),
+        todayRidesQuery,
         supabase.from("bus_location_tracking").select("id, is_full, passengers_on_board, vehicle_capacity, route:transport_routes(route_code)").in("status", ["active", "in_progress"]),
         supabase.from("sos_alerts").select("*", { count: "exact", head: true }).eq("status", "active"),
         supabase.from("vehicles").select("id, vehicle_number, license_expiry, insurance_expiry").or(`license_expiry.lte.${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]},insurance_expiry.lte.${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}`).limit(5),
         supabase.from("drivers").select("id, profile:profiles(full_name), created_at").eq("approval_status", "pending").limit(5),
-        supabase.from("rides").select("*", { count: "exact", head: true }).eq("status", "pending"),
-        supabase.from("vehicles").select("*", { count: "exact", head: true }).eq("is_active", true),
-        supabase.from("drivers").select("id, profile:profiles(full_name)").eq("is_on_break", true),
-        supabase.from("rides").select("driver_id, driver:drivers(profile:profiles(full_name))").eq("status", "completed").gte("created_at", thisMonth.toISOString()),
+        unassignedQuery,
+        vehiclesQuery,
+        driversOnBreakQuery,
+        topDriverQuery,
         supabase.from("ratings").select("rating"),
-        supabase.from("rides").select("id, status, created_at").gte("created_at", new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()),
-        supabase.from("rides").select("id, status, created_at").gte("created_at", new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString()).lt("created_at", new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()),
-        supabase.from("rides").select("*", { count: "exact", head: true }).eq("status", "cancelled").gte("created_at", todayISO),
-        supabase.from("shifts").select("id, attendance_status").eq("shift_date", todayISO.split('T')[0])
+        weekRidesQuery,
+        lastWeekRidesQuery,
+        cancelledTodayQuery,
+        shiftsQuery
       ])
+
+      // Filter recent rides by department after fetching (client-side)
+      let filteredRecentRides = recentRides || []
+      if (departmentFilter && departmentFilter !== "all") {
+        filteredRecentRides = filteredRecentRides.filter((ride: any) =>
+          ride.customer?.department_id === departmentFilter ||
+          ride.driver?.department_id === departmentFilter
+        ).slice(0, 5)
+      } else {
+        filteredRecentRides = filteredRecentRides.slice(0, 5)
+      }
+
+      // Filter top driver by department
+      let filteredTopDriver = topDriver || []
+      if (departmentFilter && departmentFilter !== "all" && driverIds) {
+        filteredTopDriver = filteredTopDriver.filter((r: any) =>
+          r.driver?.department_id === departmentFilter
+        )
+      }
 
       const calcTrend = (current: number, lastMonthTotal: number) => {
         const newThisMonth = current - lastMonthTotal
@@ -167,7 +256,7 @@ function useDashboardData() {
         : 0
 
       const driverCounts: Record<string, { count: number, name: string }> = {}
-      const topDriverRides = topDriver || []
+      const topDriverRides = filteredTopDriver
       topDriverRides.forEach((r: any) => {
         if (r.driver_id && r.driver?.profile?.full_name) {
           if (!driverCounts[r.driver_id]) {
@@ -204,7 +293,7 @@ function useDashboardData() {
         completedRides: completedRides || 0,
         pendingApprovals: pendingApprovals || 0,
         onlineDrivers: onlineDrivers?.length || 0,
-        recentRides: recentRides || [],
+        recentRides: filteredRecentRides,
         customerTrend,
         driverTrend,
         rideTrend,
@@ -254,7 +343,33 @@ const supabase = createClient()
 
 export function DashboardClient() {
   const queryClient = useQueryClient()
-  const { data: stats, isLoading } = useDashboardData()
+  const { departmentId: userDepartmentId } = usePermissions()
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [departmentFilter, setDepartmentFilter] = useState<string>("")
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
+
+  // Load departments
+  useEffect(() => {
+    async function loadDepartments() {
+      const { data } = await supabase.from("departments").select("id, name").eq("is_active", true).order("name")
+      if (data) setDepartments(data)
+    }
+    loadDepartments()
+  }, [])
+
+  // Set default department to user's department
+  useEffect(() => {
+    if (departments.length > 0 && !departmentInitialized) {
+      if (userDepartmentId) {
+        setDepartmentFilter(userDepartmentId)
+      } else {
+        setDepartmentFilter("all")
+      }
+      setDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, departmentInitialized])
+
+  const { data: stats, isLoading } = useDashboardData(departmentFilter)
 
   useEffect(() => {
     const channel = supabase
@@ -313,9 +428,10 @@ export function DashboardClient() {
 
   return (
     <div className="space-y-6">
-      {/* Quick Actions Bar */}
-      <div className="flex items-center gap-3 overflow-x-auto pb-1">
-        {quickActions.map((action) => (
+      {/* Header with Department Filter */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3 overflow-x-auto pb-1">
+          {quickActions.map((action) => (
           <Link key={action.label} href={action.href}>
             <Button
               variant="outline"
@@ -334,6 +450,18 @@ export function DashboardClient() {
             </Button>
           </Link>
         ))}
+        </div>
+        <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Department" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Departments</SelectItem>
+            {departments.map(d => (
+              <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Alerts Banner */}

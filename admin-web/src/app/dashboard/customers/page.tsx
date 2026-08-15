@@ -1,20 +1,33 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { usePermissions } from "@/hooks/usePermissions"
 import { CustomersTable } from "./customers-table"
 import { Card } from "@/components/ui/card"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Users, UserCheck, Clock, UserX } from "lucide-react"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { useSearchParams } from "next/navigation"
 import { PermissionGate } from "@/components/permission-gate"
 
+interface Department {
+  id: string
+  name: string
+}
+
 const supabase = createClient()
 
-function useCustomersData(search?: string, status?: string, page: number = 1) {
+function useCustomersData(search?: string, status?: string, page: number = 1, departmentFilter?: string) {
   return useQuery({
-    queryKey: ["customers-page", search, status, page],
+    queryKey: ["customers-page", search, status, page, departmentFilter],
     queryFn: async () => {
       const pageSize = 10
       const start = (page - 1) * pageSize
@@ -34,14 +47,31 @@ function useCustomersData(search?: string, status?: string, page: number = 1) {
         query = query.eq("status", status)
       }
 
+      if (departmentFilter && departmentFilter !== "all") {
+        query = query.eq("department_id", departmentFilter)
+      }
+
       query = query.range(start, end)
+
+      // Build stats queries with department filter
+      let totalQuery = supabase.from("profiles").select("*", { count: "exact", head: true }).neq("role", "driver")
+      let approvedQuery = supabase.from("profiles").select("*", { count: "exact", head: true }).neq("role", "driver").eq("status", "approved")
+      let pendingQuery = supabase.from("profiles").select("*", { count: "exact", head: true }).neq("role", "driver").eq("status", "pending")
+      let suspendedQuery = supabase.from("profiles").select("*", { count: "exact", head: true }).neq("role", "driver").eq("status", "suspended")
+
+      if (departmentFilter && departmentFilter !== "all") {
+        totalQuery = totalQuery.eq("department_id", departmentFilter)
+        approvedQuery = approvedQuery.eq("department_id", departmentFilter)
+        pendingQuery = pendingQuery.eq("department_id", departmentFilter)
+        suspendedQuery = suspendedQuery.eq("department_id", departmentFilter)
+      }
 
       const [{ data: customers, count }, totalRes, approvedRes, pendingRes, suspendedRes] = await Promise.all([
         query,
-        supabase.from("profiles").select("*", { count: "exact", head: true }).neq("role", "driver"),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).neq("role", "driver").eq("status", "approved"),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).neq("role", "driver").eq("status", "pending"),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).neq("role", "driver").eq("status", "suspended"),
+        totalQuery,
+        approvedQuery,
+        pendingQuery,
+        suspendedQuery,
       ])
 
       return {
@@ -58,17 +88,44 @@ function useCustomersData(search?: string, status?: string, page: number = 1) {
     },
     staleTime: 30 * 1000,
     placeholderData: (previousData) => previousData,
+    enabled: !!departmentFilter,
   })
 }
 
 export default function CustomersPage() {
   const queryClient = useQueryClient()
+  const { departmentId: userDepartmentId } = usePermissions()
   const searchParams = useSearchParams()
   const search = searchParams.get("search") || undefined
   const status = searchParams.get("status") || undefined
   const page = parseInt(searchParams.get("page") || "1")
 
-  const { data, isLoading } = useCustomersData(search, status, page)
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [departmentFilter, setDepartmentFilter] = useState<string>("")
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
+
+  // Load departments
+  useEffect(() => {
+    async function loadDepartments() {
+      const { data } = await supabase.from("departments").select("id, name").eq("is_active", true).order("name")
+      if (data) setDepartments(data)
+    }
+    loadDepartments()
+  }, [])
+
+  // Set default department to user's department
+  useEffect(() => {
+    if (departments.length > 0 && !departmentInitialized) {
+      if (userDepartmentId) {
+        setDepartmentFilter(userDepartmentId)
+      } else {
+        setDepartmentFilter("all")
+      }
+      setDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, departmentInitialized])
+
+  const { data, isLoading } = useCustomersData(search, status, page, departmentFilter)
 
   // Realtime subscription for profile updates
   useEffect(() => {
@@ -108,14 +165,27 @@ export default function CustomersPage() {
   return (
     <PermissionGate permission="customers:view">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Users className="h-6 w-6" />
-            Customers
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Manage customer profiles, ride history, and account status
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Users className="h-6 w-6" />
+              Customers
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Manage customer profiles, ride history, and account status
+            </p>
+          </div>
+          <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map(d => (
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="grid gap-3 grid-cols-2 md:grid-cols-4">

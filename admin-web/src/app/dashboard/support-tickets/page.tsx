@@ -476,7 +476,7 @@ export default function SupportTicketsPage() {
               <TableHead>Description</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Created</TableHead>
-              <TableHead></TableHead>
+              <TableHead className="w-16 text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -535,58 +535,44 @@ export default function SupportTicketsPage() {
                   <TableCell className="text-sm text-muted-foreground">
                     {formatRelativeTime(ticket.created_at)}
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => {
+                  <TableCell className="text-center">
+                    <DropdownMenu modal={false}>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => {
                           setSelectedTicket(ticket)
                           setAdminNotes(ticket.admin_notes || "")
                           setDialogType("view")
-                        }}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <DropdownMenu modal={false}>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onSelect={() => {
-                            setSelectedTicket(ticket)
-                            setAdminNotes(ticket.admin_notes || "")
-                            setDialogType("view")
-                          }}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
+                        }}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Details
+                        </DropdownMenuItem>
+                        {ticket.status === "open" && (
+                          <DropdownMenuItem onSelect={() => updateStatus(ticket.id, "in_progress")}>
+                            <Clock className="h-4 w-4 mr-2" />
+                            Mark In Progress
                           </DropdownMenuItem>
-                          {ticket.status === "open" && (
-                            <DropdownMenuItem onSelect={() => updateStatus(ticket.id, "in_progress")}>
-                              <Clock className="h-4 w-4 mr-2" />
-                              Mark In Progress
-                            </DropdownMenuItem>
-                          )}
-                          {ticket.status !== "resolved" && (
-                            <DropdownMenuItem onSelect={() => updateStatus(ticket.id, "resolved")}>
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Resolve
-                            </DropdownMenuItem>
-                          )}
-                          {ticket.status === "resolved" && (
-                            <DropdownMenuItem onSelect={() => updateStatus(ticket.id, "closed")}>
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Close
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                        )}
+                        {ticket.status !== "resolved" && (
+                          <DropdownMenuItem onSelect={() => updateStatus(ticket.id, "resolved")}>
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Resolve
+                          </DropdownMenuItem>
+                        )}
+                        {ticket.status === "resolved" && (
+                          <DropdownMenuItem onSelect={() => updateStatus(ticket.id, "closed")}>
+                            <XCircle className="h-4 w-4 mr-2" />
+                            Close
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))

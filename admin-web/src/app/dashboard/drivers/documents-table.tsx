@@ -513,7 +513,7 @@ export function DocumentsTable() {
               <TableHead>Status</TableHead>
               <TableHead>Expiry Date</TableHead>
               <TableHead>Uploaded</TableHead>
-              <TableHead className="w-24"></TableHead>
+              <TableHead className="w-16 text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -589,62 +589,49 @@ export function DocumentsTable() {
                       {formatRelativeDate(doc.uploaded_at)}
                     </span>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => {
+                  <TableCell className="text-center">
+                    <DropdownMenu modal={false}>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => {
                           setSelectedDocument(doc)
                           setDialogType("view")
-                        }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <DropdownMenu modal={false}>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onSelect={() => {
+                        }}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => {
+                          setSelectedDocument(doc)
+                          setDialogType("view")
+                        }}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        {doc.status !== "rejected" && (
+                          <DropdownMenuItem onSelect={() => handleReject(doc)}>
+                            <Ban className="mr-2 h-4 w-4" />
+                            Suspend
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onSelect={() => {
                             setSelectedDocument(doc)
-                            setDialogType("view")
-                          }}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => {
-                            setSelectedDocument(doc)
-                            setDialogType("view")
-                          }}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          {doc.status !== "rejected" && (
-                            <DropdownMenuItem onSelect={() => handleReject(doc)}>
-                              <Ban className="mr-2 h-4 w-4" />
-                              Suspend
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onSelect={() => {
-                              setSelectedDocument(doc)
-                              setDialogType("delete")
-                            }}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                            setDialogType("delete")
+                          }}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))

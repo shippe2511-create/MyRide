@@ -1208,7 +1208,7 @@ export default function ChecklistsPage() {
                   <TableHead>Status</TableHead>
                   <TableHead>Failed Items</TableHead>
                   <TableHead>Date</TableHead>
-                  <TableHead></TableHead>
+                  <TableHead className="w-16 text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1247,7 +1247,7 @@ export default function ChecklistsPage() {
                           ) : "-"}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{formatDate(checklist.checked_at)}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-center">
                           <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8">

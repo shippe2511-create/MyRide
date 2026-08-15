@@ -501,7 +501,7 @@ export default function RidesPage() {
               <TableHead>Driver</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Time</TableHead>
-              <TableHead className="w-10"></TableHead>
+              <TableHead className="w-16 text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -559,42 +559,32 @@ export default function RidesPage() {
                   <TableCell className="text-sm text-muted-foreground">
                     {formatDate(ride.created_at)}
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={(e) => { e.stopPropagation(); setEditRide(ride); setEditStatus(ride.status); }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <DropdownMenu modal={false}>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedRide(ride); }}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditRide(ride); setEditStatus(ride.status); }}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit Status
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-red-500"
-                            onClick={(e) => { e.stopPropagation(); setDeleteRideId(ride.id); }}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                  <TableCell className="text-center">
+                    <DropdownMenu modal={false}>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedRide(ride); }}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditRide(ride); setEditStatus(ride.status); }}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Status
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-red-500"
+                          onClick={(e) => { e.stopPropagation(); setDeleteRideId(ride.id); }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))

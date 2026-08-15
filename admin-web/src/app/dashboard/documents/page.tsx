@@ -393,7 +393,7 @@ export default function DocumentsPage() {
               <TableHead>Status</TableHead>
               <TableHead>Expiry Date</TableHead>
               <TableHead>Uploaded</TableHead>
-              <TableHead></TableHead>
+              <TableHead className="w-16 text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -455,53 +455,43 @@ export default function DocumentsPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{formatDate(doc.uploaded_at)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => setEditingDocument(doc)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <DropdownMenu modal={false}>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onSelect={() => setSelectedDocument(doc)}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
+                  <TableCell className="text-center">
+                    <DropdownMenu modal={false}>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onSelect={() => setSelectedDocument(doc)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setEditingDocument(doc)}>
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        {doc.status === "pending" && (
+                          <DropdownMenuItem onSelect={() => handleApprove(doc)}>
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Approve
                           </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => setEditingDocument(doc)}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
+                        )}
+                        {doc.status !== "rejected" && (
+                          <DropdownMenuItem onSelect={() => handleReject(doc)}>
+                            <XCircle className="h-4 w-4 mr-2" />
+                            Reject
                           </DropdownMenuItem>
-                          {doc.status === "pending" && (
-                            <DropdownMenuItem onSelect={() => handleApprove(doc)}>
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Approve
-                            </DropdownMenuItem>
-                          )}
-                          {doc.status !== "rejected" && (
-                            <DropdownMenuItem onSelect={() => handleReject(doc)}>
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Reject
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            className="text-red-500"
-                            onSelect={() => setDeleteId(doc.id)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                        )}
+                        <DropdownMenuItem
+                          className="text-red-500"
+                          onSelect={() => setDeleteId(doc.id)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))

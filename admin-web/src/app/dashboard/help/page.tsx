@@ -265,7 +265,7 @@ export default function HelpContentPage() {
                   <TableHead>Display Text</TableHead>
                   <TableHead>Value</TableHead>
                   <TableHead>Active</TableHead>
-                  <TableHead className="w-24"></TableHead>
+                  <TableHead className="w-16 text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -285,8 +285,8 @@ export default function HelpContentPage() {
                       <TableCell>
                         <Switch checked={item.is_active} onCheckedChange={() => toggleActive(item)} />
                       </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <TableCell className="text-center">
+                        <div className="flex gap-1 justify-center">
                           <Button size="icon" variant="ghost" onClick={() => openEditDialog(item)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -317,7 +317,7 @@ export default function HelpContentPage() {
                   <TableHead>Question</TableHead>
                   <TableHead>Answer</TableHead>
                   <TableHead>Active</TableHead>
-                  <TableHead className="w-24"></TableHead>
+                  <TableHead className="w-16 text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -335,8 +335,8 @@ export default function HelpContentPage() {
                       <TableCell>
                         <Switch checked={item.is_active} onCheckedChange={() => toggleActive(item)} />
                       </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <TableCell className="text-center">
+                        <div className="flex gap-1 justify-center">
                           <Button size="icon" variant="ghost" onClick={() => openEditDialog(item)}>
                             <Pencil className="h-4 w-4" />
                           </Button>

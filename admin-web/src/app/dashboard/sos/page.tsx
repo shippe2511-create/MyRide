@@ -671,7 +671,7 @@ export default function SOSPage() {
               <TableHead>Status</TableHead>
               <TableHead>Location</TableHead>
               <TableHead>Time</TableHead>
-              <TableHead></TableHead>
+              <TableHead className="w-16 text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -752,38 +752,28 @@ export default function SOSPage() {
                   <TableCell className="text-sm text-muted-foreground">
                     {formatDate(alert.created_at)}
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => setSelectedAlert(alert)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <DropdownMenu modal={false}>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
-                          <DropdownMenuItem onClick={() => setSelectedAlert(alert)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            View / Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-red-500"
-                            onClick={() => confirmDelete(alert.id)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                  <TableCell className="text-center">
+                    <DropdownMenu modal={false}>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
+                        <DropdownMenuItem onClick={() => setSelectedAlert(alert)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          View / Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-red-500"
+                          onClick={() => confirmDelete(alert.id)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))

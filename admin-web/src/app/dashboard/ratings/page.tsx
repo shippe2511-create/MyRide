@@ -659,7 +659,7 @@ export default function RatingsPage() {
                   <TableHead className="text-center">5★</TableHead>
                   <TableHead className="text-center">≤2★</TableHead>
                   <TableHead className="text-center">Trend</TableHead>
-                  <TableHead className="w-20"></TableHead>
+                  <TableHead className="w-16 text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -714,11 +714,10 @@ export default function RatingsPage() {
                           <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={(e) => {
                             e.stopPropagation()
                             loadDriverDetails(driver.id, driver.driver_id)

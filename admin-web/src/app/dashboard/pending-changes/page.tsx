@@ -197,7 +197,7 @@ export default function PendingChangesPage() {
                   <TableHead>Field</TableHead>
                   <TableHead>Change</TableHead>
                   <TableHead>Submitted</TableHead>
-                  <TableHead className="w-32">Actions</TableHead>
+                  <TableHead className="w-16 text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -248,8 +248,8 @@ export default function PendingChangesPage() {
                       <TableCell className="text-muted-foreground">
                         {formatDate(change.submitted_at)}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <TableCell className="text-center">
+                        <div className="flex items-center gap-1 justify-center">
                           <Button
                             variant="ghost"
                             size="icon"

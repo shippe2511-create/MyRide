@@ -296,8 +296,17 @@ export default function BusRosterPage() {
   }
 
   const loadMasterData = async () => {
+    // Get Transport department ID
+    const { data: transportDept } = await supabase
+      .from("departments")
+      .select("id")
+      .eq("name", "Transport")
+      .single()
+
     const [driversRes, vehiclesRes, schedulesRes] = await Promise.all([
-      supabase.from("drivers").select("id, profile_id, profile:profiles(full_name)"),
+      transportDept
+        ? supabase.from("drivers").select("id, profile_id, profile:profiles(full_name)").eq("department_id", transportDept.id)
+        : supabase.from("drivers").select("id, profile_id, profile:profiles(full_name)"),
       supabase.from("vehicle_types").select("id, plate_no, display_name, capacity").eq("is_active", true),
       supabase.from("route_schedules").select(`
         *,

@@ -448,6 +448,16 @@ export default function SchedulingPage() {
     setLoadingStops(false)
   }
 
+  const reloadStops = async () => {
+    if (!stopsRoute) return
+    const { data } = await supabase
+      .from("route_stops")
+      .select("*")
+      .eq("route_id", stopsRoute.id)
+      .order("stop_order")
+    setRouteStopsData(data || [])
+  }
+
   const openDrawRoute = async (route: TransportRoute) => {
     setDrawingRoute(route)
     setDrawRouteOpen(true)
@@ -538,9 +548,8 @@ export default function SchedulingPage() {
         toast.error("Failed to update stop")
       } else {
         toast.success("Stop updated")
-        setShowAddStop(false)
         setEditingStop(null)
-        openStopsDialog(stopsRoute)
+        reloadStops()
       }
     } else {
       const nextOrder = routeStopsData.length > 0 ? Math.max(...routeStopsData.map(s => s.stop_order)) + 1 : 1
@@ -555,8 +564,7 @@ export default function SchedulingPage() {
         toast.error("Failed to add stop")
       } else {
         toast.success("Stop added")
-        setShowAddStop(false)
-        openStopsDialog(stopsRoute)
+        reloadStops()
       }
     }
     setStopForm({ stop_name: "", latitude: "", longitude: "" })
@@ -568,7 +576,7 @@ export default function SchedulingPage() {
     const { error } = await supabase.from("route_stops").delete().eq("id", stopId)
     if (!error) {
       toast.success("Stop deleted")
-      openStopsDialog(stopsRoute)
+      reloadStops()
     } else {
       toast.error("Failed to delete stop")
     }
@@ -585,7 +593,7 @@ export default function SchedulingPage() {
 
     await supabase.from("route_stops").update({ stop_order: swapStop.stop_order }).eq("id", stop.id)
     await supabase.from("route_stops").update({ stop_order: stop.stop_order }).eq("id", swapStop.id)
-    openStopsDialog(stopsRoute!)
+    reloadStops()
   }
 
   const initLeafletMap = async () => {
@@ -702,7 +710,7 @@ export default function SchedulingPage() {
   }
 
   useEffect(() => {
-    if (showMapPicker) {
+    if (stopsRoute && !loadingStops) {
       // Wait for container to be in DOM then init map
       const timer = setTimeout(() => {
         if (mapPickerRef.current && !leafletMapRef.current) {
@@ -710,7 +718,7 @@ export default function SchedulingPage() {
         }
       }, 200)
       return () => clearTimeout(timer)
-    } else {
+    } else if (!stopsRoute) {
       // Cleanup when hidden
       if (leafletMapRef.current) {
         leafletMapRef.current.remove()
@@ -718,7 +726,7 @@ export default function SchedulingPage() {
         leafletMarkerRef.current = null
       }
     }
-  }, [showMapPicker])
+  }, [stopsRoute, loadingStops])
 
   // Draw Route Map
   const initDrawRouteMap = async () => {
@@ -1786,7 +1794,7 @@ export default function SchedulingPage() {
 
       {/* Manage Stops Dialog */}
       <Dialog open={!!stopsRoute} onOpenChange={(open) => !open && setStopsRoute(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Manage Stops - {stopsRoute?.route_name}</DialogTitle>
           </DialogHeader>
@@ -1797,12 +1805,7 @@ export default function SchedulingPage() {
               </div>
             ) : (
               <>
-                <div className="flex justify-between items-center">
-                  <p className="text-sm text-muted-foreground">{routeStopsData.length} stops</p>
-                  <Button size="sm" onClick={() => { setShowAddStop(true); setEditingStop(null); setStopForm({ stop_name: "", latitude: "", longitude: "" }) }}>
-                    <Plus className="h-4 w-4 mr-1" /> Add Stop
-                  </Button>
-                </div>
+                <p className="text-sm text-muted-foreground">{routeStopsData.length} stops</p>
 
                 {routeStopsData.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">No stops added yet</p>
@@ -1828,7 +1831,11 @@ export default function SchedulingPage() {
                         <Button variant="ghost" size="icon" onClick={() => {
                           setEditingStop(stop)
                           setStopForm({ stop_name: stop.stop_name, latitude: stop.latitude.toString(), longitude: stop.longitude.toString() })
-                          setShowAddStop(true)
+                          // Move map to stop location
+                          if (leafletMapRef.current && leafletMarkerRef.current) {
+                            leafletMapRef.current.setView([stop.latitude, stop.longitude], 17)
+                            leafletMarkerRef.current.setLatLng([stop.latitude, stop.longitude])
+                          }
                         }}>
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -1840,8 +1847,7 @@ export default function SchedulingPage() {
                   </div>
                 )}
 
-                {showAddStop && (
-                  <div className="border-t pt-4 space-y-3">
+                <div className="border-t pt-4 space-y-3">
                     <h4 className="font-medium">{editingStop ? "Edit Stop" : "Add Stop"}</h4>
                     <Input
                       value={stopForm.stop_name}
@@ -1865,18 +1871,8 @@ export default function SchedulingPage() {
                           step="any"
                         />
                       </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setShowMapPicker(!showMapPicker)}
-                        title="Pick from map"
-                      >
-                        <MapPin className="h-4 w-4" />
-                      </Button>
                     </div>
-                    {showMapPicker && (
-                      <div className="space-y-2">
+                    <div className="space-y-2">
                         <div className="relative">
                           <Input
                             placeholder="Search location..."
@@ -1909,21 +1905,24 @@ export default function SchedulingPage() {
                         <div
                           ref={mapPickerRef}
                           className="w-full rounded-lg border"
-                          style={{ height: "450px" }}
+                          style={{ height: "300px" }}
                         />
                       </div>
-                    )}
                     <div className="flex gap-2">
                       <Button onClick={addStop} disabled={savingStop}>
                         {savingStop && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                         {editingStop ? "Update" : "Add"}
                       </Button>
-                      <Button variant="outline" onClick={() => { setShowAddStop(false); setEditingStop(null) }}>
-                        Cancel
+                      {editingStop && (
+                        <Button variant="outline" onClick={() => { setEditingStop(null); setStopForm({ stop_name: "", latitude: "", longitude: "" }) }}>
+                          Cancel
+                        </Button>
+                      )}
+                      <Button variant="outline" onClick={() => setStopsRoute(null)}>
+                        Done
                       </Button>
                     </div>
                   </div>
-                )}
               </>
             )}
           </div>

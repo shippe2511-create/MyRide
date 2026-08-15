@@ -228,8 +228,7 @@ export default function BusRoutesPage() {
         toast.error("Failed to add stop")
       } else {
         toast.success("Stop added")
-        setShowAddStop(false)
-        loadStops(selectedRoute.id)
+        setShowStopsDialog(false) // Close dialog after adding
         loadRoutes()
       }
     }
@@ -405,7 +404,7 @@ export default function BusRoutesPage() {
 
         {/* Manage Stops Dialog */}
         <Dialog open={showStopsDialog} onOpenChange={setShowStopsDialog}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Manage Stops - {selectedRoute?.name}</DialogTitle>
               <DialogDescription>
@@ -463,8 +462,7 @@ export default function BusRoutesPage() {
                 </div>
               )}
 
-              {showAddStop ? (
-                <div className="border rounded-lg p-4 space-y-3">
+              <div className="border rounded-lg p-4 space-y-3">
                   <h4 className="font-medium">{editingStop ? "Edit Stop" : "Add Stop"}</h4>
                   <Input
                     value={stopForm.stop_name}
@@ -491,29 +489,20 @@ export default function BusRoutesPage() {
                     <Button onClick={saveStop} disabled={saving} size="sm">
                       {saving ? "Saving..." : editingStop ? "Update Stop" : "Add Stop"}
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setShowAddStop(false)
-                        setEditingStop(null)
-                        setStopForm({ stop_name: "", latitude: "", longitude: "" })
-                      }}
-                    >
-                      Cancel
-                    </Button>
+                    {editingStop && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditingStop(null)
+                          setStopForm({ stop_name: "", latitude: "", longitude: "" })
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    )}
                   </div>
                 </div>
-              ) : (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => setShowAddStop(true)}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Stop
-                </Button>
-              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowStopsDialog(false)}>Done</Button>

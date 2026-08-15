@@ -698,7 +698,7 @@ export default function ReportsPage() {
         case "customers": {
           let query = supabase
             .from("profiles")
-            .select("full_name, employee_id, phone, email, department, gender, status, created_at, department_id")
+            .select("full_name, employee_id, phone, email, gender, status, created_at, department_id, dept:departments(name)")
             .eq("role", "customer")
             .order("created_at", { ascending: false })
           if (dateFilter) {
@@ -709,16 +709,19 @@ export default function ReportsPage() {
           }
           const { data: customers } = await query
 
-          rows = (customers || []).map((c: Record<string, unknown>) => ({
-            "Name": String(c.full_name || ""),
-            "Employee ID": String(c.employee_id || "-"),
-            "Phone": formatPhone(c.phone as string | null),
-            "Email": String(c.email || "-"),
-            "Department": String(c.department || "-"),
-            "Gender": String(c.gender || "-"),
-            "Status": formatStatus(String(c.status || "")),
-            "Joined": formatDate(String(c.created_at || "")),
-          }))
+          rows = (customers || []).map((c: Record<string, unknown>) => {
+            const dept = c.dept as { name: string } | null
+            return {
+              "Name": String(c.full_name || ""),
+              "Employee ID": String(c.employee_id || "-"),
+              "Phone": formatPhone(c.phone as string | null),
+              "Email": String(c.email || "-"),
+              "Department": dept?.name || "-",
+              "Gender": String(c.gender || "-"),
+              "Status": formatStatus(String(c.status || "")),
+              "Joined": formatDate(String(c.created_at || "")),
+            }
+          })
           filename = `customers_report_${new Date().toISOString().split("T")[0]}.csv`
           break
         }
@@ -727,8 +730,8 @@ export default function ReportsPage() {
           let query = supabase
             .from("profiles")
             .select(`
-              id, full_name, employee_id, phone, email, department, gender, status, created_at,
-              driver:drivers(rating, total_trips, is_online, department_id)
+              id, full_name, employee_id, phone, email, gender, status, created_at,
+              driver:drivers(rating, total_trips, is_online, department_id, dept:departments(name))
             `)
             .eq("role", "driver")
             .order("created_at", { ascending: false })
@@ -746,17 +749,18 @@ export default function ReportsPage() {
 
           rows = (drivers || []).map((d: Record<string, unknown>) => {
             const driverInfo = Array.isArray(d.driver) ? d.driver[0] : d.driver
+            const dept = driverInfo?.dept as { name: string } | null
             return {
               "Name": String(d.full_name || ""),
               "Employee ID": String(d.employee_id || "-"),
               "Phone": formatPhone(d.phone as string | null),
               "Email": String(d.email || "-"),
-              "Department": String(d.department || "-"),
+              "Department": dept?.name || "-",
               "Gender": String(d.gender || "-"),
               "Status": formatStatus(String(d.status || "")),
               "Rating": driverInfo?.rating ? `${Number(driverInfo.rating).toFixed(1)} out of 5` : "-",
               "Total Trips": String(driverInfo?.total_trips || "0"),
-                            "Joined": formatDate(String(d.created_at || "")),
+              "Joined": formatDate(String(d.created_at || "")),
             }
           })
           filename = `drivers_report_${new Date().toISOString().split("T")[0]}.csv`
@@ -2293,86 +2297,190 @@ export default function ReportsPage() {
     toast.success(`${successCount} reports downloaded!`)
   }, [generateReport])
 
+  // Helper function to get department-filtered data (shared by CSV and PDF)
+  const getReportData = useCallback(async (reportType: string): Promise<{ rows: Record<string, string>[]; headers: string[] } | null> => {
+    const dateFilter = getDateFilter()
+
+    // Get effective department filter - non-super_admins MUST use their department
+    const { data: { user } } = await supabase.auth.getUser()
+    let effectiveDeptFilter = departmentFilterRef.current
+
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role, department_id")
+        .eq("id", user.id)
+        .single()
+
+      if (profile && profile.role !== "super_admin" && profile.department_id) {
+        effectiveDeptFilter = profile.department_id
+      }
+    }
+
+    // Get customer IDs and driver IDs for department filtering
+    let customerIds: string[] | null = null
+    let driverIds: string[] | null = null
+    let driverProfileIds: string[] | null = null
+
+    if (effectiveDeptFilter && effectiveDeptFilter !== "all") {
+      const [{ data: customers }, { data: drivers }] = await Promise.all([
+        supabase.from("profiles").select("id").eq("department_id", effectiveDeptFilter).eq("role", "customer"),
+        supabase.from("drivers").select("id, profile_id").eq("department_id", effectiveDeptFilter)
+      ])
+      customerIds = customers?.map(c => c.id) || []
+      driverIds = drivers?.map(d => d.id) || []
+      driverProfileIds = drivers?.map(d => d.profile_id) || []
+    }
+
+    let rows: Record<string, string>[] = []
+    const labels = columnLabels[reportType]
+    if (!labels) return null
+    const headers = Object.keys(labels)
+
+    switch (reportType) {
+      case "rides": {
+        let query = supabase
+          .from("rides")
+          .select(`id, pickup_name, dropoff_name, status, distance_km, duration_minutes, created_at, customer_id, customer:profiles!rides_customer_id_fkey(full_name, phone)`)
+          .order("created_at", { ascending: false })
+        if (dateFilter) {
+          query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+        }
+        if (customerIds && customerIds.length > 0) {
+          query = query.in("customer_id", customerIds)
+        } else if (customerIds && customerIds.length === 0) {
+          return { rows: [], headers }
+        }
+        const { data: rides } = await query
+        rows = (rides || []).map((r: Record<string, unknown>) => {
+          const customer = r.customer as Record<string, unknown> | null
+          return {
+            "Customer": String(customer?.full_name || "-"),
+            "Phone": formatPhone(customer?.phone as string | null),
+            "Pickup": cleanAddress(r.pickup_name as string),
+            "Dropoff": cleanAddress(r.dropoff_name as string),
+            "Status": formatStatus(String(r.status || "")),
+            "Distance (km)": r.distance_km ? String(r.distance_km) : "-",
+            "Duration (mins)": r.duration_minutes ? String(r.duration_minutes) : "-",
+            "Date": formatDate(String(r.created_at || "")),
+            "Time": formatTime(String(r.created_at || "")),
+          }
+        })
+        break
+      }
+      case "customers": {
+        let query = supabase.from("profiles").select("full_name, employee_id, phone, email, gender, status, created_at, department_id, dept:departments(name)").eq("role", "customer").order("created_at", { ascending: false })
+        if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+        if (effectiveDeptFilter && effectiveDeptFilter !== "all") {
+          query = query.eq("department_id", effectiveDeptFilter)
+        }
+        const { data: customers } = await query
+        rows = (customers || []).map((c: Record<string, unknown>) => {
+          const dept = c.dept as { name: string } | null
+          return {
+            "Name": String(c.full_name || ""),
+            "Employee ID": String(c.employee_id || "-"),
+            "Phone": formatPhone(c.phone as string | null),
+            "Email": String(c.email || "-"),
+            "Department": dept?.name || "-",
+            "Gender": String(c.gender || "-"),
+            "Status": formatStatus(String(c.status || "")),
+            "Joined": formatDate(String(c.created_at || "")),
+          }
+        })
+        break
+      }
+      case "drivers": {
+        let query = supabase.from("profiles").select(`id, full_name, employee_id, phone, email, gender, status, created_at, driver:drivers(rating, total_trips, is_online, department_id, dept:departments(name))`).eq("role", "driver").order("created_at", { ascending: false })
+        if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+        if (driverProfileIds && driverProfileIds.length > 0) {
+          query = query.in("id", driverProfileIds)
+        } else if (driverProfileIds && driverProfileIds.length === 0) {
+          return { rows: [], headers }
+        }
+        const { data: drivers } = await query
+        rows = (drivers || []).map((d: Record<string, unknown>) => {
+          const driverInfo = Array.isArray(d.driver) ? d.driver[0] : d.driver
+          const dept = driverInfo?.dept as { name: string } | null
+          return {
+            "Name": String(d.full_name || ""),
+            "Employee ID": String(d.employee_id || "-"),
+            "Phone": formatPhone(d.phone as string | null),
+            "Email": String(d.email || "-"),
+            "Department": dept?.name || "-",
+            "Gender": String(d.gender || "-"),
+            "Status": formatStatus(String(d.status || "")),
+            "Rating": driverInfo?.rating ? `${Number(driverInfo.rating).toFixed(1)} out of 5` : "-",
+            "Total Trips": String(driverInfo?.total_trips || "0"),
+            "Joined": formatDate(String(d.created_at || "")),
+          }
+        })
+        break
+      }
+      default:
+        return null
+    }
+
+    return { rows, headers }
+  }, [])
+
   const generatePDF = useCallback(async (reportType: string): Promise<void> => {
     try {
       setLoading(`${reportType}-pdf`)
-      const dateFilter = getDateFilter()
 
-      let rows: Record<string, string>[] = []
-      let reportName = reportTypes.find(r => r.id === reportType)?.name || reportType
+      const reportName = reportTypes.find(r => r.id === reportType)?.name || reportType
       const labels = columnLabels[reportType]
       if (!labels) {
         toast.error(`No column labels defined for: ${reportType}`)
         setLoading(null)
         return
       }
+
+      // Use shared data fetching for common reports
+      if (["rides", "customers", "drivers"].includes(reportType)) {
+        const data = await getReportData(reportType)
+        if (!data) {
+          toast.error(`Failed to fetch data for: ${reportType}`)
+          setLoading(null)
+          return
+        }
+        const { rows, headers } = data
+
+        // Generate PDF
+        const doc = new jsPDF()
+        doc.setFontSize(20)
+        doc.setTextColor(234, 179, 8)
+        doc.text("MyRide", 14, 20)
+        doc.setFontSize(16)
+        doc.setTextColor(0, 0, 0)
+        doc.text(reportName, 14, 30)
+        doc.setFontSize(10)
+        doc.setTextColor(100, 100, 100)
+        const dateFilter = getDateFilter()
+        const dateRangeText = dateFilter ? `${formatDate(dateFilter.start)} - ${formatDate(dateFilter.end)}` : "All Time"
+        doc.text(`Generated ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })} at ${new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })} • ${dateRangeText}`, 14, 38)
+
+        autoTable(doc, {
+          startY: 45,
+          head: [headers],
+          body: rows.map(row => headers.map(h => row[h] || "-")),
+          styles: { fontSize: 8, cellPadding: 2 },
+          headStyles: { fillColor: [234, 179, 8], textColor: [0, 0, 0], fontStyle: "bold" },
+          alternateRowStyles: { fillColor: [245, 245, 245] },
+        })
+
+        doc.save(`${reportType}-report-${new Date().toISOString().split("T")[0]}.pdf`)
+        toast.success(`${reportName} PDF downloaded`)
+        setLoading(null)
+        return
+      }
+
+      // For other reports, use the old logic (simplified)
+      const dateFilter = getDateFilter()
+      let rows: Record<string, string>[] = []
       const headers = Object.keys(labels)
 
-      // Reuse the same data fetching logic from generateReport
-      // For simplicity, we'll call generateReport logic but output HTML instead
       switch (reportType) {
-        case "rides": {
-          let query = supabase
-            .from("rides")
-            .select(`id, pickup_name, dropoff_name, status, distance_km, duration_minutes, created_at, customer:profiles!rides_customer_id_fkey(full_name, phone)`)
-            .order("created_at", { ascending: false })
-          if (dateFilter) {
-            query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
-          }
-          const { data: rides } = await query
-          rows = (rides || []).map((r: Record<string, unknown>) => {
-            const customer = r.customer as Record<string, unknown> | null
-            return {
-              "Customer": String(customer?.full_name || "-"),
-              "Phone": formatPhone(customer?.phone as string | null),
-              "Pickup": cleanAddress(r.pickup_name as string),
-              "Dropoff": cleanAddress(r.dropoff_name as string),
-              "Status": formatStatus(String(r.status || "")),
-              "Distance (km)": r.distance_km ? String(r.distance_km) : "-",
-              "Duration (mins)": r.duration_minutes ? String(r.duration_minutes) : "-",
-              "Date": formatDate(String(r.created_at || "")),
-              "Time": formatTime(String(r.created_at || "")),
-            }
-          })
-          break
-        }
-        case "customers": {
-          let query = supabase.from("profiles").select("full_name, employee_id, phone, email, department, gender, status, created_at").eq("role", "customer").order("created_at", { ascending: false })
-          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
-          const { data: customers } = await query
-          rows = (customers || []).map((c: Record<string, unknown>) => ({
-            "Name": String(c.full_name || ""),
-            "Employee ID": String(c.employee_id || "-"),
-            "Phone": formatPhone(c.phone as string | null),
-            "Email": String(c.email || "-"),
-            "Department": String(c.department || "-"),
-            "Gender": String(c.gender || "-"),
-            "Status": formatStatus(String(c.status || "")),
-            "Joined": formatDate(String(c.created_at || "")),
-          }))
-          break
-        }
-        case "drivers": {
-          let query = supabase.from("profiles").select(`full_name, employee_id, phone, email, department, gender, status, created_at, driver:drivers(rating, total_trips, is_online)`).eq("role", "driver").order("created_at", { ascending: false })
-          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
-          const { data: drivers } = await query
-          rows = (drivers || []).map((d: Record<string, unknown>) => {
-            const driverInfo = Array.isArray(d.driver) ? d.driver[0] : d.driver
-            return {
-              "Name": String(d.full_name || ""),
-              "Employee ID": String(d.employee_id || "-"),
-              "Phone": formatPhone(d.phone as string | null),
-              "Email": String(d.email || "-"),
-              "Department": String(d.department || "-"),
-              "Gender": String(d.gender || "-"),
-              "Status": formatStatus(String(d.status || "")),
-              "Rating": driverInfo?.rating ? `${Number(driverInfo.rating).toFixed(1)} out of 5` : "-",
-              "Total Trips": String(driverInfo?.total_trips || "0"),
-                            "Joined": formatDate(String(d.created_at || "")),
-            }
-          })
-          break
-        }
         case "vehicle_checks": {
           let query = supabase.from("vehicle_checklists").select("id, driver_name, vehicle_number, has_issues, issues, checked_at, resolution_status").order("checked_at", { ascending: false })
           if (dateFilter) query = query.gte("checked_at", dateFilter.start).lte("checked_at", dateFilter.end + "T23:59:59")
@@ -2390,711 +2498,43 @@ export default function ReportsPage() {
           })
           break
         }
-        case "vehicles": {
-          const { data: vehicles } = await supabase.from("vehicle_types").select("id, plate_no, display_name, make_model, color, capacity, is_active, created_at").order("created_at", { ascending: false })
-          const { data: drivers } = await supabase.from("drivers").select("vehicle_id, profile:profiles!drivers_profile_id_fkey(full_name)").not("vehicle_id", "is", null)
-          const vehicleDriverMap: Record<string, string> = {}
-          for (const d of drivers || []) {
-            const profileData = d.profile as { full_name: string } | { full_name: string }[] | null
-            const profile = Array.isArray(profileData) ? profileData[0] : profileData
-            if (d.vehicle_id && profile?.full_name) vehicleDriverMap[d.vehicle_id as string] = profile.full_name
-          }
-          rows = (vehicles || []).map((v: Record<string, unknown>) => ({
-            "Plate No": String(v.plate_no || "-"),
-            "Type": String(v.display_name || "-"),
-            "Make/Model": String(v.make_model || "-"),
-            "Color": String(v.color || "-"),
-            "Status": v.is_active ? "Active" : "Inactive",
-            "Driver": vehicleDriverMap[v.id as string] || "-",
-            "Capacity": String(v.capacity || "-"),
-          }))
-          break
-        }
-        case "vehicle_logs": {
-          let query = supabase.from("vehicle_logs").select(`id, log_type, amount, odometer, notes, log_date, created_at, driver:drivers!vehicle_logs_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`).order("log_date", { ascending: false })
-          if (dateFilter) query = query.gte("log_date", dateFilter.start).lte("log_date", dateFilter.end)
-          const { data: logs } = await query
-          rows = (logs || []).map((l: Record<string, unknown>) => {
-            const driver = l.driver as Record<string, unknown> | null
-            const profile = driver?.profile as Record<string, unknown> | null
-            return {
-              "Driver": String(profile?.full_name || "-"),
-              "Type": formatStatus(String(l.log_type || "")),
-              "Amount": l.amount ? `MVR ${l.amount}` : "-",
-              "Odometer": l.odometer ? `${l.odometer} km` : "-",
-              "Date": formatDate(String(l.log_date || l.created_at || "")),
-              "Notes": String(l.notes || "-"),
-            }
-          })
-          break
-        }
-        case "ratings": {
-          let query = supabase.from("ratings").select(`rating, comment, created_at, from_user:profiles!ratings_from_user_id_fkey(full_name), to_user:profiles!ratings_to_user_id_fkey(full_name)`).order("created_at", { ascending: false })
-          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
-          const { data: ratings } = await query
-          rows = (ratings || []).map((r: Record<string, unknown>) => {
-            const fromUser = r.from_user as Record<string, unknown> | null
-            const toUser = r.to_user as Record<string, unknown> | null
-            return {
-              "From": String(fromUser?.full_name || "-"),
-              "To": String(toUser?.full_name || "-"),
-              "Rating": `${Number(r.rating).toFixed(1)} out of 5`,
-              "Comment": String(r.comment || "-"),
-              "Date": formatDate(String(r.created_at || "")),
-            }
-          })
-          break
-        }
-        case "sos_alerts": {
-          let query = supabase.from("sos_alerts").select(`id, status, latitude, longitude, location_address, created_at, resolved_at, resolved_by, user:profiles!sos_alerts_user_id_fkey(full_name, phone, role), resolver:profiles!sos_alerts_resolved_by_fkey(full_name)`).order("created_at", { ascending: false })
-          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
-          const { data: alerts } = await query
-          rows = (alerts || []).map((a: Record<string, unknown>) => {
-            const user = a.user as Record<string, unknown> | null
-            const resolver = a.resolver as Record<string, unknown> | null
-            return {
-              "User": String(user?.full_name || "-"),
-              "Phone": formatPhone(user?.phone as string | null),
-              "Type": user?.role === "driver" ? "Driver" : "Customer",
-              "Status": formatStatus(String(a.status || "")),
-              "Location": a.location_address ? String(a.location_address) : (a.latitude ? `${a.latitude}, ${a.longitude}` : "-"),
-              "Date": formatDate(String(a.created_at || "")),
-              "Time": formatTime(String(a.created_at || "")),
-              "Resolved": a.resolved_at ? formatDateTime(String(a.resolved_at)) : "-",
-              "Resolved By": resolver?.full_name ? String(resolver.full_name) : "-",
-            }
-          })
-          break
-        }
-        case "activity_logs": {
-          let query = supabase.from("activity_logs").select("action, entity_type, entity_id, details, admin_name, created_at").order("created_at", { ascending: false }).limit(1000)
-          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
-          const { data: logs } = await query
-          rows = (logs || []).map((l: Record<string, unknown>) => {
-            const details = l.details as Record<string, unknown> | null
-            const action = String(l.action || "")
-            const entityType = String(l.entity_type || "")
-            const targetName = details?.name || details?.full_name || "-"
-            let changeText = "-"
-            if (details) {
-              if (details.private_access !== undefined) {
-                changeText = details.private_access ? "Granted private pool access" : "Revoked private pool access"
-              } else if (details.status) {
-                changeText = `Changed status to ${formatStatus(String(details.status))}`
-              } else if (details.is_active !== undefined) {
-                changeText = details.is_active ? "Activated account" : "Deactivated account"
-              } else if (details.assigned_driver) {
-                changeText = `Assigned driver: ${details.assigned_driver}`
-              } else if (details.count) {
-                changeText = `${action === "create" ? "Created" : action === "delete" ? "Deleted" : "Updated"} ${details.count} items`
-              } else if (details.bulk_import) {
-                changeText = `Bulk imported ${details.count || "multiple"} records`
-              } else if (details.message) {
-                changeText = String(details.message)
-              } else if (action === "create") {
-                changeText = `Created new ${entityType}`
-              } else if (action === "update") {
-                changeText = `Updated ${entityType} details`
-              } else if (action === "delete") {
-                changeText = `Deleted ${entityType}`
-              } else {
-                const formatted = Object.entries(details)
-                  .filter(([k, v]) => k !== "name" && k !== "full_name" && v !== null && v !== undefined && v !== "")
-                  .map(([k, v]) => {
-                    const key = k.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
-                    const val = typeof v === "boolean" ? (v ? "Yes" : "No") : String(v)
-                    return `${key}: ${val}`
-                  })
-                  .join(", ")
-                changeText = formatted || `${formatStatus(action)} ${entityType}`
-              }
-            } else {
-              changeText = `${formatStatus(action)} ${entityType}`
-            }
-            return {
-              "Date": formatDate(String(l.created_at || "")),
-              "Time": formatTime(String(l.created_at || "")),
-              "Admin": String(l.admin_name || "System"),
-              "Type": formatStatus(entityType),
-              "Target": String(targetName),
-              "Change": changeText,
-            }
-          })
-          break
-        }
-        case "driver_performance": {
-          const { data: driversData } = await supabase.from("drivers").select(`id, rating, profile:profiles!drivers_profile_id_fkey(full_name, phone), vehicle:vehicle_types(plate_no, display_name)`)
-          let ridesQuery = supabase.from("rides").select("id, driver_id, status, created_at")
-          if (dateFilter) ridesQuery = ridesQuery.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
-          const { data: ridesData } = await ridesQuery
-          rows = (driversData || []).map((d: Record<string, unknown>) => {
-            const profile = Array.isArray(d.profile) ? d.profile[0] : d.profile
-            const vehicle = Array.isArray(d.vehicle) ? d.vehicle[0] : d.vehicle
-            const driverRides = (ridesData || []).filter(r => r.driver_id === d.id)
-            const completedRides = driverRides.filter(r => r.status === 'completed').length
-            const totalRides = driverRides.length
-            const completionRate = totalRides > 0 ? Math.round((completedRides / totalRides) * 100) : 0
-            return {
-              "Driver": String(profile?.full_name || "Unknown"),
-              "Phone": formatPhone(profile?.phone as string | null),
-              "Rating": d.rating ? `${Number(d.rating).toFixed(1)} out of 5` : "-",
-              "Total Rides": String(totalRides),
-              "Completed": String(completedRides),
-              "Cancelled": String(driverRides.filter(r => r.status === 'cancelled').length),
-              "Completion %": `${completionRate}%`,
-              "This Week": String(driverRides.filter(r => r.status === 'completed' && new Date(r.created_at) >= new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length),
-              "This Month": String(driverRides.filter(r => r.status === 'completed' && new Date(r.created_at) >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length),
-              "Vehicle": vehicle ? `${vehicle.display_name || ""} (${vehicle.plate_no || ""})` : "-",
-            }
-          })
-          break
-        }
-        case "shifts": {
-          let query = supabase.from("shifts").select(`shift_date, start_time, end_time, shift_type, status, driver:drivers!shifts_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`).order("shift_date", { ascending: false })
-          if (dateFilter) query = query.gte("shift_date", dateFilter.start).lte("shift_date", dateFilter.end)
-          const { data: shifts } = await query
-          rows = (shifts || []).map((s: Record<string, unknown>) => {
-            const driver = s.driver as Record<string, unknown> | null
-            const profile = driver?.profile as Record<string, unknown> | null
-            return {
-              "Driver": String(profile?.full_name || "-"),
-              "Date": formatDate(String(s.shift_date || "")),
-              "Start": String(s.start_time || "-"),
-              "End": String(s.end_time || "-"),
-              "Type": formatStatus(String(s.shift_type || "")),
-              "Status": formatStatus(String(s.status || "")),
-            }
-          })
-          break
-        }
-        case "driver_attendance": {
-          let query = supabase.from("shifts").select(`shift_date, start_time, end_time, shift_type, attendance_status, absence_reason, marked_at, driver:drivers!shifts_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name, phone))`).order("shift_date", { ascending: false })
-          if (dateFilter) query = query.gte("shift_date", dateFilter.start).lte("shift_date", dateFilter.end)
-          const { data: attendance } = await query
-          rows = (attendance || []).map((s: Record<string, unknown>) => {
-            const driver = s.driver as Record<string, unknown> | null
-            const profile = driver?.profile as Record<string, unknown> | null
-            const status = String(s.attendance_status || "pending")
-            return {
-              "Driver": String(profile?.full_name || "-"),
-              "Phone": formatPhone(String(profile?.phone || "")),
-              "Date": formatDate(String(s.shift_date || "")),
-              "Shift": `${String(s.start_time || "").substring(0, 5)} - ${String(s.end_time || "").substring(0, 5)}`,
-              "Type": formatStatus(String(s.shift_type || "")),
-              "Status": status === "present" ? "Present" : status === "absent" ? "Absent" : "Pending",
-              "Absence Reason": String(s.absence_reason || "-"),
-            }
-          })
-          break
-        }
-        case "break_history": {
-          let query = supabase.from("break_history").select(`break_type, started_at, ended_at, duration_minutes, driver:drivers!break_history_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`).order("started_at", { ascending: false })
-          if (dateFilter) query = query.gte("started_at", dateFilter.start).lte("started_at", dateFilter.end + "T23:59:59")
-          const { data: breaks } = await query
-          rows = (breaks || []).map((b: Record<string, unknown>) => {
-            const driver = b.driver as Record<string, unknown> | null
-            const profile = driver?.profile as Record<string, unknown> | null
-            const mins = b.duration_minutes as number | null
-            let durationStr = "-"
-            if (mins != null) {
-              const hours = Math.floor(mins / 60)
-              const remainingMins = mins % 60
-              durationStr = hours > 0 ? `${hours}h ${remainingMins}m` : `${remainingMins}m`
-            }
-            return {
-              "Driver": String(profile?.full_name || "-"),
-              "Break Type": String(b.break_type || "-"),
-              "Started": b.started_at ? formatDateTime(String(b.started_at)) : "-",
-              "Ended": b.ended_at ? formatDateTime(String(b.ended_at)) : "In Progress",
-              "Duration": durationStr,
-            }
-          })
-          break
-        }
-        case "quota_usage": {
-          const { data: quotas } = await supabase.from("ride_quotas").select(`rides_today, rides_this_week, rides_this_month, last_ride_date, user:profiles!ride_quotas_user_id_fkey(full_name), campaign:ride_campaigns!ride_quotas_campaign_id_fkey(name)`).order("updated_at", { ascending: false })
-          rows = (quotas || []).map((q: Record<string, unknown>) => {
-            const user = q.user as Record<string, unknown> | null
-            const campaign = q.campaign as Record<string, unknown> | null
-            return {
-              "Customer": String(user?.full_name || "-"),
-              "Campaign": String(campaign?.name || "-"),
-              "Today": String(q.rides_today || "0"),
-              "This Week": String(q.rides_this_week || "0"),
-              "This Month": String(q.rides_this_month || "0"),
-              "Last Ride": q.last_ride_date ? formatDate(String(q.last_ride_date)) : "-",
-            }
-          })
-          break
-        }
-        case "support_tickets": {
-          let query = supabase.from("support_tickets").select(`category, description, status, created_at, resolved_at, user:profiles!support_tickets_user_id_fkey(full_name)`).order("created_at", { ascending: false })
-          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
-          const { data: tickets } = await query
-          rows = (tickets || []).map((t: Record<string, unknown>) => {
-            const user = t.user as Record<string, unknown> | null
-            return {
-              "Customer": String(user?.full_name || "-"),
-              "Category": formatStatus(String(t.category || "-")),
-              "Status": formatStatus(String(t.status || "")),
-              "Created": formatDateTime(String(t.created_at || "")),
-              "Resolved": t.resolved_at ? formatDateTime(String(t.resolved_at)) : "-",
-              "Description": String(t.description || "-").slice(0, 50),
-            }
-          })
-          break
-        }
-        case "usage": {
-          let query = supabase.from("rides").select("created_at, status")
-          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
-          const { data: rides } = await query
-          const grouped = (rides || []).reduce((acc: Record<string, { total: number; completed: number; cancelled: number }>, ride) => {
-            const date = formatDate(ride.created_at)
-            if (!acc[date]) acc[date] = { total: 0, completed: 0, cancelled: 0 }
-            acc[date].total++
-            if (ride.status === "completed") acc[date].completed++
-            if (ride.status === "cancelled") acc[date].cancelled++
-            return acc
-          }, {})
-          rows = Object.entries(grouped).map(([date, stats]) => ({
-            "Date": date,
-            "Total": String(stats.total),
-            "Completed": String(stats.completed),
-            "Cancelled": String(stats.cancelled),
-            "Completion %": stats.total > 0 ? `${Math.round((stats.completed / stats.total) * 100)}%` : "0%",
-          }))
-          break
-        }
-        case "incidents": {
-          let query = supabase.from("incidents").select(`title, type, severity, status, description, location_name, reporter_name, created_at, resolved_at, resolution`).order("created_at", { ascending: false })
-          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
-          const { data: incidents } = await query
-          rows = (incidents || []).map((i: Record<string, unknown>) => {
-            return {
-              "Title": String(i.title || "-"),
-              "Type": formatStatus(String(i.type || "")),
-              "Severity": formatStatus(String(i.severity || "")),
-              "Status": formatStatus(String(i.status || "")),
-              "Reporter": String(i.reporter_name || "-"),
-              "Location": String(i.location_name || "-"),
-              "Date": formatDate(String(i.created_at || "")),
-            }
-          })
-          break
-        }
-        case "documents": {
-          let query = supabase.from("documents").select(`document_type, status, uploaded_at, expiry_date, verified_by, driver:drivers(profile:profiles(full_name))`).order("uploaded_at", { ascending: false })
-          if (dateFilter) query = query.gte("uploaded_at", dateFilter.start).lte("uploaded_at", dateFilter.end + "T23:59:59")
-          const { data: docs } = await query
-          // Fetch verifier names
-          const verifierIds = [...new Set((docs || []).map((d: Record<string, unknown>) => d.verified_by).filter(Boolean))]
-          const verifierMap: Record<string, string> = {}
-          if (verifierIds.length > 0) {
-            const { data: verifiers } = await supabase.from("profiles").select("id, full_name").in("id", verifierIds)
-            for (const v of verifiers || []) verifierMap[v.id] = v.full_name
-          }
-          rows = (docs || []).map((d: Record<string, unknown>) => {
-            const driver = d.driver as Record<string, unknown> | null
-            const profile = driver?.profile as Record<string, unknown> | null
-            return {
-              "Driver": String(profile?.full_name || "-"),
-              "Document": formatStatus(String(d.document_type || "")),
-              "Status": formatStatus(String(d.status || "")),
-              "Uploaded": formatDate(String(d.uploaded_at || "")),
-              "Expires": d.expiry_date ? formatDate(String(d.expiry_date)) : "-",
-              "Verified By": d.verified_by ? verifierMap[String(d.verified_by)] || "-" : "-",
-            }
-          })
-          break
-        }
-        case "announcements": {
-          let query = supabase.from("announcements").select("title, message, target_audience, is_active, created_at, expires_at").order("created_at", { ascending: false })
-          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
-          const { data: announcements } = await query
-          rows = (announcements || []).map((a: Record<string, unknown>) => ({
-            "Title": String(a.title || "-"),
-            "Target": formatStatus(String(a.target_audience || "all")),
-            "Status": a.is_active ? "Active" : "Inactive",
-            "Created": formatDate(String(a.created_at || "")),
-            "Expires": a.expires_at ? formatDate(String(a.expires_at)) : "-",
-            "Message": String(a.message || "-").slice(0, 50),
-          }))
-          break
-        }
-        case "chat_messages": {
-          let query = supabase.from("chat_messages").select("message, sender_type, created_at, ride_id, sender_id, receiver_id").order("created_at", { ascending: false }).limit(500)
-          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
-          const { data: messages } = await query
-          const userIds = new Set<string>()
-          ;(messages || []).forEach((m: Record<string, unknown>) => {
-            if (m.sender_id) userIds.add(String(m.sender_id))
-            if (m.receiver_id) userIds.add(String(m.receiver_id))
-          })
-          const { data: profiles } = await supabase.from("profiles").select("id, full_name").in("id", Array.from(userIds))
-          const nameMap: Record<string, string> = {}
-          ;(profiles || []).forEach((p: { id: string; full_name: string }) => { nameMap[p.id] = p.full_name })
-          rows = (messages || []).map((m: Record<string, unknown>) => ({
-            "Ride": m.ride_id ? String(m.ride_id).slice(0, 8) : "-",
-            "From": nameMap[String(m.sender_id)] || String(m.sender_type || "-"),
-            "To": nameMap[String(m.receiver_id)] || "-",
-            "Message": String(m.message || "-").slice(0, 50),
-            "Date": formatDate(String(m.created_at || "")),
-            "Time": formatTime(String(m.created_at || "")),
-          }))
-          break
-        }
-        case "scheduled_rides": {
-          let query = supabase.from("rides").select(`pickup_name, dropoff_name, scheduled_time, status, created_at, customer:profiles!rides_customer_id_fkey(full_name)`).not("scheduled_time", "is", null).order("scheduled_time", { ascending: false })
-          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
-          const { data: rides } = await query
-          rows = (rides || []).map((r: Record<string, unknown>) => {
-            const customer = r.customer as Record<string, unknown> | null
-            return {
-              "Customer": String(customer?.full_name || "-"),
-              "Pickup": cleanAddress(r.pickup_name as string),
-              "Dropoff": cleanAddress(r.dropoff_name as string),
-              "Scheduled For": formatDateTime(String(r.scheduled_time || "")),
-              "Status": formatStatus(String(r.status || "")),
-              "Created": formatDate(String(r.created_at || "")),
-            }
-          })
-          break
-        }
-        case "recurring_rides": {
-          const { data: rides } = await supabase.from("recurring_rides").select(`pickup_name, dropoff_name, days_of_week, pickup_time, is_active, customer:profiles!recurring_rides_customer_id_fkey(full_name)`).order("created_at", { ascending: false })
-          rows = (rides || []).map((r: Record<string, unknown>) => {
-            const customer = r.customer as Record<string, unknown> | null
-            const days = r.days_of_week as string[] | null
-            return {
-              "Customer": String(customer?.full_name || "-"),
-              "Pickup": cleanAddress(r.pickup_name as string),
-              "Dropoff": cleanAddress(r.dropoff_name as string),
-              "Days": days ? days.join(", ") : "-",
-              "Time": String(r.pickup_time || "-"),
-              "Status": r.is_active ? "Active" : "Inactive",
-            }
-          })
-          break
-        }
-        case "cancellations": {
-          let query = supabase.from("rides").select(`pickup_name, cancelled_at, cancel_reason, created_at, customer:profiles!rides_customer_id_fkey(full_name), driver:drivers!rides_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`).eq("status", "cancelled").order("created_at", { ascending: false })
-          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
-          const { data: rides } = await query
-          rows = (rides || []).map((r: Record<string, unknown>) => {
-            const customer = r.customer as Record<string, unknown> | null
-            const driver = r.driver as Record<string, unknown> | null
-            const driverProfile = driver?.profile as Record<string, unknown> | null
-            const reason = String(r.cancel_reason || "Not specified")
-            const cancelledBy = reason.toLowerCase().includes("customer") ? "Customer" : reason.toLowerCase().includes("driver") ? "Driver" : driverProfile?.full_name ? "Driver" : "Customer"
-            return {
-              "Customer": String(customer?.full_name || "-"),
-              "Driver": String(driverProfile?.full_name || "Not assigned"),
-              "Cancelled By": cancelledBy,
-              "Reason": reason,
-              "Cancelled At": r.cancelled_at ? formatDateTime(String(r.cancelled_at)) : formatDateTime(String(r.created_at || "")),
-            }
-          })
-          break
-        }
-        case "peak_hours": {
-          let query = supabase.from("rides").select("created_at, status, duration_minutes")
-          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
-          const { data: rides } = await query
-          const hourStats: Record<number, { total: number; completed: number; cancelled: number; totalDuration: number }> = {}
-          for (let i = 0; i < 24; i++) hourStats[i] = { total: 0, completed: 0, cancelled: 0, totalDuration: 0 }
-          ;(rides || []).forEach((r) => {
-            const hour = new Date(r.created_at).getHours()
-            hourStats[hour].total++
-            if (r.status === "completed") { hourStats[hour].completed++; hourStats[hour].totalDuration += r.duration_minutes || 0 }
-            if (r.status === "cancelled") hourStats[hour].cancelled++
-          })
-          rows = Object.entries(hourStats).map(([hour, stats]) => ({
-            "Hour": `${hour.padStart(2, "0")}:00`,
-            "Rides": String(stats.total),
-            "Completed": String(stats.completed),
-            "Cancelled": String(stats.cancelled),
-            "Avg Duration": stats.completed > 0 ? `${Math.round(stats.totalDuration / stats.completed)} mins` : "-",
-          }))
-          break
-        }
-        case "popular_routes": {
-          let query = supabase.from("rides").select("pickup_name, dropoff_name, distance_km, duration_minutes, status")
-          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
-          const { data: rides } = await query
-          const routeStats: Record<string, { count: number; totalDistance: number; totalDuration: number }> = {}
-          ;(rides || []).filter(r => r.status === "completed").forEach((r) => {
-            const key = `${r.pickup_name || "Unknown"}|${r.dropoff_name || "Unknown"}`
-            if (!routeStats[key]) routeStats[key] = { count: 0, totalDistance: 0, totalDuration: 0 }
-            routeStats[key].count++
-            routeStats[key].totalDistance += r.distance_km || 0
-            routeStats[key].totalDuration += r.duration_minutes || 0
-          })
-          rows = Object.entries(routeStats).sort((a, b) => b[1].count - a[1].count).slice(0, 50).map(([route, stats]) => {
-            const [pickup, dropoff] = route.split("|")
-            return { "Pickup": pickup, "Dropoff": dropoff, "Rides": String(stats.count), "Avg Distance": `${(stats.totalDistance / stats.count).toFixed(1)} km`, "Avg Duration": `${Math.round(stats.totalDuration / stats.count)} mins` }
-          })
-          break
-        }
-        case "customer_loyalty": {
-          let query = supabase.from("rides").select("customer_id, status, created_at")
-          if (dateFilter) query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
-          const { data: rides } = await query
-          const customerStats: Record<string, { total: number; completed: number; cancelled: number; lastRide: string }> = {}
-          ;(rides || []).forEach((r) => {
-            const cid = r.customer_id
-            if (!cid) return
-            if (!customerStats[cid]) customerStats[cid] = { total: 0, completed: 0, cancelled: 0, lastRide: "" }
-            customerStats[cid].total++
-            if (r.status === "completed") customerStats[cid].completed++
-            if (r.status === "cancelled") customerStats[cid].cancelled++
-            if (!customerStats[cid].lastRide || r.created_at > customerStats[cid].lastRide) customerStats[cid].lastRide = r.created_at
-          })
-          const customerIds = Object.keys(customerStats)
-          const { data: profiles } = await supabase.from("profiles").select("id, full_name, phone").in("id", customerIds)
-          const profileMap: Record<string, { full_name: string; phone: string }> = {}
-          ;(profiles || []).forEach((p) => { profileMap[p.id] = { full_name: p.full_name, phone: p.phone } })
-          rows = Object.entries(customerStats).sort((a, b) => b[1].total - a[1].total).slice(0, 100).map(([cid, stats]) => ({
-            "Customer": profileMap[cid]?.full_name || "-",
-            "Phone": formatPhone(profileMap[cid]?.phone || null),
-            "Total Rides": String(stats.total),
-            "Completed": String(stats.completed),
-            "Cancelled": String(stats.cancelled),
-            "Last Ride": formatDate(stats.lastRide),
-          }))
-          break
-        }
-        case "service_zones": {
-          const [{ data: zones }, { data: locations }] = await Promise.all([
-            supabase.from("service_zones").select("name, zone_type, description, is_active, created_at"),
-            supabase.from("locations").select("name, location_type, address, is_active, created_at")
-          ])
-          const zoneRows = (zones || []).map((z: Record<string, unknown>) => ({ "Name": String(z.name || "-"), "Category": "Zone", "Type": formatStatus(String(z.zone_type || "both")), "Address": String(z.description || "-"), "Status": z.is_active ? "Active" : "Inactive", "Created": formatDate(String(z.created_at || "")) }))
-          const locationRows = (locations || []).map((l: Record<string, unknown>) => ({ "Name": String(l.name || "-"), "Category": "Location", "Type": formatStatus(String(l.location_type || "both")), "Address": String(l.address || "-"), "Status": l.is_active ? "Active" : "Inactive", "Created": formatDate(String(l.created_at || "")) }))
-          rows = [...zoneRows, ...locationRows]
-          break
-        }
-        case "driver_availability": {
-          const { data: drivers } = await supabase.from("drivers").select(`is_online, rating, total_trips, profile:profiles!drivers_profile_id_fkey(full_name, phone), vehicle:vehicle_types!drivers_vehicle_id_fkey(plate_no, display_name)`)
-          rows = (drivers || []).map((d: Record<string, unknown>) => {
-            const profile = d.profile as Record<string, unknown> | null
-            const vehicle = d.vehicle as Record<string, unknown> | null
-            return { "Driver": String(profile?.full_name || "-"), "Phone": formatPhone(profile?.phone as string | null), "Vehicle": vehicle ? `${vehicle.plate_no}` : "-", "Rating": String(d.rating || "-"), "Total Trips": String(d.total_trips || 0), "Status": d.is_online ? "Online" : "Offline" }
-          })
-          break
-        }
-        case "favorite_drivers": {
-          const { data: favorites } = await supabase.from("favorite_drivers").select(`driver_id, driver:drivers!favorite_drivers_driver_id_fkey(rating, total_trips, profile:profiles!drivers_profile_id_fkey(full_name))`)
-          const driverCounts: Record<string, { name: string; rating: number; trips: number; count: number }> = {}
-          ;(favorites || []).forEach((f: Record<string, unknown>) => {
-            const driver = f.driver as Record<string, unknown> | null
-            const profile = driver?.profile as Record<string, unknown> | null
-            const did = String(f.driver_id)
-            if (!driverCounts[did]) driverCounts[did] = { name: String(profile?.full_name || "-"), rating: Number(driver?.rating || 0), trips: Number(driver?.total_trips || 0), count: 0 }
-            driverCounts[did].count++
-          })
-          rows = Object.values(driverCounts).sort((a, b) => b.count - a.count).map((d) => ({ "Driver": d.name, "Rating": d.rating ? `${Number(d.rating).toFixed(1)} out of 5` : "-", "Favorites": String(d.count), "Total Rides": String(d.trips) }))
-          break
-        }
-        case "fleet_health":
-        case "vehicle_issues":
-        case "issue_breakdown":
-        case "pending_issues":
-        case "resolved_issues":
-        case "vehicle_lifespan": {
-          const [vehiclesRes, checklistsRes] = await Promise.all([
-            supabase.from("vehicle_types").select("plate_no, display_name, is_active, created_at").eq("is_active", true),
-            supabase.from("vehicle_checklists").select("*").order("checked_at", { ascending: false }),
-          ])
-          const vehicles = vehiclesRes.data || []
-          const checklists = checklistsRes.data || []
-          const ITEM_LABELS: Record<string, string> = { fuel: "Fuel Level", tires: "Tires", lights: "Lights", body: "Body Condition", ac: "A/C", safety: "Safety Kit", documents: "Documents", seatbelts: "Seatbelts", cleanliness: "Cleanliness" }
-          const vehicleMap = new Map<string, { vehicle_number: string; total_checks: number; total_issues: number; pending_issues: number; fixed_issues: number; deferred_issues: number; most_common_issue: string | null; issue_breakdown: Record<string, number>; health_score: number; days_in_service: number }>()
-          for (const v of vehicles) {
-            if (!v.plate_no) continue
-            vehicleMap.set(v.plate_no, { vehicle_number: v.plate_no, total_checks: 0, total_issues: 0, pending_issues: 0, fixed_issues: 0, deferred_issues: 0, most_common_issue: null, issue_breakdown: {}, health_score: 100, days_in_service: v.created_at ? Math.ceil((Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60 * 24)) : 0 })
-          }
-          for (const c of checklists) {
-            const vn = c.vehicle_number; if (!vn || !vehicleMap.has(vn)) continue
-            const h = vehicleMap.get(vn)!; h.total_checks++
-            if (c.has_issues) { h.total_issues++; if (c.resolution_status === "pending" || !c.resolution_status) h.pending_issues++; else if (c.resolution_status === "fixed") h.fixed_issues++; if (c.issues) { for (const key of Object.keys(c.issues)) { h.issue_breakdown[key] = (h.issue_breakdown[key] || 0) + 1 } } }
-          }
-          for (const h of vehicleMap.values()) {
-            let maxCount = 0, mostCommon: string | null = null; for (const [issue, count] of Object.entries(h.issue_breakdown)) { if (count > maxCount) { maxCount = count; mostCommon = issue } }; h.most_common_issue = mostCommon
-            const issueRate = h.total_checks > 0 ? (h.total_issues / h.total_checks) * 100 : 0; h.health_score = Math.max(0, Math.min(100, Math.round(100 - issueRate * 2 - h.pending_issues * 10)))
-          }
-          const getHealthLabel = (score: number) => score >= 80 ? "Excellent" : score >= 60 ? "Good" : score >= 40 ? "Fair" : "Poor"
-          const healthData = Array.from(vehicleMap.values())
-          if (reportType === "fleet_health") { rows = healthData.map(v => ({ "Vehicle": v.vehicle_number, "Health Score": `${v.health_score}%`, "Status": getHealthLabel(v.health_score), "Days Active": String(v.days_in_service), "Total Checks": String(v.total_checks), "Total Issues": String(v.total_issues), "Pending": String(v.pending_issues), "Fixed": String(v.fixed_issues), "Common Issue": v.most_common_issue ? (ITEM_LABELS[v.most_common_issue] || v.most_common_issue) : "-" })) }
-          else if (reportType === "vehicle_issues") { rows = checklists.filter((c: Record<string, unknown>) => c.has_issues).map((c: Record<string, unknown>) => ({ "Date": formatDate(String(c.checked_at)), "Vehicle": String(c.vehicle_number || "-"), "Driver": String(c.driver_name || "-"), "Issues": c.issues ? Object.keys(c.issues as Record<string, unknown>).map(k => ITEM_LABELS[k] || k).join(", ") : "-", "Status": String(c.resolution_status || "pending"), "Resolution": String(c.resolution_notes || "-") })) }
-          else if (reportType === "issue_breakdown") { const breakdown: Record<string, { count: number; vehicles: Set<string> }> = {}; checklists.forEach((c: Record<string, unknown>) => { if (c.issues) { Object.keys(c.issues as Record<string, unknown>).forEach(key => { if (!breakdown[key]) breakdown[key] = { count: 0, vehicles: new Set() }; breakdown[key].count++; breakdown[key].vehicles.add(String(c.vehicle_number)) }) } }); rows = Object.entries(breakdown).map(([key, val]) => ({ "Issue Type": ITEM_LABELS[key] || key, "Occurrences": String(val.count), "Vehicles Affected": String(val.vehicles.size) })).sort((a, b) => parseInt(b["Occurrences"]) - parseInt(a["Occurrences"])) }
-          else if (reportType === "pending_issues") { rows = checklists.filter((c: Record<string, unknown>) => c.has_issues && (!c.resolution_status || c.resolution_status === "pending")).map((c: Record<string, unknown>) => ({ "Date": formatDate(String(c.checked_at)), "Vehicle": String(c.vehicle_number || "-"), "Driver": String(c.driver_name || "-"), "Issues": c.issues ? Object.keys(c.issues as Record<string, unknown>).map(k => ITEM_LABELS[k] || k).join(", ") : "-", "Status": "Pending" })) }
-          else if (reportType === "resolved_issues") { rows = checklists.filter((c: Record<string, unknown>) => c.has_issues && c.resolution_status === "fixed").map((c: Record<string, unknown>) => ({ "Date": formatDate(String(c.checked_at)), "Vehicle": String(c.vehicle_number || "-"), "Driver": String(c.driver_name || "-"), "Issues": c.issues ? Object.keys(c.issues as Record<string, unknown>).map(k => ITEM_LABELS[k] || k).join(", ") : "-", "Resolution": String(c.resolution_notes || "-"), "Resolved": c.resolved_at ? formatDate(String(c.resolved_at)) : "-" })) }
-          else if (reportType === "vehicle_lifespan") { rows = healthData.map(v => ({ "Vehicle": v.vehicle_number, "Days Active": String(v.days_in_service), "Health Score": `${v.health_score}%`, "Issue Rate": v.total_checks > 0 ? `${Math.round((v.total_issues / v.total_checks) * 100)}%` : "0%", "Recommendation": v.health_score < 40 ? "Consider Replacement" : "Keep" })).sort((a, b) => parseInt(a["Health Score"]) - parseInt(b["Health Score"])) }
-          break
-        }
-        case "vehicle_history": {
-          const [logsRes, checklistsRes] = await Promise.all([
-            supabase.from("vehicle_logs").select(`*, driver:drivers!vehicle_logs_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`).order("created_at", { ascending: false }),
-            supabase.from("vehicle_checklists").select("*").order("checked_at", { ascending: false }),
-          ])
-          const logs = logsRes.data || []
-          const checklists = checklistsRes.data || []
-          const ITEM_LABELS: Record<string, string> = { fuel: "Fuel Level", tires: "Tires", lights: "Lights", body: "Body Condition", ac: "A/C", safety: "Safety Kit", documents: "Documents", seatbelts: "Seatbelts", cleanliness: "Cleanliness" }
-          const historyRows: { date: string; vehicle: string; event: string; driver: string; details: string; timestamp: number }[] = []
-          logs.forEach((log: Record<string, unknown>) => { const driver = log.driver as Record<string, unknown> | null; const profile = driver?.profile as Record<string, unknown> | null; historyRows.push({ date: formatDate(String(log.created_at)), vehicle: String(log.vehicle_number || "-"), event: String(log.log_type || "Log Entry"), driver: String(profile?.full_name || "-"), details: `Odometer: ${log.odometer_reading || "-"}, Fuel: ${log.fuel_amount || "-"}L`, timestamp: new Date(String(log.created_at)).getTime() }) })
-          checklists.forEach((c: Record<string, unknown>) => { const event = c.has_issues ? "Pre-trip Check (Issues)" : "Pre-trip Check (Passed)"; const issues = c.issues ? Object.keys(c.issues as Record<string, unknown>).map(k => ITEM_LABELS[k] || k).join(", ") : "All OK"; historyRows.push({ date: formatDate(String(c.checked_at)), vehicle: String(c.vehicle_number || "-"), event: event, driver: String(c.driver_name || "-"), details: c.has_issues ? `Issues: ${issues}` : "All items passed", timestamp: new Date(String(c.checked_at)).getTime() }); if (c.resolution_status === "fixed" && c.resolved_at) { historyRows.push({ date: formatDate(String(c.resolved_at)), vehicle: String(c.vehicle_number || "-"), event: "Issue Resolved", driver: "-", details: String(c.resolution_notes || "Fixed"), timestamp: new Date(String(c.resolved_at)).getTime() }) } })
-          historyRows.sort((a, b) => b.timestamp - a.timestamp)
-          rows = historyRows.map(h => ({ "Date": h.date, "Vehicle": h.vehicle, "Event": h.event, "Driver": h.driver, "Details": h.details }))
-          break
-        }
-        case "bus_routes": {
-          const [routesRes, stopsRes, schedulesRes] = await Promise.all([
-            supabase.from("transport_routes").select("*").order("sort_order"),
-            supabase.from("route_stops").select("route_id"),
-            supabase.from("route_schedules").select("route_id"),
-          ])
-          const routes = routesRes.data || []
-          const stopCounts = (stopsRes.data || []).reduce((acc: Record<string, number>, s: { route_id: string }) => { acc[s.route_id] = (acc[s.route_id] || 0) + 1; return acc }, {})
-          const scheduleCounts = (schedulesRes.data || []).reduce((acc: Record<string, number>, s: { route_id: string }) => { acc[s.route_id] = (acc[s.route_id] || 0) + 1; return acc }, {})
-          const fmtType = (t: string) => ({ "mtcc_bus": "MTCC Bus", "internal_bus": "Internal Bus", "ferry": "Ferry", "bus": "Bus" }[t] || t.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()))
-          rows = routes.map((r: Record<string, unknown>) => ({ "Route Name": String(r.route_name || ""), "Code": String(r.route_code || "-"), "Type": fmtType(String(r.transport_type || "bus")), "Direction": formatStatus(String(r.direction || "")), "Stops": String(stopCounts[String(r.id)] || 0), "Schedules": String(scheduleCounts[String(r.id)] || 0), "Active": r.is_active ? "Yes" : "No" }))
-          break
-        }
-        case "bus_stops": {
-          const { data: stops } = await supabase.from("route_stops").select(`*, route:transport_routes!route_stops_route_id_fkey(route_name)`).order("route_id").order("stop_order")
-          rows = (stops || []).map((s: Record<string, unknown>) => { const route = s.route as Record<string, unknown> | null; return { "Stop Name": String(s.stop_name || ""), "Route": String(route?.route_name || "-"), "Order": String(s.stop_order || ""), "Latitude": String(s.latitude || "-"), "Longitude": String(s.longitude || "-"), "Pickup": s.is_pickup ? "Yes" : "No", "Dropoff": s.is_dropoff ? "Yes" : "No" } })
-          break
-        }
-        case "bus_roster": {
-          let query = supabase.from("roster_assignments").select(`service_date, departure_time, status, route:transport_routes!roster_assignments_route_id_fkey(route_name), driver:drivers!roster_assignments_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name)), vehicle:vehicle_types!roster_assignments_vehicle_id_fkey(display_name, plate_no)`).order("service_date", { ascending: false }).order("departure_time")
-          if (dateFilter) { query = query.gte("service_date", dateFilter.start).lte("service_date", dateFilter.end) }
-          const { data: roster } = await query
-          rows = (roster || []).map((r: Record<string, unknown>) => { const route = r.route as Record<string, unknown> | null; const driver = r.driver as Record<string, unknown> | null; const profile = driver?.profile as Record<string, unknown> | null; const vehicle = r.vehicle as Record<string, unknown> | null; return { "Date": formatDate(String(r.service_date || "")), "Route": String(route?.route_name || "-"), "Departure": String(r.departure_time || "").slice(0, 5), "Driver": String(profile?.full_name || "-"), "Vehicle": vehicle ? `${vehicle.display_name || ""} (${vehicle.plate_no || ""})` : "-", "Status": formatStatus(String(r.status || "scheduled")) } })
-          break
-        }
-        case "bus_statistics": {
-          const [routesRes, stopsRes, schedulesRes, rosterRes, tripsRes] = await Promise.all([
-            supabase.from("transport_routes").select("*").order("sort_order"),
-            supabase.from("route_stops").select("route_id"),
-            supabase.from("route_schedules").select("route_id, is_active"),
-            supabase.from("roster_assignments").select("route_id"),
-            supabase.from("bus_trips").select("roster_assignment_id, status"),
-          ])
-          const routes = routesRes.data || []
-          const stopCounts = (stopsRes.data || []).reduce((acc: Record<string, number>, s: { route_id: string }) => { acc[s.route_id] = (acc[s.route_id] || 0) + 1; return acc }, {})
-          const scheduleCounts = (schedulesRes.data || []).reduce((acc: Record<string, number>, s: { route_id: string; is_active: boolean }) => { if (s.is_active) acc[s.route_id] = (acc[s.route_id] || 0) + 1; return acc }, {})
-          const rosterCounts = (rosterRes.data || []).reduce((acc: Record<string, number>, r: { route_id: string }) => { acc[r.route_id] = (acc[r.route_id] || 0) + 1; return acc }, {})
-          const completedTrips = (tripsRes.data || []).filter((t: { status: string }) => t.status === "completed").length
-          rows = routes.map((r: Record<string, unknown>) => ({ "Route": String(r.route_name || ""), "Code": String(r.route_code || "-"), "Total Stops": String(stopCounts[String(r.id)] || 0), "Schedules": String(scheduleCounts[String(r.id)] || 0), "Roster Assignments": String(rosterCounts[String(r.id)] || 0), "Completed Trips": String(completedTrips), "Active": r.is_active ? "Yes" : "No" }))
-          break
-        }
-        case "bus_passenger_counts": {
-          let stopQ = supabase.from("stop_passenger_counts").select(`stop_name, stop_index, boarded_count, alighted_count, recorded_at, bus_trip:bus_trips!stop_passenger_counts_bus_trip_id_fkey(roster_assignment:roster_assignments!bus_trips_roster_assignment_id_fkey(route:transport_routes!roster_assignments_route_id_fkey(route_name), driver:drivers!roster_assignments_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name)), vehicle:vehicle_types!roster_assignments_vehicle_id_fkey(display_name, plate_no)))`).order("recorded_at", { ascending: false })
-          if (dateFilter) { stopQ = stopQ.gte("recorded_at", dateFilter.start).lte("recorded_at", dateFilter.end + "T23:59:59") }
-          const { data: stopData } = await stopQ
-          if (stopData && stopData.length > 0) {
-            rows = stopData.map((c: Record<string, unknown>) => { const tr = c.bus_trip as Record<string, unknown> | null; const ra = tr?.roster_assignment as Record<string, unknown> | null; const rt = ra?.route as Record<string, unknown> | null; const dr = ra?.driver as Record<string, unknown> | null; const pr = dr?.profile as Record<string, unknown> | null; const vh = ra?.vehicle as Record<string, unknown> | null; return { "Date": formatDateTime(String(c.recorded_at || "")), "Route": String(rt?.route_name || "-"), "Stop": String(c.stop_name || "-"), "Stop #": String((c.stop_index as number || 0) + 1), "Boarded": String(c.boarded_count || 0), "Alighted": String(c.alighted_count || 0), "Vehicle": vh ? `${vh.display_name || ""} (${vh.plate_no || ""})` : "-", "Driver": String(pr?.full_name || "-") } })
-          } else {
-            let locQ = supabase.from("bus_location_tracking").select(`current_stop_name, current_stop_index, passengers_on_board, vehicle_capacity, is_full, last_updated_at, vehicle_number, route:transport_routes!bus_location_tracking_route_id_fkey(route_name), driver:drivers!bus_location_tracking_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`).order("last_updated_at", { ascending: false })
-            if (dateFilter) { locQ = locQ.gte("last_updated_at", dateFilter.start).lte("last_updated_at", dateFilter.end + "T23:59:59") }
-            const { data: locData } = await locQ
-            rows = (locData || []).map((c: Record<string, unknown>) => { const rt = c.route as Record<string, unknown> | null; const dr = c.driver as Record<string, unknown> | null; const pr = dr?.profile as Record<string, unknown> | null; const pax = c.passengers_on_board || 0; const cap = c.vehicle_capacity || 0; return { "Date": formatDateTime(String(c.last_updated_at || "")), "Route": String(rt?.route_name || "-"), "Stop": String(c.current_stop_name || "-"), "Stop #": String((c.current_stop_index as number || 0) + 1), "Boarded": String(pax), "Alighted": `of ${cap}${c.is_full ? " (Full)" : ""}`, "Vehicle": String(c.vehicle_number || "-"), "Driver": String(pr?.full_name || "-") } })
-          }
-          break
-        }
-        case "bus_trips": {
-          let query = supabase.from("bus_trips").select(`actual_start_time, actual_end_time, status, created_at, roster_assignment:roster_assignments!bus_trips_roster_assignment_id_fkey(route:transport_routes!roster_assignments_route_id_fkey(route_name), driver:drivers!roster_assignments_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name)), vehicle:vehicle_types!roster_assignments_vehicle_id_fkey(display_name, plate_no))`).order("created_at", { ascending: false })
-          if (dateFilter) { query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59") }
-          const { data: trips } = await query
-          rows = (trips || []).map((t: Record<string, unknown>) => { const ra = t.roster_assignment as Record<string, unknown> | null; const rt = ra?.route as Record<string, unknown> | null; const dr = ra?.driver as Record<string, unknown> | null; const pr = dr?.profile as Record<string, unknown> | null; const vh = ra?.vehicle as Record<string, unknown> | null; let duration = "-"; if (t.actual_start_time && t.actual_end_time) { const mins = Math.round((new Date(String(t.actual_end_time)).getTime() - new Date(String(t.actual_start_time)).getTime()) / 60000); duration = `${mins} min` } return { "Date": formatDate(String(t.created_at || "")), "Route": String(rt?.route_name || "-"), "Driver": String(pr?.full_name || "-"), "Vehicle": vh ? `${vh.display_name || ""} (${vh.plate_no || ""})` : "-", "Started": t.actual_start_time ? formatTime(String(t.actual_start_time)) : "-", "Ended": t.actual_end_time ? formatTime(String(t.actual_end_time)) : "-", "Duration": duration, "Status": formatStatus(String(t.status || "")) } })
-          break
-        }
-        case "bus_full_alerts": {
-          const { data: allVeh } = await supabase.from("vehicle_types").select("display_name, plate_no")
-          const vehLookup: Record<string, string> = {}; (allVeh || []).forEach((v: { display_name: string; plate_no: string }) => { if (v.plate_no) vehLookup[v.plate_no] = v.display_name || "" })
-          let query = supabase.from("bus_full_alerts").select("*").order("created_at", { ascending: false })
-          if (dateFilter) { query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59") }
-          const { data: alerts } = await query
-          rows = (alerts || []).map((a: Record<string, unknown>) => { const plateNo = String(a.vehicle_number || ""); const dispName = vehLookup[plateNo] || ""; const vehDisplay = dispName ? `${dispName} (${plateNo})` : plateNo || "-"; return { "Date": formatDateTime(String(a.created_at || "")), "Route": String(a.route_name || "-"), "Stop": String(a.stop_name || "-"), "Vehicle": vehDisplay, "Passengers": String(a.passengers_on_board || 0), "Capacity": String(a.vehicle_capacity || 0), "Acknowledged": a.is_acknowledged ? "Yes" : "No" } })
-          break
-        }
         default: {
-          toast.error("PDF not available for this report type")
+          toast.error(`PDF not available for this report type. Use CSV.`)
           setLoading(null)
           return
         }
       }
 
-      const reportDate = new Date().toLocaleString("en-US", {
-        timeZone: "Indian/Maldives",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-
-      // Generate PDF using jsPDF
+      // Generate PDF for other reports
       const doc = new jsPDF()
-
-      // Header
       doc.setFontSize(20)
-      doc.setTextColor(245, 158, 11) // Orange color
+      doc.setTextColor(234, 179, 8)
       doc.text("MyRide", 14, 20)
-
-      doc.setFontSize(14)
+      doc.setFontSize(16)
       doc.setTextColor(0, 0, 0)
       doc.text(reportName, 14, 30)
-
       doc.setFontSize(10)
       doc.setTextColor(100, 100, 100)
-      doc.text(`Generated ${reportDate}${dateFilter ? ` • ${dateFilter.start} to ${dateFilter.end}` : ' • All Time'}`, 14, 38)
+      const dateRangeText = dateFilter ? `${formatDate(dateFilter.start)} - ${formatDate(dateFilter.end)}` : "All Time"
+      doc.text(`Generated ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })} at ${new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })} • ${dateRangeText}`, 14, 38)
 
-      // Draw header line
-      doc.setDrawColor(245, 158, 11)
-      doc.setLineWidth(0.5)
-      doc.line(14, 42, 196, 42)
+      autoTable(doc, {
+        startY: 45,
+        head: [headers],
+        body: rows.map(row => headers.map(h => row[h] || "-")),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [234, 179, 8], textColor: [0, 0, 0], fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+      })
 
-      if (rows.length > 0) {
-        // Table data
-        const tableData = rows.map(row => headers.map(h => row[h] || "-"))
-
-        autoTable(doc, {
-          head: [headers],
-          body: tableData,
-          startY: 48,
-          styles: { fontSize: 8, cellPadding: 3 },
-          headStyles: { fillColor: [248, 249, 250], textColor: [100, 100, 100], fontStyle: 'bold' },
-          alternateRowStyles: { fillColor: [252, 252, 252] },
-        })
-
-        // Record count
-        const finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || 50
-        doc.setFontSize(9)
-        doc.setTextColor(100, 100, 100)
-        doc.text(`${rows.length} records`, 14, finalY + 10)
-      } else {
-        doc.setFontSize(12)
-        doc.setTextColor(100, 100, 100)
-        doc.text("No data available for the selected period", 14, 60)
-      }
-
-      // Footer
-      const pageHeight = doc.internal.pageSize.height
-      doc.setFontSize(8)
-      doc.setTextColor(150, 150, 150)
-      doc.text("MyRide Fleet Management", 14, pageHeight - 10)
-
-      // Save PDF
       doc.save(`${reportType}-report-${new Date().toISOString().split("T")[0]}.pdf`)
-      toast.success(`PDF downloaded - ${rows.length} records`)
-    } catch (error: unknown) {
-      console.error("PDF generation error:", error)
-      toast.error(`Failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    } finally {
-      setLoading(null)
+      toast.success(`${reportName} PDF downloaded`)
+    } catch (err) {
+      console.error("PDF generation error:", err)
+      toast.error("Failed to generate PDF")
     }
-  }, [])
+    setLoading(null)
+  }, [getReportData])
 
   const categories = [
     { name: "People", reports: ["customers", "drivers", "driver_performance", "customer_loyalty", "favorite_drivers"] },

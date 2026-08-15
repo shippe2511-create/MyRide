@@ -21,6 +21,7 @@ import { Star, Search, TrendingUp, TrendingDown, AlertTriangle, Loader2, Car, Ch
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { formatDate } from "@/lib/utils"
 import { PermissionGate } from "@/components/permission-gate"
+import { usePermissions } from "@/hooks/usePermissions"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -71,6 +72,11 @@ const CircularProgress = ({ value, size = 120, strokeWidth = 10, color = "yellow
   )
 }
 
+interface Department {
+  id: string
+  name: string
+}
+
 interface DriverRating {
   id: string
   driver_id: string
@@ -82,6 +88,7 @@ interface DriverRating {
   five_star: number
   one_star: number
   recent_trend: "up" | "down" | "stable"
+  department_id: string | null
 }
 
 interface RecentReview {
@@ -148,6 +155,7 @@ interface DriverDetails {
 
 export default function RatingsPage() {
   const supabase = createClient()
+  const { departmentId: userDepartmentId } = usePermissions()
   const [drivers, setDrivers] = useState<DriverRating[]>([])
   const [recentReviews, setRecentReviews] = useState<RecentReview[]>([])
   const [leaderboard, setLeaderboard] = useState<LeaderboardDriver[]>([])
@@ -159,6 +167,28 @@ export default function RatingsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [allRatingsData, setAllRatingsData] = useState<{id: string, to_user_id: string}[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all")
+
+  // Set department filter to user's department when it loads
+  useEffect(() => {
+    if (userDepartmentId && departmentFilter === "all") {
+      setDepartmentFilter(userDepartmentId)
+    }
+  }, [userDepartmentId])
+
+  // Load departments
+  useEffect(() => {
+    const loadDepartments = async () => {
+      const { data } = await supabase
+        .from("departments")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name")
+      setDepartments(data || [])
+    }
+    loadDepartments()
+  }, [])
 
   useEffect(() => {
     loadData()
@@ -181,12 +211,13 @@ export default function RatingsPage() {
 
   const loadData = async () => {
     const [driversRes, ratingsRes, ridesRes] = await Promise.all([
-      // Get drivers with their profile info
+      // Get drivers with their profile info and department
       supabase.from("drivers").select(`
         id,
         profile_id,
         rating,
         total_trips,
+        department_id,
         profile:profiles!drivers_profile_id_fkey(id, full_name, avatar_url, phone, status)
       `).not("profile", "is", null),
       supabase.from("ratings").select(`
@@ -242,7 +273,8 @@ export default function RatingsPage() {
         avg_rating: Math.round(avg * 10) / 10,
         five_star: fiveStar,
         one_star: oneStar,
-        recent_trend: trend
+        recent_trend: trend,
+        department_id: driver.department_id || null
       }
     })
 
@@ -471,6 +503,13 @@ export default function RatingsPage() {
 
   const filteredDrivers = drivers.filter(d => {
     const matchesSearch = d.full_name.toLowerCase().includes(search.toLowerCase())
+
+    // Department filter
+    if (departmentFilter !== "all") {
+      if (departmentFilter === "none" && d.department_id) return false
+      if (departmentFilter !== "none" && d.department_id !== departmentFilter) return false
+    }
+
     if (filter === "low") return matchesSearch && d.avg_rating > 0 && d.avg_rating < 3
     if (filter === "high") return matchesSearch && d.avg_rating >= 4.5
     return matchesSearch
@@ -638,6 +677,20 @@ export default function RatingsPage() {
                   className="pl-9"
                 />
               </div>
+              <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                <SelectTrigger className="w-36">
+                  <SelectValue placeholder="Department" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Depts</SelectItem>
+                  <SelectItem value="none">No Department</SelectItem>
+                  {departments.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
                 <SelectTrigger className="w-40">
                   <SelectValue />

@@ -109,13 +109,38 @@ async function fetchRidesData(statusFilter: string, dateRange: string, departmen
     query = query.gte("created_at", startDate.toISOString())
   }
 
+  // Get customer IDs for department filtering (if department selected)
+  let customerIds: string[] | null = null
+  if (departmentFilter && departmentFilter !== "all") {
+    const { data: customers } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("department_id", departmentFilter)
+    customerIds = customers?.map(c => c.id) || []
+  }
+
+  // Build queries - add department filter if needed
+  let totalQuery = supabase.from("rides").select("*", { count: "exact", head: true })
+  let activeQuery = supabase.from("rides").select("*", { count: "exact", head: true }).in("status", ["pending", "accepted", "arrived", "in_progress"])
+  let completedQuery = supabase.from("rides").select("*", { count: "exact", head: true }).eq("status", "completed")
+  let cancelledQuery = supabase.from("rides").select("*", { count: "exact", head: true }).eq("status", "cancelled")
+  let last7DaysQuery = supabase.from("rides").select("created_at").gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+
+  if (customerIds && customerIds.length > 0) {
+    totalQuery = totalQuery.in("customer_id", customerIds)
+    activeQuery = activeQuery.in("customer_id", customerIds)
+    completedQuery = completedQuery.in("customer_id", customerIds)
+    cancelledQuery = cancelledQuery.in("customer_id", customerIds)
+    last7DaysQuery = last7DaysQuery.in("customer_id", customerIds)
+  }
+
   const [ridesRes, totalRes, activeRes, completedRes, cancelledRes, last7DaysRes] = await Promise.all([
     query,
-    supabase.from("rides").select("*", { count: "exact", head: true }),
-    supabase.from("rides").select("*", { count: "exact", head: true }).in("status", ["pending", "accepted", "arrived", "in_progress"]),
-    supabase.from("rides").select("*", { count: "exact", head: true }).eq("status", "completed"),
-    supabase.from("rides").select("*", { count: "exact", head: true }).eq("status", "cancelled"),
-    supabase.from("rides").select("created_at").gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
+    totalQuery,
+    activeQuery,
+    completedQuery,
+    cancelledQuery,
+    last7DaysQuery,
   ])
 
   const last7Days = last7DaysRes.data || []

@@ -148,6 +148,8 @@ export default function ControlRoomPage() {
   const [demandForecast, setDemandForecast] = useState<DemandForecast[]>([])
   const [incidents, setIncidents] = useState<IncidentPin[]>([])
   const [departmentId, setDepartmentId] = useState<string | null>(null)
+  const [departments, setDepartments] = useState<{id: string, name: string}[]>([])
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
 
   // UI state
   const [loading, setLoading] = useState(true)
@@ -505,7 +507,16 @@ export default function ControlRoomPage() {
     }
   }, [])
 
-  // Load user's department for filtering
+  // Load departments
+  useEffect(() => {
+    const loadDepartments = async () => {
+      const { data } = await supabase.from("departments").select("id, name").eq("is_active", true).order("name")
+      if (data) setDepartments(data)
+    }
+    loadDepartments()
+  }, [])
+
+  // Load user's department for filtering - always default to user's department
   useEffect(() => {
     const loadUserDepartment = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -516,10 +527,11 @@ export default function ControlRoomPage() {
           .eq("id", user.id)
           .single()
 
-        // Only filter by department if not super_admin
-        if (profile && profile.role !== "super_admin") {
+        // Default to user's department for all users (including super_admin)
+        if (profile?.department_id) {
           setDepartmentId(profile.department_id)
         }
+        setDepartmentInitialized(true)
       }
     }
     loadUserDepartment()
@@ -578,8 +590,10 @@ export default function ControlRoomPage() {
     setIsUpdating(false)
   }, [supabase, departmentId])
 
-  // Initial load and realtime subscription
+  // Initial load and realtime subscription - wait for department to be initialized
   useEffect(() => {
+    if (!departmentInitialized) return
+
     loadData()
 
     // Debounced reload to prevent too many updates
@@ -601,7 +615,7 @@ export default function ControlRoomPage() {
         unsubscribeFromControlRoom(supabase, subscriptionsRef.current)
       }
     }
-  }, [loadData, supabase])
+  }, [loadData, supabase, departmentInitialized])
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -1132,6 +1146,18 @@ export default function ControlRoomPage() {
             {attentionLevel === "amber" && "Attention Needed"}
             {attentionLevel === "red" && "Action Required"}
           </Badge>
+          {/* Department Selector */}
+          <Select value={departmentId || "all"} onValueChange={(v) => setDepartmentId(v === "all" ? null : v)}>
+            <SelectTrigger className="w-36 h-8 text-xs">
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map(d => (
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4">

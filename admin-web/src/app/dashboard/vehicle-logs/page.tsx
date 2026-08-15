@@ -453,10 +453,23 @@ export default function VehicleLogsPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Fuel, maintenance, and repair records</p>
         </div>
-        <Button variant="outline" onClick={exportCSV}>
-          <Download className="mr-2 h-4 w-4" />
-          Export
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select value={departmentFilter} onValueChange={(v) => { setDepartmentFilter(v); setCurrentPage(1) }}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map(d => (
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="outline" onClick={exportCSV}>
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+        </div>
       </div>
 
       {/* Summary Stats Row */}
@@ -674,17 +687,6 @@ export default function VehicleLogsPage() {
               <SelectItem value="all">All Types</SelectItem>
               {LOG_TYPES.map(type => (
                 <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={departmentFilter} onValueChange={(v) => { setDepartmentFilter(v); setCurrentPage(1) }}>
-            <SelectTrigger className="w-44">
-              <SelectValue placeholder="Department" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Departments</SelectItem>
-              {departments.map(d => (
-                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>

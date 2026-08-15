@@ -14,7 +14,7 @@ import {
 } from "recharts"
 import {
   MapPin, Clock, Star,
-  Calendar, Activity, Target, Award, Zap
+  Calendar, Activity, Target, Award, Zap, Users, Car, TrendingUp, AlertTriangle, Repeat, BarChart3
 } from "lucide-react"
 import { SkeletonCard, SkeletonChart } from "@/components/ui/skeleton-card"
 import { PermissionGate } from "@/components/permission-gate"
@@ -62,6 +62,14 @@ export default function AnalyticsPage() {
     activeDrivers: 0,
     ridesChange: 0,
     customersChange: 0,
+    avgRating: 0,
+    totalRatings: 0,
+    onlineDrivers: 0,
+    totalVehicles: 0,
+    sosAlerts: 0,
+    avgRidesPerDay: 0,
+    repeatCustomers: 0,
+    totalDriverTrips: 0,
   })
 
   const [dailyData, setDailyData] = useState<{ date: string; rides: number; completed: number; cancelled: number }[]>([])
@@ -95,7 +103,7 @@ export default function AnalyticsPage() {
     const prevStartDate = new Date(startDate)
     prevStartDate.setDate(prevStartDate.getDate() - daysAgo)
 
-    const [ridesRes, prevRidesRes, driversRes, customersRes, prevCustomersRes] = await Promise.all([
+    const [ridesRes, prevRidesRes, driversRes, customersRes, prevCustomersRes, ratingsRes, onlineDriversRes, vehiclesRes, sosRes] = await Promise.all([
       supabase
         .from("rides")
         .select("*")
@@ -108,7 +116,7 @@ export default function AnalyticsPage() {
         .lt("created_at", startDate.toISOString()),
       supabase
         .from("drivers")
-        .select("id, rating, profile:profiles(full_name, avatar_url)"),
+        .select("id, rating, total_trips, profile:profiles(full_name, avatar_url)"),
       supabase
         .from("profiles")
         .select("id", { count: "exact", head: true })
@@ -120,6 +128,22 @@ export default function AnalyticsPage() {
         .eq("role", "customer")
         .gte("created_at", prevStartDate.toISOString())
         .lt("created_at", startDate.toISOString()),
+      supabase
+        .from("ratings")
+        .select("rating")
+        .gte("created_at", startDate.toISOString()),
+      supabase
+        .from("drivers")
+        .select("id", { count: "exact", head: true })
+        .eq("is_online", true),
+      supabase
+        .from("vehicles")
+        .select("id", { count: "exact", head: true })
+        .eq("is_active", true),
+      supabase
+        .from("sos_alerts")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", startDate.toISOString()),
     ])
 
     const allRides = (ridesRes.data || []) as Ride[]
@@ -158,6 +182,24 @@ export default function AnalyticsPage() {
     })
     const busiestDay = Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "-"
 
+    // Calculate average rating
+    const ratingsArr = ratingsRes.data || []
+    const avgRating = ratingsArr.length > 0
+      ? ratingsArr.reduce((sum, r: any) => sum + (r.rating || 0), 0) / ratingsArr.length
+      : 0
+
+    // Calculate repeat customers
+    const customerRides: Record<string, number> = {}
+    allRides.forEach(r => {
+      if (r.customer_id) {
+        customerRides[r.customer_id] = (customerRides[r.customer_id] || 0) + 1
+      }
+    })
+    const repeatCustomers = Object.values(customerRides).filter(c => c > 1).length
+
+    // Total driver trips
+    const totalDriverTrips = allDrivers.reduce((sum, d: any) => sum + (d.total_trips || 0), 0)
+
     setStats({
       totalRides: allRides.length,
       completedRides: completed.length,
@@ -171,6 +213,14 @@ export default function AnalyticsPage() {
       activeDrivers: allDrivers.filter(d => d.rating > 0).length,
       ridesChange,
       customersChange,
+      avgRating: Math.round(avgRating * 10) / 10,
+      totalRatings: ratingsArr.length,
+      onlineDrivers: onlineDriversRes.count || 0,
+      totalVehicles: vehiclesRes.count || 0,
+      sosAlerts: sosRes.count || 0,
+      avgRidesPerDay: daysAgo > 0 ? Math.round((allRides.length / daysAgo) * 10) / 10 : 0,
+      repeatCustomers,
+      totalDriverTrips,
     })
 
     // Daily trend data
@@ -359,6 +409,124 @@ export default function AnalyticsPage() {
             <div className="min-w-0">
               <p className="text-xl font-bold tracking-tight text-orange-500">{stats.avgDistance} km</p>
               <p className="text-xs text-muted-foreground truncate">Avg Distance</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Additional Stats Row */}
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-6">
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-blue-500/10">
+              <BarChart3 className="h-4 w-4 text-blue-500" />
+            </div>
+            <div>
+              <p className="text-xl font-bold">{stats.totalRides}</p>
+              <p className="text-xs text-muted-foreground">Total Rides</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-green-500/10">
+              <Users className="h-4 w-4 text-green-500" />
+            </div>
+            <div>
+              <p className="text-xl font-bold">{stats.totalCustomers}</p>
+              <p className="text-xs text-muted-foreground">New Customers</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-amber-500/10">
+              <Star className="h-4 w-4 text-amber-500" />
+            </div>
+            <div>
+              <p className="text-xl font-bold">{stats.avgRating || "—"}</p>
+              <p className="text-xs text-muted-foreground">Avg Rating ({stats.totalRatings})</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-cyan-500/10">
+              <TrendingUp className="h-4 w-4 text-cyan-500" />
+            </div>
+            <div>
+              <p className="text-xl font-bold">{stats.avgRidesPerDay}</p>
+              <p className="text-xs text-muted-foreground">Rides/Day</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-purple-500/10">
+              <Repeat className="h-4 w-4 text-purple-500" />
+            </div>
+            <div>
+              <p className="text-xl font-bold">{stats.repeatCustomers}</p>
+              <p className="text-xs text-muted-foreground">Repeat Customers</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-red-500/10">
+              <AlertTriangle className="h-4 w-4 text-red-500" />
+            </div>
+            <div>
+              <p className="text-xl font-bold">{stats.sosAlerts}</p>
+              <p className="text-xs text-muted-foreground">SOS Alerts</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Fleet & Driver Stats */}
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+        <Card className="p-4 bg-gradient-to-br from-slate-500/10 to-slate-600/5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-slate-500/20">
+              <Car className="h-4 w-4 text-slate-400" />
+            </div>
+            <div>
+              <p className="text-xl font-bold">{stats.totalVehicles}</p>
+              <p className="text-xs text-muted-foreground">Active Vehicles</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-emerald-500/20">
+              <Activity className="h-4 w-4 text-emerald-500" />
+            </div>
+            <div>
+              <p className="text-xl font-bold">{stats.onlineDrivers}</p>
+              <p className="text-xs text-muted-foreground">Online Now</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4 bg-gradient-to-br from-indigo-500/10 to-indigo-600/5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-indigo-500/20">
+              <Users className="h-4 w-4 text-indigo-500" />
+            </div>
+            <div>
+              <p className="text-xl font-bold">{stats.activeDrivers}</p>
+              <p className="text-xs text-muted-foreground">Active Drivers</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4 bg-gradient-to-br from-rose-500/10 to-rose-600/5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-rose-500/20">
+              <Target className="h-4 w-4 text-rose-500" />
+            </div>
+            <div>
+              <p className="text-xl font-bold">{stats.totalDriverTrips.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground">Total Driver Trips</p>
             </div>
           </div>
         </Card>

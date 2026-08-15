@@ -72,6 +72,7 @@ interface VoiceMessage {
   created_at: string
   sender?: { full_name: string }
   recipient?: { full_name: string }
+  sender_department_id?: string | null
 }
 
 interface Driver {
@@ -214,6 +215,7 @@ export default function PushToTalkPage() {
   }
 
   const fetchMessages = async () => {
+    // First get messages
     const { data, error } = await supabase
       .from("voice_messages")
       .select(`
@@ -227,7 +229,29 @@ export default function PushToTalkPage() {
       console.error("Error fetching messages:", error)
       return
     }
-    if (data) setMessages(data)
+
+    if (data) {
+      // Get sender department IDs from drivers table (for driver senders)
+      const senderIds = [...new Set(data.filter(m => m.sender_type === 'driver').map(m => m.sender_id))]
+
+      if (senderIds.length > 0) {
+        const { data: driverData } = await supabase
+          .from("drivers")
+          .select("profile_id, department_id")
+          .in("profile_id", senderIds)
+
+        const driverDeptMap = new Map(driverData?.map(d => [d.profile_id, d.department_id]) || [])
+
+        const messagesWithDept = data.map(m => ({
+          ...m,
+          sender_department_id: m.sender_type === 'driver' ? driverDeptMap.get(m.sender_id) || null : null
+        }))
+
+        setMessages(messagesWithDept)
+      } else {
+        setMessages(data.map(m => ({ ...m, sender_department_id: null })))
+      }
+    }
   }
 
   const fetchDrivers = async () => {
@@ -456,6 +480,13 @@ export default function PushToTalkPage() {
 
   // Filter messages based on all criteria
   const filteredMessages = messages.filter(m => {
+    // Department filter - only filter driver messages by department
+    if (departmentFilter && departmentFilter !== "all") {
+      if (m.sender_type === "driver" && m.sender_department_id !== departmentFilter) {
+        return false
+      }
+    }
+
     // Sender filter
     if (filterSender !== "all") {
       if (filterSender === "admin" && m.sender_type !== "admin") return false

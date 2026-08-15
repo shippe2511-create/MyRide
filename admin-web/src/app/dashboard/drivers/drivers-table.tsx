@@ -651,8 +651,8 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
 
   // Filter drivers by department and pool
   const filteredDrivers = drivers.filter(driver => {
-    // Department filter
-    if (departmentFilter !== "all") {
+    // Department filter (skip if empty or "all")
+    if (departmentFilter && departmentFilter !== "all") {
       if (departmentFilter === "none") {
         if (driver.driver_record?.department_id) return false
       } else {

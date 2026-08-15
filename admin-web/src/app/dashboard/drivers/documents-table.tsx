@@ -227,7 +227,7 @@ export function DocumentsTable() {
 
     const matchesType = typeFilter === "all" || doc.document_type === typeFilter
     const matchesDriver = driverFilter === "all" || doc.driver_id === driverFilter
-    const matchesDepartment = departmentFilter === "all" || doc.driver?.department_id === departmentFilter
+    const matchesDepartment = !departmentFilter || departmentFilter === "all" || doc.driver?.department_id === departmentFilter
     return matchesSearch && matchesStatus && matchesType && matchesDriver && matchesDepartment
   })
 

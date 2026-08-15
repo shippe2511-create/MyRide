@@ -255,8 +255,8 @@ export function ShiftsTable() {
       .from("drivers")
       .select("id, profile_id, department_id, profile:profiles(full_name, avatar_url, phone)")
 
-    // Apply department filter if not "all"
-    if (deptId !== "all") {
+    // Apply department filter if not "all" and not empty
+    if (deptId && deptId !== "all") {
       shiftsQuery = shiftsQuery.eq("driver.department_id", deptId)
       driversQuery = driversQuery.eq("department_id", deptId)
     }
@@ -270,17 +270,19 @@ export function ShiftsTable() {
 
   // Load data when week changes, custom date range changes, or department changes
   useEffect(() => {
-    loadData(false)
-  }, [weekOffset, customStartDate, customEndDate, selectedDepartment]) // Reload when filters change
+    if (departmentInitialized) {
+      loadData(false)
+    }
+  }, [weekOffset, customStartDate, customEndDate, selectedDepartment, departmentInitialized]) // Reload when filters change
 
-  // Initial load with spinner - runs once
+  // Initial load with spinner - runs once department is ready
   const initialLoadDone = useRef(false)
   useEffect(() => {
-    if (!initialLoadDone.current) {
+    if (!initialLoadDone.current && departmentInitialized) {
       initialLoadDone.current = true
       loadData(true)
     }
-  }, [loadData])
+  }, [loadData, departmentInitialized])
 
   // Realtime subscription - set up once and never recreate
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)

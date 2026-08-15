@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { usePermissions } from "@/hooks/usePermissions"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -59,8 +60,14 @@ interface SOSAlert {
     full_name: string
     phone: string | null
     role: string | null
+    department_id: string | null
     emergency_contacts: UserEmergencyContact[] | null
   }
+}
+
+interface Department {
+  id: string
+  name: string
 }
 
 const PAGE_SIZE = 15
@@ -139,6 +146,7 @@ function SortableContactItem({ contact, updateContact, removeContact, icons }: S
 
 export default function SOSPage() {
   const supabase = createClient()
+  const { departmentId: userDepartmentId } = usePermissions()
   const [alerts, setAlerts] = useState<SOSAlert[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -153,6 +161,9 @@ export default function SOSPage() {
   const [stats, setStats] = useState({ active: 0, responding: 0, resolved: 0 })
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [departmentFilter, setDepartmentFilter] = useState<string>("")
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
 
   interface EmergencyContact {
     id: string
@@ -232,7 +243,7 @@ export default function SOSPage() {
 
     let query = supabase
       .from("sos_alerts")
-      .select("*, user:profiles!sos_alerts_user_id_fkey(full_name, phone, role, emergency_contacts)", { count: "exact" })
+      .select("*, user:profiles!sos_alerts_user_id_fkey(full_name, phone, role, department_id, emergency_contacts)", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(start, end)
 
@@ -251,7 +262,12 @@ export default function SOSPage() {
       supabase.from("sos_alerts").select("*", { count: "exact", head: true }).eq("status", "resolved"),
     ])
 
-    setAlerts(alertsRes.data || [])
+    // Filter by department on client side (since department_id is in nested user object)
+    const allAlerts = alertsRes.data || []
+    const filteredAlerts = departmentFilter && departmentFilter !== "all"
+      ? allAlerts.filter(a => a.user?.department_id === departmentFilter)
+      : allAlerts
+    setAlerts(filteredAlerts)
     setTotalCount(filteredCountRes.count || 0)
     setStats({
       active: activeRes.count || 0,
@@ -259,11 +275,17 @@ export default function SOSPage() {
       resolved: resolvedRes.count || 0,
     })
     setLoading(false)
-  }, [currentPage, statusFilter, supabase])
+  }, [currentPage, statusFilter, departmentFilter, supabase])
 
   useEffect(() => {
-    loadAlerts(true)
     loadEmergencyContacts()
+
+    // Load departments
+    async function loadDepartments() {
+      const { data } = await supabase.from("departments").select("id, name").eq("is_active", true).order("name")
+      if (data) setDepartments(data)
+    }
+    loadDepartments()
 
     // Real-time subscription for SOS alerts
     const channel = supabase
@@ -286,6 +308,25 @@ export default function SOSPage() {
       supabase.removeChannel(channel)
     }
   }, [])
+
+  // Set default department to user's department (works for both regular and super admins)
+  useEffect(() => {
+    if (departments.length > 0 && !departmentInitialized) {
+      if (userDepartmentId) {
+        setDepartmentFilter(userDepartmentId)
+      } else {
+        setDepartmentFilter("all")
+      }
+      setDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, departmentInitialized])
+
+  // Load alerts when department filter changes
+  useEffect(() => {
+    if (departmentInitialized) {
+      loadAlerts(true)
+    }
+  }, [departmentInitialized])
 
   useEffect(() => {
     if (!loading) {
@@ -621,6 +662,17 @@ export default function SOSPage() {
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="responding">Responding</SelectItem>
               <SelectItem value="resolved">Resolved</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={departmentFilter} onValueChange={(v) => { setDepartmentFilter(v); setCurrentPage(1) }}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map(d => (
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

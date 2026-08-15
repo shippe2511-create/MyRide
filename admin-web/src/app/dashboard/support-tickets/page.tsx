@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { usePermissions } from "@/hooks/usePermissions"
 import { toast } from "sonner"
 import {
   Table,
@@ -78,6 +79,7 @@ interface SupportTicket {
     phone: string | null
     email: string | null
     employee_id: string | null
+    department_id: string | null
   }
   driver?: {
     profile?: {
@@ -86,6 +88,11 @@ interface SupportTicket {
     }
     vehicle_number: string | null
   } | null
+}
+
+interface Department {
+  id: string
+  name: string
 }
 
 const CATEGORIES = [
@@ -100,6 +107,7 @@ const PAGE_SIZE = 15
 
 export default function SupportTicketsPage() {
   const supabase = createClient()
+  const { departmentId: userDepartmentId } = usePermissions()
   const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -112,6 +120,9 @@ export default function SupportTicketsPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [departmentFilter, setDepartmentFilter] = useState<string>("")
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
 
   const [stats, setStats] = useState({
     total: 0,
@@ -129,7 +140,7 @@ export default function SupportTicketsPage() {
       .from("support_tickets")
       .select(`
         *,
-        user:profiles!support_tickets_user_id_fkey(full_name, phone, email, employee_id)
+        user:profiles!support_tickets_user_id_fkey(full_name, phone, email, employee_id, department_id)
       `, { count: "exact" })
       .order("created_at", { ascending: false })
       .range(start, end)
@@ -150,7 +161,12 @@ export default function SupportTicketsPage() {
       supabase.from("support_tickets").select("*", { count: "exact", head: true }).eq("status", "resolved"),
     ])
 
-    setTickets(ticketsRes.data || [])
+    // Filter by department on client side
+    const allTickets = ticketsRes.data || []
+    const filteredTickets = departmentFilter && departmentFilter !== "all"
+      ? allTickets.filter(t => t.user?.department_id === departmentFilter)
+      : allTickets
+    setTickets(filteredTickets)
     setTotalCount(filteredCountRes.count || 0)
     setStats({
       total: totalRes.count || 0,
@@ -162,7 +178,12 @@ export default function SupportTicketsPage() {
   }
 
   useEffect(() => {
-    loadTickets(true)
+    // Load departments
+    async function loadDepartments() {
+      const { data } = await supabase.from("departments").select("id, name").eq("is_active", true).order("name")
+      if (data) setDepartments(data)
+    }
+    loadDepartments()
 
     const channel = supabase
       .channel('support_tickets_realtime')
@@ -176,11 +197,30 @@ export default function SupportTicketsPage() {
     }
   }, [])
 
+  // Set default department to user's department
   useEffect(() => {
-    if (!loading) {
+    if (departments.length > 0 && !departmentInitialized) {
+      if (userDepartmentId) {
+        setDepartmentFilter(userDepartmentId)
+      } else {
+        setDepartmentFilter("all")
+      }
+      setDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, departmentInitialized])
+
+  // Load tickets when department filter is ready
+  useEffect(() => {
+    if (departmentInitialized) {
+      loadTickets(true)
+    }
+  }, [departmentInitialized])
+
+  useEffect(() => {
+    if (!loading && departmentInitialized) {
       loadTickets(false)
     }
-  }, [statusFilter, currentPage])
+  }, [statusFilter, currentPage, departmentFilter])
 
   const filteredTickets = tickets.filter(t =>
     t.description.toLowerCase().includes(search.toLowerCase()) ||
@@ -457,6 +497,17 @@ export default function SupportTicketsPage() {
               <SelectItem value="in_progress">In Progress</SelectItem>
               <SelectItem value="resolved">Resolved</SelectItem>
               <SelectItem value="closed">Closed</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={departmentFilter} onValueChange={(v) => { setDepartmentFilter(v); setCurrentPage(1) }}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map(d => (
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

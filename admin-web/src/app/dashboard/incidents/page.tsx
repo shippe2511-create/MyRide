@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { usePermissions } from "@/hooks/usePermissions"
 import { toast } from "sonner"
 import {
   Table,
@@ -72,13 +73,23 @@ interface Incident {
   created_at: string
   resolved_at: string | null
   resolution: string | null
+  department_id?: string | null
   customer?: { full_name: string } | null
-  driver?: { profile?: { full_name: string } } | null
+  driver?: { profile?: { full_name: string }; department_id?: string | null } | null
+}
+
+interface Department {
+  id: string
+  name: string
 }
 
 export default function IncidentsPage() {
   const supabase = createClient()
+  const { departmentId: userDepartmentId } = usePermissions()
   const [incidents, setIncidents] = useState<Incident[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [departmentFilter, setDepartmentFilter] = useState<string>("")
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -98,7 +109,12 @@ export default function IncidentsPage() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
   useEffect(() => {
-    loadIncidents(true)
+    // Load departments
+    async function loadDepartments() {
+      const { data } = await supabase.from("departments").select("id, name").eq("is_active", true).order("name")
+      if (data) setDepartments(data)
+    }
+    loadDepartments()
 
     const channel = supabase
       .channel('incidents_realtime')
@@ -110,7 +126,26 @@ export default function IncidentsPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [statusFilter, severityFilter])
+  }, [])
+
+  // Set default department to user's department
+  useEffect(() => {
+    if (departments.length > 0 && !departmentInitialized) {
+      if (userDepartmentId) {
+        setDepartmentFilter(userDepartmentId)
+      } else {
+        setDepartmentFilter("all")
+      }
+      setDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, departmentInitialized])
+
+  // Load incidents when department filter is ready
+  useEffect(() => {
+    if (departmentInitialized) {
+      loadIncidents(true)
+    }
+  }, [departmentInitialized, statusFilter, severityFilter, departmentFilter])
 
   const loadIncidents = async (showLoading = true) => {
     if (showLoading) setLoading(true)
@@ -130,7 +165,12 @@ export default function IncidentsPage() {
     if (error) {
       toast.error("Failed to load incidents")
     } else {
-      setIncidents(data || [])
+      // Filter by department (incidents may have department_id or be linked via driver)
+      const allIncidents = data || []
+      const deptFiltered = departmentFilter && departmentFilter !== "all"
+        ? allIncidents.filter(i => i.department_id === departmentFilter || i.driver?.department_id === departmentFilter)
+        : allIncidents
+      setIncidents(deptFiltered)
     }
     if (showLoading) setLoading(false)
   }
@@ -381,20 +421,34 @@ export default function IncidentsPage() {
             <SelectItem value="low">Low</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Department" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Departments</SelectItem>
+            {departments.map(d => (
+              <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <FilterPills
         filters={[
           ...(statusFilter !== "all" ? [{ key: "status", label: "Status", value: statusFilter }] : []),
           ...(severityFilter !== "all" ? [{ key: "severity", label: "Severity", value: severityFilter }] : []),
+          ...(departmentFilter && departmentFilter !== "all" ? [{ key: "department", label: "Department", value: departments.find(d => d.id === departmentFilter)?.name || departmentFilter }] : []),
         ]}
         onRemove={(key) => {
           if (key === "status") setStatusFilter("all")
           if (key === "severity") setSeverityFilter("all")
+          if (key === "department") setDepartmentFilter("all")
         }}
         onClearAll={() => {
           setStatusFilter("all")
           setSeverityFilter("all")
+          setDepartmentFilter("all")
         }}
       />
 

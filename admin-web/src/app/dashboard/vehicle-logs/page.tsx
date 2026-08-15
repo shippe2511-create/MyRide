@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { usePermissions } from "@/hooks/usePermissions"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -41,10 +42,16 @@ interface VehicleLog {
   log_date: string
   created_at: string
   driver?: {
+    department_id?: string | null
     profile?: {
       full_name: string
     }
   }
+}
+
+interface Department {
+  id: string
+  name: string
 }
 
 const LOG_TYPES = [
@@ -59,6 +66,7 @@ const PAGE_SIZE = 15
 
 export default function VehicleLogsPage() {
   const supabase = createClient()
+  const { departmentId: userDepartmentId } = usePermissions()
   const [logs, setLogs] = useState<VehicleLog[]>([])
   const [allLogs, setAllLogs] = useState<VehicleLog[]>([]) // For stats calculation
   const [loading, setLoading] = useState(true)
@@ -72,6 +80,9 @@ export default function VehicleLogsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [departmentFilter, setDepartmentFilter] = useState<string>("")
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
 
   const [formData, setFormData] = useState({
     log_type: "fuel",
@@ -169,6 +180,7 @@ export default function VehicleLogsPage() {
       .select(`
         *,
         driver:drivers!vehicle_logs_driver_id_fkey(
+          department_id,
           profile:profiles(full_name)
         )
       `, { count: "exact" })
@@ -183,6 +195,7 @@ export default function VehicleLogsPage() {
       .select(`
         *,
         driver:drivers!vehicle_logs_driver_id_fkey(
+          department_id,
           profile:profiles(full_name)
         )
       `)
@@ -194,14 +207,26 @@ export default function VehicleLogsPage() {
     }
 
     const [{ data }, { count }, { data: allData }] = await Promise.all([query, countQuery, allLogsQuery])
-    setLogs(data || [])
-    setAllLogs(allData || [])
+
+    // Filter by department
+    const filterByDept = (logs: VehicleLog[]) => {
+      if (!departmentFilter || departmentFilter === "all") return logs
+      return logs.filter(l => l.driver?.department_id === departmentFilter)
+    }
+
+    setLogs(filterByDept(data || []))
+    setAllLogs(filterByDept(allData || []))
     setTotalCount(count || 0)
     setLoading(false)
   }
 
   useEffect(() => {
-    loadLogs(true)
+    // Load departments
+    async function loadDepartments() {
+      const { data } = await supabase.from("departments").select("id, name").eq("is_active", true).order("name")
+      if (data) setDepartments(data)
+    }
+    loadDepartments()
 
     const channel = supabase
       .channel('vehicle_logs_realtime')
@@ -215,12 +240,31 @@ export default function VehicleLogsPage() {
     }
   }, [])
 
+  // Set default department to user's department
   useEffect(() => {
-    if (!loading) {
+    if (departments.length > 0 && !departmentInitialized) {
+      if (userDepartmentId) {
+        setDepartmentFilter(userDepartmentId)
+      } else {
+        setDepartmentFilter("all")
+      }
+      setDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, departmentInitialized])
+
+  // Load logs when department filter is ready
+  useEffect(() => {
+    if (departmentInitialized) {
+      loadLogs(true)
+    }
+  }, [departmentInitialized])
+
+  useEffect(() => {
+    if (!loading && departmentInitialized) {
       loadLogs(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterType, currentPage])
+  }, [filterType, currentPage, departmentFilter])
 
   const openDialog = (log?: VehicleLog) => {
     if (log) {
@@ -630,6 +674,17 @@ export default function VehicleLogsPage() {
               <SelectItem value="all">All Types</SelectItem>
               {LOG_TYPES.map(type => (
                 <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={departmentFilter} onValueChange={(v) => { setDepartmentFilter(v); setCurrentPage(1) }}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map(d => (
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>

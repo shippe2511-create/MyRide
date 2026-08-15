@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { usePermissions } from "@/hooks/usePermissions"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -43,6 +44,7 @@ interface Document {
   verified_at: string | null
   driver?: {
     id: string
+    department_id: string | null
     profile?: {
       full_name: string
       avatar_url: string | null
@@ -50,6 +52,11 @@ interface Document {
       employee_id: string | null
     }
   }
+}
+
+interface Department {
+  id: string
+  name: string
 }
 
 const PAGE_SIZE = 15
@@ -65,6 +72,7 @@ const DOCUMENT_TYPES: Record<string, string> = {
 
 export default function DocumentsPage() {
   const supabase = createClient()
+  const { departmentId: userDepartmentId } = usePermissions()
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -75,11 +83,21 @@ export default function DocumentsPage() {
   const [saving, setSaving] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [departmentFilter, setDepartmentFilter] = useState<string>("")
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
 
   const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 })
 
   useEffect(() => {
     loadDocuments(true)
+
+    // Load departments
+    async function loadDepartments() {
+      const { data } = await supabase.from("departments").select("id, name").eq("is_active", true).order("name")
+      if (data) setDepartments(data)
+    }
+    loadDepartments()
 
     const channel = supabase
       .channel('documents_realtime')
@@ -93,11 +111,30 @@ export default function DocumentsPage() {
     }
   }, [])
 
+  // Set default department to user's department
   useEffect(() => {
-    if (!loading) {
+    if (departments.length > 0 && !departmentInitialized) {
+      if (userDepartmentId) {
+        setDepartmentFilter(userDepartmentId)
+      } else {
+        setDepartmentFilter("all")
+      }
+      setDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, departmentInitialized])
+
+  // Load documents when department filter is ready
+  useEffect(() => {
+    if (departmentInitialized) {
+      loadDocuments(true)
+    }
+  }, [departmentInitialized])
+
+  useEffect(() => {
+    if (!loading && departmentInitialized) {
       loadDocuments(false)
     }
-  }, [filter, currentPage])
+  }, [filter, currentPage, departmentFilter])
 
   const loadDocuments = async (showLoading = true) => {
     if (showLoading) setLoading(true)
@@ -110,6 +147,7 @@ export default function DocumentsPage() {
         *,
         driver:drivers!inner(
           id,
+          department_id,
           profile:profiles(
             full_name,
             avatar_url,
@@ -145,7 +183,13 @@ export default function DocumentsPage() {
       supabase.from("documents").select("*", { count: "exact", head: true }).eq("status", "rejected"),
     ])
 
-    setDocuments(docsRes.data || [])
+    // Filter by department
+    const allDocs = docsRes.data || []
+    const filteredDocs = departmentFilter && departmentFilter !== "all"
+      ? allDocs.filter(d => d.driver?.department_id === departmentFilter)
+      : allDocs
+
+    setDocuments(filteredDocs)
     setTotalCount(filteredCountRes.count || 0)
     setStats({
       total: totalRes.count || 0,
@@ -381,6 +425,17 @@ export default function DocumentsPage() {
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="approved">Approved</SelectItem>
               <SelectItem value="rejected">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={departmentFilter} onValueChange={(v) => { setDepartmentFilter(v); setCurrentPage(1) }}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map(d => (
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

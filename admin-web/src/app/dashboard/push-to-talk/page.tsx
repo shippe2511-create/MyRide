@@ -215,12 +215,13 @@ export default function PushToTalkPage() {
   }
 
   const fetchMessages = async () => {
-    // First get messages
+    // First get messages with sender and recipient names
     const { data, error } = await supabase
       .from("voice_messages")
       .select(`
         *,
-        sender:profiles!sender_id(full_name)
+        sender:profiles!sender_id(full_name),
+        recipient:profiles!recipient_id(full_name)
       `)
       .order("created_at", { ascending: false })
       .limit(50)
@@ -980,8 +981,12 @@ export default function PushToTalkPage() {
                               <Badge variant="secondary">Broadcast</Badge>
                             ) : message.recipient_type === "all_drivers" ? (
                               <Badge variant="secondary">All Drivers</Badge>
+                            ) : message.recipient_type === "admin" ? (
+                              <Badge variant="secondary">Admin</Badge>
+                            ) : message.recipient_id ? (
+                              <span className="text-sm">{message.recipient?.full_name || "Driver"}</span>
                             ) : (
-                              <span className="text-sm">{message.recipient?.full_name || "Unknown"}</span>
+                              <Badge variant="secondary">Admin</Badge>
                             )}
                           </TableCell>
                           <TableCell>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { usePermissions } from "@/hooks/usePermissions"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -42,12 +43,21 @@ interface Driver {
   profile?: DriverProfile | DriverProfile[]
 }
 
+interface Department {
+  id: string
+  name: string
+}
+
 export default function AnalyticsPage() {
   const supabase = createClient()
+  const { departmentId: userDepartmentId } = usePermissions()
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState("30")
   const [rides, setRides] = useState<Ride[]>([])
   const [drivers, setDrivers] = useState<Driver[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [departmentFilter, setDepartmentFilter] = useState<string>("")
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
 
   const [stats, setStats] = useState({
     totalRides: 0,
@@ -79,7 +89,12 @@ export default function AnalyticsPage() {
   const [statusBreakdown, setStatusBreakdown] = useState<{ name: string; value: number; color: string }[]>([])
 
   useEffect(() => {
-    loadAnalytics()
+    // Load departments
+    async function loadDepartments() {
+      const { data } = await supabase.from("departments").select("id, name").eq("is_active", true).order("name")
+      if (data) setDepartments(data)
+    }
+    loadDepartments()
 
     const channel = supabase.channel('analytics_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rides' }, () => loadAnalytics(false))
@@ -90,7 +105,26 @@ export default function AnalyticsPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [period])
+  }, [])
+
+  // Set default department to user's department
+  useEffect(() => {
+    if (departments.length > 0 && !departmentInitialized) {
+      if (userDepartmentId) {
+        setDepartmentFilter(userDepartmentId)
+      } else {
+        setDepartmentFilter("all")
+      }
+      setDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, departmentInitialized])
+
+  // Load analytics when department filter is ready
+  useEffect(() => {
+    if (departmentInitialized) {
+      loadAnalytics()
+    }
+  }, [departmentInitialized, period, departmentFilter])
 
   const loadAnalytics = async (showLoading = true) => {
     if (showLoading) setLoading(true)
@@ -105,7 +139,7 @@ export default function AnalyticsPage() {
     const [ridesRes, prevRidesRes, driversRes, customersRes, prevCustomersRes, ratingsRes, onlineDriversRes, vehiclesRes, sosRes] = await Promise.all([
       supabase
         .from("rides")
-        .select("*")
+        .select("*, customer:profiles!rides_customer_id_fkey(department_id)")
         .gte("created_at", startDate.toISOString())
         .order("created_at", { ascending: true }),
       supabase
@@ -115,10 +149,10 @@ export default function AnalyticsPage() {
         .lt("created_at", startDate.toISOString()),
       supabase
         .from("drivers")
-        .select("id, rating, total_trips, profile:profiles(full_name, avatar_url)"),
+        .select("id, rating, total_trips, department_id, profile:profiles(full_name, avatar_url)"),
       supabase
         .from("profiles")
-        .select("id", { count: "exact", head: true })
+        .select("id, department_id")
         .eq("role", "customer")
         .gte("created_at", startDate.toISOString()),
       supabase
@@ -133,20 +167,51 @@ export default function AnalyticsPage() {
         .gte("created_at", startDate.toISOString()),
       supabase
         .from("drivers")
-        .select("id", { count: "exact", head: true })
+        .select("id, department_id")
         .eq("is_online", true),
       supabase
         .from("vehicles")
-        .select("id", { count: "exact", head: true })
+        .select("id, department_id")
         .eq("is_active", true),
       supabase
         .from("sos_alerts")
-        .select("id", { count: "exact", head: true })
+        .select("id, user:profiles!sos_alerts_user_id_fkey(department_id)")
         .gte("created_at", startDate.toISOString()),
     ])
 
-    const allRides = (ridesRes.data || []) as Ride[]
-    const allDrivers = (driversRes.data || []) as Driver[]
+    // Filter data by department
+    const filterByDept = departmentFilter && departmentFilter !== "all"
+
+    const rawRides = (ridesRes.data || []) as (Ride & { customer?: { department_id: string | null } })[]
+    const allRides = filterByDept
+      ? rawRides.filter(r => r.customer?.department_id === departmentFilter)
+      : rawRides
+
+    const rawDrivers = (driversRes.data || []) as (Driver & { department_id?: string | null })[]
+    const allDrivers = filterByDept
+      ? rawDrivers.filter(d => d.department_id === departmentFilter)
+      : rawDrivers
+
+    const rawCustomers = customersRes.data || []
+    const filteredCustomersCount = filterByDept
+      ? rawCustomers.filter((c: any) => c.department_id === departmentFilter).length
+      : rawCustomers.length
+
+    const rawOnlineDrivers = onlineDriversRes.data || []
+    const onlineDriversCount = filterByDept
+      ? rawOnlineDrivers.filter((d: any) => d.department_id === departmentFilter).length
+      : rawOnlineDrivers.length
+
+    const rawVehicles = vehiclesRes.data || []
+    const vehiclesCount = filterByDept
+      ? rawVehicles.filter((v: any) => v.department_id === departmentFilter).length
+      : rawVehicles.length
+
+    const rawSosAlerts = sosRes.data || []
+    const sosCount = filterByDept
+      ? rawSosAlerts.filter((s: any) => s.user?.department_id === departmentFilter).length
+      : rawSosAlerts.length
+
     setRides(allRides)
     setDrivers(allDrivers)
 
@@ -202,15 +267,15 @@ export default function AnalyticsPage() {
       completionRate: allRides.length > 0 ? Math.round((completed.length / allRides.length) * 100) : 0,
       peakHour: peakHourStr,
       busiestDay,
-      totalCustomers: currentCustomersCount,
+      totalCustomers: filteredCustomersCount,
       activeDrivers: allDrivers.filter(d => d.rating > 0).length,
       ridesChange,
       customersChange,
       avgRating: Math.round(avgRating * 10) / 10,
       totalRatings: ratingsArr.length,
-      onlineDrivers: onlineDriversRes.count || 0,
-      totalVehicles: vehiclesRes.count || 0,
-      sosAlerts: sosRes.count || 0,
+      onlineDrivers: onlineDriversCount,
+      totalVehicles: vehiclesCount,
+      sosAlerts: sosCount,
       avgRidesPerDay: daysAgo > 0 ? Math.round((allRides.length / daysAgo) * 10) / 10 : 0,
       repeatCustomers,
       totalDriverTrips,
@@ -337,17 +402,30 @@ export default function AnalyticsPage() {
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">Platform performance and insights</p>
         </div>
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-36 bg-card/80 border-border/50">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="7">Last 7 days</SelectItem>
-            <SelectItem value="30">Last 30 days</SelectItem>
-            <SelectItem value="90">Last 90 days</SelectItem>
-            <SelectItem value="365">Last year</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+            <SelectTrigger className="w-44 bg-card/80 border-border/50">
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map(d => (
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={period} onValueChange={setPeriod}>
+            <SelectTrigger className="w-36 bg-card/80 border-border/50">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Last 7 days</SelectItem>
+              <SelectItem value="30">Last 30 days</SelectItem>
+              <SelectItem value="90">Last 90 days</SelectItem>
+              <SelectItem value="365">Last year</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Top Insights Row - Colored gradient cards */}

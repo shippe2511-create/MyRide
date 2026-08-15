@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { usePermissions } from "@/hooks/usePermissions"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
@@ -19,6 +21,12 @@ interface ExpiringDocument {
   driver_name: string
   days_until_expiry: number
   reminder_sent: boolean
+  department_id?: string | null
+}
+
+interface Department {
+  id: string
+  name: string
 }
 
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
@@ -31,12 +39,21 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
 
 export default function DocumentExpiryPage() {
   const supabase = createClient()
+  const { departmentId: userDepartmentId } = usePermissions()
   const [documents, setDocuments] = useState<ExpiringDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [triggering, setTriggering] = useState(false)
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [departmentFilter, setDepartmentFilter] = useState<string>("")
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
 
   useEffect(() => {
-    loadExpiringDocuments()
+    // Load departments
+    async function loadDepartments() {
+      const { data } = await supabase.from("departments").select("id, name").eq("is_active", true).order("name")
+      if (data) setDepartments(data)
+    }
+    loadDepartments()
 
     // Realtime subscription for documents changes
     const channel = supabase
@@ -54,6 +71,25 @@ export default function DocumentExpiryPage() {
     }
   }, [])
 
+  // Set default department to user's department
+  useEffect(() => {
+    if (departments.length > 0 && !departmentInitialized) {
+      if (userDepartmentId) {
+        setDepartmentFilter(userDepartmentId)
+      } else {
+        setDepartmentFilter("all")
+      }
+      setDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, departmentInitialized])
+
+  // Load documents when department filter changes
+  useEffect(() => {
+    if (departmentInitialized) {
+      loadExpiringDocuments()
+    }
+  }, [departmentInitialized, departmentFilter])
+
   const loadExpiringDocuments = async () => {
     setLoading(true)
 
@@ -70,6 +106,7 @@ export default function DocumentExpiryPage() {
         status,
         driver_id,
         drivers!inner(
+          department_id,
           profiles!inner(full_name)
         )
       `)
@@ -104,12 +141,18 @@ export default function DocumentExpiryPage() {
         status: doc.status,
         driver_id: doc.driver_id,
         driver_name: doc.drivers?.profiles?.full_name || "Unknown",
+        department_id: doc.drivers?.department_id || null,
         days_until_expiry: daysUntil,
         reminder_sent: sentSet.has(doc.id),
       }
     })
 
-    setDocuments(enriched)
+    // Filter by department
+    const filtered = departmentFilter && departmentFilter !== "all"
+      ? enriched.filter(d => d.department_id === departmentFilter)
+      : enriched
+
+    setDocuments(filtered)
     setLoading(false)
   }
 
@@ -155,7 +198,18 @@ export default function DocumentExpiryPage() {
           <h1 className="text-2xl font-bold">Document Expiry Monitor</h1>
           <p className="text-muted-foreground">Track driver documents expiring within 60 days</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map(d => (
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button variant="outline" onClick={loadExpiringDocuments} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
             Refresh

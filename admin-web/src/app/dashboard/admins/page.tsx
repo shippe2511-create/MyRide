@@ -27,7 +27,7 @@ import { Plus, Shield, Loader2, RefreshCw, Pencil, Trash2, MoreHorizontal, KeyRo
 import { toast } from "sonner"
 import { SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-card"
 import { usePermissions } from "@/hooks/usePermissions"
-import { ROLE_DESCRIPTIONS, ROLE_COLORS, ROLE_LABELS, PERMISSION_CATEGORIES, type Role, type Permission, getPermissionsForRole } from "@/lib/permissions"
+import { ROLE_DESCRIPTIONS, ROLE_COLORS, ROLE_LABELS, PERMISSION_CATEGORIES, type Role, type Permission, getPermissionsForRole, getPermissionLabel } from "@/lib/permissions"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -976,7 +976,7 @@ export default function AdminsPage() {
                             {isCustomOverride(perm) && (
                               <div className="w-2 h-2 rounded-full bg-yellow-500" title="Custom override" />
                             )}
-                            <span className="text-sm">{perm.replace(":", " ").replace(/\b\w/g, l => l.toUpperCase())}</span>
+                            <span className="text-sm">{getPermissionLabel(perm)}</span>
                           </div>
                           <Switch
                             checked={getEffectivePermission(perm)}

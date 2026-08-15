@@ -262,9 +262,12 @@ export function getPermissionLabel(permission: Permission): string {
     view: "View",
     manage: "Manage",
     export: "Export",
-    view_all: "View All Departments",
   }
-  return `${actionLabels[action] || action} ${resourceLabels[resource] || resource}`
+  // Special case for departments:view_all
+  if (permission === "departments:view_all") {
+    return "View All Departments"
+  }
+  return `${resourceLabels[resource] || resource} ${actionLabels[action] || action}`
 }
 
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {

@@ -91,7 +91,9 @@ export default function AdminsPage() {
     phone: "",
     role: "operator",
     department_id: "",
+    password: "",
   })
+  const [showFormPassword, setShowFormPassword] = useState(false)
 
   useEffect(() => {
     loadAdmins()
@@ -107,14 +109,8 @@ export default function AdminsPage() {
         if (updatingIdsRef.current.has(updated.id)) return
 
         if (adminRoles.includes(updated.role)) {
-          // Update or add if now an admin
-          setAdmins(prev => {
-            const exists = prev.find(a => a.id === updated.id)
-            if (exists) {
-              return prev.map(a => a.id === updated.id ? { ...a, ...updated } : a)
-            }
-            return [...prev, updated]
-          })
+          // Reload to get full data with joins
+          loadAdmins(false)
         } else {
           // Remove if no longer an admin role
           setAdmins(prev => prev.filter(a => a.id !== updated.id))
@@ -123,7 +119,8 @@ export default function AdminsPage() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, (payload) => {
         const inserted = payload.new as AdminUser
         if (adminRoles.includes(inserted.role)) {
-          setAdmins(prev => [...prev, inserted])
+          // Reload to get full data with joins
+          loadAdmins(false)
         }
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'profiles' }, (payload) => {
@@ -164,6 +161,17 @@ export default function AdminsPage() {
       return
     }
 
+    // Validate password for new users
+    if (!editingAdmin && !formData.password) {
+      toast.error("Password is required for new users")
+      return
+    }
+
+    if (!editingAdmin && formData.password.length < 6) {
+      toast.error("Password must be at least 6 characters")
+      return
+    }
+
     // Validate department for non-super_admin roles
     if (formData.role !== "super_admin" && !formData.department_id) {
       toast.error("Department is required for Manager and Operator roles")
@@ -192,21 +200,32 @@ export default function AdminsPage() {
         loadAdmins(false)
       }
     } else {
-      const { error } = await supabase.from("profiles").insert({
-        full_name: formData.full_name,
-        email: formData.email,
-        phone: formData.phone || null,
-        role: formData.role,
-        department_id: departmentId,
-        status: "approved",
-      })
+      // Create user with Supabase Auth via API route
+      try {
+        const response = await fetch("/api/admin/create-user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+            full_name: formData.full_name,
+            phone: formData.phone || null,
+            role: formData.role,
+            department_id: departmentId,
+          }),
+        })
 
-      if (error) {
+        const data = await response.json()
+
+        if (response.ok) {
+          toast.success("Admin created successfully")
+          closeDialog()
+          loadAdmins(false)
+        } else {
+          toast.error(data.error || "Failed to create admin")
+        }
+      } catch {
         toast.error("Failed to create admin")
-      } else {
-        toast.success("Admin created")
-        closeDialog()
-        loadAdmins(false)
       }
     }
     setSaving(false)
@@ -215,7 +234,8 @@ export default function AdminsPage() {
   const closeDialog = () => {
     setDialogOpen(false)
     setEditingAdmin(null)
-    setFormData({ full_name: "", email: "", phone: "", role: "operator", department_id: "" })
+    setFormData({ full_name: "", email: "", phone: "", role: "operator", department_id: "", password: "" })
+    setShowFormPassword(false)
   }
 
   const openEdit = (admin: AdminUser) => {
@@ -226,6 +246,7 @@ export default function AdminsPage() {
       phone: admin.phone || "",
       role: admin.role,
       department_id: admin.department_id || "",
+      password: "",
     })
     setDialogOpen(true)
   }
@@ -731,6 +752,27 @@ export default function AdminsPage() {
                 onChange={e => setFormData({ ...formData, phone: e.target.value })}
               />
             </div>
+            {!editingAdmin && (
+              <div>
+                <label className="text-sm font-medium">Password *</label>
+                <div className="relative">
+                  <Input
+                    type={showFormPassword ? "text" : "password"}
+                    placeholder="Min 6 characters"
+                    value={formData.password}
+                    onChange={e => setFormData({ ...formData, password: e.target.value })}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowFormPassword(!showFormPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showFormPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <label className="text-sm font-medium">Role</label>

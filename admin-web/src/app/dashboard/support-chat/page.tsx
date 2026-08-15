@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { formatPhone } from "@/lib/format-phone"
+import { usePermissions } from "@/hooks/usePermissions"
 import { toast } from "sonner"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,6 +11,13 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   MessageSquare,
   Send,
@@ -44,9 +52,15 @@ interface SupportChat {
     phone: string | null
     email: string | null
     employee_id: string | null
+    department_id: string | null
   }
   last_message?: string
   unread_count?: number
+}
+
+interface Department {
+  id: string
+  name: string
 }
 
 interface ChatMessage {
@@ -64,6 +78,7 @@ interface ChatMessage {
 
 export default function SupportChatPage() {
   const supabase = createClient()
+  const { departmentId: userDepartmentId } = usePermissions()
   const [chats, setChats] = useState<SupportChat[]>([])
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(true)
@@ -76,14 +91,40 @@ export default function SupportChatPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [chatToDelete, setChatToDelete] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [departmentFilter, setDepartmentFilter] = useState<string>("")
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
 
   const [stats, setStats] = useState({ total: 0, open: 0, active: 0, resolved: 0 })
 
   const canDelete = userRole === 'super_admin' || userRole === 'manager'
 
+  // Load departments
+  useEffect(() => {
+    async function loadDepartments() {
+      const { data } = await supabase.from("departments").select("id, name").eq("is_active", true).order("name")
+      if (data) setDepartments(data)
+    }
+    loadDepartments()
+  }, [])
+
+  // Set default department to user's department
+  useEffect(() => {
+    if (departments.length > 0 && !departmentInitialized) {
+      if (userDepartmentId) {
+        setDepartmentFilter(userDepartmentId)
+      } else {
+        setDepartmentFilter("all")
+      }
+      setDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, departmentInitialized])
+
   useEffect(() => {
     loadAdminId()
-    loadChats()
+    if (departmentInitialized) {
+      loadChats()
+    }
 
     const channel = supabase
       .channel('support_chats_realtime')
@@ -102,7 +143,7 @@ export default function SupportChatPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [selectedChat?.id])
+  }, [selectedChat?.id, departmentInitialized])
 
   const loadAdminId = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -159,7 +200,7 @@ export default function SupportChatPage() {
         .from('support_chats')
         .select(`
           *,
-          customer:profiles!support_chats_customer_id_fkey(full_name, phone, email, employee_id)
+          customer:profiles!support_chats_customer_id_fkey(full_name, phone, email, employee_id, department_id)
         `)
         .order('updated_at', { ascending: false }),
       supabase.from('support_chats').select('*', { count: 'exact', head: true }),
@@ -308,11 +349,22 @@ export default function SupportChatPage() {
     }
   }
 
-  const filteredChats = chats.filter(chat =>
-    chat.customer?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-    chat.customer?.phone?.includes(search) ||
-    chat.customer?.employee_id?.toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredChats = chats.filter(chat => {
+    // Department filter
+    if (departmentFilter && departmentFilter !== "all") {
+      if (chat.customer?.department_id !== departmentFilter) return false
+    }
+    // Search filter
+    if (search) {
+      const s = search.toLowerCase()
+      return (
+        chat.customer?.full_name?.toLowerCase().includes(s) ||
+        chat.customer?.phone?.includes(search) ||
+        chat.customer?.employee_id?.toLowerCase().includes(s)
+      )
+    }
+    return true
+  })
 
   if (loading) {
     return (
@@ -336,10 +388,23 @@ export default function SupportChatPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Live chat with customers</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => loadChats()}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-3">
+          <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map(d => (
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" onClick={() => loadChats()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3 grid-cols-4">

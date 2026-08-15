@@ -534,7 +534,7 @@ export default function VehiclesPage() {
                 <TableHead>Department</TableHead>
                 <TableHead>Capacity</TableHead>
                 <TableHead>Active</TableHead>
-                <TableHead className="w-12"></TableHead>
+                <TableHead className="w-16 text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -589,16 +589,7 @@ export default function VehiclesPage() {
                           onCheckedChange={() => toggleActive(vehicle)}
                         />
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => openEditDialog(vehicle)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                      <TableCell className="text-center">
                           <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -621,7 +612,6 @@ export default function VehiclesPage() {
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
-                        </div>
                       </TableCell>
                     </TableRow>
                   )

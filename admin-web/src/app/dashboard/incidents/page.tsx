@@ -438,7 +438,7 @@ export default function IncidentsPage() {
               <TableHead>Reporter</TableHead>
               <TableHead>Location</TableHead>
               <TableHead>Created</TableHead>
-              <TableHead className="w-12"></TableHead>
+              <TableHead className="w-16 text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -475,16 +475,7 @@ export default function IncidentsPage() {
                   <TableCell>{incident.reporter_name || "-"}</TableCell>
                   <TableCell>{incident.location_name || "-"}</TableCell>
                   <TableCell>{formatDate(incident.created_at)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => { setSelectedIncident(incident); setDialogType("view") }}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                  <TableCell className="text-center">
                       <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -516,7 +507,6 @@ export default function IncidentsPage() {
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </div>
                   </TableCell>
                 </TableRow>
               ))

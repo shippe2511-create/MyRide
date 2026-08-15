@@ -559,7 +559,7 @@ export default function ZonesPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Active</TableHead>
-                  <TableHead className="w-12"></TableHead>
+                  <TableHead className="w-16 text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -590,16 +590,7 @@ export default function ZonesPage() {
                           onCheckedChange={() => toggleZoneStatus(zone)}
                         />
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => openZoneDialog(zone)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                      <TableCell className="text-center">
                           <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
@@ -616,7 +607,6 @@ export default function ZonesPage() {
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
-                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -655,7 +645,7 @@ export default function ZonesPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Active</TableHead>
-                  <TableHead className="w-12"></TableHead>
+                  <TableHead className="w-16 text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -682,16 +672,7 @@ export default function ZonesPage() {
                           onCheckedChange={() => toggleLocationStatus(loc)}
                         />
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => openLocationDialog(loc)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                      <TableCell className="text-center">
                           <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
@@ -708,7 +689,6 @@ export default function ZonesPage() {
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
-                        </div>
                       </TableCell>
                     </TableRow>
                   ))

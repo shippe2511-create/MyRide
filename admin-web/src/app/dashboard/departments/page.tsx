@@ -331,7 +331,7 @@ export default function DepartmentsPage() {
                 <TableHead>Staff</TableHead>
                 <TableHead>Active</TableHead>
                 <TableHead>Created</TableHead>
-                <TableHead className="w-[80px]"></TableHead>
+                <TableHead className="w-16 text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -368,16 +368,7 @@ export default function DepartmentsPage() {
                     <TableCell className="text-muted-foreground">
                       {formatDate(dept.created_at)}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => openEdit(dept)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                    <TableCell className="text-center">
                         <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -398,7 +389,6 @@ export default function DepartmentsPage() {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      </div>
                     </TableCell>
                   </TableRow>
                 ))

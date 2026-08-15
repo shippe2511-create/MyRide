@@ -348,7 +348,7 @@ export default function PoolsPage() {
                     <TableHead>Drivers</TableHead>
                     <TableHead>Customers</TableHead>
                     <TableHead>Status</TableHead>
-                    {canManage && <TableHead className="w-[100px]">Actions</TableHead>}
+                    {canManage && <TableHead className="w-16 text-center">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -400,7 +400,7 @@ export default function PoolsPage() {
                           </Badge>
                         </TableCell>
                         {canManage && (
-                          <TableCell>
+                          <TableCell className="text-center">
                             <DropdownMenu modal={false}>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-8 w-8">

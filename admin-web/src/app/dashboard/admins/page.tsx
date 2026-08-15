@@ -567,7 +567,7 @@ export default function AdminsPage() {
               <TableHead>Department</TableHead>
               <TableHead>Active</TableHead>
               <TableHead>Joined</TableHead>
-              <TableHead></TableHead>
+              <TableHead className="w-16 text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -627,17 +627,8 @@ export default function AdminsPage() {
                   <TableCell className="text-muted-foreground">
                     {formatDate(admin.created_at)}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-center">
                     {isSuperAdmin && (
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => openEdit(admin)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
                         <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -666,7 +657,6 @@ export default function AdminsPage() {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      </div>
                     )}
                   </TableCell>
                 </TableRow>

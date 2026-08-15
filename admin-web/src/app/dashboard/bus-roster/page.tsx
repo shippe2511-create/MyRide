@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { usePermissions } from "@/hooks/usePermissions"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -105,6 +106,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function BusRosterPage() {
   const supabase = createClient()
+  const { isSuperAdmin } = usePermissions()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [roster, setRoster] = useState<RosterAssignment[]>([])
   const [drivers, setDrivers] = useState<Driver[]>([])
@@ -130,6 +132,8 @@ export default function BusRosterPage() {
   const [backupDriverId, setBackupDriverId] = useState<string | null>(null)
   const [backupVehicleId, setBackupVehicleId] = useState<string | null>(null)
   const [assigningBackup, setAssigningBackup] = useState(false)
+  const [departments, setDepartments] = useState<{id: string, name: string}[]>([])
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("transport")
 
   const [generateForm, setGenerateForm] = useState({
     startDate: format(new Date(), "yyyy-MM-dd"),
@@ -146,6 +150,12 @@ export default function BusRosterPage() {
     loadDriverShifts()
     loadFullShuttles()
   }, [selectedDate, transportType])
+
+  useEffect(() => {
+    if (departments.length > 0) {
+      loadDriverShifts()
+    }
+  }, [selectedDepartment, departments])
 
   // Realtime subscription for bus_location_tracking (full shuttles)
   useEffect(() => {
@@ -200,16 +210,25 @@ export default function BusRosterPage() {
 
   const loadDriverShifts = async () => {
     const dateStr = format(selectedDate, "yyyy-MM-dd")
+
     const { data } = await supabase
       .from("shifts")
       .select(`
         id, driver_id, shift_date, start_time, end_time, attendance_status, absence_reason,
-        driver:drivers(id, profile_id, profile:profiles(full_name))
+        driver:drivers!inner(id, profile_id, department_id, profile:profiles(full_name))
       `)
       .eq("shift_date", dateStr)
 
     if (data) {
-      setDriverShifts(data as unknown as DriverShift[])
+      // Filter by selected department
+      let filtered = data
+      if (selectedDepartment !== "all") {
+        const dept = departments.find(d => d.name.toLowerCase() === selectedDepartment)
+        if (dept) {
+          filtered = data.filter((s: any) => s.driver?.department_id === dept.id)
+        }
+      }
+      setDriverShifts(filtered as unknown as DriverShift[])
     }
   }
 
@@ -296,12 +315,15 @@ export default function BusRosterPage() {
   }
 
   const loadMasterData = async () => {
-    // Get Transport department ID
-    const { data: transportDept } = await supabase
+    // Load departments
+    const { data: depts } = await supabase
       .from("departments")
-      .select("id")
-      .eq("name", "Transport")
-      .single()
+      .select("id, name")
+      .order("name")
+    if (depts) setDepartments(depts)
+
+    // Get Transport department ID for driver filtering
+    const transportDept = depts?.find(d => d.name === "Transport")
 
     const [driversRes, vehiclesRes, schedulesRes] = await Promise.all([
       transportDept
@@ -812,13 +834,28 @@ export default function BusRosterPage() {
                 <Users className="h-4 w-4" />
                 Driver Availability for {format(selectedDate, "MMM d")}
               </CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowDriverPanel(!showDriverPanel)}
-              >
-                {showDriverPanel ? "Hide" : "Show"}
-              </Button>
+              <div className="flex items-center gap-2">
+                {isSuperAdmin && (
+                  <select
+                    value={selectedDepartment}
+                    onChange={(e) => setSelectedDepartment(e.target.value)}
+                    className="h-8 px-2 text-sm rounded-md border bg-background"
+                  >
+                    <option value="transport">Transport</option>
+                    <option value="all">All Departments</option>
+                    {departments.filter(d => d.name !== "Transport").map(d => (
+                      <option key={d.id} value={d.name.toLowerCase()}>{d.name}</option>
+                    ))}
+                  </select>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowDriverPanel(!showDriverPanel)}
+                >
+                  {showDriverPanel ? "Hide" : "Show"}
+                </Button>
+              </div>
             </div>
           </CardHeader>
           {showDriverPanel && (

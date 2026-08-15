@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { usePermissions } from "@/hooks/usePermissions"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -69,6 +70,7 @@ const SHIFT_TYPES = [
 
 export function ShiftsTable() {
   const supabase = createClient()
+  const { departmentId: userDepartmentId } = usePermissions()
   const [shifts, setShifts] = useState<Shift[]>([])
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [loading, setLoading] = useState(true)
@@ -90,7 +92,8 @@ export function ShiftsTable() {
   const [datePickerOpen, setDatePickerOpen] = useState(false)
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear())
   const [selectedDriver, setSelectedDriver] = useState<string>("all")
-  const [selectedDepartment, setSelectedDepartment] = useState<string>("d5772aaa-02f7-4b56-bc3c-96cd7aaacd7d") // Default to Transport
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("")
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
   const [departments, setDepartments] = useState<{id: string, name: string}[]>([])
   const [selectedShifts, setSelectedShifts] = useState<string[]>([])
   const [bulkDeleting, setBulkDeleting] = useState(false)
@@ -191,6 +194,19 @@ export function ShiftsTable() {
     }
     loadDepartments()
   }, [])
+
+  // Set default department to user's department
+  useEffect(() => {
+    if (departments.length > 0 && !departmentInitialized) {
+      if (userDepartmentId) {
+        setSelectedDepartment(userDepartmentId)
+      } else {
+        // Fallback to first department (usually Transport)
+        setSelectedDepartment(departments[0]?.id || "all")
+      }
+      setDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, departmentInitialized])
 
   // Stable load function using refs
   const loadData = useCallback(async (showLoading = true) => {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { usePermissions } from "@/hooks/usePermissions"
 import { toast } from "sonner"
 import {
   Table,
@@ -87,6 +88,7 @@ const DOCUMENT_TYPES = [
 
 export function DocumentsTable() {
   const supabase = createClient()
+  const { departmentId: userDepartmentId } = usePermissions()
 
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
@@ -100,10 +102,24 @@ export function DocumentsTable() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [bulkLoading, setBulkLoading] = useState(false)
   const [driverFilter, setDriverFilter] = useState("all")
-  const [departmentFilter, setDepartmentFilter] = useState("all")
+  const [departmentFilter, setDepartmentFilter] = useState<string>("")
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
   const [departments, setDepartments] = useState<{id: string, name: string}[]>([])
   const [driverSearch, setDriverSearch] = useState("")
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+
+  // Set default department to user's department
+  useEffect(() => {
+    if (departments.length > 0 && !departmentInitialized) {
+      if (userDepartmentId) {
+        setDepartmentFilter(userDepartmentId)
+      } else {
+        setDepartmentFilter("all")
+      }
+      setDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, departmentInitialized])
+
   useEffect(() => {
     loadDocuments(true)
     loadCurrentUser()

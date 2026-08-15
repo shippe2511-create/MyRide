@@ -192,15 +192,21 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
   const [departments, setDepartments] = useState<Department[]>([])
-  const [departmentFilter, setDepartmentFilter] = useState(userDepartmentId || "all")
+  const [departmentFilter, setDepartmentFilter] = useState<string>("")
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
   const [poolFilter, setPoolFilter] = useState("all")
 
-  // Update department filter when user's department loads
+  // Set default department to user's department
   useEffect(() => {
-    if (userDepartmentId && departmentFilter === "all") {
-      setDepartmentFilter(userDepartmentId)
+    if (departments.length > 0 && !departmentInitialized) {
+      if (userDepartmentId) {
+        setDepartmentFilter(userDepartmentId)
+      } else {
+        setDepartmentFilter("all")
+      }
+      setDepartmentInitialized(true)
     }
-  }, [userDepartmentId])
+  }, [departments, userDepartmentId, departmentInitialized])
 
   useEffect(() => {
     loadVehicles()

@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useCallback, memo, useRef } from "react"
+import { useState, useCallback, memo, useRef, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { formatPhone } from "@/lib/format-phone"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PermissionGate } from "@/components/permission-gate"
+import { usePermissions } from "@/hooks/usePermissions"
 import { Button } from "@/components/ui/button"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -497,18 +498,45 @@ const columnLabels: Record<string, Record<string, string>> = {
 }
 
 export default function ReportsPage() {
+  const { departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
   const [loading, setLoading] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState("all")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
+  const [departmentFilter, setDepartmentFilter] = useState<string>("")
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
+
+  // Load departments
+  useEffect(() => {
+    async function loadDepartments() {
+      const { data } = await supabase.from("departments").select("id, name").eq("is_active", true).order("name")
+      if (data) setDepartments(data)
+    }
+    loadDepartments()
+  }, [])
+
+  // Set default department filter to user's department
+  useEffect(() => {
+    if (departments.length > 0 && !departmentInitialized) {
+      if (userDepartmentId) {
+        setDepartmentFilter(userDepartmentId)
+      } else {
+        setDepartmentFilter("all")
+      }
+      setDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, departmentInitialized])
 
   // Use refs for date values to prevent generateReport from changing
   const dateRangeRef = useRef(dateRange)
   const startDateRef = useRef(startDate)
   const endDateRef = useRef(endDate)
+  const departmentFilterRef = useRef(departmentFilter)
   dateRangeRef.current = dateRange
   startDateRef.current = startDate
   endDateRef.current = endDate
+  departmentFilterRef.current = departmentFilter
 
   const cleanAddress = (address: string | null | undefined): string => {
     if (!address) return "-"
@@ -585,6 +613,38 @@ export default function ReportsPage() {
       if (showLoading) setLoading(`${reportType}-csv`)
       const dateFilter = getDateFilter()
 
+      // Get effective department filter - non-super_admins MUST use their department
+      const { data: { user } } = await supabase.auth.getUser()
+      let effectiveDeptFilter = departmentFilterRef.current
+
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role, department_id")
+          .eq("id", user.id)
+          .single()
+
+        // Non-super_admins are forced to their department
+        if (profile && profile.role !== "super_admin" && profile.department_id) {
+          effectiveDeptFilter = profile.department_id
+        }
+      }
+
+      // Get customer IDs and driver IDs for department filtering
+      let customerIds: string[] | null = null
+      let driverIds: string[] | null = null
+      let driverProfileIds: string[] | null = null
+
+      if (effectiveDeptFilter && effectiveDeptFilter !== "all") {
+        const [{ data: customers }, { data: drivers }] = await Promise.all([
+          supabase.from("profiles").select("id").eq("department_id", effectiveDeptFilter).eq("role", "customer"),
+          supabase.from("drivers").select("id, profile_id").eq("department_id", effectiveDeptFilter)
+        ])
+        customerIds = customers?.map(c => c.id) || []
+        driverIds = drivers?.map(d => d.id) || []
+        driverProfileIds = drivers?.map(d => d.profile_id) || []
+      }
+
       let rows: Record<string, string>[] = []
       let filename = ""
       const labels = columnLabels[reportType]
@@ -606,6 +666,14 @@ export default function ReportsPage() {
             .order("created_at", { ascending: false })
           if (dateFilter) {
             query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          if (customerIds && customerIds.length > 0) {
+            query = query.in("customer_id", customerIds)
+          } else if (customerIds && customerIds.length === 0) {
+            // No customers in this department
+            rows = []
+            filename = `rides_report_${new Date().toISOString().split("T")[0]}.csv`
+            break
           }
           const { data: rides } = await query
 
@@ -630,11 +698,14 @@ export default function ReportsPage() {
         case "customers": {
           let query = supabase
             .from("profiles")
-            .select("full_name, employee_id, phone, email, department, gender, status, created_at")
+            .select("full_name, employee_id, phone, email, department, gender, status, created_at, department_id")
             .eq("role", "customer")
             .order("created_at", { ascending: false })
           if (dateFilter) {
             query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          if (effectiveDeptFilter && effectiveDeptFilter !== "all") {
+            query = query.eq("department_id", effectiveDeptFilter)
           }
           const { data: customers } = await query
 
@@ -656,13 +727,20 @@ export default function ReportsPage() {
           let query = supabase
             .from("profiles")
             .select(`
-              full_name, employee_id, phone, email, department, gender, status, created_at,
-              driver:drivers(rating, total_trips, is_online)
+              id, full_name, employee_id, phone, email, department, gender, status, created_at,
+              driver:drivers(rating, total_trips, is_online, department_id)
             `)
             .eq("role", "driver")
             .order("created_at", { ascending: false })
           if (dateFilter) {
             query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          if (driverProfileIds && driverProfileIds.length > 0) {
+            query = query.in("id", driverProfileIds)
+          } else if (driverProfileIds && driverProfileIds.length === 0) {
+            rows = []
+            filename = `drivers_report_${new Date().toISOString().split("T")[0]}.csv`
+            break
           }
           const { data: drivers } = await query
 
@@ -687,18 +765,31 @@ export default function ReportsPage() {
 
         case "driver_performance": {
           // Get all drivers with profile and vehicle info
-          const { data: driversData } = await supabase
+          let driversQuery = supabase
             .from("drivers")
             .select(`
-              id, rating, is_online, license_number,
+              id, rating, is_online, license_number, department_id,
               profile:profiles!drivers_profile_id_fkey(full_name, phone),
               vehicle:vehicle_types(plate_no, display_name)
             `)
+          if (driverIds && driverIds.length > 0) {
+            driversQuery = driversQuery.in("id", driverIds)
+          } else if (driverIds && driverIds.length === 0) {
+            rows = []
+            filename = `driver_performance_${new Date().toISOString().split("T")[0]}.csv`
+            break
+          }
+          const { data: driversData } = await driversQuery
 
           // Get all rides
-          let ridesQuery = supabase.from("rides").select("id, driver_id, status, created_at")
+          let ridesQuery = supabase.from("rides").select("id, driver_id, status, created_at, customer_id")
           if (dateFilter) {
             ridesQuery = ridesQuery.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          if (customerIds && customerIds.length > 0) {
+            ridesQuery = ridesQuery.in("customer_id", customerIds)
+          } else if (customerIds && customerIds.length === 0) {
+            // No customers in department, still show drivers but with 0 rides
           }
           const { data: ridesData } = await ridesQuery
 
@@ -755,7 +846,7 @@ export default function ReportsPage() {
           let query = supabase
             .from("break_history")
             .select(`
-              break_type, started_at, ended_at, duration_minutes, created_at,
+              break_type, started_at, ended_at, duration_minutes, created_at, driver_id,
               driver:drivers!break_history_driver_id_fkey(
                 profile:profiles!drivers_profile_id_fkey(full_name)
               )
@@ -763,6 +854,13 @@ export default function ReportsPage() {
             .order("created_at", { ascending: false })
           if (dateFilter) {
             query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          if (driverIds && driverIds.length > 0) {
+            query = query.in("driver_id", driverIds)
+          } else if (driverIds && driverIds.length === 0) {
+            rows = []
+            filename = `break_history_${new Date().toISOString().split("T")[0]}.csv`
+            break
           }
           const { data: breaks } = await query
 
@@ -792,7 +890,7 @@ export default function ReportsPage() {
           let query = supabase
             .from("shifts")
             .select(`
-              shift_date, start_time, end_time, shift_type, status, created_at,
+              shift_date, start_time, end_time, shift_type, status, created_at, driver_id,
               driver:drivers!shifts_driver_id_fkey(
                 profile:profiles!drivers_profile_id_fkey(full_name)
               )
@@ -800,6 +898,13 @@ export default function ReportsPage() {
             .order("shift_date", { ascending: false })
           if (dateFilter) {
             query = query.gte("shift_date", dateFilter.start).lte("shift_date", dateFilter.end)
+          }
+          if (driverIds && driverIds.length > 0) {
+            query = query.in("driver_id", driverIds)
+          } else if (driverIds && driverIds.length === 0) {
+            rows = []
+            filename = `shifts_${new Date().toISOString().split("T")[0]}.csv`
+            break
           }
           const { data: shifts } = await query
 
@@ -823,7 +928,7 @@ export default function ReportsPage() {
           let query = supabase
             .from("shifts")
             .select(`
-              shift_date, start_time, end_time, shift_type, attendance_status, absence_reason, marked_at,
+              shift_date, start_time, end_time, shift_type, attendance_status, absence_reason, marked_at, driver_id,
               driver:drivers!shifts_driver_id_fkey(
                 profile:profiles!drivers_profile_id_fkey(full_name, phone)
               )
@@ -831,6 +936,13 @@ export default function ReportsPage() {
             .order("shift_date", { ascending: false })
           if (dateFilter) {
             query = query.gte("shift_date", dateFilter.start).lte("shift_date", dateFilter.end)
+          }
+          if (driverIds && driverIds.length > 0) {
+            query = query.in("driver_id", driverIds)
+          } else if (driverIds && driverIds.length === 0) {
+            rows = []
+            filename = `driver_attendance_${new Date().toISOString().split("T")[0]}.csv`
+            break
           }
           const { data: attendance } = await query
 
@@ -911,13 +1023,20 @@ export default function ReportsPage() {
           let query = supabase
             .from("ratings")
             .select(`
-              rating, comment, created_at,
-              from_user:profiles!ratings_from_user_id_fkey(full_name),
+              rating, comment, created_at, from_user_id,
+              from_user:profiles!ratings_from_user_id_fkey(full_name, department_id),
               to_user:profiles!ratings_to_user_id_fkey(full_name)
             `)
             .order("created_at", { ascending: false })
           if (dateFilter) {
             query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          if (customerIds && customerIds.length > 0) {
+            query = query.in("from_user_id", customerIds)
+          } else if (customerIds && customerIds.length === 0) {
+            rows = []
+            filename = `ratings_${new Date().toISOString().split("T")[0]}.csv`
+            break
           }
           const { data: ratings } = await query
 
@@ -937,9 +1056,16 @@ export default function ReportsPage() {
         }
 
         case "usage": {
-          let query = supabase.from("rides").select("created_at, status")
+          let query = supabase.from("rides").select("created_at, status, customer_id")
           if (dateFilter) {
             query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          if (customerIds && customerIds.length > 0) {
+            query = query.in("customer_id", customerIds)
+          } else if (customerIds && customerIds.length === 0) {
+            rows = []
+            filename = `daily_usage_${new Date().toISOString().split("T")[0]}.csv`
+            break
           }
           const { data: rides } = await query
 
@@ -1294,11 +1420,18 @@ export default function ReportsPage() {
         case "scheduled_rides": {
           let query = supabase
             .from("rides")
-            .select(`id, pickup_name, dropoff_name, scheduled_time, status, created_at, customer:profiles!rides_customer_id_fkey(full_name)`)
+            .select(`id, pickup_name, dropoff_name, scheduled_time, status, created_at, customer_id, customer:profiles!rides_customer_id_fkey(full_name)`)
             .not("scheduled_time", "is", null)
             .order("scheduled_time", { ascending: false })
           if (dateFilter) {
             query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          if (customerIds && customerIds.length > 0) {
+            query = query.in("customer_id", customerIds)
+          } else if (customerIds && customerIds.length === 0) {
+            rows = []
+            filename = `scheduled_rides_${new Date().toISOString().split("T")[0]}.csv`
+            break
           }
           const { data: rides } = await query
           rows = (rides || []).map((r: Record<string, unknown>) => {
@@ -1317,10 +1450,18 @@ export default function ReportsPage() {
         }
 
         case "recurring_rides": {
-          const { data: rides } = await supabase
+          let query = supabase
             .from("recurring_rides")
-            .select(`id, pickup_name, dropoff_name, days_of_week, pickup_time, is_active, customer:profiles!recurring_rides_customer_id_fkey(full_name)`)
+            .select(`id, pickup_name, dropoff_name, days_of_week, pickup_time, is_active, customer_id, customer:profiles!recurring_rides_customer_id_fkey(full_name)`)
             .order("created_at", { ascending: false })
+          if (customerIds && customerIds.length > 0) {
+            query = query.in("customer_id", customerIds)
+          } else if (customerIds && customerIds.length === 0) {
+            rows = []
+            filename = `recurring_rides_${new Date().toISOString().split("T")[0]}.csv`
+            break
+          }
+          const { data: rides } = await query
           rows = (rides || []).map((r: Record<string, unknown>) => {
             const customer = r.customer as Record<string, unknown> | null
             const days = r.days_of_week as string[] | null
@@ -1340,11 +1481,18 @@ export default function ReportsPage() {
         case "cancellations": {
           let query = supabase
             .from("rides")
-            .select(`id, pickup_name, pickup_lat, pickup_lng, status, cancelled_at, cancel_reason, created_at, customer:profiles!rides_customer_id_fkey(full_name), driver:drivers!rides_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`)
+            .select(`id, pickup_name, pickup_lat, pickup_lng, status, cancelled_at, cancel_reason, created_at, customer_id, customer:profiles!rides_customer_id_fkey(full_name), driver:drivers!rides_driver_id_fkey(profile:profiles!drivers_profile_id_fkey(full_name))`)
             .eq("status", "cancelled")
             .order("created_at", { ascending: false })
           if (dateFilter) {
             query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          if (customerIds && customerIds.length > 0) {
+            query = query.in("customer_id", customerIds)
+          } else if (customerIds && customerIds.length === 0) {
+            rows = []
+            filename = `cancellations_${new Date().toISOString().split("T")[0]}.csv`
+            break
           }
           const { data: rides } = await query
           rows = (rides || []).map((r: Record<string, unknown>) => {
@@ -1371,9 +1519,16 @@ export default function ReportsPage() {
         }
 
         case "peak_hours": {
-          let query = supabase.from("rides").select("created_at, status, duration_minutes")
+          let query = supabase.from("rides").select("created_at, status, duration_minutes, customer_id")
           if (dateFilter) {
             query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          if (customerIds && customerIds.length > 0) {
+            query = query.in("customer_id", customerIds)
+          } else if (customerIds && customerIds.length === 0) {
+            rows = []
+            filename = `peak_hours_${new Date().toISOString().split("T")[0]}.csv`
+            break
           }
           const { data: rides } = await query
           const hourStats: Record<number, { total: number; completed: number; cancelled: number; totalDuration: number }> = {}
@@ -1399,9 +1554,16 @@ export default function ReportsPage() {
         }
 
         case "popular_routes": {
-          let query = supabase.from("rides").select("pickup_name, dropoff_name, distance_km, duration_minutes, status")
+          let query = supabase.from("rides").select("pickup_name, dropoff_name, distance_km, duration_minutes, status, customer_id")
           if (dateFilter) {
             query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
+          }
+          if (customerIds && customerIds.length > 0) {
+            query = query.in("customer_id", customerIds)
+          } else if (customerIds && customerIds.length === 0) {
+            rows = []
+            filename = `popular_routes_${new Date().toISOString().split("T")[0]}.csv`
+            break
           }
           const { data: rides } = await query
           const routeStats: Record<string, { count: number; totalDistance: number; totalDuration: number }> = {}
@@ -1434,6 +1596,13 @@ export default function ReportsPage() {
           if (dateFilter) {
             query = query.gte("created_at", dateFilter.start).lte("created_at", dateFilter.end + "T23:59:59")
           }
+          if (customerIds && customerIds.length > 0) {
+            query = query.in("customer_id", customerIds)
+          } else if (customerIds && customerIds.length === 0) {
+            rows = []
+            filename = `customer_loyalty_${new Date().toISOString().split("T")[0]}.csv`
+            break
+          }
           const { data: rides } = await query
           const customerStats: Record<string, { total: number; completed: number; cancelled: number; lastRide: string }> = {}
           ;(rides || []).forEach((r) => {
@@ -1447,8 +1616,8 @@ export default function ReportsPage() {
               customerStats[cid].lastRide = r.created_at
             }
           })
-          const customerIds = Object.keys(customerStats)
-          const { data: profiles } = await supabase.from("profiles").select("id, full_name, phone").in("id", customerIds)
+          const loyaltyCustomerIds = Object.keys(customerStats)
+          const { data: profiles } = await supabase.from("profiles").select("id, full_name, phone").in("id", loyaltyCustomerIds.length > 0 ? loyaltyCustomerIds : [""])
           const profileMap: Record<string, { full_name: string; phone: string }> = {}
           ;(profiles || []).forEach((p) => { profileMap[p.id] = { full_name: p.full_name, phone: p.phone } })
           rows = Object.entries(customerStats)
@@ -2989,6 +3158,18 @@ export default function ReportsPage() {
             <SelectItem value="month">Last 30 Days</SelectItem>
             <SelectItem value="year">Last Year</SelectItem>
             <SelectItem value="custom">Custom Range</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="h-4 w-px bg-border" />
+        <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+          <SelectTrigger className="w-44 h-9">
+            <SelectValue placeholder="Department" />
+          </SelectTrigger>
+          <SelectContent>
+            {isSuperAdmin && <SelectItem value="all">All Departments</SelectItem>}
+            {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
+              <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
         {dateRange === "custom" && (

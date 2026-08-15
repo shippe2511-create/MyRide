@@ -91,6 +91,7 @@ import {
 import { toast } from "sonner"
 import { formatDistanceToNow, format } from "date-fns"
 import { PermissionGate } from "@/components/permission-gate"
+import { usePermissions } from "@/hooks/usePermissions"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -125,6 +126,7 @@ const STATUS_LABELS = {
 
 export default function ControlRoomPage() {
   const supabase = createClient()
+  const { departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
   const subscriptionsRef = useRef<ControlRoomSubscriptions | null>(null)
 
   // Data state
@@ -1147,13 +1149,13 @@ export default function ControlRoomPage() {
             {attentionLevel === "red" && "Action Required"}
           </Badge>
           {/* Department Selector */}
-          <Select value={departmentId || "all"} onValueChange={(v) => setDepartmentId(v === "all" ? null : v)}>
+          <Select value={departmentId || (isSuperAdmin ? "all" : userDepartmentId || "all")} onValueChange={(v) => setDepartmentId(v === "all" ? null : v)}>
             <SelectTrigger className="w-36 h-8 text-xs">
               <SelectValue placeholder="Department" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Departments</SelectItem>
-              {departments.map(d => (
+              {isSuperAdmin && <SelectItem value="all">All Departments</SelectItem>}
+              {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
                 <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
               ))}
             </SelectContent>

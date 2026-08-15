@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { usePermissions } from "@/hooks/usePermissions"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -305,6 +306,7 @@ function SortableCategoryCard({ cat, sensors, openEditCategory, toggleCategoryAc
 
 export default function ChecklistsPage() {
   const supabase = createClient()
+  const { departmentId: userDepartmentId } = usePermissions()
   const [activeTab, setActiveTab] = useState("checks")
   const [checklists, setChecklists] = useState<VehicleChecklist[]>([])
   const [allChecklists, setAllChecklists] = useState<VehicleChecklist[]>([])
@@ -344,9 +346,10 @@ export default function ChecklistsPage() {
   const [stats, setStats] = useState({ total: 0, withIssues: 0, passed: 0 })
 
   // Fleet Health filters
-  const [fleetDepartmentFilter, setFleetDepartmentFilter] = useState("")
+  const [fleetDepartmentFilter, setFleetDepartmentFilter] = useState<string>("")
   const [fleetSearch, setFleetSearch] = useState("")
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
 
   // Running hours edit state
   const [editingRunningHours, setEditingRunningHours] = useState<VehicleHealth | null>(null)
@@ -420,9 +423,6 @@ export default function ChecklistsPage() {
     const loadDepartments = async () => {
       const { data } = await supabase.from("departments").select("id, name").eq("is_active", true).order("name")
       setDepartments(data || [])
-      // Set Transport as default
-      const transport = data?.find(d => d.name.toLowerCase() === "transport")
-      if (transport) setFleetDepartmentFilter(transport.id)
     }
     loadDepartments()
 
@@ -444,6 +444,20 @@ export default function ChecklistsPage() {
 
     return () => { supabase.removeChannel(channel) }
   }, [])
+
+  // Set default department to user's department
+  useEffect(() => {
+    if (departments.length > 0 && !departmentInitialized) {
+      if (userDepartmentId) {
+        setFleetDepartmentFilter(userDepartmentId)
+      } else {
+        // Fallback for superadmins - default to Transport or first department
+        const transport = departments.find(d => d.name.toLowerCase() === "transport")
+        setFleetDepartmentFilter(transport?.id || departments[0]?.id || "all")
+      }
+      setDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, departmentInitialized])
 
   useEffect(() => {
     if (!loading) loadChecklists(false)

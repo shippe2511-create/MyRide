@@ -4,6 +4,10 @@ import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { usePermissions } from "@/hooks/usePermissions"
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -70,14 +74,41 @@ interface DriverLocation {
   } | null
 }
 
+interface Department {
+  id: string
+  name: string
+}
+
 export default function TrackingPage() {
   const supabase = createClient()
+  const { departmentId: userDepartmentId } = usePermissions()
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [departmentFilter, setDepartmentFilter] = useState<string>("")
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
 
   useEffect(() => {
     setMounted(true)
+    // Load departments
+    async function loadDepartments() {
+      const { data } = await supabase.from("departments").select("id, name").eq("is_active", true).order("name")
+      if (data) setDepartments(data)
+    }
+    loadDepartments()
   }, [])
+
+  // Set default department to user's department
+  useEffect(() => {
+    if (departments.length > 0 && !departmentInitialized) {
+      if (userDepartmentId) {
+        setDepartmentFilter(userDepartmentId)
+      } else {
+        setDepartmentFilter("all")
+      }
+      setDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, departmentInitialized])
 
   const { data: driverLocations = [], isLoading: loading, refetch } = useQuery({
     queryKey: ["tracking-page"],
@@ -111,6 +142,7 @@ export default function TrackingPage() {
           updated_at,
           avatar_url,
           rating,
+          department_id,
           profile:profiles(full_name, phone, avatar_url)
         `)
         .in("id", driverIds)
@@ -171,7 +203,12 @@ export default function TrackingPage() {
     }
   }, [refetch])
 
-  const onlineDrivers = driverLocations.filter(d => d.is_online)
+  // Filter by department first, then get online drivers
+  const departmentFilteredDrivers = departmentFilter && departmentFilter !== "all"
+    ? driverLocations.filter(d => d.driver?.department_id === departmentFilter)
+    : driverLocations
+
+  const onlineDrivers = departmentFilteredDrivers.filter(d => d.is_online)
 
   const stats = {
     online: onlineDrivers.length,
@@ -214,10 +251,23 @@ export default function TrackingPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Real-time driver locations and active rides</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map(d => (
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}

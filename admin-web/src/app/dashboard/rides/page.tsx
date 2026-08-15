@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { formatPhone } from "@/lib/format-phone"
+import { usePermissions } from "@/hooks/usePermissions"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -51,8 +52,13 @@ interface Ride {
   cancel_reason: string | null
   distance_km: number | null
   duration_minutes: number | null
-  customer: { full_name: string; phone: string | null } | null
+  customer: { full_name: string; phone: string | null; department_id: string | null } | null
   driver?: { profile: { full_name: string } } | null
+}
+
+interface Department {
+  id: string
+  name: string
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -66,10 +72,10 @@ const STATUS_COLORS: Record<string, string> = {
 
 const supabase = createClient()
 
-async function fetchRidesData(statusFilter: string, dateRange: string) {
+async function fetchRidesData(statusFilter: string, dateRange: string, departmentFilter: string) {
   let query = supabase
     .from("rides")
-    .select(`*, customer:profiles!rides_customer_id_fkey(full_name, phone), driver:drivers!rides_driver_id_fkey(profile:profiles(full_name))`)
+    .select(`*, customer:profiles!rides_customer_id_fkey(full_name, phone, department_id), driver:drivers!rides_driver_id_fkey(profile:profiles(full_name))`)
     .order("created_at", { ascending: false })
     .limit(100)
 
@@ -138,9 +144,13 @@ async function fetchRidesData(statusFilter: string, dateRange: string) {
 
 export default function RidesPage() {
   const queryClient = useQueryClient()
+  const { departmentId: userDepartmentId } = usePermissions()
   const [selectedRide, setSelectedRide] = useState<Ride | null>(null)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [departmentFilter, setDepartmentFilter] = useState<string>("")
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
   const [dateRange, setDateRange] = useState("all")
   const [editRide, setEditRide] = useState<Ride | null>(null)
   const [editStatus, setEditStatus] = useState("")
@@ -152,16 +162,42 @@ export default function RidesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 20
 
+  // Load departments on mount
+  useEffect(() => {
+    async function loadDepartments() {
+      const { data } = await supabase.from("departments").select("id, name").eq("is_active", true).order("name")
+      if (data) setDepartments(data)
+    }
+    loadDepartments()
+  }, [])
+
+  // Set default department to user's department
+  useEffect(() => {
+    if (departments.length > 0 && !departmentInitialized) {
+      if (userDepartmentId) {
+        setDepartmentFilter(userDepartmentId)
+      } else {
+        setDepartmentFilter("all")
+      }
+      setDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, departmentInitialized])
+
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ["rides-page", statusFilter, dateRange],
-    queryFn: () => fetchRidesData(statusFilter, dateRange),
+    queryKey: ["rides-page", statusFilter, dateRange, departmentFilter],
+    queryFn: () => fetchRidesData(statusFilter, dateRange, departmentFilter),
     staleTime: 30 * 1000,
     placeholderData: (previousData) => previousData,
+    enabled: departmentInitialized,
   })
 
   const loading = isLoading && !data
 
-  const rides = data?.rides || []
+  // Filter rides by department (customer's department)
+  const allRides = data?.rides || []
+  const rides = departmentFilter && departmentFilter !== "all"
+    ? allRides.filter(r => r.customer?.department_id === departmentFilter)
+    : allRides
   const stats = data?.stats || { total: 0, active: 0, completed: 0, cancelled: 0 }
   const chartData = data?.chartData || []
 
@@ -445,19 +481,33 @@ export default function RidesPage() {
               <SelectItem value="quarter">Last 90 Days</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map(d => (
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <FilterPills
           filters={[
             ...(statusFilter !== "all" ? [{ key: "status", label: "Status", value: statusFilter }] : []),
+            ...(departmentFilter && departmentFilter !== "all" ? [{ key: "department", label: "Department", value: departments.find(d => d.id === departmentFilter)?.name || departmentFilter }] : []),
             ...(search ? [{ key: "search", label: "Search", value: search }] : []),
           ]}
           onRemove={(key) => {
             if (key === "status") setStatusFilter("all")
+            if (key === "department") setDepartmentFilter("all")
             if (key === "search") setSearch("")
           }}
           onClearAll={() => {
             setStatusFilter("all")
+            setDepartmentFilter("all")
             setSearch("")
           }}
         />

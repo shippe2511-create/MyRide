@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { usePermissions } from "@/hooks/usePermissions"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -78,15 +79,25 @@ interface Driver {
   profile_id: string
   profile: { id: string; full_name: string }
   is_online: boolean
+  department_id: string | null
+}
+
+interface Department {
+  id: string
+  name: string
 }
 
 export default function PushToTalkPage() {
   const supabase = createClient()
+  const { departmentId: userDepartmentId } = usePermissions()
   const [settings, setSettings] = useState<VoiceSettings | null>(null)
   const [messages, setMessages] = useState<VoiceMessage[]>([])
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [departmentFilter, setDepartmentFilter] = useState<string>("")
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false)
@@ -113,6 +124,13 @@ export default function PushToTalkPage() {
 
   useEffect(() => {
     fetchData()
+
+    // Load departments
+    async function loadDepartments() {
+      const { data } = await supabase.from("departments").select("id, name").eq("is_active", true).order("name")
+      if (data) setDepartments(data)
+    }
+    loadDepartments()
 
     // Realtime subscription for new messages
     const channel = supabase
@@ -141,6 +159,18 @@ export default function PushToTalkPage() {
       }
     }
   }, [])
+
+  // Set default department to user's department
+  useEffect(() => {
+    if (departments.length > 0 && !departmentInitialized) {
+      if (userDepartmentId) {
+        setDepartmentFilter(userDepartmentId)
+      } else {
+        setDepartmentFilter("all")
+      }
+      setDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, departmentInitialized])
 
   const fetchData = async () => {
     setLoading(true)
@@ -203,7 +233,7 @@ export default function PushToTalkPage() {
   const fetchDrivers = async () => {
     const { data } = await supabase
       .from("drivers")
-      .select("id, profile_id, is_online, profile:profiles!drivers_profile_id_fkey(id, full_name)")
+      .select("id, profile_id, is_online, department_id, profile:profiles!drivers_profile_id_fkey(id, full_name)")
     if (data) setDrivers(data as unknown as Driver[])
   }
 
@@ -496,7 +526,11 @@ export default function PushToTalkPage() {
     })
   }
 
-  const onlineDrivers = drivers.filter(d => d.is_online)
+  // Filter drivers by department, then get online ones
+  const departmentFilteredDrivers = departmentFilter && departmentFilter !== "all"
+    ? drivers.filter(d => d.department_id === departmentFilter)
+    : drivers
+  const onlineDrivers = departmentFilteredDrivers.filter(d => d.is_online)
 
   if (loading) {
     return (
@@ -517,9 +551,22 @@ export default function PushToTalkPage() {
             </h1>
             <p className="text-muted-foreground">Walkie-talkie style voice communication</p>
           </div>
-          <Badge variant={settings?.feature_enabled ? "default" : "secondary"} className="text-sm">
-            {settings?.feature_enabled ? "Enabled" : "Disabled"}
-          </Badge>
+          <div className="flex items-center gap-3">
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="Department" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.map(d => (
+                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Badge variant={settings?.feature_enabled ? "default" : "secondary"} className="text-sm">
+              {settings?.feature_enabled ? "Enabled" : "Disabled"}
+            </Badge>
+          </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">

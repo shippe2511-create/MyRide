@@ -62,6 +62,7 @@ interface VehicleChecklist {
   resolved_by: string | null
   resolution_notes: string | null
   running_hours: number | null
+  department_id?: string | null
 }
 
 interface VehicleHealth {
@@ -345,11 +346,18 @@ export default function ChecklistsPage() {
 
   const [stats, setStats] = useState({ total: 0, withIssues: 0, passed: 0 })
 
+  // Checks tab department filter
+  const [checksDepartmentFilter, setChecksDepartmentFilter] = useState<string>("")
+  const [checksDepartmentInitialized, setChecksDepartmentInitialized] = useState(false)
+
   // Fleet Health filters
   const [fleetDepartmentFilter, setFleetDepartmentFilter] = useState<string>("")
   const [fleetSearch, setFleetSearch] = useState("")
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
   const [departmentInitialized, setDepartmentInitialized] = useState(false)
+
+  // Vehicle plate to department mapping (for filtering checks by department)
+  const [vehicleDepartments, setVehicleDepartments] = useState<Record<string, string>>({})
 
   // Running hours edit state
   const [editingRunningHours, setEditingRunningHours] = useState<VehicleHealth | null>(null)
@@ -445,7 +453,7 @@ export default function ChecklistsPage() {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  // Set default department to user's department
+  // Set default department to user's department (for Fleet Health tab)
   useEffect(() => {
     if (departments.length > 0 && !departmentInitialized) {
       if (userDepartmentId) {
@@ -459,10 +467,39 @@ export default function ChecklistsPage() {
     }
   }, [departments, userDepartmentId, departmentInitialized])
 
+  // Set default department for Checks tab
   useEffect(() => {
-    if (!loading) loadChecklists(false)
+    if (departments.length > 0 && !checksDepartmentInitialized) {
+      if (userDepartmentId) {
+        setChecksDepartmentFilter(userDepartmentId)
+      } else {
+        setChecksDepartmentFilter("all")
+      }
+      setChecksDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, checksDepartmentInitialized])
+
+  // Load vehicle to department mapping
+  useEffect(() => {
+    const loadVehicleDepartments = async () => {
+      const { data } = await supabase.from("vehicle_types").select("plate_no, department_id")
+      if (data) {
+        const mapping: Record<string, string> = {}
+        data.forEach(v => {
+          if (v.plate_no && v.department_id) {
+            mapping[v.plate_no] = v.department_id
+          }
+        })
+        setVehicleDepartments(mapping)
+      }
+    }
+    loadVehicleDepartments()
+  }, [])
+
+  useEffect(() => {
+    if (!loading && checksDepartmentInitialized) loadChecklists(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, currentPage])
+  }, [filter, currentPage, checksDepartmentFilter])
 
   const loadData = async (showLoading = true) => {
     if (showLoading) setLoading(true)
@@ -848,6 +885,12 @@ export default function ChecklistsPage() {
   }
 
   const filteredChecklists = checklists.filter(c => {
+    // Department filter
+    if (checksDepartmentFilter && checksDepartmentFilter !== "all") {
+      const vehicleDeptId = vehicleDepartments[c.vehicle_number]
+      if (vehicleDeptId !== checksDepartmentFilter) return false
+    }
+    // Search filter
     if (!search) return true
     const s = search.toLowerCase()
     const vehicleDisplayName = vehicleHealthData.find(v => v.vehicle_number === c.vehicle_number)?.display_name?.toLowerCase() || ''
@@ -1209,6 +1252,15 @@ export default function ChecklistsPage() {
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="issues">With Issues</SelectItem>
                   <SelectItem value="passed">Passed</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={checksDepartmentFilter} onValueChange={(v) => { setChecksDepartmentFilter(v); setCurrentPage(1) }}>
+                <SelectTrigger className="w-44"><SelectValue placeholder="Department" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {departments.map(d => (
+                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

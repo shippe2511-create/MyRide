@@ -106,7 +106,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function BusRosterPage() {
   const supabase = createClient()
-  const { isSuperAdmin } = usePermissions()
+  const { isSuperAdmin, departmentId: userDepartmentId } = usePermissions()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [roster, setRoster] = useState<RosterAssignment[]>([])
   const [drivers, setDrivers] = useState<Driver[]>([])
@@ -133,7 +133,8 @@ export default function BusRosterPage() {
   const [backupVehicleId, setBackupVehicleId] = useState<string | null>(null)
   const [assigningBackup, setAssigningBackup] = useState(false)
   const [departments, setDepartments] = useState<{id: string, name: string}[]>([])
-  const [selectedDepartment, setSelectedDepartment] = useState<string>("transport")
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("")
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
 
   const [generateForm, setGenerateForm] = useState({
     startDate: format(new Date(), "yyyy-MM-dd"),
@@ -152,7 +153,24 @@ export default function BusRosterPage() {
   }, [selectedDate, transportType])
 
   useEffect(() => {
-    if (departments.length > 0) {
+    if (departments.length > 0 && !departmentInitialized) {
+      // Set default to user's department if available
+      if (userDepartmentId) {
+        const userDept = departments.find(d => d.id === userDepartmentId)
+        if (userDept) {
+          setSelectedDepartment(userDept.name.toLowerCase())
+        } else {
+          setSelectedDepartment("transport") // Fallback
+        }
+      } else {
+        setSelectedDepartment("transport") // Default for superadmins
+      }
+      setDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, departmentInitialized])
+
+  useEffect(() => {
+    if (departments.length > 0 && selectedDepartment) {
       loadDriverShifts()
     }
   }, [selectedDepartment, departments])

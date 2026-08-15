@@ -106,7 +106,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function BusRosterPage() {
   const supabase = createClient()
-  const { isSuperAdmin, departmentId: userDepartmentId } = usePermissions()
+  const { canViewAllDepts, departmentId: userDepartmentId } = usePermissions()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [roster, setRoster] = useState<RosterAssignment[]>([])
   const [drivers, setDrivers] = useState<Driver[]>([])
@@ -853,7 +853,7 @@ export default function BusRosterPage() {
                 Driver Availability for {format(selectedDate, "MMM d")}
               </CardTitle>
               <div className="flex items-center gap-2">
-                {isSuperAdmin && (
+                {canViewAllDepts && (
                   <select
                     value={selectedDepartment}
                     onChange={(e) => setSelectedDepartment(e.target.value)}

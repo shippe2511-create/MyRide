@@ -39,7 +39,7 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
 
 export default function DocumentExpiryPage() {
   const supabase = createClient()
-  const { departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
+  const { departmentId: userDepartmentId, canViewAllDepts } = usePermissions()
   const [documents, setDocuments] = useState<ExpiringDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [triggering, setTriggering] = useState(false)
@@ -204,8 +204,8 @@ export default function DocumentExpiryPage() {
               <SelectValue placeholder="Department" />
             </SelectTrigger>
             <SelectContent>
-              {isSuperAdmin && <SelectItem value="all">All Departments</SelectItem>}
-              {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
+              {canViewAllDepts && <SelectItem value="all">All Departments</SelectItem>}
+              {(canViewAllDepts ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
                 <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
               ))}
             </SelectContent>

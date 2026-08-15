@@ -66,7 +66,7 @@ const ROLES: { value: Role; label: string; color: string }[] = [
 
 export default function AdminsPage() {
   const supabase = createClient()
-  const { isSuperAdmin, departmentId: userDepartmentId } = usePermissions()
+  const { canViewAllDepts, departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
   const [admins, setAdmins] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -515,8 +515,8 @@ export default function AdminsPage() {
               <SelectValue placeholder="Department" />
             </SelectTrigger>
             <SelectContent>
-              {isSuperAdmin && <SelectItem value="all">All Departments</SelectItem>}
-              {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
+              {canViewAllDepts && <SelectItem value="all">All Departments</SelectItem>}
+              {(canViewAllDepts ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
                 <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
               ))}
             </SelectContent>
@@ -529,7 +529,7 @@ export default function AdminsPage() {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          {isSuperAdmin && (
+          {canViewAllDepts && (
             <Button size="sm" onClick={() => setDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Add User
@@ -611,7 +611,7 @@ export default function AdminsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              {isSuperAdmin && (
+              {canViewAllDepts && (
                 <TableHead className="w-12">
                   <Checkbox
                     checked={filteredAdmins.length > 0 && selectedIds.size === filteredAdmins.length}
@@ -638,7 +638,7 @@ export default function AdminsPage() {
             ) : (
               filteredAdmins.map(admin => (
                 <TableRow key={admin.id} className={`group hover:bg-muted/50 transition-colors ${selectedIds.has(admin.id) ? 'bg-muted/50' : ''}`}>
-                  {isSuperAdmin && (
+                  {canViewAllDepts && (
                     <TableCell>
                       <Checkbox
                         checked={selectedIds.has(admin.id)}
@@ -686,7 +686,7 @@ export default function AdminsPage() {
                     {formatDate(admin.created_at)}
                   </TableCell>
                   <TableCell className="text-center">
-                    {isSuperAdmin && (
+                    {canViewAllDepts && (
                         <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -859,7 +859,7 @@ export default function AdminsPage() {
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(dept => (
+                    {(canViewAllDepts ? departments : departments.filter(d => d.id === userDepartmentId)).map(dept => (
                       <SelectItem key={dept.id} value={dept.id}>
                         <div className="flex items-center gap-2">
                           <Building2 className="h-4 w-4 text-muted-foreground" />

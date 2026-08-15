@@ -169,7 +169,7 @@ async function fetchRidesData(statusFilter: string, dateRange: string, departmen
 
 export default function RidesPage() {
   const queryClient = useQueryClient()
-  const { departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
+  const { departmentId: userDepartmentId, canViewAllDepts } = usePermissions()
   const [selectedRide, setSelectedRide] = useState<Ride | null>(null)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -511,8 +511,8 @@ export default function RidesPage() {
               <SelectValue placeholder="Department" />
             </SelectTrigger>
             <SelectContent>
-              {isSuperAdmin && <SelectItem value="all">All Departments</SelectItem>}
-              {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
+              {canViewAllDepts && <SelectItem value="all">All Departments</SelectItem>}
+              {(canViewAllDepts ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
                 <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
               ))}
             </SelectContent>

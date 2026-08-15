@@ -156,7 +156,7 @@ interface DriverDetails {
 
 export default function RatingsPage() {
   const supabase = createClient()
-  const { departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
+  const { departmentId: userDepartmentId, canViewAllDepts } = usePermissions()
   const [drivers, setDrivers] = useState<DriverRating[]>([])
   const [recentReviews, setRecentReviews] = useState<RecentReview[]>([])
   const [leaderboard, setLeaderboard] = useState<LeaderboardDriver[]>([])
@@ -693,9 +693,9 @@ export default function RatingsPage() {
                   <SelectValue placeholder="Department" />
                 </SelectTrigger>
                 <SelectContent>
-                  {isSuperAdmin && <SelectItem value="all">All Depts</SelectItem>}
-                  {isSuperAdmin && <SelectItem value="none">No Department</SelectItem>}
-                  {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map((dept) => (
+                  {canViewAllDepts && <SelectItem value="all">All Depts</SelectItem>}
+                  {canViewAllDepts && <SelectItem value="none">No Department</SelectItem>}
+                  {(canViewAllDepts ? departments : departments.filter(d => d.id === userDepartmentId)).map((dept) => (
                     <SelectItem key={dept.id} value={dept.id}>
                       {dept.name}
                     </SelectItem>

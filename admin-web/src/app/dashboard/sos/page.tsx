@@ -146,7 +146,7 @@ function SortableContactItem({ contact, updateContact, removeContact, icons }: S
 
 export default function SOSPage() {
   const supabase = createClient()
-  const { departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
+  const { departmentId: userDepartmentId, canViewAllDepts } = usePermissions()
   const [alerts, setAlerts] = useState<SOSAlert[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -669,8 +669,8 @@ export default function SOSPage() {
               <SelectValue placeholder="Department" />
             </SelectTrigger>
             <SelectContent>
-              {isSuperAdmin && <SelectItem value="all">All Departments</SelectItem>}
-              {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
+              {canViewAllDepts && <SelectItem value="all">All Departments</SelectItem>}
+              {(canViewAllDepts ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
                 <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
               ))}
             </SelectContent>

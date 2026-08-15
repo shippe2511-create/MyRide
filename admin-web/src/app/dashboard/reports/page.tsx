@@ -498,7 +498,7 @@ const columnLabels: Record<string, Record<string, string>> = {
 }
 
 export default function ReportsPage() {
-  const { departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
+  const { departmentId: userDepartmentId, canViewAllDepts } = usePermissions()
   const [loading, setLoading] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState("all")
   const [startDate, setStartDate] = useState("")
@@ -2606,8 +2606,8 @@ export default function ReportsPage() {
             <SelectValue placeholder="Department" />
           </SelectTrigger>
           <SelectContent>
-            {isSuperAdmin && <SelectItem value="all">All Departments</SelectItem>}
-            {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
+            {canViewAllDepts && <SelectItem value="all">All Departments</SelectItem>}
+            {(canViewAllDepts ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
               <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
             ))}
           </SelectContent>

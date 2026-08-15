@@ -108,7 +108,7 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
-  const { departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
+  const { departmentId: userDepartmentId, canViewAllDepts } = usePermissions()
 
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers)
   const [totalCount, setTotalCount] = useState(initialTotalCount)
@@ -870,9 +870,9 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
               <SelectValue placeholder="Department" />
             </SelectTrigger>
             <SelectContent>
-              {isSuperAdmin && <SelectItem value="all">All Depts</SelectItem>}
-              {isSuperAdmin && <SelectItem value="none">Unassigned</SelectItem>}
-              {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map((dept) => (
+              {canViewAllDepts && <SelectItem value="all">All Depts</SelectItem>}
+              {canViewAllDepts && <SelectItem value="none">Unassigned</SelectItem>}
+              {(canViewAllDepts ? departments : departments.filter(d => d.id === userDepartmentId)).map((dept) => (
                 <SelectItem key={dept.id} value={dept.id}>
                   {dept.name}
                 </SelectItem>
@@ -1264,8 +1264,8 @@ export function CustomersTable({ customers: initialCustomers, totalCount: initia
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    {isSuperAdmin && <SelectItem value="none">Unassigned</SelectItem>}
-                    {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map((dept) => (
+                    {canViewAllDepts && <SelectItem value="none">Unassigned</SelectItem>}
+                    {(canViewAllDepts ? departments : departments.filter(d => d.id === userDepartmentId)).map((dept) => (
                       <SelectItem key={dept.id} value={dept.id}>
                         {dept.name}
                       </SelectItem>

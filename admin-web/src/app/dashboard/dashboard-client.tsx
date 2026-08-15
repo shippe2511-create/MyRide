@@ -343,7 +343,7 @@ const supabase = createClient()
 
 export function DashboardClient() {
   const queryClient = useQueryClient()
-  const { departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
+  const { departmentId: userDepartmentId, canViewAllDepts } = usePermissions()
   const [departments, setDepartments] = useState<Department[]>([])
   const [departmentFilter, setDepartmentFilter] = useState<string>("")
   const [departmentInitialized, setDepartmentInitialized] = useState(false)
@@ -456,8 +456,8 @@ export function DashboardClient() {
             <SelectValue placeholder="Department" />
           </SelectTrigger>
           <SelectContent>
-            {isSuperAdmin && <SelectItem value="all">All Departments</SelectItem>}
-            {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
+            {canViewAllDepts && <SelectItem value="all">All Departments</SelectItem>}
+            {(canViewAllDepts ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
               <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
             ))}
           </SelectContent>

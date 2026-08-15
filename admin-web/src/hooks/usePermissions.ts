@@ -127,6 +127,9 @@ export function usePermissions() {
   // Normalize role for tier checks
   const normalizedRole = role ? normalizeRole(role) : null
 
+  // Check if user can view all departments (super_admin OR has departments:view_all permission)
+  const canViewAllDepts = normalizedRole === "super_admin" || customPermissions["departments:view_all"] === true
+
   return {
     role,
     normalizedRole,
@@ -138,6 +141,7 @@ export function usePermissions() {
     canView,
     clearCache,
     isTransportDepartment,
+    canViewAllDepts,
     permissions: role ? getPermissionsForRole(role) : [],
     // Tier checks
     isSuperAdmin: normalizedRole === "super_admin",

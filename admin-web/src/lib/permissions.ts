@@ -34,6 +34,7 @@ export const ALL_PERMISSIONS = [
   "staff:manage",
   "departments:view",
   "departments:manage",
+  "departments:view_all",
   "settings:view",
   "settings:manage",
   "audit:view",
@@ -100,7 +101,7 @@ export const PERMISSION_CATEGORIES: Record<string, { label: string; permissions:
   },
   admin: {
     label: "Administration",
-    permissions: ["staff:view", "staff:manage", "departments:view", "departments:manage", "settings:view", "settings:manage", "audit:view"],
+    permissions: ["staff:view", "staff:manage", "departments:view", "departments:manage", "departments:view_all", "settings:view", "settings:manage", "audit:view"],
   },
 }
 
@@ -261,6 +262,7 @@ export function getPermissionLabel(permission: Permission): string {
     view: "View",
     manage: "Manage",
     export: "Export",
+    view_all: "View All Departments",
   }
   return `${actionLabels[action] || action} ${resourceLabels[resource] || resource}`
 }

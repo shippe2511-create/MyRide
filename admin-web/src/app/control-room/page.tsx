@@ -126,7 +126,7 @@ const STATUS_LABELS = {
 
 export default function ControlRoomPage() {
   const supabase = createClient()
-  const { departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
+  const { departmentId: userDepartmentId, canViewAllDepts } = usePermissions()
   const subscriptionsRef = useRef<ControlRoomSubscriptions | null>(null)
 
   // Data state
@@ -1149,13 +1149,13 @@ export default function ControlRoomPage() {
             {attentionLevel === "red" && "Action Required"}
           </Badge>
           {/* Department Selector */}
-          <Select value={departmentId || (isSuperAdmin ? "all" : userDepartmentId || "all")} onValueChange={(v) => setDepartmentId(v === "all" ? null : v)}>
+          <Select value={departmentId || (canViewAllDepts ? "all" : userDepartmentId || "all")} onValueChange={(v) => setDepartmentId(v === "all" ? null : v)}>
             <SelectTrigger className="w-36 h-8 text-xs">
               <SelectValue placeholder="Department" />
             </SelectTrigger>
             <SelectContent>
-              {isSuperAdmin && <SelectItem value="all">All Departments</SelectItem>}
-              {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
+              {canViewAllDepts && <SelectItem value="all">All Departments</SelectItem>}
+              {(canViewAllDepts ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
                 <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
               ))}
             </SelectContent>

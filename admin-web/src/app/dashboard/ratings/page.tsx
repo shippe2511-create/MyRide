@@ -111,6 +111,7 @@ interface LeaderboardDriver {
   review_count: number
   completion_rate: number
   this_month_reviews: number
+  department_id: string | null
 }
 
 interface DriverDetails {
@@ -322,7 +323,8 @@ export default function RatingsPage() {
         rating: parseFloat(driver.rating) || 0,
         review_count: reviewCount,
         completion_rate: Math.round(completionRate),
-        this_month_reviews: thisMonthReviews
+        this_month_reviews: thisMonthReviews,
+        department_id: driver.department_id || null
       }
     })
 
@@ -333,7 +335,7 @@ export default function RatingsPage() {
       return b.completion_rate - a.completion_rate
     })
 
-    setLeaderboard(leaderboardData.slice(0, 5)) // Top 5 drivers
+    setLeaderboard(leaderboardData) // Store all, will filter in render
 
     setLoading(false)
   }
@@ -514,6 +516,15 @@ export default function RatingsPage() {
     if (filter === "high") return matchesSearch && d.avg_rating >= 4.5
     return matchesSearch
   })
+
+  // Filter leaderboard by department too
+  const filteredLeaderboard = leaderboard.filter(d => {
+    if (departmentFilter !== "all") {
+      if (departmentFilter === "none" && d.department_id) return false
+      if (departmentFilter !== "none" && d.department_id !== departmentFilter) return false
+    }
+    return true
+  }).slice(0, 5) // Top 5 from filtered results
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return
@@ -876,10 +887,10 @@ export default function RatingsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {leaderboard.length === 0 ? (
+              {filteredLeaderboard.length === 0 ? (
                 <p className="text-center py-8 text-muted-foreground">No drivers yet</p>
               ) : (
-                leaderboard.map((driver, index) => (
+                filteredLeaderboard.map((driver, index) => (
                   <div
                     key={driver.id}
                     className={`relative flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all hover:scale-[1.02] ${
@@ -956,7 +967,7 @@ export default function RatingsPage() {
             </div>
 
             {/* View All Link */}
-            {leaderboard.length > 0 && (
+            {filteredLeaderboard.length > 0 && (
               <div className="mt-4 pt-3 border-t">
                 <p className="text-xs text-center text-muted-foreground">
                   Click any driver in the table to view full performance details

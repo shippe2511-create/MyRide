@@ -90,7 +90,7 @@ interface Department {
 
 export default function PushToTalkPage() {
   const supabase = createClient()
-  const { departmentId: userDepartmentId } = usePermissions()
+  const { departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
   const [settings, setSettings] = useState<VoiceSettings | null>(null)
   const [messages, setMessages] = useState<VoiceMessage[]>([])
   const [drivers, setDrivers] = useState<Driver[]>([])
@@ -589,8 +589,8 @@ export default function PushToTalkPage() {
                 <SelectValue placeholder="Department" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                {departments.map(d => (
+                {isSuperAdmin && <SelectItem value="all">All Departments</SelectItem>}
+                {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
                   <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                 ))}
               </SelectContent>

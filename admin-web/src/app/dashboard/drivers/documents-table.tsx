@@ -88,7 +88,7 @@ const DOCUMENT_TYPES = [
 
 export function DocumentsTable() {
   const supabase = createClient()
-  const { departmentId: userDepartmentId } = usePermissions()
+  const { departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
 
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
@@ -460,8 +460,8 @@ export function DocumentsTable() {
               <SelectValue placeholder="Department" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Departments</SelectItem>
-              {departments.map(dept => (
+              {isSuperAdmin && <SelectItem value="all">All Departments</SelectItem>}
+              {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(dept => (
                 <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
               ))}
             </SelectContent>

@@ -126,7 +126,7 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
-  const { departmentId: userDepartmentId } = usePermissions()
+  const { departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
 
   const [drivers, setDrivers] = useState<Driver[]>(initialDrivers)
   const [totalCount, setTotalCount] = useState(initialTotalCount)
@@ -1004,9 +1004,9 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
               <SelectValue placeholder="Department" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Depts</SelectItem>
-              <SelectItem value="none">No Department</SelectItem>
-              {departments.map((dept) => (
+              {isSuperAdmin && <SelectItem value="all">All Depts</SelectItem>}
+              {isSuperAdmin && <SelectItem value="none">No Department</SelectItem>}
+              {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map((dept) => (
                 <SelectItem key={dept.id} value={dept.id}>
                   {dept.name}
                 </SelectItem>
@@ -1436,8 +1436,8 @@ export function DriversTable({ drivers: initialDrivers, totalCount: initialTotal
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No Department</SelectItem>
-                    {departments.map((dept) => (
+                    {isSuperAdmin && <SelectItem value="none">No Department</SelectItem>}
+                    {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map((dept) => (
                       <SelectItem key={dept.id} value={dept.id}>
                         {dept.name}
                       </SelectItem>

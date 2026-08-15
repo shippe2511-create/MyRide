@@ -94,7 +94,7 @@ function useCustomersData(search?: string, status?: string, page: number = 1, de
 
 export default function CustomersPage() {
   const queryClient = useQueryClient()
-  const { departmentId: userDepartmentId } = usePermissions()
+  const { departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
   const searchParams = useSearchParams()
   const search = searchParams.get("search") || undefined
   const status = searchParams.get("status") || undefined
@@ -180,8 +180,8 @@ export default function CustomersPage() {
               <SelectValue placeholder="Department" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Departments</SelectItem>
-              {departments.map(d => (
+              {isSuperAdmin && <SelectItem value="all">All Departments</SelectItem>}
+              {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
                 <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
               ))}
             </SelectContent>

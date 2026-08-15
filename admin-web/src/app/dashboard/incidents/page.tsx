@@ -85,7 +85,7 @@ interface Department {
 
 export default function IncidentsPage() {
   const supabase = createClient()
-  const { departmentId: userDepartmentId } = usePermissions()
+  const { departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [departmentFilter, setDepartmentFilter] = useState<string>("")
@@ -426,8 +426,8 @@ export default function IncidentsPage() {
             <SelectValue placeholder="Department" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Departments</SelectItem>
-            {departments.map(d => (
+            {isSuperAdmin && <SelectItem value="all">All Departments</SelectItem>}
+            {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
               <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
             ))}
           </SelectContent>

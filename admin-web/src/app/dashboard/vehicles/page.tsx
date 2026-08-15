@@ -104,7 +104,7 @@ const supabase = createClient()
 
 export default function VehiclesPage() {
   const queryClient = useQueryClient()
-  const { departmentId: userDepartmentId } = usePermissions()
+  const { departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType | null>(null)
@@ -494,8 +494,8 @@ export default function VehiclesPage() {
                   <SelectValue placeholder="All Departments" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {departments.map(d => (
+                  {isSuperAdmin && <SelectItem value="all">All Departments</SelectItem>}
+                  {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
                     <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -733,8 +733,8 @@ export default function VehiclesPage() {
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No Department</SelectItem>
-                    {departments.map((dept) => (
+                    {isSuperAdmin && <SelectItem value="none">No Department</SelectItem>}
+                    {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map((dept) => (
                       <SelectItem key={dept.id} value={dept.id}>
                         {dept.name}
                       </SelectItem>

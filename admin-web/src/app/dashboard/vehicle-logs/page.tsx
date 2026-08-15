@@ -66,7 +66,7 @@ const PAGE_SIZE = 15
 
 export default function VehicleLogsPage() {
   const supabase = createClient()
-  const { departmentId: userDepartmentId } = usePermissions()
+  const { departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
   const [logs, setLogs] = useState<VehicleLog[]>([])
   const [allLogs, setAllLogs] = useState<VehicleLog[]>([]) // For stats calculation
   const [loading, setLoading] = useState(true)
@@ -459,8 +459,8 @@ export default function VehicleLogsPage() {
               <SelectValue placeholder="Department" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Departments</SelectItem>
-              {departments.map(d => (
+              {isSuperAdmin && <SelectItem value="all">All Departments</SelectItem>}
+              {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
                 <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
               ))}
             </SelectContent>

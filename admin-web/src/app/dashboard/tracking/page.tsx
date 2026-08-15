@@ -81,7 +81,7 @@ interface Department {
 
 export default function TrackingPage() {
   const supabase = createClient()
-  const { departmentId: userDepartmentId } = usePermissions()
+  const { departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const [departmentFilter, setDepartmentFilter] = useState<string>("")
@@ -257,8 +257,8 @@ export default function TrackingPage() {
               <SelectValue placeholder="Department" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Departments</SelectItem>
-              {departments.map(d => (
+              {isSuperAdmin && <SelectItem value="all">All Departments</SelectItem>}
+              {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
                 <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
               ))}
             </SelectContent>

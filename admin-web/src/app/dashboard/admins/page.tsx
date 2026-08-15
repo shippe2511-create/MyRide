@@ -66,7 +66,7 @@ const ROLES: { value: Role; label: string; color: string }[] = [
 
 export default function AdminsPage() {
   const supabase = createClient()
-  const { isSuperAdmin } = usePermissions()
+  const { isSuperAdmin, departmentId: userDepartmentId } = usePermissions()
   const [admins, setAdmins] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -84,6 +84,8 @@ export default function AdminsPage() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [departments, setDepartments] = useState<Department[]>([])
   const [searchQuery, setSearchQuery] = useState("")
+  const [departmentFilter, setDepartmentFilter] = useState<string>("")
+  const [departmentInitialized, setDepartmentInitialized] = useState(false)
 
   const [formData, setFormData] = useState({
     full_name: "",
@@ -95,8 +97,25 @@ export default function AdminsPage() {
   })
   const [showFormPassword, setShowFormPassword] = useState(false)
 
+  // Set default department filter to user's department
   useEffect(() => {
-    loadAdmins()
+    if (departments.length > 0 && !departmentInitialized) {
+      if (userDepartmentId) {
+        setDepartmentFilter(userDepartmentId)
+      } else {
+        setDepartmentFilter("all")
+      }
+      setDepartmentInitialized(true)
+    }
+  }, [departments, userDepartmentId, departmentInitialized])
+
+  useEffect(() => {
+    if (departmentInitialized) {
+      loadAdmins()
+    }
+  }, [departmentFilter, departmentInitialized])
+
+  useEffect(() => {
     loadDepartments()
 
     const adminRoles = ['super_admin', 'manager', 'supervisor', 'operator', 'support', 'viewer']
@@ -136,12 +155,19 @@ export default function AdminsPage() {
 
   const loadAdmins = async (showLoading = true) => {
     if (showLoading) setLoading(true)
-    const { data } = await supabase
+
+    let query = supabase
       .from("profiles")
       .select("*, dept_relation:departments(id, name)")
       .in("role", ["super_admin", "manager", "supervisor", "operator", "support", "viewer"])
       .order("created_at", { ascending: false })
 
+    // Filter by department (super_admins always show as they have access to all)
+    if (departmentFilter && departmentFilter !== "all") {
+      query = query.or(`department_id.eq.${departmentFilter},role.eq.super_admin`)
+    }
+
+    const { data } = await query
     setAdmins(data || [])
     if (showLoading) setLoading(false)
   }
@@ -483,7 +509,18 @@ export default function AdminsPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Manage admin users and access</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              {isSuperAdmin && <SelectItem value="all">All Departments</SelectItem>}
+              {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(d => (
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button variant="outline" size="sm" onClick={exportCSV}>
             <Download className="h-4 w-4 mr-2" />
             Export
@@ -822,7 +859,7 @@ export default function AdminsPage() {
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    {departments.map(dept => (
+                    {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(dept => (
                       <SelectItem key={dept.id} value={dept.id}>
                         <div className="flex items-center gap-2">
                           <Building2 className="h-4 w-4 text-muted-foreground" />

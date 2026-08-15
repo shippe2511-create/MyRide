@@ -70,7 +70,7 @@ const SHIFT_TYPES = [
 
 export function ShiftsTable() {
   const supabase = createClient()
-  const { departmentId: userDepartmentId } = usePermissions()
+  const { departmentId: userDepartmentId, isSuperAdmin } = usePermissions()
   const [shifts, setShifts] = useState<Shift[]>([])
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [loading, setLoading] = useState(true)
@@ -1086,8 +1086,8 @@ export function ShiftsTable() {
                 <SelectValue placeholder="Department" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                {departments.map(dept => (
+                {isSuperAdmin && <SelectItem value="all">All Departments</SelectItem>}
+                {(isSuperAdmin ? departments : departments.filter(d => d.id === userDepartmentId)).map(dept => (
                   <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
                 ))}
               </SelectContent>
